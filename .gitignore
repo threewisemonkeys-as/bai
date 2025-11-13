@@ -224,3 +224,7 @@ nle_data/
 
 # Experiment logs
 logs/
+
+
+# vscode
+.vscode/

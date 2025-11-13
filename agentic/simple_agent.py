@@ -67,7 +67,7 @@ class SimpleAgent(BaseAgent):
         response_dict = extract_xml_kv(response_output_text, ["experiment"])
         experiment_actions = self._parse_experiment(response_dict, response_output_text)
 
-        return experiment_actions, response.id
+        return experiment_actions, response.id # pyright: ignore[reportAttributeAccessIssue]
 
 
 
@@ -93,9 +93,9 @@ class SimpleAgent(BaseAgent):
         response_dict = extract_xml_kv(response_output_text, ["experiment"])
         experiment_actions = self._parse_experiment(response_dict, response_output_text)
 
-        return experiment_actions, response.id
+        return experiment_actions, response.id # pyright: ignore[reportAttributeAccessIssue]
 
-    def run(self, history_id: str | None):
+    def run(self, history_id: str | None) -> str:
         """Run the agent's main loop."""
         self.logger.info(f"Starting run")
         obs, info = self.env.reset()

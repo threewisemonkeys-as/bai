@@ -18,7 +18,7 @@ def crop_central_component(img, threshold=8, margin=6, search_radius=200):
         arr = np.repeat(arr[..., None], 3, axis=2)
     mask = (arr > threshold).any(axis=2)    # non-black
 
-    H, W = mask.shape
+    H, W = mask.shape # pyright: ignore[reportAssignmentType]
     cy, cx = H // 2, W // 2
 
     ys, xs = np.where(mask)
@@ -48,7 +48,7 @@ def crop_central_component(img, threshold=8, margin=6, search_radius=200):
         y0 = min(y0, y); y1 = max(y1, y)
         x0 = min(x0, x); x1 = max(x1, x)
         for ny, nx in ((y-1,x),(y+1,x),(y,x-1),(y,x+1)):
-            if 0 <= ny < H and 0 <= nx < W and mask[ny, nx] and not visited[ny, nx]:
+            if 0 <= ny < H and 0 <= nx < W and mask[ny, nx] and not visited[ny, nx]: # pyright: ignore[reportIndexIssue]
                 visited[ny, nx] = True
                 q.append((ny, nx))
 

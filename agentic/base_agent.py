@@ -206,6 +206,9 @@ class BaseAgent:
         Returns:
             Tuple of (final_observation, done_flag, taken_actions)
         """
+        if len(exp_actions) == 0:
+            raise RuntimeError(f"Cannot execute empty sequence of actions")
+
         taken_actions = []
         done = False
 
@@ -216,7 +219,7 @@ class BaseAgent:
             if done:
                 break
 
-        return obs, done, taken_actions
+        return obs, done, taken_actions # pyright: ignore[reportPossiblyUnboundVariable]
 
     def _save_image(self, image: np.ndarray, iter_idx: int, stage: str):
         """Save an image if logging is enabled.
@@ -243,6 +246,6 @@ class BaseAgent:
         image_obs = crop_central_component(image_obs)
         return image_obs
 
-    def run(self):
+    def run(self, history_id: str | None):
         """Run the agent. Must be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement run()")

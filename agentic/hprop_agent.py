@@ -57,11 +57,7 @@ SEED_HYPOTHESIS = [
 
 @dataclass
 class HypothesisSet:
-    hypothesis: list[str] = None
-
-    def __post_init__(self):
-        if self.hypothesis is None:
-            self.hypothesis = []
+    hypothesis: list[str] = list()
 
     def add(self, h: str):
         self.hypothesis.append(h)
@@ -71,9 +67,6 @@ class HypothesisSet:
 
     def __iter__(self):
         return iter(self.hypothesis)
-
-    def __next__(self):
-        return next(self.hypothesis)
 
     def __str__(self):
         return '\n'.join(f"- {h}" for h in self.hypothesis)
@@ -145,7 +138,7 @@ class HPropAgent(BaseAgent):
             raise RuntimeError(error_msg)
 
 
-    def run(self):
+    def run(self, history_id: str | None = None):
         """Run the agent's main loop."""
         self.logger.info(f"Starting run")
         obs, info = self.env.reset()
