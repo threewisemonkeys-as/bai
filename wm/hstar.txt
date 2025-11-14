@@ -1,59 +1,62 @@
-- The game is turn-based, with each keypress mapped to an action; for example, waiting a turn uses MiscDirection.WAIT: 46 and searching uses Command.SEARCH: 115, implying time advances per command.
-
-- Movement happens on a grid with 8-directional control. Cardinal moves use CompassDirection.N: 107, E: 108, S: 106, W: 104, and diagonals use NE: 117, SE: 110, SW: 98, NW: 121.
-
-- There are run/long-move variants that continue in a direction until interrupted, via CompassDirectionLonger.N: 75, E: 76, S: 74, W: 72, NE: 85, SE: 78, SW: 66, NW: 89.
-
-- There is also movement without picking up and/or “rush” or “go” style continuous motion: Command.MOVE: 109, Command.MOVEFAR: 77, Command.RUSH: 103, Command.RUSH2: 71, and Command.TRAVEL: 95, suggesting pathfinding/auto-run.
-
-- Vertical traversal exists (multi-level dungeons), suggested by MiscDirection.UP: 60 and MiscDirection.DOWN: 62.
-
-- The interface appears ASCII/keyboard-driven with paged messages, evidenced by Command.MORE: 13 for “--More--”, Command.REDRAW: 18, and numerous TextCharacters like TextCharacters.PLUS: 43, MINUS: 45, SPACE: 32, and digits TextCharacters.NUM_0..NUM_9: 48–57 used for counts/prompts.
-
-- Exploration and identification tools exist: Command.LOOK: 58 (look around), Command.GLANCE: 59 (list visible), Command.WHATIS: 47 (explain a map symbol), Command.WHATDOES: 38 (explain a key), Command.SEARCH: 115 (search for hidden features), Command.SEETRAP: 94 (trap knowledge), and Command.OVERVIEW: 15 (level overview).
-
-- There is a rich inventory system with item letters/categories: Command.INVENTORY: 105, Command.SEEALL: 42 (all inventory), Command.SEEWEAPON: 41, Command.SEEARMOR: 91, Command.SEERINGS: 61, Command.SEETOOLS: 40, Command.SEEGOLD: 36, Command.SEEAMULET: 34, and organization via Command.ADJUST: 225 and Command.INVENTTYPE: 73.
-
-- Item pickup/drop and auto-pickup are explicit mechanics: Command.PICKUP: 44, Command.DROP: 100, Command.DROPTYPE: 68, and Command.AUTOPICKUP: 64 to toggle behavior.
-
-- Equipment management is deep: Command.WIELD: 119 (wield weapon), Command.SWAP: 120 (swap weapons), Command.TWOWEAPON: 88 (dual-wield), Command.WEAR: 87 (armor), Command.TAKEOFF: 84, Command.TAKEOFFALL: 65, Command.PUTON: 80 (jewelry), Command.REMOVE: 82 (remove jewelry), Command.QUIVER: 81 (set ammo).
-
-- Ranged combat uses ammunition and firing abstractions: Command.FIRE: 102 (fire quivered ammo) and Command.THROW: 116 (throw any item), indicating distinct “fire” vs “throw” systems.
-
-- Melee and physical actions are explicit: Command.FIGHT: 70 (force-attack direction/target), Command.KICK: 4 (kick), Command.FORCE: 230 (force open e.g., locks), Command.UNTRAP: 245 (disarm traps), Command.OPEN: 111 (open), Command.CLOSE: 99 (close).
-
-- Magic and item activation systems coexist: Command.CAST: 90 (cast learned spells), Command.SEESPELLS: 43 (list spells), Command.ZAP: 122 (use wand), Command.INVOKE: 233 (activate artifact/power), Command.ENHANCE: 229 (improve skills), Command.TURN: 244 (turn undead), and Command.TELEPORT: 20 (teleportation).
-
-- Consumable interactions exist: Command.EAT: 101 (food), Command.QUAFF: 113 (potions), Command.READ: 114 (scrolls/book), Command.DIP: 228 (dip items into liquids), Command.RUB: 242 (rub objects), Command.WIPE: 247 (wipe face/engraving), implying emergent item effects.
-
-- Environmental writing is a mechanic: Command.ENGRAVE: 69 (write on the ground), which often interacts with monsters/effects; the presence of Command.WIPE: 247 suggests altering or removing engravings.
-
-- Religion/altar mechanics are present: Command.PRAY: 240 (pray for aid/penance) and Command.OFFER: 239 (sacrifice/offer on altars), implying alignment and deity reactions.
-
-- Social/NPC interactions and shops exist: Command.CHAT: 227 (talk), Command.PAY: 112 (pay shopkeeper), Command.TIP: 212 (tip), Command.LOOT: 236 (loot containers/corpses), and Command.RIDE: 210 (mounts), indicating merchants, containers, and tame/rideable creatures.
-
-- The presence of Command.MONSTER: 237 suggests a prompt to target or interact with monster entities (e.g., name or specify a monster for a command), supporting a rich monster model.
-
-- There are sensory/knowledge menus: Command.ATTRIBUTES: 24 (show stats/roles), Command.KNOWN: 92 and Command.KNOWNCLASS: 96 (known item discoveries), Command.HISTORY: 86 (message history), Command.CONDUCT: 195 (voluntary challenges), showing metagame tracking.
-
-- Door/lock/trap interactions are advanced: Command.UNTRAP: 245, Command.FORCE: 230, Command.OPEN: 111, Command.CLOSE: 99, and Command.SEARCH: 115 implying hidden doors/traps and multiple ways to bypass obstacles.
-
-- Mobility has special actions: Command.JUMP: 234 (jump over/onto tiles), Command.TELEPORT: 20 (instant relocation), and vertical MiscDirection.UP: 60 / DOWN: 62, suggesting terrain and hazards where special movement matters.
-
-- The UI supports extended commands via Command.EXTCMD: 35 (the “#” menu) and a listing via Command.EXTLIST: 191, implying many rarely used or context-specific actions beyond single keys.
-
-- Meta/system controls exist: Command.OPTIONS: 79 (configure options), Command.SAVE: 83 (save), Command.QUIT: 241 (quit), Command.VERSION: 246 and Command.VERSIONSHORT: 118 (version info), Command.SHELL: 33 (shell escape), Command.ESC: 27 (cancel), reinforcing a classic roguelike terminal heritage.
-
-- Currency and score are tracked: Command.SEEGOLD: 36 (show gold), together with Command.PAY: 112 and shop interactions, implying in-game economy.
-
-- There is explicit object identification/naming: Command.CALL: 67 (name an item), Command.ANNOTATE: 193 (note dungeon level), reinforcing knowledge/identification gameplay loops.
-
-- The presence of Command.APPLY: 97 (use tools), Command.TIP: 212, Command.LOOT: 236, and Command.FORCE: 230 suggests a highly interactive environment where item-context interactions produce varied outcomes.
-
-- Combat and exploration likely share a single action-per-turn budget; even informational commands like Command.LOOK: 58 probably do not consume turns, while actions like Command.SEARCH: 115 and movement commands (e.g., CompassDirection.W: 104) do consume turns.
-
-- The combination of Command.TRAVEL: 95, CompassDirectionLonger.* (75/76/74/72/85/78/66/89), and Command.RUSH: 103/Command.RUSH2: 71 implies “run until something interesting” automation that stops on threats, items, or intersections, supporting large, complex maps.
-
-- Mounts and pets likely exist: Command.RIDE: 210 (mount/dismount) and Command.CHAT: 227 (talk to peaceful/pet monsters) indicate companion systems with special commands.
-
-- There is likely permadeath/save-on-exit behavior typical of roguelikes, hinted by Command.SAVE: 83 and Command.QUIT: 241 being explicit, and the presence of Command.VERSION: 246/Command.VERSIONSHORT: 118 suggests a traditional lineage where version differences matter.
+- The game is a turn-based, grid-based roguelike with 8-direction movement, evidenced by the presence of the eight directional inputs {107,108,106,104,117,110,98,121} and a wait/skip-turn input 46. Each press consumes a turn.
+- There are vertical dungeon levels; 60 and 62 likely ascend/descend stairs/ladders, implying a multi-level dungeon with dungeon-branch traversal.
+- There are “run”/continuous movement variants for the eight directions {75,76,74,72,85,78,66,89}, distinct from the single-step directions; additionally 103 and 71 imply “run until something interesting” variations (short and long).
+- A pathfinding “travel to” mechanic exists (95), probably moving along known corridors/rooms to a destination.
+- Numeric prefixes exist to repeat commands: digits {48–57} can be prefixed to most commands to repeat them N times; 45 and 43 likely support count modifiers (e.g., “-” for negative or as an editing key, “+” for variants). Many commands also allow “.” (46) to rest for counts.
+- The input model maps directly to ASCII codes: e.g., 27 cancels prompts, 13 acknowledges paged messages. This suggests command-chaining and a terminal/TTY UI (supported by 33 invoking an OS shell).
+- List inventory (105), list by type (73), and show discovered/known items (92, 96).
+- Assign inventory letters (225), rename/“call” items (67), and toggle autopickup (64).
+- Pick up items (44), drop items (100), and drop by category (68).
+- Wielding and swapping hands (119, 120), and two-weapon fighting (88), implying offhand weapons and skill checks/penalties.
+- Wearing armor (87), taking off a single piece (84), or removing all armor (65), with a separate accessor removal (82) and putting on accessories (80). Category views for what’s worn are offered by equipment-type show commands {41,91,34,61,40,42}.
+- Melee engagement and forced-attack behavior (70), plus direct movement into monsters to attack.
+- Ranged throwing (116), firing a quivered item (102) with a dedicated quiver selector (81), implying ammo management and launcher synergies.
+- Kicking (4) has environment interactions (e.g., doors, furniture, containers) and combat utility with risks (leg injuries, noise).
+- Zapping wands (122) and reading scrolls/spellbooks (114).
+- Drinking potions (113) and eating food (101), indicating hunger and nutrition systems with conduct/alignment implications.
+- Casting spells (90) and a spell list viewer (43) suggest a separate spell skill system and memory/energy cost. Skill training/raising is supported by 229.
+- Invoking artifact powers or item-innate powers (233), jumping if you have the ability or item (234), rubbing items (242), and dipping items (228), all implying rich item interactions (e.g., rubbing a lamp for a djinni, dipping for alchemical effects).
+- Open and close (111, 99) with the ability to force locks (230) and loot containers (236).
+- Disarming traps (245) and a dedicated search (115) imply secret doors/traps and probabilistic discovery rates improved by repeated searches (with numeric prefixes).
+- Engraving/writing/wiping mechanics: creating/wiping ground inscriptions via 69 and 247 suggests persistent floor text with gameplay impact (e.g., monster-pacifying inscriptions).
+- Cursor-based looking and glancing (58, 59) for tile/monster/item description.
+- “What is that glyph?” help (47) and “what does this command do?” help (38).
+- Traps display toggle or trap information view (94), supports trap awareness beyond on-screen symbols.
+- Character attributes/status screen (24), history (86), options menu (79). This implies tunable gameplay settings (e.g., message filtering, autopickup rules).
+- Conduct tracking (195) implies a meta-challenge recording voluntary restrictions (e.g., food, prayer, genocide).
+- Overview/map memory (15) and level annotations (193) imply persistent dungeon memory with player notes.
+- Prayer (240) and sacrifice at altars (239) affect alignment, luck, intrinsics, and divine protection, with cooldowns and role/alignment sensitivities.
+- Turning undead (244) is a special action likely dependent on role or wielded holy symbol.
+- Gold count display via 36 and a payment action (112) imply shopkeepers and debt tracking for purchases/theft resolution.
+- Tipping (212) suggests interactions with shopkeepers, guards, or fountains/sinks (via coins).
+- Riding (210) indicates tamable steeds, saddles, and ride dismount/fall risk mechanics.
+- Speaking to creatures (227) implies diplomacy/quest dialog and pacification options.
+- Using innate monster abilities (237) suggests polymorph mechanics where the player can exploit the current form’s power.
+- Teleportation (20) hints at intrinsic/extrinsic gating: teleport may be restricted to when an item/intrinsic allows it (e.g., ring/cloak/artifact), and may be controlled vs. uncontrolled depending on other statuses.
+- Sitting (243) implies thrones, benches, or floor-specific effects/events.
+- Rubbing (242) and kicking (4) interact with special terrain like sinks/fountains/chests, often with randomized outcomes.
+- 109 indicates movement without pickup, complementing the autopickup toggle (64) and implying floor item density and inventory burden mechanics.
+- Long-range or “far move” (77) likely blends pathing with no-pickup behavior, hinting at convenience for traversing known corridors without interruptions.
+- Looting (236) likely opens a context menu to take items from adjacent containers/corpses, possibly also used for saddlebags when mounted.
+- 35 introduces a general extended-command mode; 191 shows the list of available extended commands. Many special actions (e.g., 210, 212, 228, 229, 230, 233, 234, 236, 237, 239, 240, 242, 243, 244, 245, 246, 247) are routed through this system and may be conditional on role, gear, or context.
+- 13 continues after “--More--”; 18 triggers a map redraw; 27 cancels prompts. This underlines a message-heavy, modal interaction model.
+- Quick inspections via {41, 91, 34, 61, 40, 42} suggest a deep equipment slot system: weapons, armor, amulet, rings, tools, and “all”.
+- 83 saves the game; 241 quits (distinct actions), implying persistence and permadeath expectations with explicit quit handling.
+- The presence of 33 (shell) and 246/118 (version output) indicates a classic UNIX-heritage terminal game with built-in version/help introspection.
+- 36 and 86/118/246 imply you can review score/history/version, consistent with a high-score table and meta-progression tracking.
+- “Rush” (103) and “Rush2” (71) probably stop on “interesting” events (hostiles, items, intersections), indicating an event-interrupt model to prevent accidental danger.
+- 115 repeated searches improve chances of revealing secret doors and traps; 94 helps track known traps on demand.
+- 230 forces locks (damaging items/doors, making noise) while 111/99 open/close. Keys and lockpicks would be used via 97, implying bashing vs. picking tradeoffs.
+- 101 implies hunger timers, corpses with varying effects, and contamination risks; combined with 240 (prayer) this suggests starvation mitigation via divine help or food items.
+- 69 plus 247 strongly implies inscriptions that affect monster behavior (e.g., fear), with wiping/eroding mechanics and writing tool quality affecting permanence.
+- 228 (dipping), 233 (invoking), 242 (rubbing), 122 (zapping) all suggest a layered BUC (blessed/uncursed/cursed) and object-prop system where context-sensitive activation and combinations yield different outcomes.
+- 237 implies that when polymorphed, you get an ability mapped to an action (e.g., breath weapon, gaze), reinforcing polymorph’s mechanical depth.
+- 229 (enhance) and 90 (cast) imply skill levels per weapon/magic school with advancement thresholds tied to experience and guild/role constraints.
+- 227 suggests dialog with NPCs (e.g., quest leaders/guardians), which supports quest branches and alignment/role-specific content.
+- The presence of 210 (ride), 243 (sit), and 4 (kick) implies numerous “situational verbs” on terrain/furniture that trigger random tables (e.g., thrones curse/bless, sinks generate rings), a hallmark of the game’s emergent event system.
+- 245 attempts trap removal on floor tiles and in containers, with failure consequences (explosions, poison needles), usually benefiting from tools applied via 97.
+- 112 supports settling debts; combined with looting/opening, this implies shop-lifting detection, guards, and anger mechanics, plus price-identification strategies.
+- 20 for teleport combined with 195 (conduct) suggests that some actions may break voluntary challenges (e.g., teleportitis/avoiding teleport), and that certain intrinsics (e.g., teleport control) can make 20 targeted vs. random.
+- 193 (annotate) tied with 15 (overview) suggests multi-branch dungeon navigation aided by player notes (e.g., “shop here”, “altar here”), supporting strategic backtracking and resource management.
+- 47 (what-is) and 38 (what-does) facilitate learning symbols and commands in-game; 92 and 96 track discoveries and item classes, supporting ID-gameplay (identification via use, price, altar, etc.).
+- Beyond 83 and 241, there are other endgame-relevant actions hinted by inventory and magic commands (e.g., 233, 240), and the presence of 246/118 indicates version-specific endgame differences may exist.

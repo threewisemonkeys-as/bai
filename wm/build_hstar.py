@@ -37,6 +37,7 @@ Finally output a list of hyptoehsis that describe aspects of the game in the for
 ...
 Explicitly talk about the command ints when talking about commands and do not use their informal names.
 Use whatever you already know about NetHack while building this list.
+Try to be as detailed as possible.
 """
 
 def main(
