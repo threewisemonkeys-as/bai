@@ -1,0 +1,59 @@
+- The game is turn-based, with each keypress mapped to an action; for example, waiting a turn uses MiscDirection.WAIT: 46 and searching uses Command.SEARCH: 115, implying time advances per command.
+
+- Movement happens on a grid with 8-directional control. Cardinal moves use CompassDirection.N: 107, E: 108, S: 106, W: 104, and diagonals use NE: 117, SE: 110, SW: 98, NW: 121.
+
+- There are run/long-move variants that continue in a direction until interrupted, via CompassDirectionLonger.N: 75, E: 76, S: 74, W: 72, NE: 85, SE: 78, SW: 66, NW: 89.
+
+- There is also movement without picking up and/or “rush” or “go” style continuous motion: Command.MOVE: 109, Command.MOVEFAR: 77, Command.RUSH: 103, Command.RUSH2: 71, and Command.TRAVEL: 95, suggesting pathfinding/auto-run.
+
+- Vertical traversal exists (multi-level dungeons), suggested by MiscDirection.UP: 60 and MiscDirection.DOWN: 62.
+
+- The interface appears ASCII/keyboard-driven with paged messages, evidenced by Command.MORE: 13 for “--More--”, Command.REDRAW: 18, and numerous TextCharacters like TextCharacters.PLUS: 43, MINUS: 45, SPACE: 32, and digits TextCharacters.NUM_0..NUM_9: 48–57 used for counts/prompts.
+
+- Exploration and identification tools exist: Command.LOOK: 58 (look around), Command.GLANCE: 59 (list visible), Command.WHATIS: 47 (explain a map symbol), Command.WHATDOES: 38 (explain a key), Command.SEARCH: 115 (search for hidden features), Command.SEETRAP: 94 (trap knowledge), and Command.OVERVIEW: 15 (level overview).
+
+- There is a rich inventory system with item letters/categories: Command.INVENTORY: 105, Command.SEEALL: 42 (all inventory), Command.SEEWEAPON: 41, Command.SEEARMOR: 91, Command.SEERINGS: 61, Command.SEETOOLS: 40, Command.SEEGOLD: 36, Command.SEEAMULET: 34, and organization via Command.ADJUST: 225 and Command.INVENTTYPE: 73.
+
+- Item pickup/drop and auto-pickup are explicit mechanics: Command.PICKUP: 44, Command.DROP: 100, Command.DROPTYPE: 68, and Command.AUTOPICKUP: 64 to toggle behavior.
+
+- Equipment management is deep: Command.WIELD: 119 (wield weapon), Command.SWAP: 120 (swap weapons), Command.TWOWEAPON: 88 (dual-wield), Command.WEAR: 87 (armor), Command.TAKEOFF: 84, Command.TAKEOFFALL: 65, Command.PUTON: 80 (jewelry), Command.REMOVE: 82 (remove jewelry), Command.QUIVER: 81 (set ammo).
+
+- Ranged combat uses ammunition and firing abstractions: Command.FIRE: 102 (fire quivered ammo) and Command.THROW: 116 (throw any item), indicating distinct “fire” vs “throw” systems.
+
+- Melee and physical actions are explicit: Command.FIGHT: 70 (force-attack direction/target), Command.KICK: 4 (kick), Command.FORCE: 230 (force open e.g., locks), Command.UNTRAP: 245 (disarm traps), Command.OPEN: 111 (open), Command.CLOSE: 99 (close).
+
+- Magic and item activation systems coexist: Command.CAST: 90 (cast learned spells), Command.SEESPELLS: 43 (list spells), Command.ZAP: 122 (use wand), Command.INVOKE: 233 (activate artifact/power), Command.ENHANCE: 229 (improve skills), Command.TURN: 244 (turn undead), and Command.TELEPORT: 20 (teleportation).
+
+- Consumable interactions exist: Command.EAT: 101 (food), Command.QUAFF: 113 (potions), Command.READ: 114 (scrolls/book), Command.DIP: 228 (dip items into liquids), Command.RUB: 242 (rub objects), Command.WIPE: 247 (wipe face/engraving), implying emergent item effects.
+
+- Environmental writing is a mechanic: Command.ENGRAVE: 69 (write on the ground), which often interacts with monsters/effects; the presence of Command.WIPE: 247 suggests altering or removing engravings.
+
+- Religion/altar mechanics are present: Command.PRAY: 240 (pray for aid/penance) and Command.OFFER: 239 (sacrifice/offer on altars), implying alignment and deity reactions.
+
+- Social/NPC interactions and shops exist: Command.CHAT: 227 (talk), Command.PAY: 112 (pay shopkeeper), Command.TIP: 212 (tip), Command.LOOT: 236 (loot containers/corpses), and Command.RIDE: 210 (mounts), indicating merchants, containers, and tame/rideable creatures.
+
+- The presence of Command.MONSTER: 237 suggests a prompt to target or interact with monster entities (e.g., name or specify a monster for a command), supporting a rich monster model.
+
+- There are sensory/knowledge menus: Command.ATTRIBUTES: 24 (show stats/roles), Command.KNOWN: 92 and Command.KNOWNCLASS: 96 (known item discoveries), Command.HISTORY: 86 (message history), Command.CONDUCT: 195 (voluntary challenges), showing metagame tracking.
+
+- Door/lock/trap interactions are advanced: Command.UNTRAP: 245, Command.FORCE: 230, Command.OPEN: 111, Command.CLOSE: 99, and Command.SEARCH: 115 implying hidden doors/traps and multiple ways to bypass obstacles.
+
+- Mobility has special actions: Command.JUMP: 234 (jump over/onto tiles), Command.TELEPORT: 20 (instant relocation), and vertical MiscDirection.UP: 60 / DOWN: 62, suggesting terrain and hazards where special movement matters.
+
+- The UI supports extended commands via Command.EXTCMD: 35 (the “#” menu) and a listing via Command.EXTLIST: 191, implying many rarely used or context-specific actions beyond single keys.
+
+- Meta/system controls exist: Command.OPTIONS: 79 (configure options), Command.SAVE: 83 (save), Command.QUIT: 241 (quit), Command.VERSION: 246 and Command.VERSIONSHORT: 118 (version info), Command.SHELL: 33 (shell escape), Command.ESC: 27 (cancel), reinforcing a classic roguelike terminal heritage.
+
+- Currency and score are tracked: Command.SEEGOLD: 36 (show gold), together with Command.PAY: 112 and shop interactions, implying in-game economy.
+
+- There is explicit object identification/naming: Command.CALL: 67 (name an item), Command.ANNOTATE: 193 (note dungeon level), reinforcing knowledge/identification gameplay loops.
+
+- The presence of Command.APPLY: 97 (use tools), Command.TIP: 212, Command.LOOT: 236, and Command.FORCE: 230 suggests a highly interactive environment where item-context interactions produce varied outcomes.
+
+- Combat and exploration likely share a single action-per-turn budget; even informational commands like Command.LOOK: 58 probably do not consume turns, while actions like Command.SEARCH: 115 and movement commands (e.g., CompassDirection.W: 104) do consume turns.
+
+- The combination of Command.TRAVEL: 95, CompassDirectionLonger.* (75/76/74/72/85/78/66/89), and Command.RUSH: 103/Command.RUSH2: 71 implies “run until something interesting” automation that stops on threats, items, or intersections, supporting large, complex maps.
+
+- Mounts and pets likely exist: Command.RIDE: 210 (mount/dismount) and Command.CHAT: 227 (talk to peaceful/pet monsters) indicate companion systems with special commands.
+
+- There is likely permadeath/save-on-exit behavior typical of roguelikes, hinted by Command.SAVE: 83 and Command.QUIT: 241 being explicit, and the presence of Command.VERSION: 246/Command.VERSIONSHORT: 118 suggests a traditional lineage where version differences matter.

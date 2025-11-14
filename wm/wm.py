@@ -3,7 +3,6 @@ from typing import Any, TypeVar, Generic
 
 import numpy as np
 
-
 class ImageState(np.ndarray):
     """Wrapper class for image states"""
     pass
