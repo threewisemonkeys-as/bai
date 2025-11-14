@@ -1,21 +1,12 @@
-from collections import defaultdict
-import random
 from pathlib import Path
-from dataclasses import dataclass
 
 from jinja2 import Template
-import numpy as np
-import nle.dataset
-import nle.dataset.db
 from nle.env.tasks import NetHackChallenge
-from nle.nethack import tty_render
 import litellm
 
 from utils import (
     build_llm_input,
     extract_llm_response_text,
-    extract_xml_kv,
-    validate_response_fields
 )
 
 
