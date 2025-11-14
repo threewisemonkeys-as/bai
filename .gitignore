@@ -221,6 +221,7 @@ __marimo__/
 
 # NLE related
 nle_data/
+ttyrecs.db
 
 # Experiment logs
 logs/

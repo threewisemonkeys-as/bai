@@ -195,7 +195,7 @@ if __name__ == '__main__':
     e = WMEvaluator(
             WMEvalConfig(
                 model="",
-                dataset_path="/Users/ays57/Documents/opus/bai/nle_data/nld-aa-taster/nle_data",
+                dataset_path="nle_data/nld-aa-taster/nle_data",
                 log_dir="logs/",
             )
     )
