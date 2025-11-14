@@ -4,10 +4,7 @@ from pathlib import Path
 import base64
 import io
 
-import litellm
 from PIL import Image
-
-
 
 
 def image_to_base64(image_data: Path | str | np.ndarray):
