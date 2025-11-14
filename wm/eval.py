@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import json
 import logging
 from datetime import datetime
+import asyncio
+from typing import List, Tuple
 
 from jinja2 import Template
 import numpy as np
@@ -194,7 +196,7 @@ class WMEvaluator:
         logger.info("Loading and processing dataset batches")
         _data = defaultdict(list)
         for i, batch in enumerate(self.dataset):
-            if i == 16:
+            if i == 2:
                 logger.debug(f"Reached batch limit (16), stopping data loading")
                 break
 
@@ -228,113 +230,173 @@ class WMEvaluator:
         logger.info("WMEvaluator initialization complete")
         
 
-    def eval_hypothesis(
+    async def _process_single_transition(
         self,
+        idx: int,
+        transition,
+        label: int,
         hset: list[str],
         subset_size: int | None = None
+    ) -> Tuple[bool, int]:
+        """
+        Process a single transition asynchronously.
+
+        Args:
+            idx: Index of the transition
+            transition: Transition data
+            label: Ground truth label (1=correct, 0=incorrect)
+            hset: List of hypothesis strings
+            subset_size: If provided, sample this many hypotheses
+
+        Returns:
+            Tuple of (is_correct, idx)
+        """
+        logger.debug(f"Processing transition {idx + 1}")
+        logger.debug(f"Ground truth label: {'correct' if label == 1 else 'incorrect'}")
+
+        # Sample a subset of hypotheses for this iteration if subset_size is specified
+        if subset_size is not None:
+            current_hset = random.sample(hset, min(subset_size, len(hset)))
+            logger.debug(f"Sampled {len(current_hset)} hypotheses for this iteration")
+        else:
+            current_hset = hset
+
+        before_screen, after_screen = render_transition(transition)
+        action_taken = int(transition[0]["keypresses"])
+        logger.debug(f"Action taken: {action_taken}")
+
+        logger.debug("Rendering prompt from template")
+        prompt = Template(WM_PROMPT_TEMPLATE).render(
+            hypothesis_list=current_hset,
+            before_screen=before_screen,
+            action_taken=action_taken,
+            after_screen=after_screen,
+        )
+        logger.debug(f"Prompt length: {len(prompt)} characters")
+
+        logger.debug(f"Building LLM input for model: {self.config.model}")
+        input_data = build_llm_input(prompt)
+
+        logger.info(f"Calling LLM for transition {idx + 1}")
+        try:
+            # Run the blocking litellm.responses call in a thread pool
+            response = await asyncio.to_thread(
+                litellm.responses,
+                model=self.config.model,
+                input=input_data,
+                num_retries=5,
+            )
+            logger.debug("LLM response received successfully")
+        except Exception as e:
+            logger.error(f"LLM call failed for transition {idx + 1}: {e}")
+            raise
+
+        response_output_text = extract_llm_response_text(response)
+        logger.debug(f"Response text length: {len(response_output_text)} characters")
+        logger.debug(f"Response preview: {response_output_text[:200]}...")
+
+        logger.debug("Extracting XML answer field")
+        response_dict = extract_xml_kv(response_output_text, ["answer"])
+        validate_response_fields(response_dict, response_output_text, ["answer"])
+
+        answer_text = response_dict["answer"].strip().lower()
+        logger.debug(f"Extracted answer text: '{answer_text}'")
+
+        if "yes" in answer_text:
+            answer_bool = True
+            logger.debug("Parsed answer as: YES (transition is correct)")
+        elif "no" in answer_text:
+            answer_bool = False
+            logger.debug("Parsed answer as: NO (transition is incorrect)")
+        else:
+            logger.error(f"Could not parse answer from text: '{answer_text}'")
+            raise RuntimeError(f"Could not get answer from answer text -\n{answer_text}")
+
+        is_correct = bool(label) == answer_bool
+
+        if is_correct:
+            logger.debug("✓ Model prediction matches ground truth")
+        else:
+            logger.debug("✗ Model prediction does NOT match ground truth")
+
+        return is_correct, idx
+
+    async def _eval_hypothesis_async(
+        self,
+        hset: list[str],
+        subset_size: int | None = None,
+        batch_size: int = 10
     ):
         """
-        Evaluate a set of hypotheses on the transition dataset.
+        Evaluate a set of hypotheses on the transition dataset asynchronously.
 
         Args:
             hset: List of hypothesis strings to evaluate
             subset_size: If provided, sample this many hypotheses randomly at each iteration.
                         If None, use all hypotheses.
+            batch_size: Number of concurrent API requests to process at once
 
         Returns:
             Accuracy score (float between 0 and 1)
         """
         logger.info("=" * 80)
-        logger.info("Starting hypothesis evaluation")
+        logger.info("Starting hypothesis evaluation (async with batching)")
         logger.info(f"Total number of hypotheses available: {len(hset)}")
         if subset_size is not None:
             logger.info(f"Will sample {subset_size} hypotheses per iteration")
         else:
             logger.info(f"Using all {len(hset)} hypotheses for each iteration")
         logger.info(f"Evaluating on {len(self.data)} transitions")
+        logger.info(f"Batch size: {batch_size} concurrent requests")
 
-        results = []
+        results = [None] * len(self.data)
         correct_count = 0
         incorrect_count = 0
 
-        for idx, (transition, label) in enumerate(self.data):
-            logger.debug(f"Processing transition {idx + 1}/{len(self.data)}")
-            logger.debug(f"Ground truth label: {'correct' if label == 1 else 'incorrect'}")
+        # Process data in batches
+        for batch_start in range(0, len(self.data), batch_size):
+            batch_end = min(batch_start + batch_size, len(self.data))
+            batch = self.data[batch_start:batch_end]
 
-            # Sample a subset of hypotheses for this iteration if subset_size is specified
-            if subset_size is not None:
-                current_hset = random.sample(hset, min(subset_size, len(hset)))
-                logger.debug(f"Sampled {len(current_hset)} hypotheses for this iteration")
-            else:
-                current_hset = hset
+            logger.info(f"Processing batch {batch_start // batch_size + 1}: transitions {batch_start + 1}-{batch_end}")
 
-            before_screen, after_screen = render_transition(transition)
-            action_taken = int(transition[0]["keypresses"])
-            logger.debug(f"Action taken: {action_taken}")
-
-            logger.debug("Rendering prompt from template")
-            prompt = Template(WM_PROMPT_TEMPLATE).render(
-                hypothesis_list=current_hset,
-                before_screen=before_screen,
-                action_taken=action_taken,
-                after_screen=after_screen,
-            )
-            logger.debug(f"Prompt length: {len(prompt)} characters")
-
-            logger.debug(f"Building LLM input for model: {self.config.model}")
-            input = build_llm_input(prompt)
-
-            logger.info(f"Calling LLM for transition {idx + 1}/{len(self.data)}")
-            try:
-                response = litellm.responses(
-                    model=self.config.model,
-                    input=input,
-                    num_retries=5,
+            # Create tasks for the current batch
+            tasks = [
+                self._process_single_transition(
+                    batch_start + i,
+                    transition,
+                    label,
+                    hset,
+                    subset_size
                 )
-                logger.debug("LLM response received successfully")
-            except Exception as e:
-                logger.error(f"LLM call failed for transition {idx + 1}: {e}")
-                raise
+                for i, (transition, label) in enumerate(batch)
+            ]
 
-            response_output_text = extract_llm_response_text(response)
-            logger.debug(f"Response text length: {len(response_output_text)} characters")
-            logger.debug(f"Response preview: {response_output_text[:200]}...")
+            # Execute all tasks in the batch concurrently
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            logger.debug("Extracting XML answer field")
-            response_dict = extract_xml_kv(response_output_text, ["answer"])
-            validate_response_fields(response_dict, response_output_text, ["answer"])
+            # Process results
+            for result in batch_results:
+                if isinstance(result, Exception):
+                    logger.error(f"Task failed with exception: {result}")
+                    continue
 
-            answer_text = response_dict["answer"].strip().lower()
-            logger.debug(f"Extracted answer text: '{answer_text}'")
+                is_correct, idx = result
+                results[idx] = is_correct
 
-            if "yes" in answer_text:
-                answer_bool = True
-                logger.debug("Parsed answer as: YES (transition is correct)")
-            elif "no" in answer_text:
-                answer_bool = False
-                logger.debug("Parsed answer as: NO (transition is incorrect)")
-            else:
-                logger.error(f"Could not parse answer from text: '{answer_text}'")
-                raise RuntimeError(f"Could not get answer from answer text -\n{answer_text}")
+                if is_correct:
+                    correct_count += 1
+                else:
+                    incorrect_count += 1
 
-            is_correct = bool(label) == answer_bool
-            results.append(is_correct)
+            # Log progress
+            processed = batch_end
+            current_accuracy = correct_count / processed
+            logger.info(f"Progress: {processed}/{len(self.data)} | Current accuracy: {current_accuracy:.4f}")
 
-            if is_correct:
-                correct_count += 1
-                logger.debug("✓ Model prediction matches ground truth")
-            else:
-                incorrect_count += 1
-                logger.debug("✗ Model prediction does NOT match ground truth")
-
-            # Log progress periodically
-            if (idx + 1) % 10 == 0:
-                current_accuracy = correct_count / (idx + 1)
-                logger.info(f"Progress: {idx + 1}/{len(self.data)} | Current accuracy: {current_accuracy:.4f}")
-
-        if len(results) == 0:
-            logger.error("No evaluations were performed!")
-            raise RuntimeError(f"Did not eval anything!")
+        if None in results or len(results) == 0:
+            logger.error("Some evaluations were not performed!")
+            raise RuntimeError(f"Did not eval everything!")
 
         accuracy = sum(results) / len(results)
         logger.info("=" * 80)
@@ -346,6 +408,26 @@ class WMEvaluator:
         logger.info("=" * 80)
 
         return accuracy
+
+    def eval_hypothesis(
+        self,
+        hset: list[str],
+        subset_size: int | None = None,
+        batch_size: int = 10
+    ):
+        """
+        Evaluate a set of hypotheses on the transition dataset.
+
+        Args:
+            hset: List of hypothesis strings to evaluate
+            subset_size: If provided, sample this many hypotheses randomly at each iteration.
+                        If None, use all hypotheses.
+            batch_size: Number of concurrent API requests to process at once (default: 10)
+
+        Returns:
+            Accuracy score (float between 0 and 1)
+        """
+        return asyncio.run(self._eval_hypothesis_async(hset, subset_size, batch_size))
         
 
 
@@ -353,6 +435,7 @@ def experiment(
     model: str,
     hstar_path: str | Path,
     log_dir: str | Path,
+    batch_size: int = 20,
 ):
     """
     Run experiment evaluating hypothesis subsets at different percentages.
@@ -361,6 +444,7 @@ def experiment(
         model: LLM model identifier
         hstar_path: Path to file containing hypothesis set (one per line)
         log_dir: Directory for saving logs and results
+        batch_size: Number of concurrent API requests to process at once (default: 10)
     """
     hstar_path = Path(hstar_path)
     log_dir = Path(log_dir)
@@ -374,6 +458,7 @@ def experiment(
     logger.info(f"Model: {model}")
     logger.info(f"Hypothesis file: {hstar_path}")
     logger.info(f"Log directory: {log_dir}")
+    logger.info(f"Batch size: {batch_size}")
     logger.info("*" * 80)
 
     logger.info("Creating WMEvaluator instance")
@@ -390,7 +475,7 @@ def experiment(
     logger.info(f"Loaded {len(hstar)} hypotheses")
 
     results = {}
-    percentages = list(range(10, 101, 10))
+    percentages = list(range(10, 101, 20))
     logger.info(f"Will evaluate at percentages: {percentages}")
 
     for pct in percentages:
@@ -400,7 +485,7 @@ def experiment(
         logger.info(f"Subset size: {subset_size} hypotheses (will be sampled differently per iteration)")
 
         print(f"Evaluating {pct}% subset (size={subset_size})...")
-        result = e.eval_hypothesis(hstar, subset_size=subset_size)
+        result = e.eval_hypothesis(hstar, subset_size=subset_size, batch_size=batch_size)
         print(f"Result for {pct}%: {result:.4f}")
 
         results[pct] = result
