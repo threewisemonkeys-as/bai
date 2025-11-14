@@ -230,21 +230,27 @@ class WMEvaluator:
 
     def eval_hypothesis(
         self,
-        hset: list[str]
+        hset: list[str],
+        subset_size: int | None = None
     ):
         """
         Evaluate a set of hypotheses on the transition dataset.
 
         Args:
             hset: List of hypothesis strings to evaluate
+            subset_size: If provided, sample this many hypotheses randomly at each iteration.
+                        If None, use all hypotheses.
 
         Returns:
             Accuracy score (float between 0 and 1)
         """
         logger.info("=" * 80)
         logger.info("Starting hypothesis evaluation")
-        logger.info(f"Number of hypotheses: {len(hset)}")
-        logger.debug(f"Hypotheses:\n" + "\n".join(f"  - {h}" for h in hset))
+        logger.info(f"Total number of hypotheses available: {len(hset)}")
+        if subset_size is not None:
+            logger.info(f"Will sample {subset_size} hypotheses per iteration")
+        else:
+            logger.info(f"Using all {len(hset)} hypotheses for each iteration")
         logger.info(f"Evaluating on {len(self.data)} transitions")
 
         results = []
@@ -255,13 +261,20 @@ class WMEvaluator:
             logger.debug(f"Processing transition {idx + 1}/{len(self.data)}")
             logger.debug(f"Ground truth label: {'correct' if label == 1 else 'incorrect'}")
 
+            # Sample a subset of hypotheses for this iteration if subset_size is specified
+            if subset_size is not None:
+                current_hset = random.sample(hset, min(subset_size, len(hset)))
+                logger.debug(f"Sampled {len(current_hset)} hypotheses for this iteration")
+            else:
+                current_hset = hset
+
             before_screen, after_screen = render_transition(transition)
-            action_taken = int(transition[0]["keypresses"][0])
+            action_taken = int(transition[0]["keypresses"])
             logger.debug(f"Action taken: {action_taken}")
 
             logger.debug("Rendering prompt from template")
             prompt = Template(WM_PROMPT_TEMPLATE).render(
-                hypothesis_list=hset,
+                hypothesis_list=current_hset,
                 before_screen=before_screen,
                 action_taken=action_taken,
                 after_screen=after_screen,
@@ -384,13 +397,10 @@ def experiment(
         subset_size = int(len(hstar) * pct / 100)
         logger.info("-" * 80)
         logger.info(f"EVALUATING {pct}% SUBSET")
-        logger.info(f"Subset size: {subset_size} hypotheses")
-
-        subset = random.sample(hstar, subset_size)
-        logger.debug(f"Sampled hypotheses for {pct}% subset")
+        logger.info(f"Subset size: {subset_size} hypotheses (will be sampled differently per iteration)")
 
         print(f"Evaluating {pct}% subset (size={subset_size})...")
-        result = e.eval_hypothesis(subset)
+        result = e.eval_hypothesis(hstar, subset_size=subset_size)
         print(f"Result for {pct}%: {result:.4f}")
 
         results[pct] = result
