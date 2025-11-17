@@ -198,8 +198,8 @@ class WMEvaluator:
         logger.info("Loading and processing dataset batches")
         _data = defaultdict(list)
         for i, batch in enumerate(self.dataset):
-            if i == 2:
-                logger.debug("Reached batch limit (16), stopping data loading")
+            if i == 4:
+                logger.debug("Reached batch limit, stopping data loading")
                 break
 
             logger.debug(f"Processing batch {i}")
@@ -407,8 +407,9 @@ class WMEvaluator:
 
         if None in results:
             logger.warning(
-                f" {len([r for r in results if r is None])} results were None"
+                f" {len([r for r in results if r is None])} / {len(results)} results were None"
             )
+            results = [r for r in results if r is not None]
 
         accuracy = sum(results) / len(results)
         logger.info("=" * 80)
