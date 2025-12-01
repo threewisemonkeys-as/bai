@@ -4,7 +4,7 @@ import json
 response = requests.post(
   url="https://openrouter.ai/api/v1/chat/completions",
   headers={
-    "Authorization": "Bearer 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",
+    "Authorization": "Bearer <token>",
     "Content-Type": "application/json",
   },
   data=json.dumps({
@@ -28,7 +28,7 @@ print(response)
 """
 curl https://openrouter.ai/api/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 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" \
+  -H "Authorization: Bearer <token>" \
   -d '{
   "model": "openai/gpt-5-mini",
   "messages": [

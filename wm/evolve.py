@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime
 
+
+from eval import WMEvalConfig, WMEvaluator, EvalMode
+
 import litellm
 from utils import (
     build_llm_input,
@@ -176,6 +179,7 @@ Think about what might be wrong with current beliefs and how to improve them bas
     # Extract response text
     response_text = extract_llm_response_text(response)
     logger.debug(f"Response text length: {len(response_text)} characters")
+    logger.info(f"Result of improvement prompt -\n{response_text}")
 
     # Extract beliefs from XML
     response_dict = extract_xml_kv(response_text, ["beliefs", "think"])
@@ -200,8 +204,9 @@ class EvolveConfig:
     model: str
     dataset_path: str | Path
     log_dir: str | Path
-    batch_size: int = 10
+    batch_size: int = 1
     eval_mode: str = "action"  # "action" or "state"
+    num_eval_instances: int = 1
 
 
 def evolve(config: EvolveConfig):
@@ -210,7 +215,6 @@ def evolve(config: EvolveConfig):
     Args:
         config: Evolution configuration
     """
-    from wm.eval_hset import WMEvaluator, WMEvalConfig, EvalMode
 
     # Set up logger
     global logger
@@ -236,6 +240,7 @@ def evolve(config: EvolveConfig):
         dataset_path=config.dataset_path,
         log_dir=config.log_dir,
         eval_mode=EvalMode.ACTION if config.eval_mode == "action" else EvalMode.STATE,
+        num_instances=config.num_eval_instances,
     )
     evaluator = WMEvaluator(eval_config)
 
@@ -257,16 +262,9 @@ def evolve(config: EvolveConfig):
 
         # Evaluate current beliefs
         logger.info(f"Evaluating beliefs on dataset...")
-        if h:
-            hset = h.splitlines()
-        else:
-            hset = []
-
         accuracy, detailed_results = evaluator.eval_hypothesis(
-            hset=hset,
-            subset_size=None,  # Use all beliefs
+            h=h,
             batch_size=config.batch_size,
-            return_details=True,  # Get detailed results for improvement
         )
 
         logger.info(f"Step {step} accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%)")
@@ -308,6 +306,7 @@ def run_evolve(
     log_dir: str = "logs/evolution",
     batch_size: int = 10,
     eval_mode: str = "action",
+    eval_instances: int = 1,
 ):
     """Run evolution loop to improve beliefs.
 
@@ -326,6 +325,7 @@ def run_evolve(
         log_dir=log_dir,
         batch_size=batch_size,
         eval_mode=eval_mode,
+        num_eval_instances=eval_instances,
     )
     evolve(config)
 

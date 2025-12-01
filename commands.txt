@@ -42,4 +42,4 @@ uv run python -m minihack.scripts.play --env MiniHack-Quest-Easy-v0
 
 
 # run wm evolve
-uv run wm/evolve.py --num_steps 1 --model openrouter/openai/gpt-5-mini --batch_size 1
+uv run wm/evolve.py --num_steps 1 --model openrouter/openai/gpt-5-mini --batch_size 1 --eval_instances 1

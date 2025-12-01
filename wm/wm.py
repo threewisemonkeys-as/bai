@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, TypeVar, Generic
 
 import numpy as np
@@ -25,7 +25,7 @@ class Transition(Generic[StateT]):
 
 @dataclass
 class HypothesisSet:
-    hypothesis: list[str] = list()
+    hypothesis: list[str] = field(default_factory=list)
 
     def add(self, h: str):
         self.hypothesis.append(h)

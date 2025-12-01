@@ -16,6 +16,7 @@ import numpy as np
 from jinja2 import Template
 from nle.env.tasks import NetHackChallenge
 from nle.nethack import tty_render
+from nle.language_wrapper.wrappers.nle_language_wrapper import NLELanguageWrapper
 from utils import (
     build_llm_input,
     extract_llm_response_text,
@@ -69,7 +70,6 @@ def setup_logger(log_dir: Path, name: str = "wm_eval") -> logging.Logger:
 logger = logging.getLogger("wm_eval")
 
 
-ACTION_MAP = {a.value: i for i, a in enumerate(NetHackChallenge().actions)}
 
 STATE_PRED_PROMPT_TEMPLATE = """We are playing a game where we control a character in a world.
 We currently know the following about the world -
@@ -164,6 +164,11 @@ def render_transition(transition):
     return before_screen, after_screen
 
 
+NetHackKPtoActions = {
+    a.value: a for a in NetHackChallenge().actions
+}
+
+
 class EvalMode(enum.Enum):
     STATE = "state"
     ACTION = "action"
@@ -175,6 +180,7 @@ class WMEvalConfig:
     dataset_path: str | Path
     log_dir: str | Path
     eval_mode: EvalMode
+    num_instances: int | None = None
 
 
 class WMEvaluator:
@@ -219,28 +225,27 @@ class WMEvaluator:
         logger.info(f'NLD AA "Taster" Dataset has {num_games} games.')
         print(f'NLD AA "Taster" Dataset has {num_games} games.')
 
-        logger.debug("Creating TtyrecDataset with batch_size=32, seq_length=2")
+        logger.debug("Creating TtyrecDataset with batch_size=1, seq_length=2")
         self.dataset = nle.dataset.TtyrecDataset(
             "taster-dataset",
-            batch_size=32,
+            batch_size=1,
             seq_length=2,
             dbfilename=self._dbfilename,
         )
 
-        logger.info("Loading and processing dataset batches")
+        logger.info("Loading and dataset")
         _data = defaultdict(list)
         for i, batch in enumerate(self.dataset):
-            if i == 4:
-                logger.debug("Reached batch limit, stopping data loading")
+            if config.num_instances is not None and i == config.num_instances :
+                logger.debug(f"Reached limit of num instance {config.num_instances}, stopping data loading")
                 break
 
-            logger.debug(f"Processing batch {i}")
             for k, v in batch.items():
                 _data[k].extend(v)
 
         logger.debug("Mapping keypresses to action indices")
         _data["keypresses"] = [
-            np.array([ACTION_MAP[kp] for kp in kpd]) for kpd in _data["keypresses"]
+            [NLELanguageWrapper.all_nle_action_map[NetHackKPtoActions[kp]][0] for kp in kpd] for kpd in _data["keypresses"]
         ]
 
         logger.debug("Inverting data structure to list of transition pairs")
@@ -274,10 +279,10 @@ class WMEvaluator:
                 # Get current action and choose a different one
                 current_action = incorrect_pair[0]["keypresses"]
                 available_actions = [
-                    a for a in ACTION_MAP.values() if a != int(current_action)
+                    a[0] for a in NLELanguageWrapper.all_nle_action_map.values() if a[0] != current_action
                 ]
-                new_action = np.random.choice(available_actions)
-                incorrect_pair[0]["keypresses"] = np.int64(new_action)
+                new_action = str(np.random.choice(available_actions))
+                incorrect_pair[0]["keypresses"] = new_action
                 self.incorrect_data.append(incorrect_pair)
 
         logger.info(f"Created {len(self.incorrect_data)} incorrect transitions")
@@ -296,10 +301,8 @@ class WMEvaluator:
         idx: int,
         transition,
         label: int,
-        hset: list[str],
-        subset_size: int | None = None,
-        return_details: bool = False,
-    ) -> Tuple[bool, int] | Tuple[bool, int, dict]:
+        h: str,
+    ) -> tuple[bool, int, dict]:
         """
         Process a single transition asynchronously.
 
@@ -307,35 +310,29 @@ class WMEvaluator:
             idx: Index of the transition
             transition: Transition data
             label: Ground truth label (1=correct, 0=incorrect)
-            hset: List of hypothesis strings
-            subset_size: If provided, sample this many hypotheses
+            h: Hypothesis to evaluate
             return_details: If True, return detailed result dict as third element
 
         Returns:
-            Tuple of (is_correct, idx) or (is_correct, idx, details_dict) if return_details=True
+            Tuple of (is_correct, idx, details_dict)
         """
         logger.debug(f"Processing transition {idx + 1}")
         logger.debug(f"Ground truth label: {'correct' if label == 1 else 'incorrect'}")
 
-        # Sample a subset of hypotheses for this iteration if subset_size is specified
-        if subset_size is not None:
-            current_hset = random.sample(hset, min(subset_size, len(hset)))
-            logger.debug(f"Sampled {len(current_hset)} hypotheses for this iteration")
-        else:
-            current_hset = hset
 
         before_screen, after_screen = render_transition(transition)
-        action_taken = int(transition[0]["keypresses"])
+        action_taken = transition[0]["keypresses"]
         logger.debug(f"Action taken: {action_taken}")
 
         logger.debug("Rendering prompt from template")
         prompt = Template(self.wm_prompt_template).render(
-            h='\n'.join(['- ' + hh for hh in hset]),
+            h=h,
             before_screen=before_screen,
             action_taken=action_taken,
             after_screen=after_screen,
         )
         logger.debug(f"Prompt length: {len(prompt)} characters")
+        # logger.info(f"Prompt -\n{prompt}")
 
         logger.debug(f"Building LLM input for model: {self.config.model}")
         input_data = build_llm_input(prompt)
@@ -384,48 +381,37 @@ class WMEvaluator:
         else:
             logger.debug("✗ Model prediction does NOT match ground truth")
 
-        if return_details:
-            details = {
-                "is_correct": is_correct,
-                "before_screen": before_screen,
-                "action_taken": str(action_taken),
-                "after_screen": after_screen,
-                "ground_truth": "correct" if label == 1 else "incorrect",
-                "predicted": "correct" if answer_bool else "incorrect",
-            }
-            return is_correct, idx, details
+        details = {
+            "is_correct": is_correct,
+            "before_screen": before_screen,
+            "action_taken": str(action_taken),
+            "after_screen": after_screen,
+            "ground_truth": "correct" if label == 1 else "incorrect",
+            "predicted": "correct" if answer_bool else "incorrect",
+        }
+        return is_correct, idx, details
 
-        return is_correct, idx
 
     async def _eval_hypothesis_async(
-        self, hset: list[str], subset_size: int | None = None, batch_size: int = 10, return_details: bool = False
+        self, h: str, batch_size: int = 1,
     ):
         """
         Evaluate a set of hypotheses on the transition dataset asynchronously.
 
         Args:
-            hset: List of hypothesis strings to evaluate
-            subset_size: If provided, sample this many hypotheses randomly at each iteration.
-                        If None, use all hypotheses.
+            h: Hypothesis to evaluate
             batch_size: Number of concurrent API requests to process at once
-            return_details: If True, return (accuracy, detailed_results) tuple
 
         Returns:
-            Accuracy score (float between 0 and 1) if return_details=False
-            Tuple of (accuracy, detailed_results) if return_details=True
+            Tuple of (accuracy, detailed_results)
         """
         logger.info("=" * 80)
         logger.info("Starting hypothesis evaluation (async with batching)")
-        logger.info(f"Total number of hypotheses available: {len(hset)}")
-        if subset_size is not None:
-            logger.info(f"Will sample {subset_size} hypotheses per iteration")
-        else:
-            logger.info(f"Using all {len(hset)} hypotheses for each iteration")
         logger.info(f"Evaluating on {len(self.data)} transitions")
         logger.info(f"Batch size: {batch_size} concurrent requests")
 
         results: list = [None] * len(self.data)
-        detailed_results = [] if return_details else None
+        detailed_results = []
         correct_count = 0
         incorrect_count = 0
 
@@ -441,7 +427,7 @@ class WMEvaluator:
             # Create tasks for the current batch
             tasks = [
                 self._process_single_transition(
-                    batch_start + i, transition, label, hset, subset_size, return_details
+                    batch_start + i, transition, label, h
                 )
                 for i, (transition, label) in enumerate(batch)
             ]
@@ -451,15 +437,12 @@ class WMEvaluator:
 
             # Process results
             for result in batch_results:
-                if isinstance(result, Exception):
+                if isinstance(result, BaseException):
                     logger.error(f"Task failed with exception: {result}")
                     continue
-
-                if return_details:
-                    is_correct, idx, details = result
-                    detailed_results.append(details)
-                else:
-                    is_correct, idx = result
+                    
+                is_correct, idx, details = result
+                detailed_results.append(details)
 
                 results[idx] = is_correct
 
@@ -493,107 +476,24 @@ class WMEvaluator:
         logger.info(f"Final accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%)")
         logger.info("=" * 80)
 
-        if return_details:
-            return accuracy, detailed_results
-        return accuracy
+        return accuracy, detailed_results
 
     def eval_hypothesis(
-        self, hset: list[str], subset_size: int | None = None, batch_size: int = 10, return_details: bool = False
+        self, h: str, batch_size: int = 1
     ):
         """
         Evaluate a set of hypotheses on the transition dataset.
 
         Args:
-            hset: List of hypothesis strings to evaluate
-            subset_size: If provided, sample this many hypotheses randomly at each iteration.
-                        If None, use all hypotheses.
-            batch_size: Number of concurrent API requests to process at once (default: 10)
-            return_details: If True, return (accuracy, detailed_results) tuple
+            h: Hypothesis to evaluate
+            batch_size: Number of concurrent API requests to process at once (default: 1)
 
         Returns:
-            Accuracy score (float between 0 and 1) if return_details=False
-            Tuple of (accuracy, detailed_results) if return_details=True
+            Tuple of (accuracy, detailed_results)
         """
-        return asyncio.run(self._eval_hypothesis_async(hset, subset_size, batch_size, return_details))
+        return asyncio.run(self._eval_hypothesis_async(h, batch_size))
 
 
-def experiment(
-    model: str,
-    hstar_path: str | Path,
-    log_dir: str | Path,
-    batch_size: int = 8,
-):
-    """
-    Run experiment evaluating hypothesis subsets at different percentages.
-
-    Args:
-        model: LLM model identifier
-        hstar_path: Path to file containing hypothesis set (one per line)
-        log_dir: Directory for saving logs and results
-        batch_size: Number of concurrent API requests to process at once (default: 10)
-    """
-    hstar_path = Path(hstar_path)
-    log_dir = Path(log_dir)
-
-    # Set up logger at the entry point
-    global logger
-    logger = setup_logger(log_dir)
-
-    logger.info("*" * 80)
-    logger.info("STARTING EXPERIMENT")
-    logger.info(f"Model: {model}")
-    logger.info(f"Hypothesis file: {hstar_path}")
-    logger.info(f"Log directory: {log_dir}")
-    logger.info(f"Batch size: {batch_size}")
-    logger.info("*" * 80)
-
-    logger.info("Creating WMEvaluator instance")
-    e = WMEvaluator(
-        WMEvalConfig(
-            model=model,
-            dataset_path="nle_data/nld-aa-taster/nle_data",
-            log_dir=log_dir,
-            eval_mode=EvalMode.ACTION,
-        )
-    )
-
-    logger.info(f"Reading hypothesis set from: {hstar_path}")
-    hstar = hstar_path.read_text().splitlines()
-    logger.info(f"Loaded {len(hstar)} hypotheses")
-
-    results = {}
-    percentages = list(range(0, 101, 25))
-    logger.info(f"Will evaluate at percentages: {percentages}")
-
-    for pct in percentages:
-        subset_size = int(len(hstar) * pct / 100)
-        logger.info("-" * 80)
-        logger.info(f"EVALUATING {pct}% SUBSET")
-        logger.info(
-            f"Subset size: {subset_size} hypotheses (will be sampled differently per iteration)"
-        )
-
-        print(f"Evaluating {pct}% subset (size={subset_size})...")
-        result = e.eval_hypothesis(
-            hstar, subset_size=subset_size, batch_size=batch_size
-        )
-        print(f"Result for {pct}%: {result:.4f}")
-
-        results[pct] = result
-        logger.info(f"Result for {pct}%: {result:.4f}")
-
-    results_path = log_dir / "results.json"
-    logger.info("-" * 80)
-    logger.info(f"Saving results to: {results_path}")
-    json.dump(results, open(results_path, "w"), indent=2)
-    logger.info("Results saved successfully")
-
-    logger.info("*" * 80)
-    logger.info("EXPERIMENT COMPLETE")
-    logger.info("Final Results Summary:")
-    for pct, acc in results.items():
-        logger.info(f"  {pct}%: {acc:.4f}")
-    logger.info("*" * 80)
 
 
 def test():
@@ -605,7 +505,8 @@ def test():
             model="",
             dataset_path="nle_data/nld-aa-taster/nle_data",
             log_dir="logs/",
-            eval_mode="action",
+            eval_mode=EvalMode.ACTION,
+            num_instances=1
         )
     )
 
@@ -617,7 +518,6 @@ if __name__ == "__main__":
 
     fire.Fire(
         {
-            "experiment": experiment,
             "test": test,
         }
     )
