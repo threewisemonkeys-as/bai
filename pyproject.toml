@@ -3,7 +3,7 @@ name = "bai"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "dotenv>=0.9.9",
     "fire>=0.7.1",
@@ -11,7 +11,24 @@ dependencies = [
     "jinja2>=3.1.6",
     "litellm>=1.79.3",
     "matplotlib==3.10.7",
-    "minihack==1.0.2",
+    "openrouter>=0.0.19",
     "pillow==12.0.0",
     "tenacity>=9.1.2",
+    "openai",
+    "anthropic",
+    "google-generativeai",
+    "hydra-core",
+    "opencv-python-headless",
+    "wandb",
+    "pytest",
+    "scipy",
+    "crafter",
+    "gym==0.23",
+    "requests",
+    "minihack>=1.0.2",
+    "textworld @ git+https://github.com/balrog-ai/TextWorld.git",
+    "tatsu==5.8.3",
+    "minigrid @ git+https://github.com/BartekCupial/Minigrid.git",
+    "baba @ git+https://github.com/nacloos/baba-is-ai.git",
+    "balrog-nle>=0.9.0",
 ]

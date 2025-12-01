@@ -8,12 +8,16 @@ them sequentially with a 1-second delay between each step.
 Usage:
     python viz_balrog.py /path/to/directory --delay=1.0
     python viz_balrog.py /path/to/file.csv --delay=0.5
+    python viz_balrog.py /path/to/file.csv --manual  # Manual navigation mode
 """
 
 import csv
 import io
 import os
+import sys
+import termios
 import time
+import tty
 from pathlib import Path
 
 import fire
@@ -22,6 +26,21 @@ import fire
 def clear_screen():
     """Clear the terminal screen."""
     os.system("clear" if os.name != "nt" else "cls")
+
+
+def get_char():
+    """
+    Get a single character from stdin without waiting for Enter.
+    Works on Unix-like systems.
+    """
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        ch = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return ch
 
 
 def extract_map_from_observation(observation):
@@ -66,13 +85,54 @@ def extract_map_from_observation(observation):
     return "\n".join(map_lines)
 
 
-def visualize_trajectory(csv_file, delay=1.0):
+def display_step(csv_path, row, current_step, total_steps, manual_mode=False):
+    """
+    Display a single step of the trajectory.
+
+    Args:
+        csv_path: Path to the CSV file
+        row: CSV row containing step data
+        current_step: Current step index (0-based)
+        total_steps: Total number of steps
+        manual_mode: Whether in manual navigation mode
+    """
+    clear_screen()
+
+    step = row.get("Step", "N/A")
+    action = row.get("Action", "N/A")
+    reward = row.get("Reward", "N/A")
+    done = row.get("Done", "N/A")
+    observation = row.get("Observation", "")
+
+    # Extract and display the map
+    map_display = extract_map_from_observation(observation)
+
+    # Display information
+    print(f"{'=' * 80}")
+    print(f"File: {csv_path.name}")
+    print(f"Step: {step} ({current_step + 1}/{total_steps})")
+    print(f"{'=' * 80}\n")
+
+    print(f"Action: {action}")
+    print(f"Reward: {reward} | Done: {done}\n")
+
+    print("Map:")
+    print(map_display)
+
+    print(f"\n{'=' * 80}")
+
+    if manual_mode:
+        print("Controls: [h] Previous | [l] Next | [q] Quit")
+
+
+def visualize_trajectory(csv_file, delay=1.0, manual=False):
     """
     Visualize a single trajectory from a CSV file.
 
     Args:
         csv_file: Path to the CSV file
-        delay: Delay in seconds between steps
+        delay: Delay in seconds between steps (ignored in manual mode)
+        manual: Enable manual navigation mode with keyboard controls
     """
     csv_path = Path(csv_file)
 
@@ -87,35 +147,51 @@ def visualize_trajectory(csv_file, delay=1.0):
 
         # Parse CSV from cleaned content using StringIO to preserve multiline fields
         reader = csv.DictReader(io.StringIO(content))
+        rows = list(reader)
 
-        for row in reader:
-            clear_screen()
+        if not rows:
+            print(f"No data found in {csv_path.name}")
+            return
 
-            step = row.get("Step", "N/A")
-            action = row.get("Action", "N/A")
-            reward = row.get("Reward", "N/A")
-            done = row.get("Done", "N/A")
-            observation = row.get("Observation", "")
+        if manual:
+            # Manual navigation mode
+            current_idx = 0
+            total_steps = len(rows)
 
-            # Extract and display the map
-            map_display = extract_map_from_observation(observation)
+            while True:
+                display_step(
+                    csv_path,
+                    rows[current_idx],
+                    current_idx,
+                    total_steps,
+                    manual_mode=True,
+                )
 
-            # Display information
-            print(f"{'=' * 80}")
-            print(f"File: {csv_path.name}")
-            print(f"Step: {step}")
-            print(f"{'=' * 80}\n")
+                # Get keyboard input
+                try:
+                    key = get_char()
+                except KeyboardInterrupt:
+                    print("\n\nVisualization interrupted by user.")
+                    raise
 
-            print(f"Action: {action}")
-            print(f"Reward: {reward} | Done: {done}\n")
-
-            print("Map:")
-            print(map_display)
-
-            print(f"\n{'=' * 80}")
-
-            # Wait before showing next step
-            time.sleep(delay)
+                if key == "h":  # Go back
+                    if current_idx > 0:
+                        current_idx -= 1
+                elif key == "l":  # Go forward
+                    if current_idx < total_steps - 1:
+                        current_idx += 1
+                    else:
+                        # Reached the end
+                        break
+                elif key == "q" or key == "\x03":  # q or Ctrl+C
+                    raise KeyboardInterrupt
+        else:
+            # Automatic mode
+            total_steps = len(rows)
+            for idx, row in enumerate(rows):
+                display_step(csv_path, row, idx, total_steps, manual_mode=False)
+                # Wait before showing next step
+                time.sleep(delay)
 
     except Exception as e:
         print(f"\n\nError processing {csv_path.name}: {e}")
@@ -133,13 +209,14 @@ def visualize_trajectory(csv_file, delay=1.0):
         raise
 
 
-def visualize(path, delay=1.0):
+def visualize(path, delay=1.0, manual=False):
     """
     Visualize Balrog trajectories from a CSV file or directory.
 
     Args:
         path: Path to a CSV file or directory containing CSV files
-        delay: Delay in seconds between steps (default: 1.0)
+        delay: Delay in seconds between steps (default: 1.0, ignored in manual mode)
+        manual: Enable manual navigation mode with keyboard controls (h=back, l=forward)
     """
     path = Path(path).expanduser()
 
@@ -161,12 +238,17 @@ def visualize(path, delay=1.0):
         return 1
 
     print(f"Found {len(csv_files)} trajectory file(s)")
+    if manual:
+        print("Manual navigation mode enabled")
+        print("Controls: [h] Previous step | [l] Next step | [q] Quit\n")
+    else:
+        print("Automatic mode enabled")
     print("Starting visualization...\n")
     time.sleep(2)
 
     try:
         for csv_file in csv_files:
-            visualize_trajectory(csv_file, delay)
+            visualize_trajectory(csv_file, delay, manual)
     except KeyboardInterrupt:
         print("\n\nVisualization stopped by user.")
         return 0

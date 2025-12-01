@@ -1,0 +1,45 @@
+# viz minihack corridor gpt-5 mini trajectories
+uv run sandbox/viz_balrog.py nle_data/balrog_results/submissions/LLM/20250808_naive_gpt-
+5-minimal/minihack/MiniHack-Corridor-R3-v0/
+
+# run BALROG eval
+
+## with openai
+
+uv run eval.py \
+  agent.type=robust_cot \
+  agent.max_image_history=0 \
+  agent.max_text_history=16 \
+  agent.max_cot_history=16 \
+  eval.num_workers=16 \
+  client.client_name=openrouter \
+  client.model_id=openai/gpt-5-mini \
+  envs.names=minihack
+
+## with vllm
+
+
+uv run eval.py \
+  agent.type=robust_cot \
+  agent.max_image_history=0 \
+  agent.max_text_history=16 \
+  agent.max_cot_history=16 \
+  eval.num_workers=16 \
+  client.client_name=vllm \
+  client.model_id=Qwen/Qwen3-4B \
+  client.base_url=http://0.0.0.0:8000/v1 \
+  envs.names=minihack
+
+
+# run offline data prediction eval
+uv run wm/eval.py experiment --model hosted_vllm/Qwen/Qwen3-8B --hstar_path wm/hstar.txt --log_dir logs/wm_qwen3_8b_actions/
+
+uv run wm/eval.py experiment --model openai/gpt-5 --hstar_path wm/hstar.txt --log_dir logs/wm_qwen3_8b_actions/
+
+
+# run minihack game
+uv run python -m minihack.scripts.play --env MiniHack-Quest-Easy-v0
+
+
+# run wm evolve
+uv run wm/evolve.py --num_steps 1 --model openrouter/openai/gpt-5-mini --batch_size 1
