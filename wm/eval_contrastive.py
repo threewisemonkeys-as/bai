@@ -71,18 +71,47 @@ logger = logging.getLogger("wm_eval")
 
 
 
+STATE_PRED_PROMPT_TEMPLATE = """We are playing a game where we control a character in a world.
+We currently know the following about the world -
+
+{{ h }}
+
+Given that we know this, our task is to determine whether the transition presented below is correct.
+You will be shown the game screen before an action is taken, the action that was taken and a possible game screen after the action is taken.
+Your task is to determine whether the after screen displays the correct consequence of taking the given action.
+
+Before screen -
+
+{{ before_screen }}
+
+Action taken - {{ action_taken }}
+
+After screen -
+
+{{ after_screen }}
+
+Determine whether the after screen is the correct result of taking the given action on the before screen.
+Present your judgement at the end of your answer in an xml format -
+<answer>
+Yes/No
+</answer>
+"""
+
+
 ACTION_PRED_PROMPT_TEMPLATE = """We are playing a game where we control a character in a world.
 We currently know the following about the world -
 
 {{ h }}
 
-Given that we know this, our task is to determine what action would cause the before screen to transition to the after screen.
-You will be shown the game screen before an action is taken, and a possible game screen after an action is taken.
-Your task is to determine what action 
+Given that we know this, our task is to determine whether the transition presented below is correct.
+You will be shown the game screen before an action is taken, the action that was taken and a possible game screen after the action is taken.
+Your task is to determine whether the action presented is the correct one that will result in the before screen transitioning to the after screen.
 
 Before screen -
 
 {{ before_screen }}
+
+Action taken - {{ action_taken }}
 
 After screen -
 
