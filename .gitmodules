@@ -1,0 +1,3 @@
+[submodule "BALROG"]
+	path = BALROG
+	url = git@github.com:threewisemonkeys-as/BALROG.git
