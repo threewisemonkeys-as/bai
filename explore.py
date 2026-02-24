@@ -651,7 +651,7 @@ def main(config: DictConfig):
 
     # Get exploration config with defaults
     num_experiments = config.eval.evolve.get("num_experiments", 1)
-    num_baseline_rollouts = config.eval.evolve.get("num_baseline_rollouts", 3)
+    num_baseline_rollouts = config.eval.evolve.get("num_baseline_rollouts", 1)
 
     match config.eval.mode:
         case "eval":

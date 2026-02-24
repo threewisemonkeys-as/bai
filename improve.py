@@ -73,34 +73,21 @@ def get_episode_outcome_header(trajectory_path: str) -> str:
         # Determine success/failure status
         if progression >= 1.0:
             outcome_status = "SUCCESS - Goal achieved!"
-        elif progression > 0:
-            outcome_status = f"PARTIAL SUCCESS ({progression*100:.0f}% progress toward goal)"
         else:
-            outcome_status = "FAILURE - No progress toward goal (0%)"
+            outcome_status = "FAILURE"
 
         # Provide goal context based on task name
         if "Quest" in task or "Staircase" in task:
             goal_reminder = "GOAL: Find and reach the stairs down (>) to descend to the next level."
-        elif "Oracle" in task:
-            goal_reminder = "GOAL: Find and reach the Oracle."
-        elif "Gold" in task:
-            goal_reminder = "GOAL: Collect as much gold as possible."
-        elif "Eat" in task:
-            goal_reminder = "GOAL: Find and consume food to stay alive."
-        elif "Scout" in task:
-            goal_reminder = "GOAL: Explore and discover as much of the map as possible."
         else:
             goal_reminder = "GOAL: Complete the task objective."
 
-        header = f"""=== EPISODE OUTCOME ===
-Task: {task}
+        header = f"""Task: {task}
 {goal_reminder}
 Status: {outcome_status}
 End Reason: {end_reason_str}
 Steps Taken: {num_steps}
-Progression: {progression*100:.1f}%
 Episode Return: {episode_return:.2f}
-===========================
 """
         return header
 
@@ -116,44 +103,167 @@ def trim_to_model_context_lim(text: str, model_name: str, buffer: int = 0, prefi
         return text[-350000:]
 
 
-async def _get_instructions_perception_summary_async(
+def _extract_between(text: str, start_marker: str, end_marker: str) -> str:
+    """Extract content between two delimiter strings."""
+    if start_marker not in text:
+        return ""
+    after = text.split(start_marker, 1)[1]
+    if end_marker not in after:
+        return after.strip()
+    return after.split(end_marker, 1)[0].strip()
+
+
+def _sample_indices(n: int, k: int) -> list[int]:
+    """Return k evenly-spaced indices in [0, n)."""
+    if k >= n:
+        return list(range(n))
+    return [int(i * (n - 1) / (k - 1)) for i in range(k)] if k > 1 else [0]
+
+
+def extract_obs_perc_examples(
+    output_dir: str,
+    perception: str,
+    max_trajs: int = 3,
+    max_steps_per_traj: int = 1,
+) -> str:
+    """Extract concrete (raw_observation, perception_output) pairs from trajectory CSVs.
+
+    Shows the verbatim input fed to perceive() and its verbatim output, so the
+    improve LLM can see exactly what the code receives and produces.
+
+    Returns a formatted string to inject into the improve prompt, or "" if perception
+    is empty or no perception sections are found in the CSVs.
+    """
+    import csv as csv_module
+
+    if not perception or not perception.strip():
+        return ""
+
+    PERC_START = "========== Start of features from Perception Module =========="
+    PERC_END   = "========== End of features from Perception Module =========="
+    OBS_START  = "========== Start of Direct Game Observation =========="
+    OBS_END    = "========== End of Direct Game Observation =========="
+
+    examples = []
+    csv_paths = sorted(Path(output_dir).rglob("*.csv"))[:max_trajs]
+
+    for traj_idx, csv_path in enumerate(csv_paths):
+        try:
+            with open(csv_path, newline='') as f:
+                reader = csv_module.DictReader(f, escapechar="\u02d8", quoting=csv_module.QUOTE_MINIMAL)
+                rows = list(reader)
+        except Exception as e:
+            logging.warning(f"Failed to read {csv_path}: {e}")
+            continue
+
+        if not rows:
+            continue
+
+        # len(rows) - 1 is so that we dont include last state
+        # which is usually just the end status screen
+        for row_idx in _sample_indices(len(rows) - 1, max_steps_per_traj):
+            obs_text = rows[row_idx].get('Observation', '')
+            if PERC_START not in obs_text:
+                continue  # perception not active for this step
+
+            perc_out = _extract_between(obs_text, PERC_START, PERC_END)
+            raw_obs  = _extract_between(obs_text, OBS_START,  OBS_END)
+
+            if perc_out and raw_obs:
+                step_num = rows[row_idx].get('Step', str(row_idx))
+                examples.append((traj_idx + 1, step_num, raw_obs, perc_out))
+
+    if not examples:
+        if perception and perception.strip():
+            logging.warning(
+                "Perception code is non-empty but no perception output found in any trajectory CSV. "
+                "The perception module may have failed silently during rollouts."
+            )
+            return (
+                "<perception_examples>\n"
+                "WARNING: The perception code was provided but produced NO output in any trajectory.\n"
+                "This means the perception module either failed silently (e.g. a runtime error disabled it)\n"
+                "or it ran but returned an empty string for every observation.\n"
+                "Please review and fix the perception code so it reliably produces output.\n"
+                "</perception_examples>"
+            )
+        return ""
+
+    lines = [
+        "<perception_examples>",
+        "These show the exact input the current perception code receives and the exact output it produces.",
+        "Use them to verify correctness and identify bugs or missing information.",
+        "",
+    ]
+    for ep_num, step_num, raw_obs, perc_out in examples:
+        lines.append(f"<example episode={ep_num} step={step_num}>")
+        lines.append("INPUT to perceive() — verbatim Direct Game Observation:")
+        lines.append(f"<perceive_input>")
+        lines.append(raw_obs.strip())
+        lines.append("")
+        lines.append(f"</perceive_input>\n")
+        lines.append("OUTPUT of perceive():")
+        lines.append("<perceive_output>")
+        lines.append(perc_out.strip())
+        lines.append("")
+        lines.append(f"</perceive_output>")
+        lines.append("</example>")
+        lines.append("")
+
+    lines.append("</perception_examples>")
+    return '\n'.join(lines)
+
+
+async def _get_beliefs_perception_summary_async(
     config: DictConfig,
-    instruction: str,
+    beliefs: str,
     perception: str,
     outcome_header: str,
     traj_text: str,
     trajectory_path: str,
+    default_knowledge: str,
 ) -> str:
-    """Get a summary focused on instructions and perception evaluation (async).
+    """Get a summary focused on beliefs and perception evaluation (async).
 
     Args:
         config: Configuration containing model information
-        instruction: Current beliefs/instructions about the game
+        beliefs: Current beliefs about the game
         perception: Current perception module code
         outcome_header: Formatted episode outcome header
         traj_text: Trajectory text content
         trajectory_path: Path to the trajectory file (for logging)
 
     Returns:
-        Summary text focused on instructions and perception
+        Summary text focused on beliefs and perception
     """
     prompt = f"""We are playing a game and trying to figure out how it works.
-Currently we have the following list of beliefs about the game -
 
-{instruction if instruction else "(empty - no beliefs)"}
+The agent receives the following default instructions/knowledge by default:
+=== DEFAULT KNOWLEDGE ===
+{default_knowledge}
+=== END DEFAULT KNOWLEDGE ===
 
-We are also using the following perception module to process game observations -
+We maintain the following current beliefs about the game:
+=== CURRENT BELIEFS ===
+{beliefs if beliefs else "(empty - no beliefs yet)"}
+=== END OF CURRENT BELIEFS ===
 
-{perception if perception else "(empty - no perception module)"}
+The following code is used to extract useful features from the raw game observations:
+=== PERCEPTION MODULE ===
+{perception if perception else "(empty - no perception module yet)"}
+=== END OF PERCEPTION MODULE ===
 
 We have played the game using these beliefs and perception.  
 Here is the episode outcome and trajectory:
-
+=== EPISODE OUTCOME ===
 {outcome_header}
+=== END OF EPISODE OUTCOME ===
+=== TRAJECTORY ===
 {traj_text}
+=== END OF TRAJECTORY ===
 
 Your summary should contain analysis of the behaviour of the perception module:
-- The perception module is provided everything inside the Direct Game Observation as an input string.
+- The perception module is provided with everything inside the Direct Game Observation as an input string.
 - It should extract features that are useful to playing the game.
 - Ensure that the perception module is working correctly in that the intended information in the perception code is correctly being presented in the features from perception module section.
 
@@ -164,24 +274,26 @@ If the episode was a FAILURE (0% progress or death):
 - What beliefs led to bad decisions? 
 - What beliefs were missing that would have prevented this outcome?
 - Did the perception module include any misleading information that led to this outcome?
-- Was there information that the perception module could have included that would have prevented this outcome?
+- What additional information could be included by the perception module that would have prevented this outcome?
 
-If the episode was a PARTIAL SUCCESS (some progress but not completed):
-- What allowed progress to be made? These patterns should be preserved.
+Even if the episode was a FAILURE, the agent may have made partial progress towards the goal.
+- Decide if the agent was able to make progress towards the goal?
+- What allowed progress to be made? This is important to identifying beliefs that might lead to success.
 - What prevented full completion? Identify the specific bottleneck or mistake.
-- Did the perception module help with the successful parts? What did it do incorrectly or what was it missing for the unsuccessful parts?
+- Did the perception module help with the successful parts? What did it do incorrectly? 
+- What information could be included by the perception module that would have resulted in further progress?
 
 If the episode was a SUCCESS:
-- What key decisions led to success? If not already present, what beliefs can we infer about the world from this?
+- What key actions led to success? What beliefs can we infer about the world from this?
 - What information from perception (if any) was most valuable?
 - Was there unnecessary inefficiency that could be improved?
 
 Provide a summary highlighting:
 - Root cause analysis: Why did the episode end this way?
-- Belief analysis: What beliefs can we infer from the trajectory, especially those that may lead to a positive outcome. Were there beliefs that were incorrect or misleading?
-- Perception analysis: What information was presented in the explicit features from perception module section. What part of that information was helpful, what information was misleading / incorrect and what missing information could have helped if extracted by the perception module?
+- Belief learning: What beliefs can we infer from the trajectory, especially those that show us how to make progress towards completing the task. 
+- Belief update: How should we update our beliefs so that we can make progress towards completing the task. Were there beliefs that were incorrect or misleading?
 - Perception correctness: Regardless of the outcome of the episode, verify whether the perception module is working correctly. Check that the output of the perception module is correctly mapping the corresponding direct game observation into the intended features.
-- Patterns to preserve: What worked well and should NOT be changed?
+- Perception analysis: What information was presented in the explicit features from perception module section. What part of that information was helpful, what information was misleading / incorrect and what additional information would have helped if extracted by the perception module?
 
 Format your response in XML style as -
 <think>
@@ -251,9 +363,12 @@ We were testing the following experiment in this episode:
 === END EXPERIMENT ===
 
 Here is the episode outcome and trajectory:
-
+=== EPISODE OUTCOME ===
 {outcome_header}
+=== END OF EPISODE OUTCOME ===
+=== TRAJECTORY ===
 {traj_text}
+=== END OF TRAJECTORY ===
 
 Analyse whether the above trajectory provides enough evidence to validate or invalidate the given experiment.
 
@@ -300,20 +415,21 @@ A summary of the reasons behind whether the given experiment is correct or not, 
 
 async def get_episode_summary_async(
     config: DictConfig,
-    instruction: str,
+    beliefs: str,
     perception: str,
     trajectory_path: str,
-    experiment: str = None,
-) -> str:
+    default_knowledge: str,
+    experiment: str | None = None,
+) -> tuple[str, str]:
     """Get a summary of an episode trajectory using LLM (async).
 
     This function makes separate LLM calls for:
-    1. Instructions and perception evaluation
+    1. Beliefs and perception evaluation
     2. Experiment evaluation (if experiment is provided)
 
     Args:
         config: Configuration containing model information
-        instruction: Current beliefs/instructions about the game
+        beliefs: Current beliefs about the game
         perception: Current perception module code
         trajectory_path: Path to the trajectory file
         experiment: Optional experiment that was being tested in this episode
@@ -328,27 +444,28 @@ async def get_episode_summary_async(
     traj_text = trim_to_model_context_lim(traj_text, config.client.model_id)
 
     # Call for instructions and perception summary
-    instructions_perception_summary, ip_cost = await _get_instructions_perception_summary_async(
-        config, instruction, perception, outcome_header, traj_text, trajectory_path
+    beliefs_perception_summary, ip_cost = await _get_beliefs_perception_summary_async(
+        config, beliefs, perception, outcome_header, traj_text, trajectory_path, default_knowledge
     )
 
     total_cost = ip_cost
+    include_experiment_summary = config.eval.evolve.get("include_experiment_summary", True)
 
-    # If experiment is provided, make a separate call for experiment summary
-    if experiment:
+    # If experiment is provided and enabled in config, make a separate call for experiment summary
+    if experiment and include_experiment_summary:
         experiment_summary, h_cost = await _get_experiment_summary_async(
             config, experiment, outcome_header, traj_text, trajectory_path
         )
         total_cost += h_cost
         # Combine both summaries
         combined_summary = f"""=== INSTRUCTIONS AND PERCEPTION ANALYSIS ===
-{instructions_perception_summary}
+{beliefs_perception_summary}
 
 === EXPERIMENT ANALYSIS ===
 {experiment_summary}"""
         return combined_summary, total_cost
     else:
-        return instructions_perception_summary, total_cost
+        return beliefs_perception_summary, total_cost
 
 
 def validate_perception_code(code: str) -> tuple[bool, str | None]:
@@ -379,7 +496,18 @@ def validate_perception_code(code: str) -> tuple[bool, str | None]:
             return False, "'perceive' is not a callable function"
 
         # Test with a sample input to catch runtime errors in basic execution
-        test_input = "message: test\ncursor: x=0, y=0\nmap:\n...\n"
+        test_input = (
+            "message: You see here a +0 dagger.\n\n"
+            "cursor:\nYourself a rogue\n(x=10, y=5)\n\n"
+            "map:\n"
+            "         -----          \n"
+            "         |...|          \n"
+            "         |.@d.|         \n"
+            "         |..F.|         \n"
+            "         -----          \n\n"
+            "Agent the Footpad              St:15 Dx:17 Co:13 In:13 Wi:11 Ch:6 Chaotic S:0\n"
+            "Dlvl:1 $:0 HP:12(12) Pw:2(2) AC:7 Xp:1/0\n"
+        )
         try:
             result = namespace["perceive"](test_input)
             if not isinstance(result, str):
@@ -423,6 +551,9 @@ def improve_step(
         new_experiments is [] when num_experiments == 0.
     """
     generate_experiments = num_experiments > 0
+    improve_mode = config.eval.evolve.get("improve_mode", "both")
+    improve_beliefs = improve_mode in ("both", "beliefs")
+    improve_perception = improve_mode in ("both", "perception")
 
     async def get_all_summaries():
         """Get all episode summaries in parallel."""
@@ -448,6 +579,7 @@ def improve_step(
                         base_beliefs,
                         perception,
                         str(episode_path),
+                        default_knowledge,
                         experiment=experiment_text,
                     )
                 )
@@ -462,30 +594,46 @@ def improve_step(
     ep_results = asyncio.run(get_all_summaries())
 
     # Combine all summaries and track costs
-    evidence_section = ""
+    episode_summaries = "<episode_summaries>\nThese are summaries of different episodes of playing the game."
     summary_cost = 0.0
     for i, (summary, cost) in enumerate(ep_results):
-        evidence_section += f"Episode {i+1} Summary:\n{summary.strip()}\n\n"
+        episode_summaries += f"<episode_summary episode_idx={i+1}>\n{summary.strip()}\n</episode_summary>\n"
         summary_cost += cost
 
     # Include any rollout errors in evidence section
     if rollout_results:
         for run_name, result in rollout_results.items():
             if "error" in result:
-                evidence_section += f"Rollout {run_name} ERROR: {result['error']}\n\n"
+                episode_summaries += f"<rollout_error run={run_name}>\n{result['error']}\n<rollout_error>\n"
+    episode_summaries += "</episode_summaries>"
+  
+    # Extract concrete (observation → perception output) pairs for grounded perception improvement
+    perc_example_max_trajs = config.eval.evolve.get("perc_example_max_trajs", 3)
+    perc_example_max_steps = config.eval.evolve.get("perc_example_max_steps", 1)
+    perception_examples = extract_obs_perc_examples(
+        output_dir, perception,
+        max_trajs=perc_example_max_trajs,
+        max_steps_per_traj=perc_example_max_steps,
+    )
 
     # Build prompt — experiment generation section is conditional
     if generate_experiments:
-        experience_preamble = "We have collected new experience."
-        task_section = f"""Your task is to:
-1. Analyze the results. If experiments were tested, determine if they were confirmed or refuted.
-2. Update our beliefs about the game based on confirmed knowledge.
-3. Update the perception module to make sure it is correct and that it extracts better features from the direct game observation.
-4. Generate {num_experiments} NEW experiments to test in the next step.
-   - Experiments should be specific, actionable strategies or mechanics to test.
-   - They should help us achieve the main goal."""
-        conservatism_note = ""
-        think_tag = "<think>\nAnalyze results, evaluate experiments, determine belief updates, design perception improvements, and brainstorm new experiments.\n</think>"
+        _steps = ["1. Analyze the results. If experiments were tested, determine if they were confirmed or refuted."]
+        _step_num = 2
+        if improve_beliefs:
+            _steps.append(f"{_step_num}. Update our beliefs about the game based on confirmed knowledge.")
+            _step_num += 1
+        if improve_perception:
+            _steps.append(
+                f"{_step_num}. Update the perception module to make sure it is correct and that it extracts better features from the direct game observation."
+            )
+            _step_num += 1
+        _steps.append(
+            f"{_step_num}. Generate {num_experiments} NEW experiments to test in the next step.\n"
+            "   - Experiments should be specific, actionable strategies or mechanics to test.\n"
+            "   - They should help us achieve the main goal."
+        )
+        task_section = "Your task is to:\n" + "\n".join(_steps)
         experiments_xml = f"""<new_experiments>
 EXPERIMENT 1: [First experiment to test]
 
@@ -494,63 +642,126 @@ EXPERIMENT 2: [Second experiment to test]
 (Generate exactly {num_experiments} experiments)
 </new_experiments>"""
     else:
-        experience_preamble = "We have collected new experience by attempting to play the game with certain experiments in mind."
-        task_section = """Your task is to:
-1. Analyze the results.
-2. Update our beliefs about the game based on confirmed knowledge.
-3. Update the perception module to make sure it is correct and that it extracts better features from the direct game observation."""
-        conservatism_note = "\nSince we are only evaluating experiments, only update the beliefs or the perception if we have learned anything new from the collected experience. Do not update them if we have not learned anything new."
-        think_tag = "<think>\nAnalyze results, evaluate experiments, determine belief updates, and design perception improvements.\n</think>"
+        _steps = ["1. Analyze the results."]
+        _step_num = 2
+        if improve_beliefs:
+            _steps.append(f"{_step_num}. Update our beliefs about the game based on confirmed knowledge.")
+            _step_num += 1
+        if improve_perception:
+            _steps.append(
+                f"{_step_num}. Update the perception module to make sure it is correct and that it extracts useful information from the direct game observation and presents in a clear and descriptive way."
+            )
+            _step_num += 1
+        task_section = "Your task is to:\n" + "\n".join(_steps)
         experiments_xml = ""
 
-    base_prompt = f"""We are playing a game and trying to figure out how it works.
-Current beliefs about the game:
-{base_beliefs if base_beliefs else "(empty - no beliefs yet)"}
+    # Build think_tag conditioned on which components are active
+    _think_actions = ["Analyze results"]
+    if generate_experiments:
+        _think_actions.append("evaluate experiments")
+    if improve_beliefs:
+        _think_actions.append("determine belief updates")
+    if improve_perception:
+        _think_actions.append("design perception improvements")
+    if generate_experiments:
+        _think_actions.append("brainstorm new experiments")
+    if len(_think_actions) == 2:
+        _think_inner = " and ".join(_think_actions)
+    elif len(_think_actions) > 2:
+        _think_inner = ", ".join(_think_actions[:-1]) + f", and {_think_actions[-1]}"
+    else:
+        _think_inner = _think_actions[0]
+    think_tag = f"<think>\n{_think_inner}.\n</think>"
 
-The agent also receives the following default instructions/knowledge by default:
-=== DEFAULT KNOWLEDGE ===
-{default_knowledge}
-=== END DEFAULT KNOWLEDGE ===
+    # Build conservatism_note conditioned on which components are active
+    if generate_experiments:
+        conservatism_note = ""
+    else:
+        if improve_beliefs and improve_perception:
+            _update_target = "the beliefs or the perception module"
+        elif improve_beliefs:
+            _update_target = "the beliefs"
+        else:
+            _update_target = "the perception module"
+        conservatism_note = (
+            f"\nSince we are only evaluating experiments, only update {_update_target} if we have learned "
+            "anything new from the collected experience. Do not update if we have not learned anything new."
+        )
 
-Current perception module:
-{perception if perception else "(empty - no perception module yet)"}
-
-{experience_preamble}
-{evidence_section}
-
-{task_section}
-
-It is important that you keep both the beliefs and the output of the perception module as simple as possible.
-
-For beliefs:
-- They should describe essential information about how the game works.
-- They should be very brief with a limit of 10 points, each of which should be only a few sentences. It is important to keep the beliefs simple.
+    # Build conditional instruction blocks
+    beliefs_instructions = ""
+    if improve_beliefs:
+        beliefs_instructions = """For beliefs:
+- They should describe information about how the game works that helps us complete the objective.
+- They should be brief with each point being a few sentences.
 - Correct any wrong or misleading beliefs
-- From evidence present from the trajectories, infer beliefs that might lead to a positive outcome.
+- They should be grounded in the evidence present from the trajectories.
+- They should be as simple as possible."""
 
-For the perception module:
+    perception_instructions = ""
+    if improve_perception:
+        perception_instructions = """For the perception module:
 - It should be a Python function `perceive(observation_text: str) -> str`.
 - Input `observation_text` contains everything from the direct game observation as a string.
+- The code must be valid Python.
 - Ensure that the perception module is working correctly in that it is correctly extracting the intended information from the direct game state and presenting it in the features from perception module section.
 - Output should be a textual description of the game state that is useful for progressing in the game.
-- The output should be brief and to the point.
-- The code must be valid Python.
-{conservatism_note}
+- Output should contain all information that is necessary for progressing in the game and should be presented in a clear and description way."""
 
-Format your response in XML style as:
-{think_tag}
-<updated_beliefs>
+    # Build conditional XML format blocks
+    beliefs_xml_fmt = ""
+    if improve_beliefs:
+        beliefs_xml_fmt = """<updated_beliefs>
 - [belief 1]
 - [belief 2]
 ...
-</updated_beliefs>
-<perception>
+</updated_beliefs>"""
+
+    perception_xml_fmt = ""
+    if improve_perception:
+        perception_xml_fmt = """<updated_perception>
 ```python
 def perceive(observation_text: str) -> str:
     # Your implementation here
     pass
 ```
-</perception>
+</updated_perception>"""
+
+    base_prompt = f"""We are playing a game and trying to figure out how it works.
+
+The agent receives the following default instructions/knowledge by default:
+=== DEFAULT KNOWLEDGE ===
+{default_knowledge}
+=== END DEFAULT KNOWLEDGE ===
+
+We maintain the following current beliefs about the game:
+=== CURRENT BELIEFS ===
+{base_beliefs if base_beliefs else "(empty - no beliefs yet)"}
+=== END OF CURRENT BELIEFS ===
+
+The following code is used to extract useful features from the raw game observations:
+=== PERCEPTION MODULE ===
+{perception if perception else "(empty - no perception module yet)"}
+=== END OF PERCEPTION MODULE ===
+
+We have collected the following experience by playing the game:
+=== COLLECTED EXPERIENCE ===
+{episode_summaries}
+{perception_examples}
+=== END OF COLLECTED EXPERIENCES ===
+
+{task_section}
+
+{beliefs_instructions}
+
+{perception_instructions}
+
+{conservatism_note}
+
+Format your response in XML style as:
+{think_tag}
+{beliefs_xml_fmt}
+{perception_xml_fmt}
 {experiments_xml}
 """
 
@@ -561,7 +772,11 @@ def perceive(observation_text: str) -> str:
         model_name = f"{config.client.client_name}/{config.client.model_id}"
 
     # Determine which XML fields to extract
-    xml_fields = ["updated_beliefs", "perception"]
+    xml_fields = []
+    if improve_beliefs:
+        xml_fields.append("updated_beliefs")
+    if improve_perception:
+        xml_fields.append("updated_perception")
     if generate_experiments:
         xml_fields.append("new_experiments")
 
@@ -583,7 +798,7 @@ Your previous perception code had an error and failed to execute:
 {perception_error}
 
 Please fix the error in your perception code.
-=== END ERROR ===
+=== END OF PERCEPTION CODE ERROR ===
 """
         else:
             prompt = base_prompt
@@ -611,13 +826,17 @@ Please fix the error in your perception code.
         validate_response_fields(response_dict, response_text, xml_fields)
 
         # Process beliefs
-        if "updated_beliefs" in response_dict:
+        if improve_beliefs and "updated_beliefs" in response_dict:
             updated_beliefs = response_dict["updated_beliefs"].strip()
+
+        # If perception updating is disabled, no validation loop needed
+        if not improve_perception:
+            break
 
         # Process perception
         candidate_perception = perception
-        if "perception" in response_dict:
-            candidate_perception = response_dict["perception"].strip()
+        if "updated_perception" in response_dict:
+            candidate_perception = response_dict["updated_perception"].strip()
             # Strip markdown markers
             if candidate_perception.startswith("```python"):
                 candidate_perception = candidate_perception[len("```python"):].strip()
@@ -673,4 +892,3 @@ Please fix the error in your perception code.
 
     total_improve_cost = summary_cost + improve_call_cost
     return updated_beliefs, updated_perception, new_experiments, total_improve_cost
-
