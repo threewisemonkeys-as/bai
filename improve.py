@@ -290,10 +290,11 @@ If the episode was a SUCCESS:
 
 Provide a summary highlighting:
 - Root cause analysis: Why did the episode end this way?
-- Belief learning: What beliefs can we infer from the trajectory, especially those that show us how to make progress towards completing the task. 
-- Belief update: How should we update our beliefs so that we can make progress towards completing the task. Were there beliefs that were incorrect or misleading?
+- Belief learning: What concrete strategies can we learn from this trajectory? Focus on specific actions that worked or failed (e.g., "zapping wand at lava cleared the path" or "going east after crossing lava led to stairs"). Do not describe abstract reasoning frameworks.
+- Belief update: What short, actionable strategy updates should we make? Focus on what the agent should DO, not how it should think. Avoid abstract rules about coordinate tracking, frontier management, or internal state.
 - Perception correctness: Regardless of the outcome of the episode, verify whether the perception module is working correctly. Check that the output of the perception module is correctly mapping the corresponding direct game observation into the intended features.
 - Perception analysis: What information was presented in the explicit features from perception module section. What part of that information was helpful, what information was misleading / incorrect and what additional information would have helped if extracted by the perception module?
+- Keep the summary focused on ACTIONABLE INSIGHTS. What concrete strategy should the agent follow? Avoid verbose meta-cognitive analysis.
 
 Format your response in XML style as -
 <think>
@@ -521,20 +522,16 @@ def validate_perception_code(code: str) -> tuple[bool, str | None]:
     return True, None
 
 
-def improve_step(
+def prepare_improve_context(
     config: DictConfig,
     base_beliefs: str,
     perception: str,
     output_dir: str,
     previous_experiments: list[str],
     default_knowledge: str,
-    num_experiments: int = 0,
     rollout_results: dict[str, dict] | None = None,
-) -> tuple[str, str, list[str], float]:
-    """Improve step: Evaluate, Update Beliefs/Perception, optionally Generate New Experiments.
-
-    When num_experiments > 0, the LLM is asked to generate new experiments to test.
-    When num_experiments == 0, only beliefs and perception are updated (no experiment generation).
+) -> tuple[str, str, float]:
+    """Compute episode summaries (async parallel) and perception examples.
 
     Args:
         config: Configuration containing model information
@@ -543,18 +540,11 @@ def improve_step(
         output_dir: Directory containing rollout results
         previous_experiments: List of experiments tested in the last step
         default_knowledge: Default knowledge string to include in prompt
-        num_experiments: Number of new experiments to generate (0 = no generation)
         rollout_results: Results from run_explore_rollouts, including any errors
 
     Returns:
-        Tuple of (updated_beliefs, updated_perception, new_experiments, total_improve_cost).
-        new_experiments is [] when num_experiments == 0.
+        Tuple of (episode_summaries_xml, perception_examples_str, summary_cost).
     """
-    generate_experiments = num_experiments > 0
-    improve_mode = config.eval.evolve.get("improve_mode", "both")
-    improve_beliefs = improve_mode in ("both", "beliefs")
-    improve_perception = improve_mode in ("both", "perception")
-
     async def get_all_summaries():
         """Get all episode summaries in parallel."""
         episode_tasks = []
@@ -606,7 +596,7 @@ def improve_step(
             if "error" in result:
                 episode_summaries += f"<rollout_error run={run_name}>\n{result['error']}\n<rollout_error>\n"
     episode_summaries += "</episode_summaries>"
-  
+
     # Extract concrete (observation → perception output) pairs for grounded perception improvement
     perc_example_max_trajs = config.eval.evolve.get("perc_example_max_trajs", 3)
     perc_example_max_steps = config.eval.evolve.get("perc_example_max_steps", 1)
@@ -615,6 +605,48 @@ def improve_step(
         max_trajs=perc_example_max_trajs,
         max_steps_per_traj=perc_example_max_steps,
     )
+
+    return episode_summaries, perception_examples, summary_cost
+
+
+def generate_candidate_beliefs(
+    config: DictConfig,
+    base_beliefs: str,
+    perception: str,
+    episode_summaries: str,
+    perception_examples: str,
+    previous_experiments: list[str],
+    default_knowledge: str,
+    num_experiments: int = 0,
+    candidate_index: int = 0,
+    all_experiments: list[str] | None = None,
+) -> tuple[str, str, list[str], float]:
+    """Single improve LLM call: build prompt, call LLM, parse, validate perception.
+
+    Args:
+        config: Configuration containing model information
+        base_beliefs: Current beliefs/instructions
+        perception: Current perception module
+        episode_summaries: Pre-computed episode summaries XML string
+        perception_examples: Pre-computed perception examples string
+        previous_experiments: List of experiments tested in the last step
+        default_knowledge: Default knowledge string to include in prompt
+        num_experiments: Number of new experiments to generate (0 = no generation)
+        candidate_index: Index of this candidate (for logging)
+        all_experiments: Cumulative pool of all previously generated experiments (for deduplication)
+
+    Returns:
+        Tuple of (updated_beliefs, updated_perception, new_experiments, cost).
+        new_experiments is [] when num_experiments == 0.
+    """
+    if all_experiments is None:
+        all_experiments = []
+    generate_experiments = num_experiments > 0
+    improve_mode = config.eval.evolve.get("improve_mode", "both")
+    improve_beliefs = improve_mode in ("both", "beliefs")
+    improve_perception = improve_mode in ("both", "perception")
+
+    experiment_mode = config.eval.evolve.get("experiment_mode", "binary")
 
     # Build prompt — experiment generation section is conditional
     if generate_experiments:
@@ -628,18 +660,29 @@ def improve_step(
                 f"{_step_num}. Update the perception module to make sure it is correct and that it extracts better features from the direct game observation."
             )
             _step_num += 1
-        _steps.append(
-            f"{_step_num}. Generate {num_experiments} NEW experiments to test in the next step.\n"
-            "   - Experiments should be specific, actionable strategies or mechanics to test.\n"
-            "   - They should help us achieve the main goal."
-        )
+        if experiment_mode == "binary":
+            _steps.append(
+                f"{_step_num}. Suggest up to {num_experiments} binary question experiments worth testing. Each should be a specific YES/NO question about a game mechanic, strategy, or interaction that we can test by playing.\n"
+                "   - Prefer novel experiments not already in the pool, but it is OK to suggest fewer if the pool already covers the important questions."
+            )
+            exp_placeholder_1 = "[First binary question experiment]"
+            exp_placeholder_2 = "[Second binary question experiment]"
+        else:
+            _steps.append(
+                f"{_step_num}. Suggest up to {num_experiments} NEW experiments to test in the next step.\n"
+                "   - Experiments should be specific, actionable strategies or mechanics to test.\n"
+                "   - They should help us achieve the main goal.\n"
+                "   - Prefer novel experiments not already in the pool, but it is OK to suggest fewer if the pool already covers the important questions."
+            )
+            exp_placeholder_1 = "[First experiment to test]"
+            exp_placeholder_2 = "[Second experiment to test]"
         task_section = "Your task is to:\n" + "\n".join(_steps)
         experiments_xml = f"""<new_experiments>
-EXPERIMENT 1: [First experiment to test]
+EXPERIMENT 1: {exp_placeholder_1}
 
-EXPERIMENT 2: [Second experiment to test]
+EXPERIMENT 2: {exp_placeholder_2}
 ...
-(Generate exactly {num_experiments} experiments)
+(Up to {num_experiments} experiments)
 </new_experiments>"""
     else:
         _steps = ["1. Analyze the results."]
@@ -664,7 +707,7 @@ EXPERIMENT 2: [Second experiment to test]
     if improve_perception:
         _think_actions.append("design perception improvements")
     if generate_experiments:
-        _think_actions.append("brainstorm new experiments")
+        _think_actions.append("brainstorm new binary question experiments" if experiment_mode == "binary" else "brainstorm new experiments")
     if len(_think_actions) == 2:
         _think_inner = " and ".join(_think_actions)
     elif len(_think_actions) > 2:
@@ -689,14 +732,27 @@ EXPERIMENT 2: [Second experiment to test]
         )
 
     # Build conditional instruction blocks
+    beliefs_style = config.eval.evolve.get("beliefs_style", "strict")
     beliefs_instructions = ""
     if improve_beliefs:
-        beliefs_instructions = """For beliefs:
+        if beliefs_style == "relaxed":
+            beliefs_instructions = """For beliefs:
 - They should describe information about how the game works that helps us complete the objective.
 - They should be brief with each point being a few sentences.
 - Correct any wrong or misleading beliefs
 - They should be grounded in the evidence present from the trajectories.
 - They should be as simple as possible."""
+        else:
+            beliefs_instructions = """For beliefs:
+- Beliefs must be SHORT, CONCRETE, ACTIONABLE strategies — not abstract reasoning frameworks or meta-cognitive rules.
+- Each belief should tell the agent WHAT TO DO in a specific situation, in plain language.
+- Good belief: "Zap a wand to clear through the lava. After crossing, keep exploring east to find the stairs."
+- Bad belief: "The agent must maintain a working memory of all visited coordinates and prioritize movement towards Known_Unexplored_Frontiers when a large room-like area is sufficiently explored..."
+- Focus on patterns specific to THIS game environment — not generic game-playing principles.
+- Do NOT include instructions about how to reason, how to validate coordinates, or how to manage internal state. The agent already has a perception module for that.
+- Total beliefs should be at most 10 short bullet points (~200 words total). Fewer actionable beliefs are better than many abstract ones.
+- Correct any wrong or misleading beliefs.
+- They should be grounded in the evidence present from the trajectories."""
 
     perception_instructions = ""
     if improve_perception:
@@ -727,6 +783,18 @@ def perceive(observation_text: str) -> str:
 ```
 </updated_perception>"""
 
+    # Build experiment pool display for deduplication
+    if generate_experiments and all_experiments:
+        pool_lines = [f"EXPERIMENT {i+1}: {exp}" for i, exp in enumerate(all_experiments)]
+        experiment_pool_section = (
+            "We maintain a pool of all previously generated experiments:\n"
+            "=== EXPERIMENT POOL ===\n"
+            + "\n".join(pool_lines)
+            + "\n=== END OF EXPERIMENT POOL ==="
+        )
+    else:
+        experiment_pool_section = ""
+
     base_prompt = f"""We are playing a game and trying to figure out how it works.
 
 The agent receives the following default instructions/knowledge by default:
@@ -750,6 +818,7 @@ We have collected the following experience by playing the game:
 {perception_examples}
 === END OF COLLECTED EXPERIENCES ===
 
+{experiment_pool_section}
 {task_section}
 
 {beliefs_instructions}
@@ -803,13 +872,13 @@ Please fix the error in your perception code.
         else:
             prompt = base_prompt
 
-        logging.info(f"Improve step prompt (attempt {attempt + 1}/{max_retries}):\n{prompt}")
+        logging.info(f"Improve step prompt (candidate {candidate_index}, attempt {attempt + 1}/{max_retries}):\n{prompt}")
 
         # Build input for LLM
         input_data = build_llm_input(prompt)
 
         # Call LLM
-        logging.info(f"Calling LLM for improve step (attempt {attempt + 1}/{max_retries})")
+        logging.info(f"Calling LLM for improve step (candidate {candidate_index}, attempt {attempt + 1}/{max_retries})")
         response = litellm.responses(
             model=model_name,
             input=input_data,
@@ -819,7 +888,7 @@ Please fix the error in your perception code.
 
         # Extract response text
         response_text = extract_llm_response_text(response)
-        logging.info(f"Improve step LLM response (attempt {attempt + 1}/{max_retries}):\n{response_text}")
+        logging.info(f"Improve step LLM response (candidate {candidate_index}, attempt {attempt + 1}/{max_retries}):\n{response_text}")
 
         # Extract fields
         response_dict = extract_xml_kv(response_text, xml_fields)
@@ -886,9 +955,631 @@ Please fix the error in your perception code.
     if generate_experiments:
         new_experiments = new_experiments[:num_experiments]
 
-    logging.info(f"Updated beliefs:\n{updated_beliefs}")
-    logging.info(f"Updated perception:\n{updated_perception}")
-    logging.info(f"Generated {len(new_experiments)} new experiments")
+    # Deduplicate new experiments against the cumulative pool (case-insensitive)
+    if generate_experiments and all_experiments:
+        existing_lower = {e.strip().lower() for e in all_experiments}
+        deduped = []
+        for exp in new_experiments:
+            if exp.strip().lower() not in existing_lower:
+                deduped.append(exp)
+                existing_lower.add(exp.strip().lower())
+        if len(deduped) < len(new_experiments):
+            logging.info(f"Deduplicated experiments: {len(new_experiments)} -> {len(deduped)}")
+        new_experiments = deduped
 
-    total_improve_cost = summary_cost + improve_call_cost
-    return updated_beliefs, updated_perception, new_experiments, total_improve_cost
+    logging.info(f"Candidate {candidate_index} - Updated beliefs:\n{updated_beliefs}")
+    logging.info(f"Candidate {candidate_index} - Updated perception:\n{updated_perception}")
+    logging.info(f"Candidate {candidate_index} - Generated {len(new_experiments)} new experiments")
+
+    return updated_beliefs, updated_perception, new_experiments, improve_call_cost
+
+
+def improve_step(
+    config: DictConfig,
+    base_beliefs: str,
+    perception: str,
+    output_dir: str,
+    previous_experiments: list[str],
+    default_knowledge: str,
+    num_experiments: int = 0,
+    rollout_results: dict[str, dict] | None = None,
+    all_experiments: list[str] | None = None,
+) -> tuple[str, str, list[str], float]:
+    """Improve step: Evaluate, Update Beliefs/Perception, optionally Generate New Experiments.
+
+    Thin wrapper that composes prepare_improve_context() and generate_candidate_beliefs().
+
+    When num_experiments > 0, the LLM is asked to generate new experiments to test.
+    When num_experiments == 0, only beliefs and perception are updated (no experiment generation).
+
+    Args:
+        config: Configuration containing model information
+        base_beliefs: Current beliefs/instructions
+        perception: Current perception module
+        output_dir: Directory containing rollout results
+        previous_experiments: List of experiments tested in the last step
+        default_knowledge: Default knowledge string to include in prompt
+        num_experiments: Number of new experiments to generate (0 = no generation)
+        rollout_results: Results from run_explore_rollouts, including any errors
+        all_experiments: Cumulative pool of all previously generated experiments (for deduplication)
+
+    Returns:
+        Tuple of (updated_beliefs, updated_perception, new_experiments, total_improve_cost).
+        new_experiments is [] when num_experiments == 0.
+    """
+    summaries, perc_examples, summary_cost = prepare_improve_context(
+        config=config,
+        base_beliefs=base_beliefs,
+        perception=perception,
+        output_dir=output_dir,
+        previous_experiments=previous_experiments,
+        default_knowledge=default_knowledge,
+        rollout_results=rollout_results,
+    )
+
+    beliefs, perception_out, experiments, improve_cost = generate_candidate_beliefs(
+        config=config,
+        base_beliefs=base_beliefs,
+        perception=perception,
+        episode_summaries=summaries,
+        perception_examples=perc_examples,
+        previous_experiments=previous_experiments,
+        default_knowledge=default_knowledge,
+        num_experiments=num_experiments,
+        all_experiments=all_experiments,
+    )
+
+    return beliefs, perception_out, experiments, summary_cost + improve_cost
+
+
+def generate_experiments_from_baseline(
+    config: DictConfig,
+    base_beliefs: str,
+    episode_summaries: str,
+    all_experiments: list[str],
+    experiment_results: dict[str, list[dict]],
+    default_knowledge: str,
+    num_to_generate: int,
+    num_to_select: int,
+    refine_experiments: bool = True,
+) -> tuple[list[str], list[str], list[dict], float]:
+    """Analyze baseline trajectories, generate new experiments, select which to run.
+
+    Args:
+        config: Configuration containing model information
+        base_beliefs: Current beliefs/instructions
+        episode_summaries: Pre-computed episode summaries XML string
+        all_experiments: Full cumulative experiment pool E
+        experiment_results: Map of experiment -> list of {answer, reasoning} dicts
+        default_knowledge: Default knowledge string
+        num_to_generate: Number of new experiments to generate
+        num_to_select: Number of experiments to select for the next rollout phase
+
+    Returns:
+        Tuple of (updated_E, selected_experiments, refinements, cost).
+        refinements is a list of {index, old_wording, new_wording, keep_results} dicts.
+    """
+    experiment_mode = config.eval.evolve.get("experiment_mode", "binary")
+
+    # Build experiment pool display with ANSWERED/UNANSWERED labels
+    experiment_pool_lines = []
+    for i, exp in enumerate(all_experiments):
+        results = experiment_results.get(exp, [])
+        if results:
+            # Show answered results
+            answers = [r["answer"] for r in results]
+            yes_count = sum(1 for a in answers if a)
+            no_count = sum(1 for a in answers if not a)
+            experiment_pool_lines.append(
+                f"EXPERIMENT {i+1} [ANSWERED - YES:{yes_count} NO:{no_count}]: {exp}"
+            )
+            for j, r in enumerate(results):
+                ans_str = "YES" if r["answer"] else "NO"
+                experiment_pool_lines.append(f"  Result {j+1}: {ans_str} - {r['reasoning']}")
+        else:
+            experiment_pool_lines.append(f"EXPERIMENT {i+1} [UNANSWERED]: {exp}")
+
+    experiment_pool_str = "\n".join(experiment_pool_lines) if experiment_pool_lines else "(empty - no experiments yet)"
+
+    # Build task items conditionally based on experiment_mode
+    if experiment_mode == "binary":
+        task_items = f"""1. Analyze the baseline experience to identify knowledge gaps and uncertainties about how the game works.
+2. Generate {num_to_generate} NEW binary question experiments. Each experiment should be a specific YES/NO question about a game mechanic, strategy, or interaction that we can test by playing.
+   - Good experiment: "Does zapping a wand at lava clear the lava so we can walk across?"
+   - Good experiment: "Can we pick up items while standing on a trap?"
+   - Bad experiment: "Is the game fun?" (not testable via gameplay)
+   - Do NOT duplicate existing experiments in the pool."""
+        exp_placeholder_1 = "[First binary question experiment]"
+        exp_placeholder_2 = "[Second binary question experiment]"
+    else:
+        task_items = f"""1. Analyze the baseline experience to identify knowledge gaps and uncertainties about how the game works.
+2. Generate {num_to_generate} NEW experiments to test. Each experiment should be a specific, actionable strategy or mechanic to test that helps us achieve the main goal.
+   - Good experiment: "Try zapping a wand at lava to see if it clears a path"
+   - Good experiment: "Attempt to pick up items while standing on a trap"
+   - Bad experiment: "Is the game fun?" (not testable via gameplay)
+   - Do NOT duplicate existing experiments in the pool."""
+        exp_placeholder_1 = "[First experiment to test]"
+        exp_placeholder_2 = "[Second experiment to test]"
+
+    if refine_experiments:
+        task_items += f"""
+3. REFINE existing experiments if their wording is incorrect, too vague, or based on wrong assumptions.
+   For each refinement, indicate whether old results still apply:
+   - KEEP_RESULTS: YES if the new wording asks essentially the same question, just more precisely
+   - KEEP_RESULTS: NO if the meaning changed substantially (old answers may be wrong for the new question)
+   Only refine experiments that genuinely need it. Do NOT refine experiments just to rephrase them cosmetically.
+4. Select {num_to_select} experiments from the FULL updated pool (including your new ones) to test next. Prioritize UNANSWERED experiments, but you may re-test ANSWERED ones if results are uncertain."""
+    else:
+        task_items += f"""
+3. Select {num_to_select} experiments from the FULL updated pool (including your new ones) to test next. Prioritize UNANSWERED experiments, but you may re-test ANSWERED ones if results are uncertain."""
+
+    # Build XML format section conditionally
+    xml_format = """<think>
+Analyze baseline experience, identify knowledge gaps, design experiments.
+</think>
+<new_experiments>
+EXPERIMENT 1: {exp_placeholder_1}
+EXPERIMENT 2: {exp_placeholder_2}
+...
+(Generate exactly {num_to_generate} experiments)
+</new_experiments>""".format(exp_placeholder_1=exp_placeholder_1, exp_placeholder_2=exp_placeholder_2, num_to_generate=num_to_generate)
+
+    if refine_experiments:
+        xml_format += """
+<refined_experiments>
+REFINE N: [new wording for experiment N] KEEP_RESULTS: YES/NO
+(Only include experiments that need refinement. N refers to the experiment number in the pool above.)
+</refined_experiments>"""
+
+    xml_format += """
+<selected_experiments>
+[Comma-separated list of experiment numbers from the FULL updated pool to test next, e.g. "3, 5, 7"]
+</selected_experiments>"""
+
+    prompt = f"""We are playing a game and trying to figure out how it works.
+
+The agent receives the following default instructions/knowledge by default:
+=== DEFAULT KNOWLEDGE ===
+{default_knowledge}
+=== END DEFAULT KNOWLEDGE ===
+
+We maintain the following current beliefs about the game:
+=== CURRENT BELIEFS ===
+{base_beliefs if base_beliefs else "(empty - no beliefs yet)"}
+=== END OF CURRENT BELIEFS ===
+
+We have collected the following experience from baseline rollouts (playing with current beliefs):
+=== BASELINE EXPERIENCE ===
+{episode_summaries}
+=== END OF BASELINE EXPERIENCE ===
+
+We maintain a pool of experiments to test about the game:
+=== EXPERIMENT POOL ===
+{experiment_pool_str}
+=== END OF EXPERIMENT POOL ===
+
+Your task is to:
+{task_items}
+
+Format your response in XML style as:
+{xml_format}
+"""
+
+    # Setup model name
+    if config.client.client_name == "vllm":
+        model_name = f"hosted_vllm/{config.client.model_id}"
+    else:
+        model_name = f"{config.client.client_name}/{config.client.model_id}"
+
+    logging.info(f"Generate experiments prompt:\n{prompt}")
+
+    input_data = build_llm_input(prompt)
+    response = litellm.responses(
+        model=model_name,
+        input=input_data,
+        num_retries=5,
+    )
+    cost = _get_response_cost(response, config.client.model_id)
+
+    response_text = extract_llm_response_text(response)
+    logging.info(f"Generate experiments LLM response:\n{response_text}")
+
+    xml_keys = ["new_experiments", "selected_experiments"]
+    if refine_experiments:
+        xml_keys.insert(1, "refined_experiments")
+    response_dict = extract_xml_kv(response_text, xml_keys)
+    validate_response_fields(response_dict, response_text, ["new_experiments", "selected_experiments"])
+
+    # Parse new experiments
+    new_experiments = []
+    if "new_experiments" in response_dict:
+        experiments_text = response_dict["new_experiments"].strip()
+        experiment_pattern = r'EXPERIMENT\s*\d+\s*:\s*(.+?)(?=EXPERIMENT\s*\d+\s*:|$)'
+        matches = re.findall(experiment_pattern, experiments_text, re.DOTALL | re.IGNORECASE)
+        new_experiments = [m.strip() for m in matches if m.strip()]
+        if not new_experiments:
+            new_experiments = [b.strip() for b in experiments_text.split('\n\n') if b.strip()]
+    new_experiments = new_experiments[:num_to_generate]
+
+    # Parse refined experiments
+    refinements = []
+    if refine_experiments and "refined_experiments" in response_dict:
+        refine_text = response_dict["refined_experiments"].strip()
+        refine_pattern = r'REFINE\s*(\d+)\s*:\s*(.+?)\s*KEEP_RESULTS\s*:\s*(YES|NO)'
+        refine_matches = re.findall(refine_pattern, refine_text, re.DOTALL | re.IGNORECASE)
+        for idx_str, new_wording, keep_str in refine_matches:
+            idx = int(idx_str) - 1  # Convert 1-based to 0-based
+            if 0 <= idx < len(all_experiments):
+                old_wording = all_experiments[idx]
+                new_wording = new_wording.strip()
+                keep_results = keep_str.strip().upper() == "YES"
+
+                # Skip if wording hasn't actually changed
+                if new_wording.lower() == old_wording.lower():
+                    continue
+
+                refinements.append({
+                    "index": idx,
+                    "old_wording": old_wording,
+                    "new_wording": new_wording,
+                    "keep_results": keep_results,
+                })
+
+                # Apply refinement to experiment pool
+                all_experiments[idx] = new_wording
+
+                # Handle results migration
+                old_results = experiment_results.pop(old_wording, [])
+                if keep_results and old_results:
+                    experiment_results[new_wording] = old_results
+                # If not keeping results, new_wording starts with no results (unanswered)
+
+                logging.info(
+                    f"Refined experiment {idx+1}: '{old_wording}' -> '{new_wording}' "
+                    f"(keep_results={keep_results}, had {len(old_results)} results)"
+                )
+
+    # Deduplicate new experiments against existing pool (case-insensitive)
+    existing_lower = {e.strip().lower() for e in all_experiments}
+    deduped_new = []
+    for exp in new_experiments:
+        if exp.strip().lower() not in existing_lower:
+            deduped_new.append(exp)
+            existing_lower.add(exp.strip().lower())
+
+    # Build updated pool
+    updated_E = list(all_experiments) + deduped_new
+
+    # Parse selected experiments
+    selected_experiments = []
+    if "selected_experiments" in response_dict:
+        sel_text = response_dict["selected_experiments"].strip()
+        # Parse comma-separated indices
+        for part in sel_text.replace("\n", ",").split(","):
+            part = part.strip()
+            # Extract number from the part
+            num_match = re.search(r'\d+', part)
+            if num_match:
+                idx = int(num_match.group()) - 1  # Convert 1-based to 0-based
+                if 0 <= idx < len(updated_E):
+                    selected_experiments.append(updated_E[idx])
+
+    # Fallback: if no valid selections, pick first num_to_select unanswered experiments
+    if not selected_experiments:
+        for exp in updated_E:
+            if exp not in experiment_results or not experiment_results[exp]:
+                selected_experiments.append(exp)
+                if len(selected_experiments) >= num_to_select:
+                    break
+
+    selected_experiments = selected_experiments[:num_to_select]
+
+    logging.info(f"Updated experiment pool size: {len(updated_E)}")
+    logging.info(f"New experiments added: {len(deduped_new)}")
+    logging.info(f"Refined {len(refinements)} existing experiments")
+    for r in refinements:
+        logging.info(f"  Refined: '{r['old_wording']}' -> '{r['new_wording']}' (keep_results={r['keep_results']})")
+    logging.info(f"Selected {len(selected_experiments)} experiments for next rollout")
+    for i, exp in enumerate(selected_experiments):
+        logging.info(f"  Selected {i+1}: {exp}")
+
+    return updated_E, selected_experiments, refinements, cost
+
+
+async def analyze_experiment_conclusiveness_async(
+    config: DictConfig,
+    experiment_question: str,
+    outcome_header: str,
+    traj_text: str,
+    trajectory_path: str,
+) -> tuple[dict, float]:
+    """Determine if a trajectory conclusively answers a binary question experiment.
+
+    Args:
+        config: Configuration containing model information
+        experiment_question: The binary question being tested
+        outcome_header: Formatted episode outcome header
+        traj_text: Trajectory text content
+        trajectory_path: Path to the trajectory file (for logging)
+
+    Returns:
+        Tuple of (result_dict, cost).
+        result_dict has keys: "conclusive" (bool), "answer" (bool|None), "reasoning" (str).
+    """
+    prompt = f"""We are playing a game and testing a specific binary question experiment.
+
+The experiment question is:
+=== EXPERIMENT ===
+{experiment_question}
+=== END EXPERIMENT ===
+
+Here is the episode outcome and trajectory:
+=== EPISODE OUTCOME ===
+{outcome_header}
+=== END OF EPISODE OUTCOME ===
+=== TRAJECTORY ===
+{traj_text}
+=== END OF TRAJECTORY ===
+
+Does this trajectory provide CONCLUSIVE evidence to answer the binary question above?
+- A trajectory is conclusive if the agent clearly attempted the action/strategy in question AND the result was unambiguous.
+- A trajectory is NOT conclusive if the agent never got the opportunity to test the question, or if the result is ambiguous.
+
+Format your response in XML style as:
+<think>
+Analyze whether the trajectory provides conclusive evidence for the experiment question.
+</think>
+<conclusive>YES or NO</conclusive>
+<answer>YES or NO (only if conclusive, otherwise leave empty)</answer>
+<reasoning>Brief explanation of why this is or is not conclusive, and what the answer is if conclusive.</reasoning>
+"""
+
+    input_data = build_llm_input(prompt)
+
+    logging.info(f"Analyzing experiment conclusiveness for: {trajectory_path}")
+    if config.client.client_name == "vllm":
+        model_name = f"hosted_vllm/{config.client.model_id}"
+    else:
+        model_name = f"{config.client.client_name}/{config.client.model_id}"
+
+    response = await asyncio.to_thread(
+        litellm.responses,
+        model=model_name,
+        input=input_data,
+        num_retries=5,
+    )
+
+    cost = _get_response_cost(response, config.client.model_id)
+    response_text = extract_llm_response_text(response)
+    logging.info(f"Experiment conclusiveness response for {trajectory_path}:\n{response_text}")
+
+    response_dict = extract_xml_kv(response_text, ["conclusive", "answer", "reasoning"])
+
+    conclusive = response_dict.get("conclusive", "").strip().upper() == "YES"
+    answer = None
+    if conclusive:
+        answer = response_dict.get("answer", "").strip().upper() == "YES"
+    reasoning = response_dict.get("reasoning", "").strip()
+
+    return {"conclusive": conclusive, "answer": answer, "reasoning": reasoning}, cost
+
+
+def analyze_all_experiment_trajectories(
+    config: DictConfig,
+    experiment_rollout_results: dict[str, dict],
+    selected_experiments: list[str],
+    output_dir: str,
+) -> tuple[dict[str, list[dict]], float]:
+    """Batch analyze all experiment trajectories for conclusiveness.
+
+    Args:
+        config: Configuration containing model information
+        experiment_rollout_results: Results from experiment rollouts
+        selected_experiments: List of experiment questions that were tested
+        output_dir: Directory containing experiment rollout trajectory files
+
+    Returns:
+        Tuple of (new_conclusive_results, total_cost).
+        new_conclusive_results maps experiment_question -> list of {answer, reasoning} dicts.
+        Only includes conclusive results.
+    """
+    async def _analyze_all():
+        tasks = []
+        task_metadata = []  # Track which experiment each task corresponds to
+
+        for episode_path in Path(output_dir).rglob("*.csv"):
+            try:
+                rel_path = episode_path.relative_to(output_dir)
+                run_name = rel_path.parts[0]
+
+                # Only analyze experiment rollouts
+                if not run_name.startswith("experiment_"):
+                    continue
+
+                try:
+                    idx = int(run_name.split("_")[1])
+                    if 0 <= idx < len(selected_experiments):
+                        experiment_question = selected_experiments[idx]
+                    else:
+                        continue
+                except (ValueError, IndexError):
+                    continue
+
+                outcome_header = get_episode_outcome_header(str(episode_path))
+                traj_text = Path(episode_path).read_text()
+                traj_text = trim_to_model_context_lim(traj_text, config.client.model_id)
+
+                tasks.append(
+                    analyze_experiment_conclusiveness_async(
+                        config, experiment_question, outcome_header, traj_text, str(episode_path)
+                    )
+                )
+                task_metadata.append(experiment_question)
+            except ValueError:
+                continue
+
+        logging.info(f"Analyzing conclusiveness for {len(tasks)} experiment trajectories")
+        if not tasks:
+            return {}, 0.0
+
+        results = await asyncio.gather(*tasks)
+
+        new_conclusive_results: dict[str, list[dict]] = {}
+        total_cost = 0.0
+
+        for (result_dict, cost), experiment_question in zip(results, task_metadata):
+            total_cost += cost
+            if result_dict["conclusive"]:
+                if experiment_question not in new_conclusive_results:
+                    new_conclusive_results[experiment_question] = []
+                new_conclusive_results[experiment_question].append({
+                    "answer": result_dict["answer"],
+                    "reasoning": result_dict["reasoning"],
+                })
+
+        return new_conclusive_results, total_cost
+
+    return asyncio.run(_analyze_all())
+
+
+def score_candidate_beliefs(
+    config: DictConfig,
+    candidates: list[str],
+    experiment_results: dict[str, list[dict]],
+    default_knowledge: str,
+    num_score_experiments: int,
+) -> tuple[list[int], list[dict], float]:
+    """Score candidate beliefs by predicting experiment answers.
+
+    For each candidate: one LLM call presenting the candidate beliefs + K sampled
+    binary questions. LLM predicts YES/NO for each. Score = number matching ground truth
+    (majority vote of conclusive results).
+
+    Args:
+        config: Configuration containing model information
+        candidates: List of candidate belief strings
+        experiment_results: Map of experiment -> list of {answer, reasoning} dicts
+        default_knowledge: Default knowledge string
+        num_score_experiments: Number of experiments to sample for scoring
+
+    Returns:
+        Tuple of (scores, details, total_cost).
+        scores[i] = score for candidate i.
+        details[i] = dict with prediction details for candidate i.
+    """
+    import random
+
+    # Build ground truth via majority vote
+    answered_experiments = {}
+    for exp, results in experiment_results.items():
+        if not results:
+            continue
+        yes_count = sum(1 for r in results if r["answer"])
+        no_count = sum(1 for r in results if not r["answer"])
+        if yes_count == no_count:
+            continue  # Tie = treat as unanswered for scoring
+        ground_truth = yes_count > no_count
+        answered_experiments[exp] = ground_truth
+
+    if not answered_experiments:
+        logging.info("No answered experiments with clear majority vote. Skipping scoring.")
+        return [0] * len(candidates), [{}] * len(candidates), 0.0
+
+    # Sample experiments for scoring
+    all_answered = list(answered_experiments.keys())
+    if len(all_answered) <= num_score_experiments:
+        sampled_experiments = all_answered
+    else:
+        sampled_experiments = random.sample(all_answered, num_score_experiments)
+
+    # Build experiment questions list for the prompt
+    exp_questions_lines = []
+    for i, exp in enumerate(sampled_experiments):
+        exp_questions_lines.append(f"Q{i+1}: {exp}")
+    exp_questions_str = "\n".join(exp_questions_lines)
+
+    if config.client.client_name == "vllm":
+        model_name = f"hosted_vllm/{config.client.model_id}"
+    else:
+        model_name = f"{config.client.client_name}/{config.client.model_id}"
+
+    async def _score_all():
+        tasks = []
+        for cand_idx, candidate_beliefs in enumerate(candidates):
+            prompt = f"""You are evaluating a set of beliefs about a game by predicting answers to binary questions.
+
+The agent receives the following default instructions/knowledge by default:
+=== DEFAULT KNOWLEDGE ===
+{default_knowledge}
+=== END DEFAULT KNOWLEDGE ===
+
+Given these beliefs about the game:
+=== BELIEFS ===
+{candidate_beliefs}
+=== END OF BELIEFS ===
+
+Based ONLY on the beliefs above (and the default knowledge), predict YES or NO for each of the following questions:
+{exp_questions_str}
+
+Format your response in XML style as:
+<predictions>
+Q1: YES or NO
+Q2: YES or NO
+...
+</predictions>
+"""
+            input_data = build_llm_input(prompt)
+            logging.info(f"Scoring candidate {cand_idx} prompt:\n{prompt}")
+
+            tasks.append(
+                asyncio.to_thread(
+                    litellm.responses,
+                    model=model_name,
+                    input=input_data,
+                    num_retries=5,
+                )
+            )
+
+        responses = await asyncio.gather(*tasks)
+        return responses
+
+    responses = asyncio.run(_score_all())
+
+    scores = []
+    details = []
+    total_cost = 0.0
+
+    for cand_idx, response in enumerate(responses):
+        cost = _get_response_cost(response, config.client.model_id)
+        total_cost += cost
+
+        response_text = extract_llm_response_text(response)
+        logging.info(f"Scoring candidate {cand_idx} response:\n{response_text}")
+
+        response_dict = extract_xml_kv(response_text, ["predictions"])
+        predictions_text = response_dict.get("predictions", "")
+
+        # Parse predictions
+        score = 0
+        cand_details = {"predictions": {}, "ground_truth": {}}
+        for i, exp in enumerate(sampled_experiments):
+            q_label = f"Q{i+1}"
+            ground_truth = answered_experiments[exp]
+            cand_details["ground_truth"][exp] = ground_truth
+
+            # Search for prediction in response
+            pattern = rf'{q_label}\s*:\s*(YES|NO)'
+            match = re.search(pattern, predictions_text, re.IGNORECASE)
+            if match:
+                predicted = match.group(1).strip().upper() == "YES"
+                cand_details["predictions"][exp] = predicted
+                if predicted == ground_truth:
+                    score += 1
+            else:
+                cand_details["predictions"][exp] = None
+
+        scores.append(score)
+        details.append(cand_details)
+        logging.info(f"Candidate {cand_idx} score: {score}/{len(sampled_experiments)}")
+
+    return scores, details, total_cost

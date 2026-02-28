@@ -2,9 +2,9 @@
 """Visualize explore.py logs with a local web server.
 
 Usage:
-    python visualize_explore.py <log_dir> [--port PORT]
+    python visualize_explore.py <log_dir> [--port PORT] [--open-browser]
 
-Opens a browser with an interactive viewer for explore.py log directories.
+Serves an interactive viewer for explore.py log directories.
 Trajectories are loaded on-demand to keep the UI fast.
 """
 
@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import threading
+import traceback
 import webbrowser
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -49,20 +50,27 @@ def find_rollout_files(rollout_dir):
 
 
 def _sort_key(name, phase_type):
-    prefix = "hypothesis_" if phase_type == "explore" else "baseline_"
-    try:
-        return int(name.replace(prefix, ""))
-    except ValueError:
-        return 999
+    # Support legacy explore rollouts (hypothesis_N) and experiment-guided ones (experiment_N).
+    for prefix in ("baseline_", "hypothesis_", "experiment_"):
+        if name.startswith(prefix):
+            try:
+                return int(name.replace(prefix, ""))
+            except ValueError:
+                break
+    return 999
 
 
 def load_phase_light(phase_dir, phase_type):
     """Load phase data WITHOUT trajectory CSVs (lightweight)."""
+    # Try hypotheses.json (old format), fall back to experiments.json (new format)
+    hypotheses = read_json(os.path.join(phase_dir, "hypotheses.json"))
+    if hypotheses is None:
+        hypotheses = read_json(os.path.join(phase_dir, "experiments.json"))
     phase = {
         "beliefs": read_file(os.path.join(phase_dir, "beliefs.txt")),
         "perception": read_file(os.path.join(phase_dir, "perception.py")),
         "rollout_stats": read_json(os.path.join(phase_dir, "rollout_stats.json")),
-        "hypotheses": read_json(os.path.join(phase_dir, "hypotheses.json")),
+        "hypotheses": hypotheses,
         "rollouts": [],
     }
 
@@ -80,13 +88,19 @@ def load_phase_light(phase_dir, phase_type):
         meta = read_json(json_file) if json_file else None
 
         hypothesis_text = ""
+        text_label = "Hypothesis"
         hyp_file = os.path.join(rollout_path, "hypothesis.txt")
+        exp_file = os.path.join(rollout_path, "experiment.txt")
         if os.path.exists(hyp_file):
             hypothesis_text = read_file(hyp_file)
+        elif os.path.exists(exp_file):
+            hypothesis_text = read_file(exp_file)
+            text_label = "Experiment"
 
         phase["rollouts"].append({
             "name": name,
             "hypothesis": hypothesis_text,
+            "hypothesis_label": text_label,
             "meta": meta,
         })
 
@@ -112,16 +126,61 @@ def load_log_dir_light(log_dir):
 
     for idx, name in step_dirs:
         step_path = os.path.join(log_dir, name)
+        candidate_names = []
+        candidates_dir = os.path.join(step_path, "candidates")
+        if os.path.isdir(candidates_dir):
+            for cand_name in sorted(os.listdir(candidates_dir)):
+                cand_path = os.path.join(candidates_dir, cand_name)
+                if os.path.isfile(cand_path) and cand_name.endswith(".txt"):
+                    candidate_names.append(cand_name)
         step = {
             "index": idx,
             "input_beliefs": read_file(os.path.join(step_path, "input_beliefs.txt")),
             "input_perception": read_file(os.path.join(step_path, "input_perception.txt")),
+            # Keep initial payload lightweight; experiment-guided artifacts are loaded on demand.
+            "has_experiment_artifacts": any(os.path.exists(os.path.join(step_path, f)) for f in (
+                "input_experiments.json",
+                "input_experiment_results.json",
+                "experiment_generation.json",
+                "experiment_analysis.json",
+                "scoring.json",
+                "experiments.json",
+                "experiment_results.json",
+                "improve.log",
+            )) or bool(candidate_names),
+            "candidate_names": candidate_names,
             "baseline": load_phase_light(os.path.join(step_path, "baseline"), "baseline"),
             "explore": load_phase_light(os.path.join(step_path, "explore"), "explore"),
         }
         data["steps"].append(step)
 
     return data
+
+
+def load_step_artifacts(log_dir, step_idx):
+    """Load experiment-guided step-level artifacts on demand."""
+    step_path = os.path.join(log_dir, f"step_{step_idx}")
+    if not os.path.isdir(step_path):
+        return {}
+
+    candidates = []
+    candidates_dir = os.path.join(step_path, "candidates")
+    if os.path.isdir(candidates_dir):
+        for cand_name in sorted(os.listdir(candidates_dir)):
+            cand_path = os.path.join(candidates_dir, cand_name)
+            if os.path.isfile(cand_path) and cand_name.endswith(".txt"):
+                candidates.append({"name": cand_name, "text": read_file(cand_path)})
+
+    return {
+        "input_experiments": read_json(os.path.join(step_path, "input_experiments.json")),
+        "input_experiment_results": read_json(os.path.join(step_path, "input_experiment_results.json")),
+        "experiment_generation": read_json(os.path.join(step_path, "experiment_generation.json")),
+        "experiment_analysis": read_json(os.path.join(step_path, "experiment_analysis.json")),
+        "scoring": read_json(os.path.join(step_path, "scoring.json")),
+        "experiments": read_json(os.path.join(step_path, "experiments.json")),
+        "experiment_results": read_json(os.path.join(step_path, "experiment_results.json")),
+        "candidates": candidates,
+    }
 
 
 def load_trajectory(log_dir, step_idx, phase, rollout_name):
@@ -153,9 +212,9 @@ def load_trajectory(log_dir, step_idx, phase, rollout_name):
 
 
 def _extract_rollout_label(text):
-    """Extract rollout name (baseline_N or hypothesis_N) from a log line."""
+    """Extract rollout name (baseline_N, hypothesis_N, or experiment_N) from a log line."""
     for part in text.split("/"):
-        if "baseline_" in part or "hypothesis_" in part:
+        if "baseline_" in part or "hypothesis_" in part or "experiment_" in part:
             return part
     return ""
 
@@ -387,34 +446,52 @@ class Handler(BaseHTTPRequestHandler):
         pass  # suppress default logging
 
     def do_GET(self):
-        parsed = urlparse(self.path)
-        path = parsed.path
-        params = parse_qs(parsed.query)
+        try:
+            parsed = urlparse(self.path)
+            path = parsed.path
+            params = parse_qs(parsed.query)
 
-        if path == "/":
-            self._serve_html()
-        elif path == "/api/data":
-            self._json_response({"data": DATA, "meta": META})
-        elif path == "/api/trajectory":
-            step = int(params.get("step", [0])[0])
-            phase = params.get("phase", ["baseline"])[0]
-            rollout = params.get("rollout", [""])[0]
-            traj = load_trajectory(LOG_DIR, step, phase, rollout)
-            self._json_response(traj)
-        elif path == "/api/improve_log":
-            step = int(params.get("step", [0])[0])
-            phase = params.get("phase", ["baseline"])[0]
-            log_path = os.path.join(LOG_DIR, f"step_{step}", phase, "improve.log")
-            result = parse_improve_log(log_path)
-            self._json_response(result)
-        elif path == "/api/search":
-            query = params.get("q", [""])[0]
-            scope_str = params.get("scopes", ["actions,reasoning,beliefs,hypotheses"])[0]
-            scopes = set(scope_str.split(","))
-            results = search_logs(LOG_DIR, DATA, query, scopes)
-            self._json_response(results)
-        else:
-            self.send_error(404)
+            if path == "/":
+                self._serve_html()
+            elif path == "/api/data":
+                self._json_response({"data": DATA, "meta": META})
+            elif path == "/api/trajectory":
+                step = int(params.get("step", [0])[0])
+                phase = params.get("phase", ["baseline"])[0]
+                rollout = params.get("rollout", [""])[0]
+                traj = load_trajectory(LOG_DIR, step, phase, rollout)
+                self._json_response(traj)
+            elif path == "/api/improve_log":
+                step = int(params.get("step", [0])[0])
+                phase = params.get("phase", ["baseline"])[0]
+                # Legacy two-step runs log per-phase; experiment-guided runs use a step-level improve.log.
+                log_path = os.path.join(LOG_DIR, f"step_{step}", phase, "improve.log")
+                if not os.path.exists(log_path):
+                    log_path = os.path.join(LOG_DIR, f"step_{step}", "improve.log")
+                result = parse_improve_log(log_path)
+                self._json_response(result)
+            elif path == "/api/step_artifacts":
+                step = int(params.get("step", [0])[0])
+                self._json_response(load_step_artifacts(LOG_DIR, step))
+            elif path == "/api/search":
+                query = params.get("q", [""])[0]
+                scope_str = params.get("scopes", ["actions,reasoning,beliefs,hypotheses"])[0]
+                scopes = set(scope_str.split(","))
+                results = search_logs(LOG_DIR, DATA, query, scopes)
+                self._json_response(results)
+            else:
+                self.send_error(404)
+        except Exception as e:
+            err = f"[visualize_explore] request failed for {self.path}: {e}\n{traceback.format_exc()}"
+            print(err, file=sys.stderr, flush=True)
+            try:
+                self._json_response({"error": str(e), "path": self.path})
+            except Exception:
+                # If response writing itself failed, close gracefully.
+                try:
+                    self.send_error(500, explain=str(e))
+                except Exception:
+                    pass
 
     def _json_response(self, obj):
         data = json.dumps(obj, default=str).encode()
@@ -752,14 +829,21 @@ let currentView = 'meta';
 let currentStep = null;
 let stepPhase = 'input';
 const trajCache = {};
+const stepArtifactCache = {};
 
 async function init() {
-  const resp = await fetch('/api/data');
-  const json = await resp.json();
-  DATA = json.data;
-  META = json.meta;
-  buildSidebar();
-  renderMeta();
+  try {
+    const resp = await fetch('/api/data');
+    if (!resp.ok) throw new Error(`/api/data returned ${resp.status}`);
+    const json = await resp.json();
+    DATA = json.data;
+    META = json.meta;
+    buildSidebar();
+    renderMeta();
+  } catch (e) {
+    document.getElementById('main-content').innerHTML =
+      `<h1>Viewer Error</h1><div class="card"><div class="card-body"><pre>${esc(String(e && e.stack ? e.stack : e))}</pre></div></div>`;
+  }
 }
 
 function buildSidebar() {
@@ -770,8 +854,10 @@ function buildSidebar() {
     el.className = 'sidebar-item';
     el.dataset.view = 'step';
     el.dataset.step = i;
-    const numHyp = step.explore.rollouts ? step.explore.rollouts.length : 0;
-    el.innerHTML = `Step ${step.index} <span class="badge">${numHyp}h</span>`;
+    const numExplore = step.explore.rollouts ? step.explore.rollouts.length : 0;
+    const hasExperimentRollouts = (step.explore.rollouts || []).some(r => (r.name || '').startsWith('experiment_'));
+    const badgeSuffix = hasExperimentRollouts ? 'e' : 'h';
+    el.innerHTML = `Step ${step.index} <span class="badge">${numExplore}${badgeSuffix}</span>`;
     el.onclick = () => showStep(i);
     stepList.appendChild(el);
   });
@@ -919,7 +1005,68 @@ function renderInputPhase(step) {
   let html = '';
   html += collapsible('Input Beliefs', `<pre>${esc(step.input_beliefs || '(empty - initial step)')}</pre>`, true);
   html += collapsible('Input Perception Module', `<pre>${esc(step.input_perception || '(empty - initial step)')}</pre>`, true);
+  if (step.has_experiment_artifacts) {
+    const count = (step.candidate_names || []).length;
+    const hint = count ? ` (${count} candidate files)` : '';
+    html += `<div id="step-artifacts-container" data-step="${step.index}">
+      <div class="card">
+        <div class="card-header" onclick="loadStepArtifacts(this)" style="cursor:pointer">
+          Experiment-Guided Artifacts${hint}
+          <span class="toggle" style="color:var(--text-muted);font-size:12px">&#9654; Click to load</span>
+        </div>
+        <div class="card-body collapsed" id="step-artifacts-body"><div class="loading">Loading...</div></div>
+      </div>
+    </div>`;
+  }
   return html;
+}
+
+async function loadStepArtifacts(headerEl) {
+  const body = headerEl.nextElementSibling;
+  const toggle = headerEl.querySelector('.toggle');
+  if (body.dataset.loaded === 'true') {
+    body.classList.toggle('collapsed');
+    toggle.innerHTML = body.classList.contains('collapsed') ? '&#9654; Click to load' : '&#9660;';
+    return;
+  }
+
+  body.classList.remove('collapsed');
+  toggle.innerHTML = '&#9660;';
+
+  const container = headerEl.closest('#step-artifacts-container') || headerEl.parentElement.parentElement;
+  const step = container.dataset.step;
+  let data = stepArtifactCache[step];
+  try {
+    if (!data) {
+      const resp = await fetch(`/api/step_artifacts?step=${step}`);
+      if (!resp.ok) throw new Error(`/api/step_artifacts returned ${resp.status}`);
+      data = await resp.json();
+      stepArtifactCache[step] = data;
+    }
+  } catch (e) {
+    body.innerHTML = `<pre>${esc(String(e && e.stack ? e.stack : e))}</pre>`;
+    return;
+  }
+
+  let html = '';
+  if (data.input_experiments) html += collapsible('Input Experiments', `<pre>${esc(JSON.stringify(data.input_experiments, null, 2))}</pre>`, false);
+  if (data.input_experiment_results) html += collapsible('Input Experiment Results', `<pre>${esc(JSON.stringify(data.input_experiment_results, null, 2))}</pre>`, false);
+  if (data.experiment_generation) html += collapsible('Experiment Generation', `<pre>${esc(JSON.stringify(data.experiment_generation, null, 2))}</pre>`, false);
+  if (data.experiment_analysis) html += collapsible('Experiment Analysis', `<pre>${esc(JSON.stringify(data.experiment_analysis, null, 2))}</pre>`, false);
+  if (data.scoring) html += collapsible('Scoring', `<pre>${esc(JSON.stringify(data.scoring, null, 2))}</pre>`, false);
+  if (data.candidates && data.candidates.length) {
+    let cHtml = '';
+    data.candidates.forEach(c => {
+      cHtml += `<div class="card" style="margin-bottom:8px"><div class="card-header" onclick="toggleCard(this)">${esc(c.name)} <span class="toggle">&#9654;</span></div><div class="card-body collapsed"><pre>${esc(c.text)}</pre></div></div>`;
+    });
+    html += collapsible(`Candidates (${data.candidates.length})`, cHtml, false);
+  }
+  if (data.experiments) html += collapsible('Updated Experiments', `<pre>${esc(JSON.stringify(data.experiments, null, 2))}</pre>`, false);
+  if (data.experiment_results) html += collapsible('Updated Experiment Results', `<pre>${esc(JSON.stringify(data.experiment_results, null, 2))}</pre>`, false);
+  if (!html) html = '<div style="color:var(--text-muted);font-style:italic">No experiment-guided artifacts found for this step.</div>';
+
+  body.innerHTML = html;
+  body.dataset.loaded = 'true';
 }
 
 function renderPhaseView(step, phaseKey) {
@@ -950,9 +1097,11 @@ function renderPhaseView(step, phaseKey) {
 
   // Rollouts table
   const isExplore = phaseKey === 'explore';
+  const exploreUsesExperiments = isExplore && phase.rollouts.some(r => (r.name || '').startsWith('experiment_'));
+  const rolloutTextCol = exploreUsesExperiments ? 'Experiment' : 'Hypothesis';
   html += `<div class="card"><div class="card-header">Rollouts</div><div class="card-body">
     <table class="rollout-table">
-    <tr><th>#</th><th>Name</th>${isExplore ? '<th>Hypothesis</th>' : ''}<th>Steps</th><th>Prog</th><th>Cost</th><th>End</th></tr>`;
+    <tr><th>#</th><th>Name</th>${isExplore ? `<th>${rolloutTextCol}</th>` : ''}<th>Steps</th><th>Prog</th><th>Cost</th><th>End</th></tr>`;
 
   phase.rollouts.forEach((r, ri) => {
     const m = r.meta || {};
@@ -1004,8 +1153,10 @@ async function showRollout(stepIdx, phaseKey, rolloutIdx) {
   let html = `<button class="back-btn" onclick="renderStep(${stepIdx})">&#8592; Back to Step ${step.index} / ${phaseKey}</button>`;
   html += `<h1>${esc(rollout.name)}</h1>`;
 
-  if (rollout.hypothesis)
-    html += `<div class="card"><div class="card-header">Hypothesis</div><div class="card-body"><pre>${esc(rollout.hypothesis)}</pre></div></div>`;
+  if (rollout.hypothesis) {
+    const rolloutTextLabel = rollout.hypothesis_label || 'Hypothesis';
+    html += `<div class="card"><div class="card-header">${esc(rolloutTextLabel)}</div><div class="card-body"><pre>${esc(rollout.hypothesis)}</pre></div></div>`;
+  }
 
   if (rollout.meta) {
     const m = rollout.meta;
@@ -1290,7 +1441,8 @@ def main():
     parser = argparse.ArgumentParser(description="Visualize explore.py logs")
     parser.add_argument("log_dir", help="Path to the explore log directory")
     parser.add_argument("--port", type=int, default=8765, help="Port (default: 8765)")
-    parser.add_argument("--no-browser", action="store_true", help="Don't open browser automatically")
+    parser.add_argument("--open-browser", action="store_true", help="Open browser automatically (opt-in)")
+    parser.add_argument("--no-browser", action="store_true", help="Deprecated; browser does not auto-open by default")
     args = parser.parse_args()
 
     global LOG_DIR, DATA, META
@@ -1312,7 +1464,7 @@ def main():
     print(f"\nServing at {url}")
     print("Press Ctrl+C to stop\n")
 
-    if not args.no_browser:
+    if args.open_browser and not args.no_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
 
     try:
