@@ -660,9 +660,14 @@ def generate_candidate_beliefs(
             )
             _step_num += 1
         if experiment_mode == "binary":
+            _novel_bullet = (
+                "\n   - Prefer novel experiments not already in the pool, but it is OK to suggest fewer if the pool already covers the important questions."
+                if all_experiments
+                else ""
+            )
             _steps.append(
-                f"{_step_num}. Suggest up to {num_experiments} binary question experiments worth testing. Each should be a specific YES/NO question about a game mechanic, strategy, or interaction that we can test by playing.\n"
-                "   - Prefer novel experiments not already in the pool, but it is OK to suggest fewer if the pool already covers the important questions."
+                f"{_step_num}. Suggest up to {num_experiments} binary question experiments worth testing. Each should be a specific YES/NO question about a game mechanic, strategy, or interaction that we can test by playing."
+                + _novel_bullet
             )
             exp_placeholder_1 = "[First binary question experiment]"
             exp_placeholder_2 = "[Second binary question experiment]"
@@ -675,11 +680,16 @@ def generate_candidate_beliefs(
                     "   - They should help us achieve the main goal."
                 )
             else:
+                _novel_bullet = (
+                    "\n   - Prefer novel experiments not already in the pool, but it is OK to suggest fewer if the pool already covers the important questions."
+                    if all_experiments
+                    else ""
+                )
                 _steps.append(
                     f"{_step_num}. Suggest up to {num_experiments} NEW experiments to test in the next step.\n"
                     "   - Experiments should be specific, actionable strategies or mechanics to test.\n"
-                    "   - They should help us achieve the main goal.\n"
-                    "   - Prefer novel experiments not already in the pool, but it is OK to suggest fewer if the pool already covers the important questions."
+                    "   - They should help us achieve the main goal."
+                    + _novel_bullet
                 )
             exp_placeholder_1 = "[First experiment to test]"
             exp_placeholder_2 = "[Second experiment to test]"
