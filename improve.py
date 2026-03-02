@@ -270,7 +270,7 @@ Your summary should contain analysis of the behaviour of the perception module:
 Your summary should be grounded in the episode outcome above:
 
 If the episode was a FAILURE (0% progress or death):
-- What was the PRIMARY CAUSE of failure? Trace back from the end state to identify the critical mistake(s).
+- What was the primary cause of failure? Trace back from the end state to identify the critical mistake(s).
 - What beliefs led to bad decisions? 
 - What beliefs were missing that would have prevented this outcome?
 - Did the perception module include any misleading information that led to this outcome?
@@ -290,11 +290,10 @@ If the episode was a SUCCESS:
 
 Provide a summary highlighting:
 - Root cause analysis: Why did the episode end this way?
-- Belief learning: What concrete strategies can we learn from this trajectory? Focus on specific actions that worked or failed (e.g., "zapping wand at lava cleared the path" or "going east after crossing lava led to stairs"). Do not describe abstract reasoning frameworks.
-- Belief update: What short, actionable strategy updates should we make? Focus on what the agent should DO, not how it should think. Avoid abstract rules about coordinate tracking, frontier management, or internal state.
+- Belief learning: What beliefs can we infer from the trajectory, especially those that show us how to make progress towards completing the task. 
+- Belief update: How should we update our beliefs so that we can make progress towards completing the task. Were there beliefs that were incorrect or misleading?
 - Perception correctness: Regardless of the outcome of the episode, verify whether the perception module is working correctly. Check that the output of the perception module is correctly mapping the corresponding direct game observation into the intended features.
 - Perception analysis: What information was presented in the explicit features from perception module section. What part of that information was helpful, what information was misleading / incorrect and what additional information would have helped if extracted by the perception module?
-- Keep the summary focused on ACTIONABLE INSIGHTS. What concrete strategy should the agent follow? Avoid verbose meta-cognitive analysis.
 
 Format your response in XML style as -
 <think>
@@ -732,7 +731,7 @@ EXPERIMENT 2: {exp_placeholder_2}
         )
 
     # Build conditional instruction blocks
-    beliefs_style = config.eval.evolve.get("beliefs_style", "strict")
+    beliefs_style = config.eval.evolve.get("beliefs_style", "relaxed")
     beliefs_instructions = ""
     if improve_beliefs:
         if beliefs_style == "relaxed":
@@ -746,8 +745,6 @@ EXPERIMENT 2: {exp_placeholder_2}
             beliefs_instructions = """For beliefs:
 - Beliefs must be SHORT, CONCRETE, ACTIONABLE strategies — not abstract reasoning frameworks or meta-cognitive rules.
 - Each belief should tell the agent WHAT TO DO in a specific situation, in plain language.
-- Good belief: "Zap a wand to clear through the lava. After crossing, keep exploring east to find the stairs."
-- Bad belief: "The agent must maintain a working memory of all visited coordinates and prioritize movement towards Known_Unexplored_Frontiers when a large room-like area is sufficiently explored..."
 - Focus on patterns specific to THIS game environment — not generic game-playing principles.
 - Do NOT include instructions about how to reason, how to validate coordinates, or how to manage internal state. The agent already has a perception module for that.
 - Total beliefs should be at most 10 short bullet points (~200 words total). Fewer actionable beliefs are better than many abstract ones.
@@ -1085,18 +1082,16 @@ def generate_experiments_from_baseline(
     if experiment_mode == "binary":
         task_items = f"""1. Analyze the baseline experience to identify knowledge gaps and uncertainties about how the game works.
 2. Generate {num_to_generate} NEW binary question experiments. Each experiment should be a specific YES/NO question about a game mechanic, strategy, or interaction that we can test by playing.
-   - Good experiment: "Does zapping a wand at lava clear the lava so we can walk across?"
-   - Good experiment: "Can we pick up items while standing on a trap?"
-   - Bad experiment: "Is the game fun?" (not testable via gameplay)
+   - Experiments should be testable by playing the game.
+   - Experiments should target specific, observable game mechanics or interactions.
    - Do NOT duplicate existing experiments in the pool."""
         exp_placeholder_1 = "[First binary question experiment]"
         exp_placeholder_2 = "[Second binary question experiment]"
     else:
         task_items = f"""1. Analyze the baseline experience to identify knowledge gaps and uncertainties about how the game works.
 2. Generate {num_to_generate} NEW experiments to test. Each experiment should be a specific, actionable strategy or mechanic to test that helps us achieve the main goal.
-   - Good experiment: "Try zapping a wand at lava to see if it clears a path"
-   - Good experiment: "Attempt to pick up items while standing on a trap"
-   - Bad experiment: "Is the game fun?" (not testable via gameplay)
+   - Experiments should be testable by playing the game.
+   - Experiments should target specific, observable game mechanics or interactions.
    - Do NOT duplicate existing experiments in the pool."""
         exp_placeholder_1 = "[First experiment to test]"
         exp_placeholder_2 = "[Second experiment to test]"
