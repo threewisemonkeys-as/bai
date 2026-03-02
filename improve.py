@@ -645,7 +645,7 @@ def generate_candidate_beliefs(
     improve_beliefs = improve_mode in ("both", "beliefs")
     improve_perception = improve_mode in ("both", "perception")
 
-    experiment_mode = config.eval.evolve.get("experiment_mode", "binary")
+    experiment_mode = config.eval.evolve.get("experiment_mode", "free")
 
     # Build prompt — experiment generation section is conditional
     if generate_experiments:
@@ -667,21 +667,35 @@ def generate_candidate_beliefs(
             exp_placeholder_1 = "[First binary question experiment]"
             exp_placeholder_2 = "[Second binary question experiment]"
         else:
-            _steps.append(
-                f"{_step_num}. Suggest up to {num_experiments} NEW experiments to test in the next step.\n"
-                "   - Experiments should be specific, actionable strategies or mechanics to test.\n"
-                "   - They should help us achieve the main goal.\n"
-                "   - Prefer novel experiments not already in the pool, but it is OK to suggest fewer if the pool already covers the important questions."
-            )
+            two_step = config.eval.evolve.get("two_step", False)
+            if two_step:
+                _steps.append(
+                    f"{_step_num}. Generate {num_experiments} NEW experiments to test in the next step.\n"
+                    "   - Experiments should be specific, actionable strategies or mechanics to test.\n"
+                    "   - They should help us achieve the main goal."
+                )
+            else:
+                _steps.append(
+                    f"{_step_num}. Suggest up to {num_experiments} NEW experiments to test in the next step.\n"
+                    "   - Experiments should be specific, actionable strategies or mechanics to test.\n"
+                    "   - They should help us achieve the main goal.\n"
+                    "   - Prefer novel experiments not already in the pool, but it is OK to suggest fewer if the pool already covers the important questions."
+                )
             exp_placeholder_1 = "[First experiment to test]"
             exp_placeholder_2 = "[Second experiment to test]"
         task_section = "Your task is to:\n" + "\n".join(_steps)
+        if experiment_mode == "binary":
+            exp_count_instruction = f"(Up to {num_experiments} experiments)"
+        elif two_step:
+            exp_count_instruction = f"(Generate exactly {num_experiments} experiments)"
+        else:
+            exp_count_instruction = f"(Up to {num_experiments} experiments)"
         experiments_xml = f"""<new_experiments>
 EXPERIMENT 1: {exp_placeholder_1}
 
 EXPERIMENT 2: {exp_placeholder_2}
 ...
-(Up to {num_experiments} experiments)
+{exp_count_instruction}
 </new_experiments>"""
     else:
         _steps = ["1. Analyze the results."]
@@ -1056,7 +1070,7 @@ def generate_experiments_from_baseline(
         Tuple of (updated_E, selected_experiments, refinements, cost).
         refinements is a list of {index, old_wording, new_wording, keep_results} dicts.
     """
-    experiment_mode = config.eval.evolve.get("experiment_mode", "binary")
+    experiment_mode = config.eval.evolve.get("experiment_mode", "free")
 
     # Build experiment pool display with ANSWERED/UNANSWERED labels
     experiment_pool_lines = []
