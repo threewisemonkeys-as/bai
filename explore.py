@@ -99,8 +99,8 @@ class ExploreConfig:
     min_experiments_for_scoring: int = 3
 
 
-def _log_rollout_stats(rollout_results: dict[str, dict], phase_name: str):
-    """Calculate and log rollout success statistics."""
+def _get_rollout_stats(rollout_results: dict[str, dict]) -> dict:
+    """Calculate rollout success statistics and return as a dict."""
     total_rollouts = len(rollout_results)
     successful_rollouts = 0
     partial_rollouts = 0
@@ -120,9 +120,21 @@ def _log_rollout_stats(rollout_results: dict[str, dict], phase_name: str):
             else:
                 failed_rollouts += 1
 
+    return {
+        "total": total_rollouts,
+        "successful": successful_rollouts,
+        "partial": partial_rollouts,
+        "failed": failed_rollouts,
+        "errors": error_rollouts,
+    }
+
+
+def _log_rollout_stats(rollout_results: dict[str, dict], phase_name: str):
+    """Calculate and log rollout success statistics."""
+    stats = _get_rollout_stats(rollout_results)
     evolve_logger.info(
-        f"[{phase_name}] Rollout results: {total_rollouts} total, {successful_rollouts} successful (100%), "
-        f"{partial_rollouts} partial progress, {failed_rollouts} failed (0%), {error_rollouts} errors"
+        f"[{phase_name}] Rollout results: {stats['total']} total, {stats['successful']} successful (100%), "
+        f"{stats['partial']} partial progress, {stats['failed']} failed (0%), {stats['errors']} errors"
     )
 
 
@@ -134,6 +146,40 @@ def _compute_rollout_cost(rollout_results: dict[str, dict]) -> float:
             for env_stats in result["summary"].values():
                 cost += env_stats.get("total_cost", 0)
     return cost
+
+
+def _update_summary_json(output_dir: str, step: int, step_cost: float, cumulative_cost: float,
+                         rollout_stats: dict, phase_stats: dict | None = None):
+    """Update the summary.json file with data from the completed step.
+
+    Args:
+        output_dir: Root output directory containing summary.json
+        step: Current step number
+        step_cost: Total cost for this step
+        cumulative_cost: Cumulative cost up to and including this step
+        rollout_stats: Dict with keys: total, successful, partial, failed, errors
+        phase_stats: Optional dict of per-phase stats (e.g. {"baseline": {...}, "explore": {...}})
+    """
+    summary_path = Path(output_dir) / "summary.json"
+    if summary_path.exists():
+        with open(summary_path) as f:
+            summary = json.load(f)
+    else:
+        summary = {"steps": []}
+
+    step_data = {
+        "step": step,
+        "step_cost": step_cost,
+        "cumulative_cost": cumulative_cost,
+        "rollout_stats": rollout_stats,
+    }
+    if phase_stats:
+        step_data["phase_stats"] = phase_stats
+
+    summary["steps"].append(step_data)
+
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=4)
 
 
 def get_default_knowledge(config: DictConfig) -> str:
@@ -384,6 +430,14 @@ def online_explore(
         evolve_logger.info(f"Step {step} costs: rollout=${rollout_cost:.6f}, improve=${improve_cost:.6f}, total=${total_step_cost:.6f}")
         evolve_logger.info(f"Cumulative cost after step {step}: ${cumulative_cost:.6f}")
 
+        _update_summary_json(
+            output_dir=output_dir,
+            step=step,
+            step_cost=total_step_cost,
+            cumulative_cost=cumulative_cost,
+            rollout_stats=_get_rollout_stats(rollout_results),
+        )
+
         # Log summary to eval.log
         evolve_logger.info(f"Step {step} completed.")
         evolve_logger.info(f"Updated beliefs:\n{b}")
@@ -613,6 +667,24 @@ def online_explore_2step(
         cumulative_cost += total_step_cost
         evolve_logger.info(f"Step {step} total cost: ${total_step_cost:.6f}")
         evolve_logger.info(f"Cumulative cost after step {step}: ${cumulative_cost:.6f}")
+
+        _update_summary_json(
+            output_dir=output_dir,
+            step=step,
+            step_cost=total_step_cost,
+            cumulative_cost=cumulative_cost,
+            rollout_stats=_get_rollout_stats(explore_rollout_results),
+            phase_stats={
+                "baseline": {
+                    "cost": baseline_total_cost,
+                    "rollout_stats": _get_rollout_stats(baseline_rollout_results),
+                },
+                "explore": {
+                    "cost": explore_total_cost,
+                    "rollout_stats": _get_rollout_stats(explore_rollout_results),
+                },
+            },
+        )
 
         # Log summary
         evolve_logger.info(f"Step {step} completed.")
@@ -1003,6 +1075,25 @@ def online_explore_experiment_guided(
         cumulative_cost += step_cost
         evolve_logger.info(f"Step {step} cost: ${step_cost:.6f}")
         evolve_logger.info(f"Cumulative cost after step {step}: ${cumulative_cost:.6f}")
+
+        _update_summary_json(
+            output_dir=output_dir,
+            step=step,
+            step_cost=step_cost,
+            cumulative_cost=cumulative_cost,
+            rollout_stats=_get_rollout_stats(experiment_rollout_results),
+            phase_stats={
+                "baseline": {
+                    "cost": baseline_rollout_cost,
+                    "rollout_stats": _get_rollout_stats(baseline_rollout_results),
+                },
+                "experiment": {
+                    "cost": experiment_rollout_cost,
+                    "rollout_stats": _get_rollout_stats(experiment_rollout_results),
+                },
+            },
+        )
+
         evolve_logger.info(f"Step {step} completed.")
         evolve_logger.info(f"Updated beliefs:\n{b}")
         evolve_logger.info(f"Experiment pool: {len(all_experiments)} experiments")

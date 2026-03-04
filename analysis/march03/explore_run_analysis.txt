@@ -1,0 +1,64 @@
+## Analysis: Performance Fluctuation and Ceiling in Steps 15-20
+
+### Performance Summary
+
+| Step | Pass Rate | Failures |
+|------|-----------|----------|
+| 15   | 17/20 (85%) | 3 |
+| 16   | 14/20 (70%) | 6 |
+| 17   | 17/20 (85%) | 3 |
+| 18   | 15/20 (75%) | 5 |
+| 19   | 17/20 (85%) | 3 |
+| 20   | 16/20 (80%) | 4 |
+
+### Q1: Source of Fluctuation — Mostly Eval Noise, Not Belief/Perception Changes
+
+**The fluctuation is primarily driven by evaluation noise (different random seeds/maps), not by belief/perception regressions.** Key evidence:
+
+1. **Each step uses completely different seeds** — no run shares a seed across steps. This means each step gets 20 entirely different random maps. Some maps are inherently harder (e.g., lava barriers with no wand of cold, monsters near spawn, etc.).
+
+2. **The belief/perception diffs between steps are minor and incremental** — mostly small wording refinements, added edge cases, and comment cleanup. No step introduces a fundamentally different strategy or removes a critical belief. For example:
+   - Step 15→16: The dedicated "self-zap warning" bullet got merged into the wand-of-cold bullet (consolidation, not removal). Added note about `<` stairs, added Power tracking to perception.
+   - Step 16→17: Added note about lichen stuck status and `'o'` as traversable character.
+   - Step 17→18: Mostly comment/diagnostic cleanup, reordered Game Over vs Message output.
+   - Step 18→19: Added `'('` as item character, more traversable characters in perception.
+   - Step 19→20: No diff at all!
+
+3. **The worst step (16, 70%) had 6 failures from diverse causes** — 2 lava deaths, 1 monster death, 1 holy water, 2 timeouts. This is consistent with bad luck on map draws rather than a systematic regression.
+
+4. **Steps 19 and 20 have identical beliefs and perception code**, yet score 85% vs 80% — a 1-run difference purely from seed randomness.
+
+**With only 20 runs per step, the standard error is roughly ±8-9 percentage points**, so 70-85% fluctuation is within normal statistical noise.
+
+### Q2: Why Not 100%? — Five Distinct Failure Modes
+
+Across all 120 runs (steps 15-20), there are **24 failures** falling into 5 categories:
+
+#### 1. Walked into molten lava (7 failures — 29% of failures)
+The agent walks directly into lava tiles despite hazard warnings. This happens even with beliefs explicitly warning about lava. Examples: step 15 run_00 (31 steps), step 18 run_17 (4 steps — very early death). The perception module marks lava as hazards, but the LLM sometimes ignores this, especially when the lava is between the agent and the goal.
+
+#### 2. Timeout/stuck — ran out of 100 steps (7 failures — 29%)
+The agent wanders aimlessly (mostly N/S/E/W movements) without finding the stairs. Action frequency shows nearly uniform directional movement distribution (e.g., E:38, W:23, S:17, N:15). The agent never finds the path through the lava or fails to use the wand of cold to create one. It doesn't get killed, but can't solve the puzzle within 100 steps.
+
+#### 3. Self-zap with wand of cold (4 failures — 17%)
+The agent zaps the wand of cold in a direction that causes the bolt to hit itself (e.g., zapping south while standing in the bolt's path, or bouncing off a wall). The beliefs warn about this extensively, but the LLM still makes the mistake. Example: step 15 run_02 died in only 3 steps by zapping the ebony wand (wand of cold) southward at the lava but killing itself.
+
+#### 4. Killed by weak monsters (4 failures — 17%)
+Deaths from sewer rats, newts, and foxes — weak monsters that shouldn't be fatal. This suggests the agent either engaged unnecessarily or failed to heal/flee when HP was low.
+
+#### 5. Killed by potion of holy water (2 failures — 8%)
+An unusual death cause — the agent likely used a potion incorrectly or was caught by a game mechanic.
+
+### Root Cause Summary
+
+The **ceiling at 80-85%** comes from:
+- **Lava management** (lava death + self-zap + timeout from inability to cross lava) accounts for **~75% of all failures**. The core challenge is that the agent must identify the wand of cold in inventory, zap it at the lava without killing itself, and navigate through — all requiring multi-step reasoning the LLM sometimes gets wrong.
+- **LLM stochasticity** — even with correct beliefs, the model (gemini-2.5-flash at temperature=1.0) sometimes ignores its own instructions, walks into hazards, or wanders without purpose.
+- **100-step limit** is tight — successful runs average 30-40 steps, leaving little margin for exploration on harder maps.
+
+### Potential Improvements to Reach Higher Performance
+1. **Lower temperature** from 1.0 to reduce stochastic errors
+2. **Stronger lava-specific belief** — a very explicit "NEVER move into a tile marked as Hazard" rule with highest priority
+3. **Self-zap prevention** — belief that says "when zapping wand of cold at lava, always zap toward the wall/lava (east if lava is east), never toward open space behind you"
+4. **Anti-wandering** — a belief about systematic exploration (e.g., "if you've been moving for 20+ steps without progress, try using items in inventory")
+5. **Increase step limit** beyond 100 for the harder maps

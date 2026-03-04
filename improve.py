@@ -677,7 +677,8 @@ def generate_candidate_beliefs(
                 _steps.append(
                     f"{_step_num}. Generate {num_experiments} NEW experiments to test in the next step.\n"
                     "   - Experiments should be specific, actionable strategies or mechanics to test.\n"
-                    "   - They should help us achieve the main goal."
+                    "   - They should be aimed at gaining knoweledge that helps us achieve the main goal.\n"
+                    "   - Experiments should be conditional on environment state, having prefix of the kind: if environment is in a specific state, ..."
                 )
             else:
                 _novel_bullet = (
@@ -688,7 +689,8 @@ def generate_candidate_beliefs(
                 _steps.append(
                     f"{_step_num}. Suggest up to {num_experiments} NEW experiments to test in the next step.\n"
                     "   - Experiments should be specific, actionable strategies or mechanics to test.\n"
-                    "   - They should help us achieve the main goal."
+                    "   - They should be aimed at gaining knoweledge that helps us achieve the main goal.\n"
+                    "   - Experiments should be conditional on environment state, having prefix of the kind: if environment is in a specific state, ..."
                     + _novel_bullet
                 )
             exp_placeholder_1 = "[First experiment to test]"
@@ -760,18 +762,23 @@ EXPERIMENT 2: {exp_placeholder_2}
     if improve_beliefs:
         if beliefs_style == "relaxed":
             beliefs_instructions = """For beliefs:
-- They should describe information about how the game works that helps us complete the objective.
+- Beliefs are split into two sections:
+  * <world_knowledge>: Facts about how the game works — mechanics, environmental properties, cause-and-effect relationships.
+  * <level_strategy>: Tactical approaches — what to do in specific situations, priorities, strategies for completing the objective.
 - They should be brief with each point being a few sentences.
-- Correct any wrong or misleading beliefs
+- Correct any wrong or misleading beliefs in either section.
 - They should be grounded in the evidence present from the trajectories.
 - They should be as simple as possible."""
         else:
             beliefs_instructions = """For beliefs:
-- Beliefs must be SHORT, CONCRETE, ACTIONABLE strategies — not abstract reasoning frameworks or meta-cognitive rules.
-- Each belief should tell the agent WHAT TO DO in a specific situation, in plain language.
+- Beliefs are split into two sections:
+  * <world_knowledge>: Facts about how the game works — mechanics, environmental properties, cause-and-effect relationships.
+  * <level_strategy>: Tactical approaches — what to do in specific situations, priorities, strategies for completing the objective.
+- Beliefs must be SHORT, CONCRETE, ACTIONABLE — not abstract reasoning frameworks or meta-cognitive rules.
+- <world_knowledge> should describe specific game mechanics. <level_strategy> should tell the agent WHAT TO DO.
 - Focus on patterns specific to THIS game environment — not generic game-playing principles.
 - Do NOT include instructions about how to reason, how to validate coordinates, or how to manage internal state. The agent already has a perception module for that.
-- Total beliefs should be at most 10 short bullet points (~200 words total). Fewer actionable beliefs are better than many abstract ones.
+- Total beliefs should be at most 10 short bullet points (~200 words total) across both sections. Fewer actionable beliefs are better than many abstract ones.
 - Correct any wrong or misleading beliefs.
 - They should be grounded in the evidence present from the trajectories."""
 
@@ -789,9 +796,14 @@ EXPERIMENT 2: {exp_placeholder_2}
     beliefs_xml_fmt = ""
     if improve_beliefs:
         beliefs_xml_fmt = """<updated_beliefs>
-- [belief 1]
-- [belief 2]
-...
+<world_knowledge>
+- [fact about game mechanics, environmental properties, cause-and-effect relationships, etc ...]
+- ...
+</world_knowledge>
+<level_strategy>
+- [tactical approach: what to do in specific situations, priorities, strategies for completing the objective etc ...]
+- ...
+</level_strategy>
 </updated_beliefs>"""
 
     perception_xml_fmt = ""

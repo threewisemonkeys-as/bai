@@ -9,6 +9,7 @@ Usage:
 
 Examples:
     python sandbox/eval_explore.py logs/dev/feb23/some_explore_run --num-episodes 2
+    python sandbox/eval_explore.py logs/dev/feb23/some_explore_run --steps 15-20
     python sandbox/eval_explore.py logs/dev/feb23/some_explore_run -- client.model_id=gpt-4o
     python sandbox/eval_explore.py logs/dev/feb23/some_explore_run --max-workers 4 -- envs.names=minihack
 """
@@ -261,6 +262,8 @@ def main():
     parser.add_argument("explore_run_dir", type=str, help="Path to the explore run directory")
     parser.add_argument("--max-workers", type=int, default=1, help="Max parallel step evals (default: 1)")
     parser.add_argument("--num-episodes", type=int, default=20, help="Episodes per step eval (default: 20)")
+    parser.add_argument("--steps", type=str, default=None,
+                        help="Step range to eval, e.g. '15-20' or '5-' or '-10' or '3' (default: all)")
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory (default: <run_dir>/evals)")
     parser.add_argument("--explore-py", type=str, default=None, help="Path to explore.py (default: auto-detect)")
     args = parser.parse_args(our_args)
@@ -300,6 +303,21 @@ def main():
     if not steps:
         print("No steps found with beliefs.txt + perception.py")
         sys.exit(1)
+
+    # Filter by step range if specified
+    if args.steps:
+        step_range = args.steps
+        if "-" in step_range:
+            parts = step_range.split("-", 1)
+            lo = int(parts[0]) if parts[0] else None
+            hi = int(parts[1]) if parts[1] else None
+        else:
+            lo = hi = int(step_range)
+        steps = [s for s in steps
+                 if (lo is None or s["step_num"] >= lo) and (hi is None or s["step_num"] <= hi)]
+        if not steps:
+            print(f"No steps found in range '{args.steps}'")
+            sys.exit(1)
 
     print(f"Found {len(steps)} steps: {[s['step_num'] for s in steps]}")
 
