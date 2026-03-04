@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import sys
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +23,17 @@ from improve import (
     score_candidate_beliefs,
 )
 from rollout import run_explore_rollouts
+
+
+@contextmanager
+def override_temperature(config: DictConfig, temperature: float):
+    """Temporarily override client.generate_kwargs.temperature."""
+    original = config.client.generate_kwargs.get("temperature")
+    config.client.generate_kwargs.temperature = temperature
+    try:
+        yield
+    finally:
+        config.client.generate_kwargs.temperature = original
 
 
 # Top-level logger for high-level evolution logs (eval.log)
@@ -335,6 +346,7 @@ def online_explore(
         experiments = []  # Start with no experiments -> will trigger baseline rollouts
 
     config.eval.num_episodes = explore_config.rollouts_per_step
+    explore_temp = config.eval.evolve.get("explore_temp", 1.0)
 
     # Fetch default knowledge once
     default_knowledge = get_default_knowledge(config)
@@ -344,6 +356,7 @@ def online_explore(
     evolve_logger.info(f"Rollouts per step: {explore_config.rollouts_per_step}")
     evolve_logger.info(f"Experiments per step: {explore_config.num_experiments}")
     evolve_logger.info(f"Baseline rollouts: {explore_config.num_baseline_rollouts}")
+    evolve_logger.info(f"Explore temperature: {explore_temp}")
 
     cumulative_cost = 0.0
 
@@ -370,6 +383,9 @@ def online_explore(
         rollout_dir = step_output_dir / "rollouts"
         rollout_dir.mkdir(parents=True, exist_ok=True)
 
+        # Use explore_temp for experiment rollouts, default temp for baseline
+        use_explore_temp = bool(experiments)
+
         # Phase 1: Explore (Rollouts) - with step-specific logging for agent steps
         with step_logging(step_output_dir) as step_log_file:
             logging.info(f"Step {step} agent rollout logs")
@@ -378,15 +394,17 @@ def online_explore(
 
             logging.info("=== Phase 1: Explore (Rollouts) ===")
 
-            rollout_results = run_explore_rollouts(
-                base_beliefs=b,
-                perception=p,
-                experiments=experiments,
-                config=config,
-                original_cwd=original_cwd,
-                output_dir=str(rollout_dir),
-                num_baseline_rollouts=explore_config.num_baseline_rollouts,
-            )
+            temp_ctx = override_temperature(config, explore_temp) if use_explore_temp else nullcontext()
+            with temp_ctx:
+                rollout_results = run_explore_rollouts(
+                    base_beliefs=b,
+                    perception=p,
+                    experiments=experiments,
+                    config=config,
+                    original_cwd=original_cwd,
+                    output_dir=str(rollout_dir),
+                    num_baseline_rollouts=explore_config.num_baseline_rollouts,
+                )
 
         # Save detailed rollout stats (outside logging context)
         with open(step_output_dir / "rollout_stats.json", "w") as f:
@@ -494,6 +512,7 @@ def online_explore_2step(
     experiments = []
 
     config.eval.num_episodes = explore_config.rollouts_per_step
+    explore_temp = config.eval.evolve.get("explore_temp", 1.0)
 
     # Fetch default knowledge once
     default_knowledge = get_default_knowledge(config)
@@ -503,6 +522,7 @@ def online_explore_2step(
     evolve_logger.info(f"Rollouts per step: {explore_config.rollouts_per_step}")
     evolve_logger.info(f"Experiments per step: {explore_config.num_experiments}")
     evolve_logger.info(f"Baseline rollouts: {explore_config.num_baseline_rollouts}")
+    evolve_logger.info(f"Explore temperature: {explore_temp}")
 
     cumulative_cost = 0.0
 
@@ -607,22 +627,23 @@ def online_explore_2step(
         explore_rollout_dir = explore_dir / "rollouts"
         explore_rollout_dir.mkdir(parents=True, exist_ok=True)
 
-        # Phase B.1: Explore rollouts (with experiments)
+        # Phase B.1: Explore rollouts (with experiments) — use explore_temp
         with step_logging(explore_dir) as step_log_file:
             logging.info(f"Step {step} Phase B: Explore rollout logs")
             logging.info(f"Current beliefs:\n{b if b else '(empty)'}")
             logging.info(f"Current perception:\n{p if p else '(empty)'}")
             logging.info("=== Phase B.1: Explore Rollouts (with experiments) ===")
 
-            explore_rollout_results = run_explore_rollouts(
-                base_beliefs=b,
-                perception=p,
-                experiments=experiments,
-                config=config,
-                original_cwd=original_cwd,
-                output_dir=str(explore_rollout_dir),
-                num_baseline_rollouts=explore_config.num_baseline_rollouts,
-            )
+            with override_temperature(config, explore_temp):
+                explore_rollout_results = run_explore_rollouts(
+                    base_beliefs=b,
+                    perception=p,
+                    experiments=experiments,
+                    config=config,
+                    original_cwd=original_cwd,
+                    output_dir=str(explore_rollout_dir),
+                    num_baseline_rollouts=explore_config.num_baseline_rollouts,
+                )
 
         # Save explore rollout stats
         with open(explore_dir / "rollout_stats.json", "w") as f:
@@ -743,6 +764,7 @@ def online_explore_experiment_guided(
         experiment_results = {}
 
     config.eval.num_episodes = explore_config.rollouts_per_step
+    explore_temp = config.eval.evolve.get("explore_temp", 1.0)
 
     # Fetch default knowledge once
     default_knowledge = get_default_knowledge(config)
@@ -755,6 +777,7 @@ def online_explore_experiment_guided(
     evolve_logger.info(f"Candidates per step: {explore_config.num_candidates}")
     evolve_logger.info(f"Score experiments: {explore_config.num_score_experiments}")
     evolve_logger.info(f"Min experiments for scoring: {explore_config.min_experiments_for_scoring}")
+    evolve_logger.info(f"Explore temperature: {explore_temp}")
 
     cumulative_cost = 0.0
 
@@ -869,15 +892,16 @@ def online_explore_experiment_guided(
             logging.info(f"Current beliefs:\n{b if b else '(empty)'}")
             logging.info(f"Current perception:\n{p if p else '(empty)'}")
 
-            experiment_rollout_results = run_explore_rollouts(
-                base_beliefs=b,
-                perception=p,
-                experiments=selected_experiments,
-                config=config,
-                original_cwd=original_cwd,
-                output_dir=str(explore_rollout_dir),
-                num_baseline_rollouts=explore_config.num_baseline_rollouts,
-            )
+            with override_temperature(config, explore_temp):
+                experiment_rollout_results = run_explore_rollouts(
+                    base_beliefs=b,
+                    perception=p,
+                    experiments=selected_experiments,
+                    config=config,
+                    original_cwd=original_cwd,
+                    output_dir=str(explore_rollout_dir),
+                    num_baseline_rollouts=explore_config.num_baseline_rollouts,
+                )
 
         with open(explore_dir / "rollout_stats.json", "w") as f:
             json.dump(experiment_rollout_results, f, indent=4, default=str)

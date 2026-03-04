@@ -1,0 +1,334 @@
+## Full Step-by-Step Analysis: Belief & Perception Evolution (Steps 1-20)
+## Run: warmP_better_explore
+
+================================================================================
+## OVERVIEW: Performance Trajectory
+================================================================================
+
+Step  1:  0/10 experiments solved ( 0%) | beliefs: 20 lines | perception: 275 lines
+Step  2:  0/10 experiments solved ( 0%) | beliefs: 22 lines | perception: 286 lines
+Step  3:  0/10 experiments solved ( 0%) | beliefs: 24 lines | perception: 309 lines
+Step  4:  0/10 experiments solved ( 0%) | beliefs: 16 lines | perception: 342 lines
+Step  5:  1/10 experiments solved (10%) | beliefs: 22 lines | perception: 342 lines
+Step  6:  0/10 experiments solved ( 0%) | beliefs: 28 lines | perception: 381 lines
+Step  7:  2/10 experiments solved (20%) | beliefs: 29 lines | perception: 381 lines
+Step  8:  3/10 experiments solved (30%) | beliefs: 34 lines | perception: 382 lines
+Step  9:  1/10 experiments solved (10%) | beliefs: 44 lines | perception: 382 lines
+Step 10: 10/10 experiments solved (100%)| beliefs: 46 lines | perception: 382 lines  ** BREAKTHROUGH **
+Step 11:  8/10 experiments solved (80%) | beliefs: 46 lines | perception: 377 lines
+Step 12:  8/10 experiments solved (80%) | beliefs: 48 lines | perception: 377 lines
+Step 13:  6/10 experiments solved (60%) | beliefs: 49 lines | perception: 376 lines
+Step 14:  8/10 experiments solved (80%) | beliefs: 48 lines | perception: 377 lines
+Step 15:  9/10 experiments solved (90%) | beliefs: 48 lines | perception: 302 lines
+Step 16:  9/10 experiments solved (90%) | beliefs: 47 lines | perception: 313 lines
+Step 17: 10/10 experiments solved (100%)| beliefs: 47 lines | perception: 313 lines
+Step 18:  8/10 experiments solved (80%) | beliefs: 47 lines | perception: 289 lines
+Step 19: 10/10 experiments solved (100%)| beliefs: 46 lines | perception: 290 lines
+Step 20:  9/10 experiments solved (90%) | beliefs: 48 lines | perception: 290 lines
+
+Eval results (steps 15-20 on 20 independent seeds each):
+Step 15: 17/20 = 85%
+Step 16: 14/20 = 70%
+Step 17: 17/20 = 85%
+Step 18: 15/20 = 75%
+Step 19: 17/20 = 85%
+Step 20: 16/20 = 80%
+
+Three clear performance phases:
+  Phase 1 (Steps 1-4):   0% solve rate — foundational learning
+  Phase 2 (Steps 5-9):   Sporadic solves (0-30%) — accumulating critical knowledge
+  Phase 3 (Steps 10-20): 60-100% solve rate — mature system, plateau
+
+================================================================================
+## PHASE 1: FOUNDATION (Steps 1-4) — 0% solve rate
+================================================================================
+
+### Step 1: Initial World Model
+Starting beliefs (20 lines) already include:
+  - Lava (}) = instant death hazard
+  - Stairs: '<' = up, '>' = down; 'down' action only works on '>'
+  - Monsters can move and engage
+  - Walls are impassable
+  - Wand of teleportation is unsafe across hazards
+
+Starting perception (275 lines) includes:
+  - Stairs detection, hazard detection, monster detection
+  - Items on floor, HP tracking, burden, power, inventory
+  - Game over detection
+  - Does NOT yet have: Movement Outcomes
+
+Experiments: 10 tests of basic behaviors (lava avoidance, monster engagement,
+door opening, item pickup, maze exploration). All fail — the agent can't
+reliably navigate because it lacks structured movement outcome information.
+
+How learned: Warm-started from prior knowledge (the "warmP" in the run name).
+These initial beliefs came from a warm prior, not from scratch.
+
+### Step 2: Wand of Cold First Mentioned
+New beliefs:
+  - "wand of cold" concept enters beliefs (from prior knowledge)
+  - "eat" action for healing
+
+Perception: Minor updates (+11 lines)
+Experiments: All 10 fail (0%). Tests navigation, door interaction, monster
+handling. Agent still can't reliably act.
+
+### Step 3: Monster Combat + Stuck Detection
+New beliefs:
+  - Monster combat knowledge
+  - Lichen "stuck" state awareness
+
+New perception feature: stuck_detection added (lichen awareness)
+Experiments: Still 0%. Agent struggles with fundamental navigation.
+
+### Step 4: **CRITICAL — Movement Outcomes Added to Perception**
+This is the most important perception change in the entire run.
+
+Belief restructuring: File shrinks from 24 to 16 lines — a major rewrite.
+  - Drops the old "Traversable Safe Neighbors" framing
+  - Introduces: "Movement Outcomes provided by the perception module explicitly
+    state the target coordinate and its associated status (Hazard, Monster,
+    Wall/Obstacle, Safe, Unknown/Unseen)"
+  - Adds explicit directional movement coordinate math (N = r-1, S = r+1, etc.)
+
+Perception overhaul: Grows from 309 to 342 lines.
+  - Adds full Movement Outcomes computation for all 8 directions
+  - Classifies each neighbor tile by status: Safe, Hazard, Monster, Wall/Obstacle
+  - This gives the LLM structured, actionable info about where it can move
+
+How learned: The system recognized from the step 1-3 failures that the agent
+couldn't make safe movement decisions. The improve step redesigned both beliefs
+and perception to provide explicit movement outcome information.
+
+Experiments: Still 0% — the new framework needs time to be integrated with
+strategy knowledge.
+
+================================================================================
+## PHASE 2: ACCUMULATION (Steps 5-9) — Sporadic solves
+================================================================================
+
+### Step 5: **FIRST SOLVE — Zap Wand at Lava**
+New beliefs:
+  - "search" action limitations (won't bypass lava)
+  - "Barrier Bypass Protocol" introduced — structured approach to blocked paths
+  - Explicit lava handling: "Hazard tiles treated like Wall/Obstacle"
+  - Stairs '<' vs '>' disambiguation strengthened
+
+Key experiment: experiment_2 (1/10 solved, 32 steps):
+  "If an item in inventory has a name containing 'wand' and a continuous
+  'Hazard' blocks progress, try to `zap` the wand towards the hazard to
+  see if it has an effect"
+  → This is the FIRST successful episode. The agent zapped a wand at lava.
+
+How learned: The experiment system proposed trying wands against hazards.
+One of the 10 experiments happened to test this, and it worked.
+
+### Step 6: Perception Refinement (0% solve rate — regression)
+Perception grows significantly (+39 lines, 381 total).
+Experiments are too specific/narrow (testing individual movement outcomes,
+specific coordinates). The experiments are testing perception accuracy rather
+than strategy, so none solve the full game.
+
+### Step 7: Second Wave of Solves (20%)
+Key experiments:
+  - experiment_6 (solved, 32 steps): "Attempt kick action on a visible monster"
+  - experiment_8 (solved, 46 steps): "If contiguous Hazard and no visible path,
+    check inventory for a wand and zap towards hazard"
+
+How learned: The system is re-testing the wand-at-lava strategy and finding
+it works again. Also discovering that kick works on monsters.
+
+### Step 8: Three Solves (30%)
+Key experiments:
+  - experiment_4 (solved, 31 steps): "If agent has 'wand' in inventory and
+    blocked by Hazard, attempt to zap in direction of hazard"
+  - experiment_5 (solved, 31 steps): "If unidentified item, try to quaff it"
+  - experiment_7 (solved, 51 steps): "Prioritize paths leading into unexplored
+    areas"
+
+How learned: Wand-at-lava strategy is becoming more reliable. Agent is also
+learning general exploration strategies.
+
+### Step 9: Consolidation (10% — only 1 solve)
+Beliefs grow significantly (34→44 lines):
+  - Pickup items knowledge
+  - HP threshold for healing
+  - Far movement for monster avoidance
+  - Multi-step action handling improvements
+
+Only 1 solve this step — experiments are testing edge cases (HP thresholds,
+monster following behavior, pray action) rather than core gameplay.
+
+================================================================================
+## PHASE 3: BREAKTHROUGH & PLATEAU (Steps 10-20) — 60-100% solve rate
+================================================================================
+
+### Step 10: **THE BREAKTHROUGH — 100% Experiment Solve Rate**
+
+Key belief change (step 9→10 diff):
+  - "zapping a 'wand of cold' at molten lava is a PROVEN way to bypass this
+    Hazard by freezing and solidifying it into a traversable path" (upgraded
+    from "potential way" to "proven way")
+  - "Unidentified wands reveal their true nature upon successful first use"
+  - Added: "Moving into a Monster tile initiates combat" (explicit attack)
+  - Specific Hazard Interaction instructions now include: "identified or not"
+    for wands, and explicit multi-step prompt handling for zap
+
+All 10 experiments succeed because they are tightly focused on the lava
+scenario with variations:
+  - experiment_0: "zap east with 'oak wand' at molten lava" (solved, 30 steps)
+  - experiment_1: "if lava frozen, move onto newly created path" (solved, 69 steps)
+  - experiment_2: "if path traversable, pickup items on floor" (solved, 32 steps)
+  - experiment_3: "try zapping in other directions" (solved, 26 steps)
+  - experiment_4: "if oak wand gives unhelpful message" (solved, 67 steps)
+  - experiment_5: "verify correct letter for wand" (solved, 47 steps)
+  - experiment_6: "try east direction after item selection" (solved, 70 steps)
+  - experiment_7: "if wand runs out, strategic retreat" (solved, 41 steps)
+  - experiment_8: "search around ends of lava line" (solved, 27 steps)
+  - experiment_9: "assess if zap creates different terrain" (solved, 31 steps)
+
+How learned: The cumulative knowledge from steps 5-9 (wand of cold freezes
+lava, movement outcomes for safe navigation, multi-step action handling)
+reached a tipping point. The system had enough correct beliefs + a good enough
+perception module that even varied experimental scenarios could be solved.
+The key was upgrading "potential" to "proven" for the freeze-lava strategy
+and adding explicit handling for unidentified wands.
+
+### Step 11: Self-Zap Danger Learned (80% solve rate)
+
+Key new belief (10→11 diff):
+  - "zapping a wand with a specified direction causes a magical bolt to travel
+    FROM the agent IN that direction. If the agent's body is in the path of
+    the bolt... the agent can be harmed or killed by its own spell, especially
+    with offensive wands (e.g., 'wand of cold'). Therefore, the agent must be
+    cautious when zapping"
+  - Multi-step action interruption handling improved
+  - Monster engagement now includes: "When zapping an offensive wand for combat,
+    ensure the chosen direction does not place the agent in the path of its own
+    spell"
+  - Loop detection refined to prioritize bypass mechanism over circuitous
+    exploration
+
+How learned: Step 10's experiments included scenarios where the agent
+zapped wands, and some likely resulted in self-damage. The improve step
+extracted this pattern and added it as a safety rule.
+
+### Steps 12-14: Refinement (60-80% solve rate)
+
+Step 12 (80%): Minor belief tweaks. Added 'd' character disambiguation
+  (door vs monster). 8/10 experiments solve.
+
+Step 13 (60%): Added knowledge about different hazard types ('~', '^', '#').
+  Dip in solve rate from harder experimental scenarios.
+
+Step 14 (80%): Added knowledge about 'up' action on '<' stairs, passive vs
+  aggressive monster distinction. Beliefs stabilize at 48 lines.
+
+### Step 15: Perception Compression (90% solve rate)
+
+Perception drops from 377 to 302 lines — significant cleanup/compression.
+Beliefs remain at 48 lines. 9/10 experiments solve.
+
+### Steps 16-20: Stable Plateau (80-100% experiment solve rate)
+
+Step 16 (90%): Added power tracking to perception. Minor belief wording.
+Step 17 (100%): Added 'o' as traversable character in perception.
+Step 18 (80%): Perception cleanup (removed diagnostic variables/comments),
+  reordered Game Over vs Message output.
+Step 19 (100%): Added '(' as item character, more traversable chars.
+Step 20 (90%): Identical to step 19 (no diff at all).
+
+================================================================================
+## KEY BELIEF EVOLUTION TIMELINE
+================================================================================
+
+Concept                  | First Appears | Mature/Proven | Key Trigger
+-------------------------|---------------|---------------|---------------------------
+Lava = fatal hazard      | Step 1 (warm) | Step 1        | Warm prior
+Stairs >/< distinction   | Step 1 (warm) | Step 5        | Experiment failures
+Movement Outcomes        | Step 4        | Step 4        | Navigation failure analysis
+Wand of cold exists      | Step 2 (warm) | Step 5        | Warm prior
+Zap wand at lava         | Step 5        | Step 10       | experiment_2 at step 5
+Barrier Bypass Protocol  | Step 5        | Step 10       | Accumulated failures
+Freeze lava = PROVEN     | Step 10       | Step 10       | 10/10 experiments succeed
+Self-zap danger          | Step 11       | Step 11       | Self-damage during step 10
+Multi-step action handling| Step 1 (warm)| Step 11       | Repeated action failures
+Monster combat (move-in) | Step 3        | Step 10       | Combat experiments
+Door vs monster ('d')    | Step 10       | Step 12       | Failed 'open' actions
+Stuck by lichen          | Step 3        | Step 3        | Lichen encounter
+
+================================================================================
+## KEY PERCEPTION EVOLUTION TIMELINE
+================================================================================
+
+Feature                  | First Appears | Notes
+-------------------------|---------------|--------------------------------------
+Basic features (stairs,  | Step 1        | Present from warm start
+  hazards, monsters, HP) |               |
+Stuck detection (lichen) | Step 3        | Added after lichen encounter
+Movement Outcomes        | Step 4        | THE critical perception addition
+Power tracking           | Step 16       | Late addition, minor impact
+'o' as traversable       | Step 17       | Edge case fix
+Perception compression   | Step 15       | 377→302 lines, no functional change
+Further compression      | Step 18       | 313→289 lines, cleanup
+
+Perception peaked at 382 lines (steps 8-10), then was progressively
+compressed to 290 lines by step 19 without losing functionality.
+
+================================================================================
+## HOW BELIEFS ARE LEARNED: THE MECHANISM
+================================================================================
+
+The explore loop works as follows:
+1. Each step runs 10 experiments (single-episode rollouts with specific goals)
+2. The LLM summarizes what was learned from each experiment's trajectory
+3. The improve step integrates these summaries to update beliefs and perception
+
+Three learning mechanisms observed:
+
+### 1. Warm Prior (Steps 1-2)
+Some knowledge (lava=hazard, wand of cold exists, stairs, etc.) was present
+from the warm start. This provides a foundation but isn't sufficient for
+reliable gameplay.
+
+### 2. Failure-Driven Refinement (Steps 3-9)
+Most learning comes from analyzing WHY experiments fail:
+  - Agent walks into lava → strengthen hazard avoidance beliefs
+  - Agent can't navigate → add Movement Outcomes to perception (step 4)
+  - Agent stuck at lava barrier → experiment with items → discover zap works (step 5)
+  - Agent gets stuck in loops → add loop detection (step 9)
+
+### 3. Success Consolidation (Steps 10+)
+Once a critical mass of correct beliefs exists:
+  - Successful experiments CONFIRM beliefs (potential → proven)
+  - The system generates tightly focused experiments that test variations
+  - Edge cases are discovered (self-zap, door vs monster disambiguation)
+
+The step 10 breakthrough happened because:
+  (a) Perception had Movement Outcomes (since step 4)
+  (b) Beliefs had the freeze-lava strategy (since step 5)
+  (c) Multi-step action handling was adequate (since step 8)
+  (d) The system had enough successful examples to upgrade strategy confidence
+
+================================================================================
+## WHY PERFORMANCE DOESN'T REACH 100% (EVAL ANALYSIS)
+================================================================================
+
+(See explore_run_analysis.txt for detailed per-run failure analysis)
+
+Summary of 24 failures across 120 eval runs (steps 15-20):
+  - Walked into lava:     7 (29%) — LLM ignores hazard warnings
+  - Timeout/stuck:        7 (29%) — agent wanders without finding solution
+  - Self-zap bolt of cold: 4 (17%) — zaps wand in wrong direction
+  - Killed by monsters:    4 (17%) — fails to heal/flee
+  - Killed by holy water:  2 ( 8%) — unexpected game mechanic
+
+~75% of failures relate to lava management (lava death + self-zap + timeout
+from inability to cross). The remaining failures are LLM stochasticity
+(ignoring beliefs) and edge-case game mechanics.
+
+Contributing factors:
+  1. Temperature=1.0 — high stochasticity in LLM outputs
+  2. 100-step limit — tight for harder random maps
+  3. 20 different seeds per eval step — map difficulty varies
+  4. Beliefs are advisory, not enforced — LLM can and does ignore them
