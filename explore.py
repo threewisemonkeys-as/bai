@@ -13,7 +13,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from balrog.utils import setup_environment
 from balrog.environments import make_env
-from balrog.environments.minihack import get_loaded_instruction_prompt
+from balrog.environments.nle import get_loaded_instruction_prompt
 from improve import (
     improve_step,
     prepare_improve_context,

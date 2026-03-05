@@ -1,0 +1,305 @@
+Performance Jump Analysis: Steps 8-10 in warmP_better_explore
+=============================================================
+Run: /home/ays57/bai/logs/dev/mar02/warmP_better_explore
+
+Eval results (from eval_summary.json):
+  Step 8:  avg_prog=0.25, num_perfect=5/20
+  Step 9:  avg_prog=0.05, num_perfect=1/20
+  Step 10: avg_prog=0.80, num_perfect=16/20
+
+The performance jumps dramatically at step 10 (0.05 -> 0.80). This analysis
+traces the exact changes, rollout experiences, and model reasoning that led
+to this improvement.
+
+
+================================================================================
+PART 1: WHAT CHANGED IN BELIEFS & PERCEPTION (DIFFS)
+================================================================================
+
+Perception Module Changes
+-------------------------
+- Step 8 -> Step 9: No changes.
+- Step 9 -> Step 10: Only a trivial reorder of direction dict keys
+  (northeast/southwest/southeast/northwest order swapped). Functionally identical.
+
+Beliefs Changes: Step 8 -> Step 9 (major restructuring)
+--------------------------------------------------------
+The entire level_strategy was reorganized from a "Barrier Bypass Protocol" focus
+to a "Self-Preservation & Barrier Bypass Protocol" with a new priority hierarchy:
+
+World Knowledge additions:
+  1. Multi-step action understanding: eat, zap, apply, kick require multiple
+     inputs. Game awaits follow-up input (item selection, direction) before
+     the turn ends.
+  2. "Retry" message reinterpretation: "Your previous output did not contain a
+     valid action. Retry" can mean the game is awaiting follow-up input for a
+     multi-step action, not just bad syntax.
+  3. Satiation/choking risk: eating when "Satiated" risks choking death.
+  4. Power/charge tracking: Pw:X(Y) indicates wand charges (X current, Y max).
+  5. Cursor position as ground truth: cursor: (x, y) interpreted as (y, x) is
+     the agent's absolute position.
+
+Level Strategy restructuring:
+  1. Added "Immediate Threat Triage" as #1 priority with 3 sub-rules:
+     - Heal at <50% HP (supersedes all other actions)
+     - Escape/neutralize adjacent monster before multi-turn healing at <25% HP
+     - Complete multi-step actions once initiated (e.g., provide item letter
+       for eat)
+  2. Added "Specific Hazard Interaction" to Barrier Bypass Protocol: if
+     continuous lava and wand of cold in inventory, prioritize zapping.
+  3. Added far movement caveat: not guaranteed disengagement, re-evaluate if
+     still in combat.
+  4. Added "Monster Engagement/Avoidance" as explicit strategy point #4.
+  5. Added "Loop Detection & Escape Strategy": detect repetitive exploration,
+     trigger backtracking to unexplored intersections.
+  6. Added "Burden Management": drop non-essential items like corpses when
+     Burdened.
+
+Beliefs Changes: Step 9 -> Step 10 (surgical refinements)
+----------------------------------------------------------
+Only small incremental changes:
+
+World Knowledge additions:
+  1. Zapping wand of cold at lava is a "proven way" to bypass (upgraded from
+     implicit). Added: "Unidentified wands reveal their true nature (e.g.,
+     wand of cold) upon successful first use."
+  2. Added wield and fire to multi-step action list.
+  3. Added: "Moving into a tile occupied by a Monster initiates combat. This
+     can be used as an attack action."
+  4. Added: "There is nothing here to pick up" explanation (auto-pickup or
+     transient visual effect).
+
+Level Strategy refinements:
+  1. Wand of cold strategy now says "identified or not" and includes explicit
+     prompt-response instructions (select unknown wand, choose direction).
+  2. Monster engagement updated to: "consider fighting the monster by moving
+     into its square as an implicit attack."
+
+
+================================================================================
+PART 2: STEP 9 IMPROVE LOG ANALYSIS - LEARNING FROM FAILURE
+================================================================================
+
+Log: step_9/explore/improve.log (66,960 lines)
+
+Log Structure:
+  - Lines 1-38: Current beliefs
+  - Lines 39-422: Current perception module (full Python)
+  - Lines 423-63846: 10 parallel LLM calls summarizing rollout trajectories
+    (each includes perception code, raw CSV trajectory, episode outcomes)
+  - Lines 63849-64694: 10 LLM-generated summaries with <think>,
+    <root_cause_analysis>, <belief_learning>, <belief_update>,
+    <perception_correctness>, <perception_analysis> sections
+  - Lines 64695-65809: Improve step prompt (default knowledge + current beliefs
+    + current perception + 10 episode summaries)
+  - Lines 65815-66528: Improve LLM response (<think> analysis + <updated_beliefs>
+    + <updated_perception>)
+  - Lines 66529-66960: Validation and output
+
+Input Rollouts (10 experiments on MiniHack-Quest-Easy-v0):
+----------------------------------------------------------
+  Exp 0: DEATH     - Died to goblin; couldn't heal because eat/quaff require
+                      multi-step input (item selection), agent didn't understand
+  Exp 1: DEATH     - Died to jackal; successfully zapped wand of cold to clear
+                      lava, but died during multi-step eat action -- killed
+                      before completing healing
+  Exp 2: SUCCESS   - Explored, used wand of cold on lava, found stairs down
+  Exp 3: ABORTED   - Trapped by continuous lava, repeatedly explored same
+                      confined area, never attempted to use inventory items
+  Exp 4: ABORTED   - Trapped by lava; had "pine wand" (wand of cold) but never
+                      used it; repetitive east/west loop along lava wall
+  Exp 5: ABORTED   - Trapped in clockwise perimeter loop around lava
+  Exp 6: ABORTED   - Trapped in rectangular room bordered by lava and walls;
+                      explored perimeter repeatedly
+  Exp 7: ABORTED   - Same pattern -- repetitive exploration loop
+  Exp 8: DEATH     - Died by CHOKING on cram ration while Satiated at 1 HP,
+                      after being attacked by grid bug; wand of cold reflected
+                      hitting self
+  Exp 9: ABORTED   - Exhaustive local exploration, no stairs found; repetitive
+                      movement in explored corridors
+
+  Result: 1/10 success, 4 deaths, 5 aborts from exploration loops.
+
+Key Failure Patterns Identified by Model:
+------------------------------------------
+
+A. Multi-step action failures (Experiments 0, 1, 8):
+   - Actions like eat, quaff, zap, kick, apply require multiple inputs (first
+     the action, then item selection and/or direction)
+   - The "Retry" message was misinterpreted as a syntax error, when it actually
+     meant the game was awaiting follow-up input
+   - Agents died because they couldn't complete healing sequences before being
+     killed by adjacent monsters
+
+B. Choking death (Experiment 8):
+   - Agent ate a cram ration while "Satiated" at 1 HP -> choked and died
+   - Also had wand of cold reflect back on self
+
+C. Lava exploration loops (Experiments 3, 4, 5, 6, 7, 9):
+   - Agents became trapped in confined areas bounded by continuous molten lava
+   - They repeatedly traced the same perimeter without finding exits
+   - Several had wand of cold in inventory but never tried using it
+   - No mechanism existed to detect being stuck in a loop
+
+D. The one success (Experiment 2):
+   - Agent correctly identified lava barrier, exhausted search/movement options
+   - Then experimentally zapped a "forked wand" at the lava
+   - This revealed it was a wand of cold, solidified the lava, killed a lichen,
+     and opened a path
+   - Agent then found and reached stairs down
+
+Model's Improve Step Reasoning:
+--------------------------------
+The improve step LLM (Gemini 2.5 Flash) performed:
+  1. Deep dive into the coordinate system (cursor vs agent screen position),
+     concluding the perception module's internal coordinate math was correct
+     despite confusing diagnostic output
+  2. Synthesis of 10 summaries into consolidated belief updates:
+     - Multi-step action understanding from experiments 0, 1, 8
+     - Healing under threat from experiments 0, 1 (agents died mid-healing)
+     - Loop detection from experiments 3, 4, 5, 6, 7, 9
+     - Burden management from experiment 2 (success case, became Burdened)
+     - Satiation/choking from experiment 8
+
+Perception module was NOT changed -- all 10 episode summaries confirmed the
+perception module was extracting features accurately.
+
+NOTE: Despite the comprehensive belief restructuring, step 9 eval performance
+actually dropped (0.25 -> 0.05). The structural framework was correct but the
+agent still lacked confident operational knowledge about how to solve the level.
+
+
+================================================================================
+PART 3: STEP 10 IMPROVE LOG ANALYSIS - LEARNING FROM SUCCESS
+================================================================================
+
+Log: step_10/explore/improve.log (47,721 lines)
+
+Log Structure:
+  - Lines 1-433: Current beliefs and perception module
+  - Lines 434-45018: Raw CSV data from 10 experiment rollouts
+  - Lines 45019-45668: Per-experiment LLM summaries (structured XML)
+  - Lines 45671-46780: Improve step prompt
+  - Lines 46781-47288: Improve LLM response (<think> + updates)
+  - Lines 47289-47721: Validation and output
+
+Input Rollouts (10 experiments on MiniHack-Quest-Easy-v0):
+----------------------------------------------------------
+ALL 10 EXPERIMENTS SUCCEEDED. The scenario was remarkably consistent:
+
+  - Agent starts in a room with molten lava blocking the path eastward
+  - Agent has an UNIDENTIFIED WAND in inventory (different name every time):
+      Exp 0: "marble wand"
+      Exp 1: "balsa wand"
+      Exp 2: "forked wand"
+      Exp 3: "oak wand"
+      Exp 4: "tin wand"
+      Exp 5: "tin wand"
+      Exp 7: "blessed iron wand"
+      Exp 8: "long wand"
+      Exp 9: "oak wand"
+  - Agent zaps the wand at lava -> reveals it as wand of cold -> lava
+    solidifies -> path opens -> finds stairs down
+  - Along the way, agent encounters monsters (newts, foxes/jackals as 'd',
+    grid bugs, goblins as 'o', sewer rats as 'r')
+  - Experiment 1 used wield + fire with a crossbow/arrows for ranged combat
+
+Model's Improve Step Reasoning:
+--------------------------------
+From the <think> block (lines 46782-46850):
+
+On lava bypass:
+  "Molten Lava Bypass (Wand of Cold): This belief is strongly confirmed across
+   multiple episodes. Zapping various wands (tin, oak, forked, balsa, blessed
+   iron) consistently led to 'wand of cold' identification and successful
+   solidification of lava. This is a very robust and proven mechanism."
+
+On multi-step actions:
+  "The process of zap (item selection, direction) is also consistently
+   confirmed. This extends to fire and wield as well."
+
+On monster combat:
+  "Implicit Combat: The agent successfully killed monsters by moving into their
+   squares. This implicitly shows that movement into a monster's square
+   initiates an attack. This is a common Nethack mechanic that wasn't explicitly
+   encoded..."
+
+On "nothing to pick up":
+  "The 'nothing here to pick up' message followed by items appearing in
+   inventory... indicates a slight disconnect between the explicit pickup
+   action, the visual map, and the actual game state."
+
+The model also deliberated about whether to change perception module's monster
+detection (moving 'd' and 'o' from "Other Interesting Map Characters" to
+"Monsters"), ultimately deciding NOT to because Movement Outcomes already
+correctly labels them as "Monster" when relevant.
+
+Specific Changes and Their Evidence:
+--------------------------------------
+
+1. "potential way" -> "proven way" to bypass lava
+   Source: All 10 experiments confirmed the mechanism with differently-named wands
+   Rationale: "Consolidate and explicitly state the wand of cold - molten lava
+   interaction. Reinforce the general expectation that unidentified wands reveal
+   their true nature upon first use."
+
+2. Added wield and fire to multi-step action list
+   Source: Experiment 1's summary -- agent "correctly retreated, wielded a bow
+   (b), selected the stronger arrows (c), and fired east to eliminate the
+   second 'r' monster."
+
+3. "Moving into a Monster tile initiates combat"
+   Source: Multiple experiments. Experiment 2 explicitly noted "movement into a
+   monster's square initiates an attack." Experiment 7 showed agent "persisted
+   using the 'west' action (implicitly attacking the monster to the west)."
+
+4. Unknown wands usable for hazard bypass ("identified or not")
+   Source: All 10 experiments showed wands appearing under unknown names that
+   turned out to be wand of cold. Strategy now explicitly tells agent to try
+   zapping unknown wands, not just identified ones.
+
+5. "nothing here to pick up" explanation
+   Source: Experiments 0, 2, 6, 9 showed agent attempting pickup on a tile with
+   visible character only to get "There is nothing here to pick up", with the
+   item sometimes appearing in inventory anyway.
+
+
+================================================================================
+PART 4: WHY THIS SEQUENCE CAUSED THE PERFORMANCE JUMP
+================================================================================
+
+The critical insight is the TWO-STEP LEARNING DYNAMIC:
+
+Step 9 provided the structural framework (survive first, understand multi-step
+actions, detect loops) but was learned from mostly-failing rollouts (1/10
+success). The beliefs were correct but the agent still lacked confident
+operational knowledge about HOW to actually solve the level. Performance
+actually dropped (0.25 -> 0.05).
+
+Step 10 provided confident operational details learned from 10/10 successes.
+The key changes were small but decisive:
+
+  - Telling the agent to zap UNIDENTIFIED wands (not just "wand of cold") meant
+    it would actually attempt the lava bypass in practice
+  - Explicit combat-via-movement meant it could handle monsters instead of
+    getting stuck avoiding them
+  - "Proven way" language removed hesitation
+
+BOOTSTRAP EFFECT:
+  The step 9 beliefs set up the right priorities so the rollouts in step 10
+  could succeed (the structural improvements -- threat triage, loop detection,
+  multi-step action understanding -- enabled the agent to survive long enough
+  to discover the lava bypass). The step 10 refinements then locked in the
+  confident, actionable knowledge from those successes.
+
+  Step 9 (structural) -> enabled successful step 10 rollouts -> step 10
+  (operational) -> locked in reliable performance
+
+  The structural improvements alone (step 9) weren't enough without the
+  concrete operational knowledge (step 10). And the operational knowledge
+  couldn't have been discovered without the structural framework enabling
+  the agent to survive and explore effectively.
+
+This is a clear example of how the explore/improve loop bootstraps itself:
+failure teaches the agent how to survive, survival enables discovery, and
+discovery teaches the agent how to succeed.

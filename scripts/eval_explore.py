@@ -263,7 +263,7 @@ def main():
     parser.add_argument("--max-workers", type=int, default=1, help="Max parallel step evals (default: 1)")
     parser.add_argument("--num-episodes", type=int, default=20, help="Episodes per step eval (default: 20)")
     parser.add_argument("--steps", type=str, default=None,
-                        help="Step range to eval, e.g. '15-20' or '5-' or '-10' or '3' (default: all)")
+                        help="Steps to eval, e.g. '2,5,9,12,14' or '15-20' or '5-' or '-10' or '3' (default: all)")
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory (default: <run_dir>/evals)")
     parser.add_argument("--explore-py", type=str, default=None, help="Path to explore.py (default: auto-detect)")
     args = parser.parse_args(our_args)
@@ -306,17 +306,22 @@ def main():
 
     # Filter by step range if specified
     if args.steps:
-        step_range = args.steps
-        if "-" in step_range:
-            parts = step_range.split("-", 1)
-            lo = int(parts[0]) if parts[0] else None
-            hi = int(parts[1]) if parts[1] else None
-        else:
-            lo = hi = int(step_range)
-        steps = [s for s in steps
-                 if (lo is None or s["step_num"] >= lo) and (hi is None or s["step_num"] <= hi)]
+        # Support comma-separated list (e.g. "2,5,9,12,14"), ranges (e.g. "5-10"), or single step
+        allowed = set()
+        for token in args.steps.split(","):
+            token = token.strip()
+            if "-" in token:
+                parts = token.split("-", 1)
+                lo = int(parts[0]) if parts[0] else None
+                hi = int(parts[1]) if parts[1] else None
+                for s in steps:
+                    if (lo is None or s["step_num"] >= lo) and (hi is None or s["step_num"] <= hi):
+                        allowed.add(s["step_num"])
+            else:
+                allowed.add(int(token))
+        steps = [s for s in steps if s["step_num"] in allowed]
         if not steps:
-            print(f"No steps found in range '{args.steps}'")
+            print(f"No steps found matching '{args.steps}'")
             sys.exit(1)
 
     print(f"Found {len(steps)} steps: {[s['step_num'] for s in steps]}")
