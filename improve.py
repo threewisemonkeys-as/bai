@@ -198,15 +198,15 @@ def extract_obs_perc_examples(
     for ep_num, step_num, raw_obs, perc_out in examples:
         lines.append(f"<example episode={ep_num} step={step_num}>")
         lines.append("INPUT to perceive() — verbatim Direct Observation:")
-        lines.append(f"<perceive_input>")
+        lines.append("<perceive_input>")
         lines.append(raw_obs.strip())
         lines.append("")
-        lines.append(f"</perceive_input>\n")
+        lines.append("</perceive_input>\n")
         lines.append("OUTPUT of perceive():")
         lines.append("<perceive_output>")
         lines.append(perc_out.strip())
         lines.append("")
-        lines.append(f"</perceive_output>")
+        lines.append("</perceive_output>")
         lines.append("</example>")
         lines.append("")
 
@@ -222,7 +222,7 @@ async def _get_beliefs_perception_summary_async(
     traj_text: str,
     trajectory_path: str,
     default_knowledge: str,
-) -> str:
+) -> tuple[str, float]:
     """Get a summary focused on beliefs and perception evaluation (async).
 
     Args:
@@ -342,7 +342,7 @@ async def _get_experiment_summary_async(
     outcome_header: str,
     traj_text: str,
     trajectory_path: str,
-) -> str:
+) -> tuple[str, float]:
     """Get a summary focused on experiment evaluation (async).
 
     Args:
@@ -420,7 +420,7 @@ async def get_episode_summary_async(
     trajectory_path: str,
     default_knowledge: str,
     experiment: str | None = None,
-) -> tuple[str, str]:
+) -> tuple[str, float]:
     """Get a summary of an episode trajectory using LLM (async).
 
     This function makes separate LLM calls for:
@@ -646,6 +646,7 @@ def generate_candidate_beliefs(
     improve_perception = improve_mode in ("both", "perception")
 
     experiment_mode = config.eval.evolve.get("experiment_mode", "free")
+    two_step = config.eval.evolve.get("two_step", False)
 
     # Build prompt — experiment generation section is conditional
     if generate_experiments:
@@ -672,7 +673,6 @@ def generate_candidate_beliefs(
             exp_placeholder_1 = "[First binary question experiment]"
             exp_placeholder_2 = "[Second binary question experiment]"
         else:
-            two_step = config.eval.evolve.get("two_step", False)
             if two_step:
                 _steps.append(
                     f"{_step_num}. Generate {num_experiments} NEW experiments to test in the next step.\n"
@@ -889,6 +889,7 @@ Format your response in XML style as:
     updated_perception = perception
     new_experiments = []
     improve_call_cost = 0.0
+    response_dict: dict[str, str] = {}
 
     for attempt in range(max_retries):
         # Build prompt with error feedback if this is a retry

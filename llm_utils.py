@@ -3,7 +3,7 @@
 from typing import Any
 
 
-def build_llm_input(prompt: str) -> list[dict]:
+def build_llm_input(prompt: str) -> list[Any]:
     """Build LLM input with text prompt.
 
     Args:

@@ -319,7 +319,7 @@ def online_explore(
         original_cwd: Original working directory
         output_dir: Output directory for results
     """
-    evolve_logger.info(f"Running exploration with experiment generation")
+    evolve_logger.info("Running exploration with experiment generation")
 
     # Check for existing progress and resume if available
     last_step, b, p, experiments, _ = find_last_completed_step(output_dir)
@@ -368,7 +368,7 @@ def online_explore(
             for i, exp in enumerate(experiments):
                 evolve_logger.info(f"  Experiment {i+1}: {exp}")
         else:
-            evolve_logger.info(f"  (no experiments - running baseline rollouts)")
+            evolve_logger.info("  (no experiments - running baseline rollouts)")
         evolve_logger.info(f"{'='*80}")
 
         step_output_dir = Path(output_dir) / f"step_{step}"
@@ -387,7 +387,7 @@ def online_explore(
         use_explore_temp = bool(experiments)
 
         # Phase 1: Explore (Rollouts) - with step-specific logging for agent steps
-        with step_logging(step_output_dir) as step_log_file:
+        with step_logging(step_output_dir):
             logging.info(f"Step {step} agent rollout logs")
             logging.info(f"Current beliefs:\n{b if b else '(empty)'}")
             logging.info(f"Current perception:\n{p if p else '(empty)'}")
@@ -413,7 +413,7 @@ def online_explore(
         _log_rollout_stats(rollout_results, "Explore")
 
         # Phase 2: Improve (Analyze -> Update -> Generate Experiments) - with improve-specific logging
-        with improve_logging(step_output_dir) as improve_log_file:
+        with improve_logging(step_output_dir):
             logging.info(f"Step {step} improve phase logs")
             logging.info("=== Phase 2: Improve (Update & Generate) ===")
             logging.info(f"Current beliefs:\n{b if b else '(empty)'}")
@@ -541,7 +541,7 @@ def online_explore_2step(
         # ================================================================
         # PHASE A: Baseline (no experiments)
         # ================================================================
-        evolve_logger.info(f"--- Phase A: Baseline (no experiments) ---")
+        evolve_logger.info("--- Phase A: Baseline (no experiments) ---")
 
         baseline_dir = step_output_dir / "baseline"
         baseline_dir.mkdir(parents=True, exist_ok=True)
@@ -549,7 +549,7 @@ def online_explore_2step(
         baseline_rollout_dir.mkdir(parents=True, exist_ok=True)
 
         # Phase A.1: Baseline rollouts (no experiments)
-        with step_logging(baseline_dir) as step_log_file:
+        with step_logging(baseline_dir):
             logging.info(f"Step {step} Phase A: Baseline rollout logs")
             logging.info(f"Current beliefs:\n{b if b else '(empty)'}")
             logging.info(f"Current perception:\n{p if p else '(empty)'}")
@@ -572,7 +572,7 @@ def online_explore_2step(
         _log_rollout_stats(baseline_rollout_results, "Baseline")
 
         # Phase A.2: Baseline improve (generates experiments for Phase B)
-        with improve_logging(baseline_dir) as improve_log_file:
+        with improve_logging(baseline_dir):
             logging.info(f"Step {step} Phase A: Baseline improve logs")
             logging.info("=== Phase A.2: Baseline Improve (generates experiments) ===")
             logging.info(f"Current beliefs:\n{b if b else '(empty)'}")
@@ -614,7 +614,7 @@ def online_explore_2step(
         # ================================================================
         # PHASE B: Explore (with experiments from Phase A)
         # ================================================================
-        evolve_logger.info(f"--- Phase B: Explore (with experiments from Phase A) ---")
+        evolve_logger.info("--- Phase B: Explore (with experiments from Phase A) ---")
         evolve_logger.info(f"Experiments to test: {len(experiments)}")
         if experiments:
             for i, exp in enumerate(experiments):
@@ -628,7 +628,7 @@ def online_explore_2step(
         explore_rollout_dir.mkdir(parents=True, exist_ok=True)
 
         # Phase B.1: Explore rollouts (with experiments) — use explore_temp
-        with step_logging(explore_dir) as step_log_file:
+        with step_logging(explore_dir):
             logging.info(f"Step {step} Phase B: Explore rollout logs")
             logging.info(f"Current beliefs:\n{b if b else '(empty)'}")
             logging.info(f"Current perception:\n{p if p else '(empty)'}")
@@ -652,7 +652,7 @@ def online_explore_2step(
         _log_rollout_stats(explore_rollout_results, "Explore")
 
         # Phase B.2: Explore improve (evaluates experiments, does NOT generate new ones)
-        with improve_logging(explore_dir) as improve_log_file:
+        with improve_logging(explore_dir):
             logging.info(f"Step {step} Phase B: Explore improve logs")
             logging.info("=== Phase B.2: Explore Improve (evaluate experiments, no generation) ===")
             logging.info(f"Current beliefs:\n{b if b else '(empty)'}")
@@ -946,7 +946,6 @@ def online_explore_experiment_guided(
         evolve_logger.info(f"--- Step 5: Generate {explore_config.num_candidates} Candidate Beliefs ---")
 
         # Combine all rollout dirs for summaries
-        all_rollout_dirs = [str(baseline_rollout_dir), str(explore_rollout_dir)]
         all_rollout_results = {}
         all_rollout_results.update(baseline_rollout_results)
         all_rollout_results.update(experiment_rollout_results)
