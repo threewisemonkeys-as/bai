@@ -141,8 +141,8 @@ def extract_obs_perc_examples(
 
     PERC_START = "========== Start of features from Perception Module =========="
     PERC_END   = "========== End of features from Perception Module =========="
-    OBS_START  = "========== Start of Direct Game Observation =========="
-    OBS_END    = "========== End of Direct Game Observation =========="
+    OBS_START  = "========== Start of Direct Observation =========="
+    OBS_END    = "========== End of Direct Observation =========="
 
     examples = []
     csv_paths = sorted(Path(output_dir).rglob("*.csv"))[:max_trajs]
@@ -197,7 +197,7 @@ def extract_obs_perc_examples(
     ]
     for ep_num, step_num, raw_obs, perc_out in examples:
         lines.append(f"<example episode={ep_num} step={step_num}>")
-        lines.append("INPUT to perceive() — verbatim Direct Game Observation:")
+        lines.append("INPUT to perceive() — verbatim Direct Observation:")
         lines.append(f"<perceive_input>")
         lines.append(raw_obs.strip())
         lines.append("")
@@ -227,7 +227,7 @@ async def _get_beliefs_perception_summary_async(
 
     Args:
         config: Configuration containing model information
-        beliefs: Current beliefs about the game
+        beliefs: Current beliefs about the environment
         perception: Current perception module code
         outcome_header: Formatted episode outcome header
         traj_text: Trajectory text content
@@ -236,24 +236,24 @@ async def _get_beliefs_perception_summary_async(
     Returns:
         Summary text focused on beliefs and perception
     """
-    prompt = f"""We are playing a game and trying to figure out how it works.
+    prompt = f"""We are interacting with an environment and trying to figure out how it works.
 
 The agent receives the following default instructions/knowledge by default:
 === DEFAULT KNOWLEDGE ===
 {default_knowledge}
 === END DEFAULT KNOWLEDGE ===
 
-We maintain the following current beliefs about the game:
+We maintain the following current beliefs about the environment:
 === CURRENT BELIEFS ===
 {beliefs if beliefs else "(empty - no beliefs yet)"}
 === END OF CURRENT BELIEFS ===
 
-The following code is used to extract useful features from the raw game observations:
+The following code is used to extract useful features from the raw observations:
 === PERCEPTION MODULE ===
 {perception if perception else "(empty - no perception module yet)"}
 === END OF PERCEPTION MODULE ===
 
-We have played the game using these beliefs and perception.  
+We have run the agent using these beliefs and perception.
 Here is the episode outcome and trajectory:
 === EPISODE OUTCOME ===
 {outcome_header}
@@ -263,8 +263,8 @@ Here is the episode outcome and trajectory:
 === END OF TRAJECTORY ===
 
 Your summary should contain analysis of the behaviour of the perception module:
-- The perception module is provided with everything inside the Direct Game Observation as an input string.
-- It should extract features that are useful to playing the game.
+- The perception module is provided with everything inside the Direct Observation as an input string.
+- It should extract features that are useful to progressing in the environment.
 - Ensure that the perception module is working correctly in that the intended information in the perception code is correctly being presented in the features from perception module section.
 
 Your summary should be grounded in the episode outcome above:
@@ -292,7 +292,7 @@ Provide a summary highlighting:
 - Root cause analysis: Why did the episode end this way?
 - Belief learning: What beliefs can we infer from the trajectory, especially those that show us how to make progress towards completing the task. 
 - Belief update: How should we update our beliefs so that we can make progress towards completing the task. Were there beliefs that were incorrect or misleading?
-- Perception correctness: Regardless of the outcome of the episode, verify whether the perception module is working correctly. Check that the output of the perception module is correctly mapping the corresponding direct game observation into the intended features.
+- Perception correctness: Regardless of the outcome of the episode, verify whether the perception module is working correctly. Check that the output of the perception module is correctly mapping the corresponding direct observation into the intended features.
 - Perception analysis: What information was presented in the explicit features from perception module section. What part of that information was helpful, what information was misleading / incorrect and what additional information would have helped if extracted by the perception module?
 
 Format your response in XML style as -
@@ -355,7 +355,7 @@ async def _get_experiment_summary_async(
     Returns:
         Summary text focused on experiment evaluation
     """
-    prompt = f"""We are playing a game and testing a specific experiment about how it works.
+    prompt = f"""We are interacting with an environment and testing a specific experiment about how it works.
 
 We were testing the following experiment in this episode:
 === EXPERIMENT ===
@@ -429,7 +429,7 @@ async def get_episode_summary_async(
 
     Args:
         config: Configuration containing model information
-        beliefs: Current beliefs about the game
+        beliefs: Current beliefs about the environment
         perception: Current perception module code
         trajectory_path: Path to the trajectory file
         experiment: Optional experiment that was being tested in this episode
@@ -583,7 +583,7 @@ def prepare_improve_context(
     ep_results = asyncio.run(get_all_summaries())
 
     # Combine all summaries and track costs
-    episode_summaries = "<episode_summaries>\nThese are summaries of different episodes of playing the game."
+    episode_summaries = "<episode_summaries>\nThese are summaries of different episodes of running the agent."
     summary_cost = 0.0
     for i, (summary, cost) in enumerate(ep_results):
         episode_summaries += f"<episode_summary episode_idx={i+1}>\n{summary.strip()}\n</episode_summary>\n"
@@ -652,11 +652,11 @@ def generate_candidate_beliefs(
         _steps = ["1. Analyze the results. If experiments were tested, determine if they were confirmed or refuted."]
         _step_num = 2
         if improve_beliefs:
-            _steps.append(f"{_step_num}. Update our beliefs about the game based on confirmed knowledge.")
+            _steps.append(f"{_step_num}. Update our beliefs about the environment based on confirmed knowledge.")
             _step_num += 1
         if improve_perception:
             _steps.append(
-                f"{_step_num}. Update the perception module to make sure it is correct and that it extracts better features from the direct game observation."
+                f"{_step_num}. Update the perception module to make sure it is correct and that it extracts better features from the direct observation."
             )
             _step_num += 1
         if experiment_mode == "binary":
@@ -666,7 +666,7 @@ def generate_candidate_beliefs(
                 else ""
             )
             _steps.append(
-                f"{_step_num}. Suggest up to {num_experiments} binary question experiments worth testing. Each should be a specific YES/NO question about a game mechanic, strategy, or interaction that we can test by playing."
+                f"{_step_num}. Suggest up to {num_experiments} binary question experiments worth testing. Each should be a specific YES/NO question about a environment mechanic, strategy, or interaction that we can test by running the agent."
                 + _novel_bullet
             )
             exp_placeholder_1 = "[First binary question experiment]"
@@ -713,11 +713,11 @@ EXPERIMENT 2: {exp_placeholder_2}
         _steps = ["1. Analyze the results."]
         _step_num = 2
         if improve_beliefs:
-            _steps.append(f"{_step_num}. Update our beliefs about the game based on confirmed knowledge.")
+            _steps.append(f"{_step_num}. Update our beliefs about the environment based on confirmed knowledge.")
             _step_num += 1
         if improve_perception:
             _steps.append(
-                f"{_step_num}. Update the perception module to make sure it is correct and that it extracts useful information from the direct game observation and presents in a clear and descriptive way."
+                f"{_step_num}. Update the perception module to make sure it is correct and that it extracts useful information from the direct observation and presents in a clear and descriptive way."
             )
             _step_num += 1
         task_section = "Your task is to:\n" + "\n".join(_steps)
@@ -763,8 +763,8 @@ EXPERIMENT 2: {exp_placeholder_2}
         if beliefs_style == "relaxed":
             beliefs_instructions = """For beliefs:
 - Beliefs are split into two sections:
-  * <world_knowledge>: Facts about how the game works — mechanics, environmental properties, cause-and-effect relationships.
-  * <level_strategy>: Tactical approaches — what to do in specific situations, priorities, strategies for completing the objective.
+  * <world_knowledge>: mechanics, environmental properties, cause-and-effect relationships.
+  * <policy>: what to do in specific situations, priorities, strategies for completing the objective.
 - They should be brief with each point being a few sentences.
 - Correct any wrong or misleading beliefs in either section.
 - They should be grounded in the evidence present from the trajectories.
@@ -772,11 +772,11 @@ EXPERIMENT 2: {exp_placeholder_2}
         else:
             beliefs_instructions = """For beliefs:
 - Beliefs are split into two sections:
-  * <world_knowledge>: Facts about how the game works — mechanics, environmental properties, cause-and-effect relationships.
-  * <level_strategy>: Tactical approaches — what to do in specific situations, priorities, strategies for completing the objective.
+  * <world_knowledge>: mechanics, environmental properties, cause-and-effect relationships.
+  * <policy>: what to do in specific situations, priorities, strategies for completing the objective.
 - Beliefs must be SHORT, CONCRETE, ACTIONABLE — not abstract reasoning frameworks or meta-cognitive rules.
-- <world_knowledge> should describe specific game mechanics. <level_strategy> should tell the agent WHAT TO DO.
-- Focus on patterns specific to THIS game environment — not generic game-playing principles.
+- <world_knowledge> should describe specific environment mechanics. <policy> should tell the agent WHAT TO DO.
+- Focus on patterns specific to THIS environment — not generic principles.
 - Do NOT include instructions about how to reason, how to validate coordinates, or how to manage internal state. The agent already has a perception module for that.
 - Total beliefs should be at most 10 short bullet points (~200 words total) across both sections. Fewer actionable beliefs are better than many abstract ones.
 - Correct any wrong or misleading beliefs.
@@ -786,24 +786,24 @@ EXPERIMENT 2: {exp_placeholder_2}
     if improve_perception:
         perception_instructions = """For the perception module:
 - It should be a Python function `perceive(observation_text: str) -> str`.
-- Input `observation_text` contains everything from the direct game observation as a string.
+- Input `observation_text` contains everything from the direct observation as a string.
 - The code must be valid Python.
-- Ensure that the perception module is working correctly in that it is correctly extracting the intended information from the direct game state and presenting it in the features from perception module section.
-- Output should be a textual description of the game state that is useful for progressing in the game.
-- Output should contain all information that is necessary for progressing in the game and should be presented in a clear and description way."""
+- Ensure that the perception module is working correctly in that it is correctly extracting the intended information from the environment state and presenting it in the features from perception module section.
+- Output should be a textual description of the environment state that is useful for progressing in the environment.
+- Output should contain all information that is necessary for progressing in the environment and should be presented in a clear and description way."""
 
     # Build conditional XML format blocks
     beliefs_xml_fmt = ""
     if improve_beliefs:
         beliefs_xml_fmt = """<updated_beliefs>
 <world_knowledge>
-- [fact about game mechanics, environmental properties, cause-and-effect relationships, etc ...]
+- [fact about mechanics, environmental properties, cause-and-effect relationships, etc ...]
 - ...
 </world_knowledge>
-<level_strategy>
+<policy>
 - [tactical approach: what to do in specific situations, priorities, strategies for completing the objective etc ...]
 - ...
-</level_strategy>
+</policy>
 </updated_beliefs>"""
 
     perception_xml_fmt = ""
@@ -828,24 +828,24 @@ def perceive(observation_text: str) -> str:
     else:
         experiment_pool_section = ""
 
-    base_prompt = f"""We are playing a game and trying to figure out how it works.
+    base_prompt = f"""We are interacting with an environment and trying to figure out how it works.
 
 The agent receives the following default instructions/knowledge by default:
 === DEFAULT KNOWLEDGE ===
 {default_knowledge}
 === END DEFAULT KNOWLEDGE ===
 
-We maintain the following current beliefs about the game:
+We maintain the following current beliefs about the environment:
 === CURRENT BELIEFS ===
 {base_beliefs if base_beliefs else "(empty - no beliefs yet)"}
 === END OF CURRENT BELIEFS ===
 
-The following code is used to extract useful features from the raw game observations:
+The following code is used to extract useful features from the raw observations:
 === PERCEPTION MODULE ===
 {perception if perception else "(empty - no perception module yet)"}
 === END OF PERCEPTION MODULE ===
 
-We have collected the following experience by playing the game:
+We have collected the following experience by running the agent:
 === COLLECTED EXPERIENCE ===
 {episode_summaries}
 {perception_examples}
@@ -1116,18 +1116,18 @@ def generate_experiments_from_baseline(
 
     # Build task items conditionally based on experiment_mode
     if experiment_mode == "binary":
-        task_items = f"""1. Analyze the baseline experience to identify knowledge gaps and uncertainties about how the game works.
-2. Generate {num_to_generate} NEW binary question experiments. Each experiment should be a specific YES/NO question about a game mechanic, strategy, or interaction that we can test by playing.
-   - Experiments should be testable by playing the game.
-   - Experiments should target specific, observable game mechanics or interactions.
+        task_items = f"""1. Analyze the baseline experience to identify knowledge gaps and uncertainties about how the environment works.
+2. Generate {num_to_generate} NEW binary question experiments. Each experiment should be a specific YES/NO question about a environment mechanic, strategy, or interaction that we can test by running the agent.
+   - Experiments should be testable by running the agent.
+   - Experiments should target specific, observable environment mechanics or interactions.
    - Do NOT duplicate existing experiments in the pool."""
         exp_placeholder_1 = "[First binary question experiment]"
         exp_placeholder_2 = "[Second binary question experiment]"
     else:
-        task_items = f"""1. Analyze the baseline experience to identify knowledge gaps and uncertainties about how the game works.
+        task_items = f"""1. Analyze the baseline experience to identify knowledge gaps and uncertainties about how the environment works.
 2. Generate {num_to_generate} NEW experiments to test. Each experiment should be a specific, actionable strategy or mechanic to test that helps us achieve the main goal.
-   - Experiments should be testable by playing the game.
-   - Experiments should target specific, observable game mechanics or interactions.
+   - Experiments should be testable by running the agent.
+   - Experiments should target specific, observable environment mechanics or interactions.
    - Do NOT duplicate existing experiments in the pool."""
         exp_placeholder_1 = "[First experiment to test]"
         exp_placeholder_2 = "[Second experiment to test]"
@@ -1167,24 +1167,24 @@ REFINE N: [new wording for experiment N] KEEP_RESULTS: YES/NO
 [Comma-separated list of experiment numbers from the FULL updated pool to test next, e.g. "3, 5, 7"]
 </selected_experiments>"""
 
-    prompt = f"""We are playing a game and trying to figure out how it works.
+    prompt = f"""We are interacting with an environment and trying to figure out how it works.
 
 The agent receives the following default instructions/knowledge by default:
 === DEFAULT KNOWLEDGE ===
 {default_knowledge}
 === END DEFAULT KNOWLEDGE ===
 
-We maintain the following current beliefs about the game:
+We maintain the following current beliefs about the environment:
 === CURRENT BELIEFS ===
 {base_beliefs if base_beliefs else "(empty - no beliefs yet)"}
 === END OF CURRENT BELIEFS ===
 
-We have collected the following experience from baseline rollouts (playing with current beliefs):
+We have collected the following experience from baseline rollouts (running with current beliefs):
 === BASELINE EXPERIENCE ===
 {episode_summaries}
 === END OF BASELINE EXPERIENCE ===
 
-We maintain a pool of experiments to test about the game:
+We maintain a pool of experiments to test about the environment:
 === EXPERIMENT POOL ===
 {experiment_pool_str}
 === END OF EXPERIMENT POOL ===
@@ -1337,7 +1337,7 @@ async def analyze_experiment_conclusiveness_async(
         Tuple of (result_dict, cost).
         result_dict has keys: "conclusive" (bool), "answer" (bool|None), "reasoning" (str).
     """
-    prompt = f"""We are playing a game and testing a specific binary question experiment.
+    prompt = f"""We are interacting with an environment and testing a specific binary question experiment.
 
 The experiment question is:
 === EXPERIMENT ===
@@ -1537,14 +1537,14 @@ def score_candidate_beliefs(
     async def _score_all():
         tasks = []
         for cand_idx, candidate_beliefs in enumerate(candidates):
-            prompt = f"""You are evaluating a set of beliefs about a game by predicting answers to binary questions.
+            prompt = f"""You are evaluating a set of beliefs about an environment by predicting answers to binary questions.
 
 The agent receives the following default instructions/knowledge by default:
 === DEFAULT KNOWLEDGE ===
 {default_knowledge}
 === END DEFAULT KNOWLEDGE ===
 
-Given these beliefs about the game:
+Given these beliefs about the environment:
 === BELIEFS ===
 {candidate_beliefs}
 === END OF BELIEFS ===

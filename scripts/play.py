@@ -289,7 +289,7 @@ def main():
     if args.env_type == "minihack":
         goal = minihack_get_task_goal(args.task)
     else:
-        goal = "Your goal is to get as far as possible in the game."
+        goal = "Your goal is to get as far as possible."
 
     # Track failed actions across the episode
     failed_actions = []
