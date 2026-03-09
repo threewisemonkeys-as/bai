@@ -4,14 +4,11 @@ import os
 import sys
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 import hydra
-from hydra.utils import get_original_cwd
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
-from balrog.utils import setup_environment
 from balrog.environments import make_env
 from balrog.environments.nle import get_loaded_instruction_prompt
 from improve import (
@@ -23,6 +20,7 @@ from improve import (
     score_candidate_beliefs,
 )
 from rollout import run_explore_rollouts
+from run_utils import setup_run, improve_logging, _update_summary_json
 
 
 @contextmanager
@@ -66,36 +64,6 @@ def step_logging(step_output_dir: Path):
     finally:
         # Restore original handlers
         step_handler.close()
-        root_logger.handlers = original_handlers
-
-
-@contextmanager
-def improve_logging(step_output_dir: Path):
-    """Context manager to redirect all logging to an improve-specific log file.
-
-    During the context, all log messages go to step_output_dir/improve.log.
-    After exiting, logging returns to normal (eval.log).
-    This is used for logging LLM prompts and outputs during the improve phase.
-    """
-    improve_log_file = step_output_dir / "improve.log"
-
-    # Create a handler for the improve log
-    improve_handler = logging.FileHandler(improve_log_file)
-    improve_handler.setLevel(logging.INFO)
-    improve_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-
-    # Get the root logger and save its current handlers
-    root_logger = logging.getLogger()
-    original_handlers = root_logger.handlers.copy()
-
-    # Replace handlers with improve handler
-    root_logger.handlers = [improve_handler]
-
-    try:
-        yield improve_log_file
-    finally:
-        # Restore original handlers
-        improve_handler.close()
         root_logger.handlers = original_handlers
 
 
@@ -157,40 +125,6 @@ def _compute_rollout_cost(rollout_results: dict[str, dict]) -> float:
             for env_stats in result["summary"].values():
                 cost += env_stats.get("total_cost", 0)
     return cost
-
-
-def _update_summary_json(output_dir: str, step: int, step_cost: float, cumulative_cost: float,
-                         rollout_stats: dict, phase_stats: dict | None = None):
-    """Update the summary.json file with data from the completed step.
-
-    Args:
-        output_dir: Root output directory containing summary.json
-        step: Current step number
-        step_cost: Total cost for this step
-        cumulative_cost: Cumulative cost up to and including this step
-        rollout_stats: Dict with keys: total, successful, partial, failed, errors
-        phase_stats: Optional dict of per-phase stats (e.g. {"baseline": {...}, "explore": {...}})
-    """
-    summary_path = Path(output_dir) / "summary.json"
-    if summary_path.exists():
-        with open(summary_path) as f:
-            summary = json.load(f)
-    else:
-        summary = {"steps": []}
-
-    step_data = {
-        "step": step,
-        "step_cost": step_cost,
-        "cumulative_cost": cumulative_cost,
-        "rollout_stats": rollout_stats,
-    }
-    if phase_stats:
-        step_data["phase_stats"] = phase_stats
-
-    summary["steps"].append(step_data)
-
-    with open(summary_path, "w") as f:
-        json.dump(summary, f, indent=4)
 
 
 def get_default_knowledge(config: DictConfig) -> str:
@@ -1135,105 +1069,61 @@ def redirect_to_file(filepath):
 
 @hydra.main(config_path="BALROG/balrog/config", config_name="config", version_base="1.1")
 def main(config: DictConfig):
-    original_cwd = get_original_cwd()
-    setup_environment(original_cwd=original_cwd)
-
     two_step = config.eval.evolve.get("two_step", False)
     experiment_guided = config.eval.evolve.get("experiment_guided", False)
 
-    # Determine output directory
-    if config.eval.resume_from is not None:
-        output_dir: str = config.eval.resume_from
+    # Build run-name suffix
+    if experiment_guided:
+        suffix = "_explore_expguided"
+    elif two_step:
+        suffix = "_explore2step"
     else:
-        now = datetime.now()
-        timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
-        if experiment_guided:
-            suffix = "_explore_expguided"
-        elif two_step:
-            suffix = "_explore2step"
-        else:
-            suffix = "_explore"
-        run_name = f"{timestamp}_{config.agent.type}_{config.client.model_id.replace('/', '_')}{suffix}"
-        output_dir = os.path.join(config.eval.output_dir, run_name)
+        suffix = "_explore"
+    run_name_suffix = f"{config.agent.type}_{config.client.model_id.replace('/', '_')}{suffix}"
 
-        # Create the directory if it doesn't exist
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-    # Setup loggers
-    log_filename = os.path.join(output_dir, "eval.log")
-    log_format = "%(asctime)s - %(levelname)s - %(message)s"
-
-    # Configure root logger (used for detailed step logs)
-    logging.basicConfig(
-        level=logging.INFO,
-        format=log_format,
-        handlers=[logging.FileHandler(log_filename)],
-        force=True,
+    original_cwd, output_dir = setup_run(
+        config,
+        run_name_suffix=run_name_suffix,
+        resume_from=config.eval.resume_from,
+        output_dir_base=config.eval.output_dir,
+        logger_name="evolve",
     )
-
-    # Configure evolve_logger for high-level logs (always writes to eval.log)
-    evolve_handler = logging.FileHandler(log_filename)
-    evolve_handler.setLevel(logging.INFO)
-    evolve_handler.setFormatter(logging.Formatter(log_format))
-    evolve_logger.addHandler(evolve_handler)
-    evolve_logger.setLevel(logging.INFO)
-    evolve_logger.propagate = False  # Don't propagate to root logger
-
-    # Print output location to terminal
-    print(f"Output directory: {output_dir}")
-    print(f"Log file: {log_filename}")
-
-    # Save config to output directory
-    config_path = os.path.join(output_dir, "config.yaml")
-    with open(config_path, "w") as f:
-        OmegaConf.save(config=config, f=f)
-    evolve_logger.info(f"Saved config to {config_path}")
 
     # Get exploration config with defaults
     num_experiments = config.eval.evolve.get("num_experiments", 1)
     num_baseline_rollouts = config.eval.evolve.get("num_baseline_rollouts", 1)
 
-    match config.eval.mode:
-        case "eval":
-            # Simple eval mode - just run one step
-            from rollout import one_step_wrap
-            one_step_wrap(config=config, original_cwd=original_cwd, output_dir=output_dir)
+    ec = ExploreConfig(
+        num_steps=config.eval.evolve.num_steps,
+        rollouts_per_step=config.eval.evolve.rollouts_per_step,
+        num_experiments=num_experiments,
+        num_baseline_rollouts=num_baseline_rollouts,
+        num_candidates=config.eval.evolve.get("num_candidates", 3),
+        num_score_experiments=config.eval.evolve.get("num_score_experiments", 5),
+        min_experiments_for_scoring=config.eval.evolve.get("min_experiments_for_scoring", 3),
+    )
 
-        case "explore":
-            ec = ExploreConfig(
-                num_steps=config.eval.evolve.num_steps,
-                rollouts_per_step=config.eval.evolve.rollouts_per_step,
-                num_experiments=num_experiments,
-                num_baseline_rollouts=num_baseline_rollouts,
-                num_candidates=config.eval.evolve.get("num_candidates", 3),
-                num_score_experiments=config.eval.evolve.get("num_score_experiments", 5),
-                min_experiments_for_scoring=config.eval.evolve.get("min_experiments_for_scoring", 3),
-            )
-            if experiment_guided:
-                online_explore_experiment_guided(
-                    explore_config=ec,
-                    config=config,
-                    original_cwd=original_cwd,
-                    output_dir=output_dir,
-                )
-            elif two_step:
-                online_explore_2step(
-                    explore_config=ec,
-                    config=config,
-                    original_cwd=original_cwd,
-                    output_dir=output_dir,
-                )
-            else:
-                online_explore(
-                    explore_config=ec,
-                    config=config,
-                    original_cwd=original_cwd,
-                    output_dir=output_dir,
-                )
-
-        case _:
-            evolve_logger.error(f"Unsupported mode: {config.eval.mode}. explore_eval.py supports 'eval' and 'explore' modes.")
-            raise ValueError(f"Unsupported mode: {config.eval.mode}")
+    if experiment_guided:
+        online_explore_experiment_guided(
+            explore_config=ec,
+            config=config,
+            original_cwd=original_cwd,
+            output_dir=output_dir,
+        )
+    elif two_step:
+        online_explore_2step(
+            explore_config=ec,
+            config=config,
+            original_cwd=original_cwd,
+            output_dir=output_dir,
+        )
+    else:
+        online_explore(
+            explore_config=ec,
+            config=config,
+            original_cwd=original_cwd,
+            output_dir=output_dir,
+        )
 
 
 if __name__ == "__main__":

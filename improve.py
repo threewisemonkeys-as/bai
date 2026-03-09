@@ -801,7 +801,7 @@ EXPERIMENT 2: {exp_placeholder_2}
 - ...
 </world_knowledge>
 <policy>
-- [tactical approach: what to do in specific situations, priorities, strategies for completing the objective etc ...]
+- [what to do in specific situations, priorities, strategies for completing the objective etc ...]
 - ...
 </policy>
 </updated_beliefs>"""
