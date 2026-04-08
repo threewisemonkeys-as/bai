@@ -59,6 +59,8 @@ def setup_run(
         handlers=[logging.FileHandler(log_filename)],
         force=True,
     )
+    logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+    logging.getLogger("litellm").setLevel(logging.WARNING)
 
     if logger_name is not None:
         named_logger = logging.getLogger(logger_name)

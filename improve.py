@@ -125,6 +125,7 @@ def extract_obs_perc_examples(
     perception: str,
     max_trajs: int = 3,
     max_steps_per_traj: int = 1,
+    randomize: bool = False,
 ) -> str:
     """Extract concrete (raw_observation, perception_output) pairs from trajectory CSVs.
 
@@ -145,7 +146,12 @@ def extract_obs_perc_examples(
     OBS_END    = "========== End of Direct Observation =========="
 
     examples = []
-    csv_paths = sorted(Path(output_dir).rglob("*.csv"))[:max_trajs]
+    all_csv_paths = sorted(Path(output_dir).rglob("*.csv"))
+    if randomize and len(all_csv_paths) > max_trajs:
+        import random
+        csv_paths = random.sample(all_csv_paths, max_trajs)
+    else:
+        csv_paths = all_csv_paths[:max_trajs]
 
     for traj_idx, csv_path in enumerate(csv_paths):
         try:
@@ -161,7 +167,13 @@ def extract_obs_perc_examples(
 
         # len(rows) - 1 is so that we dont include last state
         # which is usually just the end status screen
-        for row_idx in _sample_indices(len(rows) - 1, max_steps_per_traj):
+        n_rows = len(rows) - 1
+        if randomize and n_rows > max_steps_per_traj:
+            import random
+            sample_indices = sorted(random.sample(range(n_rows), max_steps_per_traj))
+        else:
+            sample_indices = _sample_indices(n_rows, max_steps_per_traj)
+        for row_idx in sample_indices:
             obs_text = rows[row_idx].get('Observation', '')
             if PERC_START not in obs_text:
                 continue  # perception not active for this step
@@ -222,7 +234,7 @@ async def _get_beliefs_perception_summary_async(
     traj_text: str,
     trajectory_path: str,
     default_knowledge: str,
-) -> tuple[str, float]:
+) -> tuple[str, float, str, str]:
     """Get a summary focused on beliefs and perception evaluation (async).
 
     Args:
@@ -331,9 +343,9 @@ Summary with the sections above clearly addressed
     response_dict = extract_xml_kv(response_text, ["summary"])
 
     if not validate_response_fields(response_dict, response_text, ["summary"]):
-        return "", cost
+        return "", cost, prompt, response_text
     else:
-        return response_dict["summary"], cost
+        return response_dict["summary"], cost, prompt, response_text
 
 
 async def _get_experiment_summary_async(
@@ -444,7 +456,7 @@ async def get_episode_summary_async(
     traj_text = trim_to_model_context_lim(traj_text, config.client.model_id)
 
     # Call for instructions and perception summary
-    beliefs_perception_summary, ip_cost = await _get_beliefs_perception_summary_async(
+    beliefs_perception_summary, ip_cost, bp_prompt, bp_response = await _get_beliefs_perception_summary_async(
         config, beliefs, perception, outcome_header, traj_text, trajectory_path, default_knowledge
     )
 
@@ -463,16 +475,23 @@ async def get_episode_summary_async(
 
 === EXPERIMENT ANALYSIS ===
 {experiment_summary}"""
-        return combined_summary, total_cost
+        return combined_summary, total_cost, bp_prompt, bp_response
     else:
-        return beliefs_perception_summary, total_cost
+        return beliefs_perception_summary, total_cost, bp_prompt, bp_response
 
 
-def validate_perception_code(code: str) -> tuple[bool, str | None]:
-    """Validate perception code by attempting to compile and execute it.
+def validate_perception_code(
+    code: str,
+    test_observations: list[str] | None = None,
+) -> tuple[bool, str | None]:
+    """Validate perception code by attempting to compile, execute, and test it.
 
     Args:
-        code: Python code string containing the perceive function
+        code: Python code string containing the perceive function.
+        test_observations: Optional list of real raw observation strings to test
+            the perceive function on. When provided, the function is tested on
+            each observation. When not provided, a minimal synthetic input is used
+            to catch basic runtime errors.
 
     Returns:
         Tuple of (is_valid, error_message). If valid, error_message is None.
@@ -495,25 +514,19 @@ def validate_perception_code(code: str) -> tuple[bool, str | None]:
         if not callable(namespace["perceive"]):
             return False, "'perceive' is not a callable function"
 
-        # Test with a sample input to catch runtime errors in basic execution
-        test_input = (
-            "message: You see here a +0 dagger.\n\n"
-            "cursor:\nYourself a rogue\n(x=10, y=5)\n\n"
-            "map:\n"
-            "         -----          \n"
-            "         |...|          \n"
-            "         |.@d.|         \n"
-            "         |..F.|         \n"
-            "         -----          \n\n"
-            "Agent the Footpad              St:15 Dx:17 Co:13 In:13 Wi:11 Ch:6 Chaotic S:0\n"
-            "Dlvl:1 $:0 HP:12(12) Pw:2(2) AC:7 Xp:1/0\n"
-        )
-        try:
-            result = namespace["perceive"](test_input)
-            if not isinstance(result, str):
-                return False, f"'perceive' function must return a string, got {type(result).__name__}"
-        except Exception as e:
-            return False, f"Runtime error when testing perceive function: {e}"
+        # Test on real observations if available, otherwise use a minimal input
+        if test_observations:
+            test_inputs = test_observations
+        else:
+            test_inputs = ["message:\nTest message\n\nmap:\n...\n"]
+
+        for i, test_input in enumerate(test_inputs):
+            try:
+                result = namespace["perceive"](test_input)
+                if not isinstance(result, str):
+                    return False, f"'perceive' function must return a string, got {type(result).__name__} (test input {i})"
+            except Exception as e:
+                return False, f"Runtime error when testing perceive function on input {i}: {e}"
 
     except Exception as e:
         return False, f"Failed to execute perception code: {e}"
@@ -585,7 +598,8 @@ def prepare_improve_context(
     # Combine all summaries and track costs
     episode_summaries = "<episode_summaries>\nThese are summaries of different episodes of running the agent."
     summary_cost = 0.0
-    for i, (summary, cost) in enumerate(ep_results):
+    for i, result in enumerate(ep_results):
+        summary, cost = result[0], result[1]
         episode_summaries += f"<episode_summary episode_idx={i+1}>\n{summary.strip()}\n</episode_summary>\n"
         summary_cost += cost
 

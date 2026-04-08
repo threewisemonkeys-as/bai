@@ -10,7 +10,6 @@ import hydra
 from omegaconf import DictConfig
 
 from balrog.environments import make_env
-from balrog.environments.nle import get_loaded_instruction_prompt
 from improve import (
     improve_step,
     prepare_improve_context,
@@ -127,6 +126,40 @@ def _compute_rollout_cost(rollout_results: dict[str, dict]) -> float:
     return cost
 
 
+def get_default_actions(config: DictConfig) -> str:
+    """Get only the available actions for the environment (no goal).
+
+    Args:
+        config: BALROG configuration
+
+    Returns:
+        String listing the available actions.
+    """
+    env_name = config.envs.names.split("-")[0]
+    tasks = config.tasks[f"{env_name}_tasks"]
+    if not tasks:
+        return ""
+
+    task = tasks[0]
+
+    try:
+        if env_name == "minihack":
+            from balrog.environments.minihack import get_available_actions
+            env = make_env(env_name, task, config)
+            available_actions = get_available_actions(env)
+            env.close()
+        else:
+            from balrog.environments.nle import ACTIONS as available_actions
+        action_strings = ",\n".join(
+            f"{action}: {description}"
+            for action, description in available_actions.items()
+        )
+        return f"Available actions:\n<actions>\n{action_strings}.\n</actions>"
+    except Exception as e:
+        logging.warning(f"Failed to extract default actions: {e}")
+        return ""
+
+
 def get_default_knowledge(config: DictConfig) -> str:
     """Get the default instructions/knowledge for the environment.
 
@@ -146,9 +179,14 @@ def get_default_knowledge(config: DictConfig) -> str:
     logging.info(f"Extracting default knowledge for env: {env_name}, task: {task}")
     
     try:
-        env = make_env(env_name, task, config)
-        instruction_prompt = get_loaded_instruction_prompt(env, load="", task=task)
-        env.close()
+        if env_name == "minihack":
+            from balrog.environments.minihack import get_instruction_prompt
+            env = make_env(env_name, task, config)
+            instruction_prompt = get_instruction_prompt(env, task=task)
+            env.close()
+        else:
+            from balrog.environments.nle import get_instruction_prompt
+            instruction_prompt = get_instruction_prompt(task=task)
         return instruction_prompt
     except Exception as e:
         logging.warning(f"Failed to extract default knowledge: {e}")

@@ -81,6 +81,42 @@ def extract_xml_kv(data: str, keys: list[str]) -> dict[str, Any]:
     return extracted
 
 
+def build_llm_input_multiturn(history: list[dict], user_message: str) -> list[dict]:
+    """Build multi-turn LLM input by appending a user message to conversation history.
+
+    Args:
+        history: Existing conversation history (list of message dicts)
+        user_message: New user message text to append
+
+    Returns:
+        Updated message list with the new user message appended
+    """
+    return history + [
+        {
+            "role": "user",
+            "content": [{"type": "input_text", "text": user_message}],
+        }
+    ]
+
+
+def append_assistant_message(history: list[dict], text: str) -> list[dict]:
+    """Append an assistant response to conversation history.
+
+    Args:
+        history: Existing conversation history
+        text: Assistant response text
+
+    Returns:
+        Updated message list with the assistant message appended
+    """
+    return history + [
+        {
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": text}],
+        }
+    ]
+
+
 def validate_response_fields(response_dict: dict, response_output_text: str, required_fields: list[str]) -> bool:
     """Validate that required fields exist in response.
 

@@ -1,0 +1,8 @@
+client_name: openrouter
+model_id: google/gemini-2.5-flash
+api_key: null          # optional: set here or via env var (e.g. OPENROUTER_API_KEY)
+api_base: null         # optional: base URL override (e.g. for local vllm server)
+temperature: 1.0
+max_tokens: 4096
+max_retries: 3
+system_prompt: null    # optional: system prompt text

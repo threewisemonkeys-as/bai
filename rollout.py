@@ -4,7 +4,7 @@ import logging
 import os
 from pathlib import Path
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from balrog.agents import AgentFactory
 from balrog.evaluator import EvaluatorManager
@@ -97,7 +97,7 @@ def run_single_rollout_task(
     run_name: str,
     base_beliefs: str,
     perception: str,
-    experiment: str | None,
+    experiment: str | list[str] | None,
     config: DictConfig,
     original_cwd: str,
     output_dir: str,
@@ -108,7 +108,7 @@ def run_single_rollout_task(
         run_name: Name of the run (e.g., baseline_0, experiment_1)
         base_beliefs: Base beliefs
         perception: Current perception module
-        experiment: Specific experiment to test (or None for baseline)
+        experiment: Experiment string, list of experiment strings, or None for baseline
         config: Configuration object
         original_cwd: Original working directory
         output_dir: Root output directory
@@ -124,29 +124,35 @@ def run_single_rollout_task(
 
     instruction_to_use = base_beliefs
     result_type = "baseline"
+    OmegaConf.update(config, "eval.goal_override", None, force_add=True)
 
-    if experiment:
+    # Normalize experiment to a list
+    if isinstance(experiment, str):
+        experiments_list = [experiment]
+    elif isinstance(experiment, list):
+        experiments_list = experiment
+    else:
+        experiments_list = []
+
+    if experiments_list:
         result_type = "experiment"
-        # Save the experiment being tested
-        (run_dir / "experiment.txt").write_text(experiment)
+        # Save the experiments being tested
+        (run_dir / "experiment.txt").write_text("\n\n---\n\n".join(experiments_list))
 
-        # Combine base instruction with experiment
-        if base_beliefs:
-            instruction_to_use = f"""{base_beliefs}
-
-=== EXPERIMENT TO TEST ===
-The following experiment might help achieve the goal. Try to test it during gameplay:
-
-{experiment}
-=== END EXPERIMENT ===
-"""
+        # Format experiments as explicit directives that replace the goal
+        if len(experiments_list) == 1:
+            experiments_block = experiments_list[0]
         else:
-            instruction_to_use = f"""=== EXPERIMENT TO TEST ===
-The following experiment might help achieve the goal. Try to test it during gameplay:
+            experiments_block = "\n".join(
+                f"{i+1}. {exp}" for i, exp in enumerate(experiments_list)
+            )
 
-{experiment}
-=== END EXPERIMENT ===
-"""
+        # Build goal override from experiments
+        goal_text = f"You MUST execute the following during this episode:\n\n{experiments_block}"
+        OmegaConf.update(config, "eval.goal_override", goal_text, force_add=True)
+
+        # Keep base beliefs as tips but don't repeat experiments there
+        instruction_to_use = base_beliefs if base_beliefs else ""
 
     logging.info(f"Starting rollout for {run_name} in process {os.getpid()}")
 
@@ -163,8 +169,8 @@ The following experiment might help achieve the goal. Try to test it during game
             "type": result_type,
             "summary": summary,
         }
-        if experiment:
-            result_data["experiment"] = experiment
+        if experiments_list:
+            result_data["experiment"] = experiments_list if len(experiments_list) > 1 else experiments_list[0]
 
         return run_name, result_data
 
@@ -181,10 +187,11 @@ def run_explore_rollouts(
     original_cwd: str,
     output_dir: str,
     num_baseline_rollouts: int = 3,
+    experiments_per_rollout: int = 1,
 ) -> dict[str, dict]:
     """Run rollouts for exploration in parallel using ProcessPoolExecutor.
 
-    If experiments are provided, runs one rollout per experiment.
+    If experiments are provided, batches them into rollouts according to experiments_per_rollout.
     If no experiments are provided (empty list), runs `num_baseline_rollouts` baseline rollouts.
 
     Args:
@@ -195,6 +202,7 @@ def run_explore_rollouts(
         original_cwd: Original working directory
         output_dir: Output directory for results
         num_baseline_rollouts: Number of rollouts to run if no experiments are provided
+        experiments_per_rollout: Number of experiments to bundle into each rollout
 
     Returns:
         Dictionary mapping run index/name to their results summary
@@ -211,11 +219,15 @@ def run_explore_rollouts(
                 "experiment": None
             })
     else:
-        logging.info(f"Preparing {len(experiments)} experiment rollouts.")
-        for i, experiment in enumerate(experiments):
+        # Batch experiments into groups of experiments_per_rollout
+        epr = max(1, experiments_per_rollout)
+        batches = [experiments[i:i + epr] for i in range(0, len(experiments), epr)]
+        logging.info(f"Preparing {len(batches)} rollouts for {len(experiments)} experiments "
+                     f"({epr} experiments per rollout).")
+        for i, batch in enumerate(batches):
             tasks.append({
                 "run_name": f"experiment_{i}",
-                "experiment": experiment
+                "experiment": batch if len(batch) > 1 else batch[0],
             })
 
     # Use configured number of workers for parallelism
