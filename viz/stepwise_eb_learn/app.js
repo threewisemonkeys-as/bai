@@ -11,6 +11,9 @@ let currentStaticRun = null;
 let currentStaticRunBase = null;
 
 const VIEWER_CONFIG = window.STEPWISE_EB_VIEWER_CONFIG || {};
+if (VIEWER_CONFIG.dataIndexPath && !/^https?:\/\//.test(VIEWER_CONFIG.dataIndexPath)) {
+  VIEWER_CONFIG.dataIndexPath = new URL(VIEWER_CONFIG.dataIndexPath, window.location.href).toString();
+}
 const TABS = [
   ["overview", "Overview"],
   ["experiments", "Questions & Experiments"],
