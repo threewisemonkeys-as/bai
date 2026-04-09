@@ -477,35 +477,7 @@ function renderOverview(data, step) {
   if (!c) return;
   let html = "";
 
-  html += '<div class="stats-grid">' +
-    '<div class="stat-card"><div class="stat-label">Action</div><div class="stat-value blue" style="font-size:16px;font-family:var(--font-mono)">' + esc(step.action) + "</div></div>" +
-    '<div class="stat-card"><div class="stat-label">Reward</div><div class="stat-value ' + (step.reward > 0 ? "green" : step.reward < 0 ? "red" : "") + '">' + Number(step.reward).toFixed(2) + "</div></div>" +
-    '<div class="stat-card"><div class="stat-label">Return So Far</div><div class="stat-value ' + (step.episode_return_so_far > 0 ? "green" : "") + '">' + Number(step.episode_return_so_far).toFixed(2) + "</div></div>" +
-    '<div class="stat-card"><div class="stat-label">Done</div><div class="stat-value ' + (step.done ? "red" : "green") + '">' + (step.done ? "YES" : "NO") + "</div></div>" +
-    "</div>";
-
-  html += '<div class="stats-grid">' +
-    '<div class="stat-card"><div class="stat-label">Agent Cost</div><div class="stat-value yellow" style="font-size:16px">$' + Number(step.agent_step_cost).toFixed(4) + "</div></div>" +
-    '<div class="stat-card"><div class="stat-label">Extract Cost</div><div class="stat-value yellow" style="font-size:16px">$' + Number(step.extract_cost).toFixed(4) + "</div></div>" +
-    '<div class="stat-card"><div class="stat-label">Improve Cost</div><div class="stat-value yellow" style="font-size:16px">$' + Number(step.improve_cost).toFixed(4) + "</div></div>" +
-    '<div class="stat-card"><div class="stat-label">Experiment Cost</div><div class="stat-value yellow" style="font-size:16px">$' + Number(step.experiment_cost).toFixed(4) + "</div></div>" +
-    "</div>";
-
-  const numAnswered = step.num_qa_pairs - step.num_unanswered_questions;
-  html += '<div class="stats-grid">' +
-    '<div class="stat-card"><div class="stat-label">Questions (Total)</div><div class="stat-value purple">' + step.num_qa_pairs + "</div></div>" +
-    '<div class="stat-card"><div class="stat-label">Answered</div><div class="stat-value green">' + numAnswered + "</div></div>" +
-    '<div class="stat-card"><div class="stat-label">Unanswered</div><div class="stat-value yellow">' + step.num_unanswered_questions + "</div></div>" +
-    '<div class="stat-card"><div class="stat-label">Step Total Cost</div><div class="stat-value yellow">$' + Number(step.step_total_cost).toFixed(4) + "</div></div>" +
-    "</div>";
-
-  if (step.active_experiment) {
-    const genLabel = step.did_formulate_experiment ? "formulated at start of this step" : "carried over from previous step";
-    html += '<div class="card" style="margin-bottom:16px;border-left:3px solid var(--accent2)">' +
-      '<div class="card-header" onclick="toggleCard(this)">Active Experiment <span style="font-size:11px;color:var(--text-muted);font-weight:400">' + genLabel + '</span> <span class="toggle">&#9660;</span></div>' +
-      '<div class="card-body"><pre style="max-height:none">' + esc(step.active_experiment) + "</pre></div></div>";
-  }
-
+  // Agent LLM Call section at top with bigger boxes — show only Current Observation from prompt
   const msgs = data.agent_messages || [];
   if (msgs.length > 0) {
     let lastUser = null;
@@ -518,20 +490,76 @@ function renderOverview(data, step) {
     if (lastUser || lastAssistant) {
       let agentHtml = "";
       if (lastUser) {
-        agentHtml += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:4px">Last Message to LLM (' + lastUser.content.length + ' chars)</div>' +
-          '<pre style="max-height:300px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(lastUser.content) + "</pre></div>";
+        // Extract only the "Current Observation" section from the prompt
+        const fullContent = lastUser.content || "";
+        let observationContent = fullContent;
+        const obsStart = fullContent.indexOf("Current Observation:");
+        if (obsStart !== -1) {
+          // Start after the "Current Observation:" header line
+          let obsText = fullContent.substring(obsStart + "Current Observation:".length);
+          // Find the end — cut before agent instruction boilerplate
+          const endMarkers = ["\n\nTips -", "\n\nCurrent experimental goal:", "\n\nFirst create (if not present)", "\n\nYou always have to output", "\n\nFinally you must choose"];
+          let endIdx = obsText.length;
+          for (const marker of endMarkers) {
+            const idx = obsText.indexOf(marker);
+            if (idx !== -1 && idx < endIdx) endIdx = idx;
+          }
+          observationContent = obsText.substring(0, endIdx).trim();
+        }
+        agentHtml += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:4px">Current Observation</div>' +
+          '<pre style="max-height:none;font-size:11px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(observationContent) + "</pre></div>";
       }
       if (lastAssistant) {
         const actionBadge = lastAssistant.action ? ' <span style="display:inline-block;margin-left:8px;padding:2px 8px;background:var(--accent);color:#fff;border-radius:4px;font-family:var(--font-mono);font-size:11px">' + esc(lastAssistant.action) + "</span>" : "";
         agentHtml += '<div><div style="font-weight:600;font-size:12px;color:var(--accent2);margin-bottom:4px">Model Response' + actionBadge + "</div>" +
-          '<pre style="max-height:300px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(lastAssistant.content || "") + "</pre></div>";
+          '<pre style="max-height:500px;overflow:auto;font-size:11px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(lastAssistant.content || "") + "</pre></div>";
       }
-      html += collapsible("Agent LLM Call (last message & response)", agentHtml, true);
+      html += collapsible("Agent LLM Call", agentHtml, true);
     }
   }
 
-  html += '<div class="side-by-side" style="margin-bottom:16px"><div><h3>Beliefs</h3><pre>' + esc(data.beliefs || "(empty)") + "</pre></div>";
-  html += '<div><h3>Perception</h3><pre>' + esc(data.perception || "(empty)") + "</pre></div></div>";
+  // Active Experiment with selected questions
+  if (step.active_experiment) {
+    const genLabel = step.did_formulate_experiment ? "formulated at start of this step" : "carried over from previous step";
+    let expContent = "";
+    // Show selected question if available
+    const expLog = data.experiment_log || {};
+    const selectedQIdx = expLog.selected_question_index;
+    if (selectedQIdx != null) {
+      const qa = data.qa_pairs || [];
+      const selectedQ = selectedQIdx < qa.length ? qa[selectedQIdx] : null;
+      if (selectedQ) {
+        expContent += '<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--accent3);border-radius:4px">' +
+          '<span style="color:var(--accent3);font-weight:600">Selected Question (Q' + (selectedQIdx + 1) + '):</span> ' + esc(selectedQ.question) + "</div>";
+      }
+    }
+    expContent += '<pre style="max-height:none">' + esc(step.active_experiment) + "</pre>";
+    html += '<div class="card" style="margin-bottom:16px;border-left:3px solid var(--accent2)">' +
+      '<div class="card-header" onclick="toggleCard(this)">Active Experiment <span style="font-size:11px;color:var(--text-muted);font-weight:400">' + genLabel + '</span> <span class="toggle">&#9660;</span></div>' +
+      '<div class="card-body">' + expContent + "</div></div>";
+  }
+
+  html += '<div style="margin-bottom:16px"><h3 style="font-size:12px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Beliefs</h3><pre>' + esc(data.beliefs || "(empty)") + "</pre></div>";
+  html += '<div style="margin-bottom:16px"><h3 style="font-size:12px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Perception</h3><pre>' + esc(data.perception || "(empty)") + "</pre></div>";
+
+  // Cost section — below perception
+  let costHtml = '<table class="data-table"><tr><th>Category</th><th>This Step</th><th>Cumulative</th></tr>';
+  let cumAgent = 0, cumExtract = 0, cumImprove = 0, cumExperiment = 0, cumTotal = 0;
+  for (let i = 0; i <= selectedStepIdx; i++) {
+    const s = DATA.steps[i];
+    cumAgent += s.agent_step_cost || 0;
+    cumExtract += s.extract_cost || 0;
+    cumImprove += s.improve_cost || 0;
+    cumExperiment += s.experiment_cost || 0;
+    cumTotal += s.step_total_cost || 0;
+  }
+  costHtml += '<tr><td>Agent</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.agent_step_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumAgent.toFixed(4) + "</td></tr>";
+  costHtml += '<tr><td>Extraction</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.extract_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumExtract.toFixed(4) + "</td></tr>";
+  costHtml += '<tr><td>Improve</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.improve_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumImprove.toFixed(4) + "</td></tr>";
+  costHtml += '<tr><td>Experiment</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.experiment_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumExperiment.toFixed(4) + "</td></tr>";
+  costHtml += '<tr style="font-weight:600"><td>Total</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.step_total_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + cumTotal.toFixed(4) + "</td></tr>";
+  costHtml += "</table>";
+  html += collapsible("Cost Breakdown", costHtml, true);
   html += renderCostChart();
 
   c.innerHTML = html;
@@ -624,15 +652,7 @@ function renderExperiments(data) {
       : "No question generation this step — the agent used the experiment carried over from the previous cycle.") +
     "</div>";
 
-  if (expLog.new_questions && expLog.new_questions.length > 0) {
-    let qHtml = '<ul style="margin:0;padding-left:20px">';
-    expLog.new_questions.forEach((question) => {
-      qHtml += '<li style="margin-bottom:4px;font-size:13px;color:var(--accent3)">' + esc(question) + "</li>";
-    });
-    qHtml += "</ul>";
-    html += collapsible("New Questions Generated (" + expLog.new_questions.length + ")", qHtml, true);
-  }
-
+  // Step 1: Question Generation — Prompt & Response
   if (expLog.question_gen_prompt || expLog.question_gen_response) {
     let qGenHtml = "";
     if (expLog.question_gen_prompt) {
@@ -643,19 +663,53 @@ function renderExperiments(data) {
       qGenHtml += '<div><div style="font-weight:600;font-size:12px;color:var(--accent3);margin-bottom:4px">Response</div>' +
         '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.question_gen_response) + "</pre></div>";
     }
-    html += collapsible("Step 1: Question Generation — Prompt & Response", qGenHtml, true);
+    html += collapsible("Step 1: Question Generation — Prompt & Response", qGenHtml, false);
   }
 
-  if (expLog.experiment_prompt || expLog.experiment_response || expLog.experiment_plan) {
+  // Step 2: New Questions Generated
+  if (expLog.new_questions && expLog.new_questions.length > 0) {
+    let qHtml = '<ul style="margin:0;padding-left:20px">';
+    expLog.new_questions.forEach((question) => {
+      qHtml += '<li style="margin-bottom:4px;font-size:13px;color:var(--accent3)">' + esc(question) + "</li>";
+    });
+    qHtml += "</ul>";
+    html += collapsible("Step 2: New Questions Generated (" + expLog.new_questions.length + ")", qHtml, true);
+  }
+
+  // Step 3: All Available Questions Now (question bank)
+  const qa = data.qa_pairs || [];
+  if (qa.length > 0) {
+    const answered = qa.filter((item) => item.answer !== null);
+    const unanswered = qa.filter((item) => item.answer === null);
+    let qaHtml = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' +
+      answered.length + " answered, " + unanswered.length + " unanswered</div>";
+    qaHtml += '<table class="data-table"><tr><th>#</th><th>Question</th><th>Answer</th><th>Evidence</th><th>Src Step</th></tr>';
+    qa.forEach((item, i) => {
+      let answer;
+      let verdictClass;
+      if (item.answer === null || item.answer === undefined) {
+        answer = "UNANSWERED";
+        verdictClass = "verdict-unanswered";
+      } else if (item.answer === true) {
+        answer = "YES";
+        verdictClass = "verdict-correct";
+      } else {
+        answer = "NO";
+        verdictClass = "verdict-incorrect";
+      }
+      qaHtml += '<tr><td style="color:var(--text-muted)">Q' + (i + 1) + "</td>" +
+        '<td style="max-width:280px">' + esc(item.question) + "</td>" +
+        '<td><span class="verdict ' + verdictClass + '">' + answer + "</span></td>" +
+        '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(item.evidence) + '">' + esc(item.evidence || "") + "</td>" +
+        "<td>" + esc(item.source_step) + "</td></tr>";
+    });
+    qaHtml += "</table>";
+    html += collapsible("Step 3: All Available Questions (" + qa.length + ": " + answered.length + " answered, " + unanswered.length + " unanswered)", qaHtml, false);
+  }
+
+  // Step 4: Experiment Formulation — Prompt & Response
+  if (expLog.experiment_prompt || expLog.experiment_response) {
     let expHtml = "";
-    if (expLog.experiment_plan) {
-      const qIdx = expLog.selected_question_index;
-      const qRef = qIdx != null ? " (targeting Q" + (qIdx + 1) + ")" : "";
-      expHtml += '<div style="font-size:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--accent2);border-radius:6px;margin-bottom:10px">' +
-        '<strong style="color:var(--accent2)">Experiment Plan' + qRef + ":</strong> " + esc(expLog.experiment_plan) + "</div>";
-    } else {
-      expHtml += '<div style="color:var(--text-muted);font-size:12px;margin-bottom:10px;padding:8px 12px;background:var(--surface);border-radius:4px">LLM chose to keep the current experiment (returned null).</div>';
-    }
     if (expLog.experiment_prompt) {
       expHtml += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:4px">Prompt</div>' +
         '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.experiment_prompt) + "</pre></div>";
@@ -664,7 +718,24 @@ function renderExperiments(data) {
       expHtml += '<div><div style="font-weight:600;font-size:12px;color:var(--accent2);margin-bottom:4px">Response</div>' +
         '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.experiment_response) + "</pre></div>";
     }
-    html += collapsible("Step 2: Experiment Formulation — Prompt & Response", expHtml, true);
+    html += collapsible("Step 4: Experiment Formulation — Prompt & Response", expHtml, false);
+  }
+
+  // Step 5: Selected Question & Formulated Experiment
+  if (expLog.experiment_plan || expLog.selected_question_index != null) {
+    let resultHtml = "";
+    const qIdx = expLog.selected_question_index;
+    if (qIdx != null && qIdx < qa.length) {
+      resultHtml += '<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--accent3);border-radius:4px">' +
+        '<span style="color:var(--accent3);font-weight:600">Selected Question (Q' + (qIdx + 1) + '):</span> ' + esc(qa[qIdx].question) + "</div>";
+    }
+    if (expLog.experiment_plan) {
+      resultHtml += '<div style="font-size:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--accent2);border-radius:6px">' +
+        '<strong style="color:var(--accent2)">Formulated Experiment:</strong> ' + esc(expLog.experiment_plan) + "</div>";
+    } else {
+      resultHtml += '<div style="color:var(--text-muted);font-size:12px;padding:8px 12px;background:var(--surface);border-radius:4px">LLM chose to keep the current experiment (returned null).</div>';
+    }
+    html += collapsible("Step 5: Selected Question & Formulated Experiment", resultHtml, true);
   }
 
   if (!html) html = '<div style="color:var(--text-muted);padding:20px">No experiment data for this step.</div>';
@@ -688,7 +759,6 @@ function renderFeedback(data) {
   }
 
   let html = "";
-  html += renderFeedbackProgressChart(fb);
 
   fb.forEach((trackRecord) => {
     const track = trackRecord.track || "unknown";
@@ -757,36 +827,53 @@ function renderFeedback(data) {
     html += '<div style="margin-bottom:16px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;border-left:3px solid ' + meta.color + '">' +
       '<div style="font-size:13px;font-weight:600;color:' + meta.color + ';margin-bottom:8px">' + meta.label + "</div>" +
       trackHtml + "</div>";
+
+    // After the QA track, show QA answering performance chart
+    if (track === "qa") {
+      html += renderQAPerformanceChart(trackRecord, turns);
+    }
   });
 
   c.innerHTML = html;
 }
 
-function renderFeedbackProgressChart(fb) {
-  const trackData = [];
-  fb.forEach((track) => {
-    if (track.turns && track.turns.length > 1) {
-      trackData.push({ track: track.track, turns: track.turns });
+function renderQAPerformanceChart(trackRecord, turns) {
+  if (!turns || turns.length === 0) return "";
+
+  let scoreData = [];
+  // Initial scores
+  scoreData.push({ label: "Init", correct: trackRecord.initial_correct || 0, incorrect: trackRecord.initial_incorrect || 0 });
+  // Extract scores from each turn's response
+  turns.forEach((turn) => {
+    const resp = turn.response || "";
+    const correctMatch = resp.match(/(\d+)\s*correct/i);
+    const incorrectMatch = resp.match(/(\d+)\s*incorrect/i);
+    if (correctMatch || incorrectMatch) {
+      scoreData.push({
+        label: "T" + turn.turn,
+        correct: correctMatch ? parseInt(correctMatch[1]) : 0,
+        incorrect: incorrectMatch ? parseInt(incorrectMatch[1]) : 0,
+      });
     }
   });
-  if (trackData.length === 0) return "";
+  if (scoreData.length <= 1) return "";
 
-  let html = '<div class="card" style="margin-bottom:16px"><div class="card-header" onclick="toggleCard(this)">Conversation Progress <span class="toggle">&#9660;</span></div><div class="card-body">';
-  trackData.forEach((td) => {
-    const meta = getTrackMeta(td.track);
-    html += '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:600;margin-bottom:8px;color:' + meta.color + '">' + meta.label + " (" + td.turns.length + " turns)</div>";
-    const maxCost = Math.max(...td.turns.map((turn) => turn.cost || 0), 0.0001);
-    html += '<div style="display:flex;gap:8px;align-items:flex-end;height:80px">';
-    td.turns.forEach((turn) => {
-      const height = Math.max(Math.round(((turn.cost || 0) / maxCost) * 70), 2);
-      const color = turn.submitted ? "var(--accent2)" : meta.color;
-      html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0">' +
-        '<div style="font-size:9px;color:var(--text-muted);margin-bottom:2px">$' + (turn.cost || 0).toFixed(3) + "</div>" +
-        '<div style="width:100%;min-width:20px;height:' + height + "px;background:" + color + ';border-radius:3px" title="Turn ' + turn.turn + ": $" + (turn.cost || 0).toFixed(4) + (turn.submitted ? " (SUBMITTED)" : "") + '"></div>' +
-        '<div style="font-size:10px;color:var(--text-muted);margin-top:4px">T' + turn.turn + "</div></div>";
-    });
-    html += "</div></div>";
+  const maxScore = Math.max(...scoreData.map((d) => d.correct + d.incorrect), 1);
+  let html = '<div class="card" style="margin-bottom:16px"><div class="card-header" onclick="toggleCard(this)">QA Answering Performance Per Turn <span class="toggle">&#9660;</span></div><div class="card-body">';
+  html += '<div style="display:flex;align-items:flex-end;gap:8px;height:100px">';
+  scoreData.forEach((d) => {
+    const correctH = Math.max(Math.round((d.correct / maxScore) * 85), 1);
+    const incorrectH = Math.max(Math.round((d.incorrect / maxScore) * 85), 1);
+    html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0">' +
+      '<div style="display:flex;flex-direction:column-reverse;height:85px;width:100%;min-width:24px">' +
+      '<div style="height:' + correctH + 'px;background:var(--accent2);border-radius:0 0 2px 2px"></div>' +
+      '<div style="height:' + incorrectH + 'px;background:var(--danger);border-radius:2px 2px 0 0"></div>' +
+      "</div>" +
+      '<div style="font-size:10px;color:var(--text-muted);margin-top:4px">' + d.label + "</div>" +
+      '<div style="font-size:10px;color:var(--accent2);font-weight:600">' + d.correct + '/' + (d.correct + d.incorrect) + "</div></div>";
   });
+  html += "</div>";
+  html += '<div style="display:flex;gap:16px;margin-top:8px;font-size:11px"><span><span style="display:inline-block;width:10px;height:10px;background:var(--accent2);border-radius:2px;vertical-align:middle"></span> Correct</span><span><span style="display:inline-block;width:10px;height:10px;background:var(--danger);border-radius:2px;vertical-align:middle"></span> Incorrect</span></div>';
   html += "</div></div>";
   return html;
 }
@@ -945,6 +1032,58 @@ async function loadQATimeline(highlightGlobalStep) {
   html += '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:4px"><span>g' + timeline[0].global_step + "</span><span>g" + timeline[timeline.length - 1].global_step + "</span></div>";
   html += '<div style="display:flex;gap:16px;margin-top:8px;font-size:11px"><span><span style="display:inline-block;width:10px;height:10px;background:var(--accent2);border-radius:2px;vertical-align:middle"></span> Answered</span><span><span style="display:inline-block;width:10px;height:10px;background:var(--accent3);border-radius:2px;vertical-align:middle"></span> Unanswered</span></div>';
   html += "</div></div>";
+
+  // Per-step details: new questions and full question list in dropdowns
+  let lastEp = -1;
+  timeline.forEach((item, idx) => {
+    if (item.episode_idx !== lastEp) {
+      lastEp = item.episode_idx;
+      html += '<div style="padding:8px 16px;font-size:12px;font-weight:600;color:var(--accent);background:var(--bg);border-bottom:1px solid var(--border);margin-top:8px">Episode ' + item.episode_idx + "</div>";
+    }
+
+    const isHighlighted = item.global_step === highlightGlobalStep;
+    const borderStyle = isHighlighted ? "border-left:3px solid var(--accent)" : "border-left:3px solid var(--surface2)";
+    let stepHtml = '<div style="padding:10px 14px;margin-bottom:6px;background:var(--surface);border:1px solid var(--border);border-radius:6px;' + borderStyle + '">';
+    stepHtml += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">';
+    stepHtml += '<span style="font-size:12px;font-weight:600;color:var(--accent)">g' + item.global_step + "</span>";
+    stepHtml += '<span style="font-size:11px;color:var(--text-muted)">ep' + item.episode_idx + " step " + item.step + "</span>";
+    stepHtml += '<span style="font-size:11px;color:var(--accent2)">' + item.answered + " answered</span>";
+    stepHtml += '<span style="font-size:11px;color:var(--accent3)">' + item.unanswered + " unanswered</span>";
+    stepHtml += "</div>";
+
+    const newQ = item.new_questions || [];
+    if (newQ.length > 0) {
+      stepHtml += '<div class="extraction-section" style="margin-bottom:4px"><div class="extraction-header" onclick="toggleBody(this)" style="padding:6px 10px">' +
+        '<span style="font-size:11px;color:var(--accent3);font-weight:600">New Questions (+' + newQ.length + ')</span>' +
+        '<span style="margin-left:auto;font-size:11px">&#9654;</span></div>' +
+        '<div class="extraction-body"><ul style="margin:0;padding-left:18px;font-size:12px">';
+      newQ.forEach((q) => {
+        stepHtml += '<li style="margin-bottom:2px;color:var(--accent3)">' + esc(q) + "</li>";
+      });
+      stepHtml += "</ul></div></div>";
+    }
+
+    const allQ = item.all_questions || [];
+    if (allQ.length > 0) {
+      stepHtml += '<div class="extraction-section"><div class="extraction-header" onclick="toggleBody(this)" style="padding:6px 10px">' +
+        '<span style="font-size:11px;color:var(--text-muted);font-weight:600">All Questions (' + allQ.length + ')</span>' +
+        '<span style="margin-left:auto;font-size:11px">&#9654;</span></div>' +
+        '<div class="extraction-body"><table class="data-table" style="font-size:11px"><tr><th>#</th><th>Question</th><th>Status</th></tr>';
+      allQ.forEach((q, qi) => {
+        const status = q.answer === null || q.answer === undefined
+          ? '<span class="verdict verdict-unanswered">UNANSWERED</span>'
+          : q.answer === true
+            ? '<span class="verdict verdict-correct">YES</span>'
+            : '<span class="verdict verdict-incorrect">NO</span>';
+        stepHtml += "<tr><td>Q" + (qi + 1) + "</td><td>" + esc(q.question) + "</td><td>" + status + "</td></tr>";
+      });
+      stepHtml += "</table></div></div>";
+    }
+
+    stepHtml += "</div>";
+    html += stepHtml;
+  });
+
   c.innerHTML = html;
 }
 
@@ -965,7 +1104,7 @@ async function loadExperimentTimeline(highlightGlobalStep) {
     return;
   }
 
-  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px">Question generation and experiment formulation events. Each event shows new questions generated and the experiment formulated to answer one.</div>';
+  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px">Experiment formulation events. Each event shows the selected question and the experiment formulated to investigate it.</div>';
   if (timeline.length > 1) {
     const maxQ = Math.max(...timeline.map((item) => item.cumulative_questions), 1);
     html += '<div class="card" style="margin-bottom:16px"><div class="card-header" onclick="toggleCard(this)">Cumulative Questions Generated <span class="toggle">&#9660;</span></div><div class="card-body">';
@@ -994,26 +1133,20 @@ async function loadExperimentTimeline(highlightGlobalStep) {
     eventHtml += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">';
     eventHtml += '<span style="font-size:12px;font-weight:600;color:var(--accent)">g' + item.global_step + "</span>";
     eventHtml += '<span style="font-size:11px;color:var(--text-muted)">ep' + item.episode_idx + " step " + item.step + "</span>";
-    if (item.new_questions.length > 0) {
-      eventHtml += '<span style="font-size:11px;padding:2px 8px;background:rgba(210,153,34,0.15);color:var(--accent3);border-radius:4px;font-weight:600">+' + item.new_questions.length + " questions</span>";
-    }
     if (item.experiment_plan) {
       eventHtml += '<span style="font-size:11px;padding:2px 8px;background:rgba(63,185,80,0.15);color:var(--accent2);border-radius:4px;font-weight:600">new experiment</span>';
     }
     eventHtml += "</div>";
 
-    if (item.new_questions.length > 0) {
-      eventHtml += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">NEW QUESTIONS:</div>';
-      eventHtml += '<ul style="margin:0 0 8px 20px;font-size:12px">';
-      item.new_questions.forEach((question) => {
-        eventHtml += '<li style="margin-bottom:2px;color:var(--accent3)">' + esc(question) + "</li>";
-      });
-      eventHtml += "</ul>";
+    // Show selected question
+    if (item.selected_question_index != null) {
+      const qText = item.selected_question_text || ("Q" + (item.selected_question_index + 1));
+      eventHtml += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">SELECTED QUESTION (Q' + (item.selected_question_index + 1) + "):</div>";
+      eventHtml += '<div style="font-size:12px;padding:6px 10px;margin-bottom:8px;background:var(--bg);border:1px solid var(--accent3);border-radius:4px;color:var(--accent3)">' + esc(qText) + "</div>";
     }
 
     if (item.experiment_plan) {
-      const qRef = item.selected_question_index != null ? " (from Q" + (item.selected_question_index + 1) + ")" : "";
-      eventHtml += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">EXPERIMENT' + qRef + ":</div>";
+      eventHtml += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">FORMULATED EXPERIMENT:</div>';
       eventHtml += '<div style="font-size:12px;padding:6px 10px;background:var(--bg);border:1px solid var(--accent2);border-radius:4px">' + esc(item.experiment_plan) + "</div>";
     }
     eventHtml += "</div>";

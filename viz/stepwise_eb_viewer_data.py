@@ -134,6 +134,7 @@ def load_log_dir(log_dir):
                 "did_gen_questions": step_log.get("did_gen_questions", False),
                 "did_formulate_experiment": step_log.get("did_formulate_experiment", False),
                 "active_experiment": step_log.get("active_experiment"),
+                "selected_question": step_log.get("selected_question"),
                 "phase": step_log.get("phase", "complete"),
                 "path": s_path,
             })
@@ -276,6 +277,13 @@ def load_experiment_timeline(log_dir):
             experiment_plan = exp_log.get("experiment_plan")
             selected_q_idx = exp_log.get("selected_question_index")
 
+            # Try to resolve the selected question text from qa_pairs
+            selected_question_text = None
+            if selected_q_idx is not None:
+                qa_pairs = read_json(os.path.join(s_path, "qa_pairs.json")) or []
+                if 0 <= selected_q_idx < len(qa_pairs):
+                    selected_question_text = qa_pairs[selected_q_idx].get("question", "")
+
             total_questions_generated += len(new_questions)
             if experiment_plan:
                 total_experiments_formulated += 1
@@ -287,6 +295,7 @@ def load_experiment_timeline(log_dir):
                 "new_questions": new_questions,
                 "experiment_plan": experiment_plan,
                 "selected_question_index": selected_q_idx,
+                "selected_question_text": selected_question_text,
                 "cumulative_questions": total_questions_generated,
                 "cumulative_experiments": total_experiments_formulated,
             })
@@ -327,6 +336,20 @@ def load_qa_timeline(log_dir):
             qa_pairs = read_json(qa_file) or []
             answered = sum(1 for qa in qa_pairs if qa.get("answer") is not None)
             unanswered = len(qa_pairs) - answered
+
+            # Include new questions from experiment_log if available
+            exp_log = read_json(os.path.join(s_path, "experiment_log.json"))
+            new_questions = exp_log.get("new_questions", []) if exp_log else []
+
+            # Include all questions with their status
+            all_questions = []
+            for qa in qa_pairs:
+                all_questions.append({
+                    "question": qa.get("question", ""),
+                    "answer": qa.get("answer"),
+                    "source_step": qa.get("source_step"),
+                })
+
             timeline.append({
                 "episode_idx": ep_idx,
                 "step": s_idx,
@@ -334,6 +357,8 @@ def load_qa_timeline(log_dir):
                 "total": len(qa_pairs),
                 "answered": answered,
                 "unanswered": unanswered,
+                "new_questions": new_questions,
+                "all_questions": all_questions,
             })
     return timeline
 
