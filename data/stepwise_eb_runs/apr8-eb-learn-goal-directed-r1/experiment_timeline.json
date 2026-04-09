@@ -1,0 +1,1212 @@
+[
+  {
+    "cumulative_experiments": 1,
+    "cumulative_questions": 5,
+    "episode_idx": 0,
+    "experiment_plan": "Move one step to the east and observe what happens to the 'F' symbol. If the 'F' symbol is still present, then move one more step east to see if it remains. This will help determine if it is a permanent map feature, an item, or a mobile entity.",
+    "global_step": 0,
+    "new_questions": [
+      "Will using the 'east' action move the agent one step to the east if the path is clear?",
+      "Can the agent move through the '}' symbol by using a directional movement command?",
+      "Will the 'far east' action move the agent directly to the \"F\" symbol without stopping?",
+      "Is the 'F' symbol an enemy that needs to be dealt with before reaching the stairs?",
+      "Will pressing 'more' immediately reveal more of the message if there is an ongoing message?"
+    ],
+    "selected_question_index": 3,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 1,
+    "cumulative_questions": 10,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 1,
+    "new_questions": [
+      "Does taking the 'east' action again from (27,10) move the agent to (28,10)?",
+      "Can the agent move onto the 'F' symbol by taking an adjacent step towards it?",
+      "Can the agent open an adjacent closed door ('}') using the 'open' action?",
+      "Will moving onto the 'x' symbol (a trap) cause the agent to take damage?",
+      "Does moving east from (29,10) lead into another room given the current map and the closed door at (30,10)?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 1,
+    "cumulative_questions": 15,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 2,
+    "new_questions": [
+      "Can the agent's movement be blocked by the 'F' symbol?",
+      "Will opening the closed door '}' reveal a new unexplored area?",
+      "Is the 'F' symbol a static entity (e.g., furniture or a feature) rather than a mobile creature?",
+      "If the agent attempts to move onto the 'x' (trap) symbol, will it always suffer a negative consequence?",
+      "Does the message \"i - a blessed horn. j - a blessed spiked wand.\" indicate items on the floor that can be picked up, or does it refer to items already in the inventory?"
+    ],
+    "selected_question_index": null,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 2,
+    "cumulative_questions": 20,
+    "episode_idx": 0,
+    "experiment_plan": "Use the 'open' action on the closed door '}' at (30,10). Observe if the door changes its state to an open door or a passage, and if the agent can then move through that location.",
+    "global_step": 3,
+    "new_questions": [
+      "Will using the 'open' action on the closed door '}' at (30,10) allow the agent to pass through that location?",
+      "If the agent attempts to move onto the 'x' symbol, will it always suffer a negative consequence?",
+      "Will the 'F' symbol interact with the agent if the agent moves into an adjacent square?",
+      "Does successfully opening a closed door ('}') consume a turn or is it a free action?",
+      "Can the agent attack the 'F' symbol with its current weapon?"
+    ],
+    "selected_question_index": 15,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 2,
+    "cumulative_questions": 25,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 4,
+    "new_questions": [
+      "Will providing 'east' as the direction after the 'open' command successfully open the door at (30,10)?",
+      "Will moving onto the 'F' symbol allow the agent to pass over it, or will it block the agent's movement?",
+      "Will the agent take damage if it moves onto the 'x' symbol (trap)?",
+      "Will the 'F' symbol interact with the agent if the agent moves onto its square?",
+      "Will opening a door always consume a turn?"
+    ],
+    "selected_question_index": null,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 2,
+    "cumulative_questions": 30,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 5,
+    "new_questions": [
+      "Will successfully opening the door at (30,10) reveal the stairs down previously seen at (49,11)?",
+      "Will moving onto a trap ('x') prevent the agent from continuing its movement in that same turn?",
+      "Is it possible for an open door to spontaneously close?",
+      "Will moving adjacent to the 'F' symbol (e.g., at (40,11) or (42,11)) trigger any interaction or event?",
+      "Does the `open` action consume a turn even if the door is already open?"
+    ],
+    "selected_question_index": null,
+    "step": 5
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 35,
+    "episode_idx": 0,
+    "experiment_plan": "From the current position (29,10), move east towards the door at (30,10). Observe if the door automatically opens upon contact or if another action is required.",
+    "global_step": 6,
+    "new_questions": [
+      "Does the 'open' command followed by a direction work only if the agent is standing exactly on the same tile as the door?",
+      "Will directly stepping east into the closed door '}' at (30,10) cause the agent to automatically open it if it's unlockable?",
+      "If the agent attempts to apply a tool (e.g., a wand) to the closed door, will the environment prompt for a direction as it did with the `open` command?",
+      "Will the agent take damage if it moves onto a trap ('x')?",
+      "Can the agent use the 'kick' action on the closed door '}' to open it?"
+    ],
+    "selected_question_index": 29,
+    "step": 6
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 40,
+    "episode_idx": 1,
+    "experiment_plan": "From the current position (26,10), attempt to move south to (26,11) and then east, circumventing the line of '}' symbols to reach the stairs down (>) at (49,11). This will assess if direct interaction with the '}' symbols is necessary.",
+    "global_step": 7,
+    "new_questions": [
+      "If the agent attempts to move directly onto a '}' symbol by using a directional movement command (e.g., `east`), will it trigger a trap like molten lava?",
+      "Can a '}' symbol, which previously returned \"You see no door there\", be bypassed by using the `kick` action in its direction?",
+      "Is it possible to reach the stairs down (>) without interacting with any of the '}' symbols shown on the current map?",
+      "Does the 'more' command always display more text when available, or can it be a general prompt for action even if no text needs displaying?",
+      "If the agent is positioned east of a '}' symbol, but the square directly east of the '}' symbol is clear, will moving far east (past the '}') still trigger a trap associated with the '}' if the '}' itself is a trap?"
+    ],
+    "selected_question_index": 35,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 45,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 8,
+    "new_questions": [
+      "If the agent attempts to move onto a '}' symbol using a direct directional command (e.g., `east`), will it result in instant death from a trap like molten lava?",
+      "Can the '}' symbol be safely bypassed by moving into an adjacent clear square (e.g., South-East of the '}') and then continuing in the intended direction (East)?",
+      "Will the `kick` action directed at a '}' symbol trigger a trap or have other negative consequences for the agent?",
+      "Does the game environment provide any visual or textual warning before the agent moves onto a square that would result in death (e.g., from molten lava)?",
+      "Can the 'g' inventory item (curved wand) be successfully applied to the '}' symbol to open or neutralize it?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 50,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 9,
+    "new_questions": [
+      "Will directly moving \"east\" onto the 'd' symbol (currently at relative 1,0) allow the agent to pick up the item automatically, or will it require a 'pickup' action?",
+      "Will moving onto the 'x' symbol (a trap) cause the agent to die instantly?",
+      "Can the agent's movement be blocked by the 'F' symbol if the agent attempts to move onto its square?",
+      "Will moving adjacent to the 'F' symbol (e.g., at (40,11) or (42,11)) trigger any hostile interaction from 'F'?",
+      "Does the 'pickup' action consume an entire turn, regardless of the number of items picked up?"
+    ],
+    "selected_question_index": null,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 55,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 10,
+    "new_questions": [
+      "Does moving into a square adjacent to *any* monster automatically trigger an attack and kill the monster?",
+      "If the agent attempts to move onto a '}' symbol using a direct directional command (e.g., `east`), will it result in a fatality each time?",
+      "Can the agent kill a monster without moving adjacent to it, for example, by using a ranged attack with a weapon like the 'curved wand'?",
+      "Will `pickup` automatically collect all items at the current location or does it require specifying individual items?",
+      "Does the game environment ever contain loot or items on the floor that are not explicitly mentioned in the message text?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 60,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 11,
+    "new_questions": [
+      "Does the ':' symbol always represent a walkable, safe path?",
+      "Can the agent use the 'apply' action with the horn (f) to produce an effect on the environment?",
+      "Can the agent use the 'zap' action with the curved wand (g) to clear or interact with the dangerous '}' symbols?",
+      "Does approaching a '}' symbol from an adjacent '.' (floor) tile trigger an immediate negative consequence (e.g., molten lava)?",
+      "Does walking adjacent to any monster automatically trigger an attack and kill it, regardless of monster type?"
+    ],
+    "selected_question_index": null,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 65,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 12,
+    "new_questions": [
+      "Does taking a step onto a ':' symbol always result in a safe, walkable tile?",
+      "Will attempting to move onto the 'F' symbol block the agent's movement?",
+      "Will using the 'down' action successfully move the agent to the next level when standing on the '>' symbol?",
+      "Will `pickup` or `loot` a recently killed monster (e.g., the jackal) yield any items?",
+      "Will attempting to move directly onto a '}' symbol using a directional command (e.g., `east`) result in a lethal outcome?"
+    ],
+    "selected_question_index": null,
+    "step": 5
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 70,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 13,
+    "new_questions": [
+      "Does moving onto a ':' symbol (fountain) have any negative consequences for the agent?",
+      "Will using the 'east' action repeatedly allow the agent to traverse the floor tiles at y=12, bypassing the '}' symbols to the north, until it reaches an eastern column where it can then move north to y=11?",
+      "If the agent attempts to move directly onto a '}' symbol (e.g., at (30,12) from (29,12)) using a directional movement command (e.g., `east`), will it result in a fatal outcome?",
+      "Will the agent's path be blocked if it attempts to move onto the 'F' symbol at (31,12) directly after moving east past the '}' symbol?",
+      "Will the 'down' action successfully move the agent to the next level when standing directly on the '>' symbol?"
+    ],
+    "selected_question_index": null,
+    "step": 6
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 75,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 14,
+    "new_questions": [
+      "Will moving onto an 'F' symbol block the agent's movement?",
+      "Will moving onto a ':' symbol (fountain) result in any negative consequences for the agent?",
+      "Will moving onto an 'x' symbol (trap) instantly kill the agent or cause damage?",
+      "Does the 'far east' action still attempt to move the agent as far east as possible given the new character and map?",
+      "Does the game provide any textual warnings or different visual forms for '}' symbols that are lethal molten lava compared to benign openable doors?"
+    ],
+    "selected_question_index": null,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 80,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 15,
+    "new_questions": [
+      "Can the '}' symbol represent both a closed door and molten lava within the same game session?",
+      "Will moving onto an 'F' symbol (furniture) block the agent's movement and prevent it from entering that square?",
+      "Will moving onto an 'x' symbol (trap) always result in the agent taking damage or experiencing a negative status effect?",
+      "Does the map reveal new areas only when the agent moves into an adjacent, previously unseen tile?",
+      "If the stairs down (>) are not currently visible on the map, will they always be located beyond the current visible lava obstructions?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 82,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 16,
+    "new_questions": [
+      "Does the 'far east' action move the agent as far east as possible until an obstacle is encountered, irrespective of visible map boundaries?",
+      "Can the agent attack the 'F' symbol with its wielded weapon?"
+    ],
+    "selected_question_index": null,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 86,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 17,
+    "new_questions": [
+      "Can the agent move onto the 'F' symbol?",
+      "Will moving onto a ':' symbol (fountain) always be a safe action that does not cause damage or negative effects?",
+      "Does the map reveal new areas only when the agent moves into an adjacent, previously unseen tile, or does movement reveal a larger radius of unseen tiles?",
+      "Will `far east` move the agent as far east as possible, automatically navigating around known safe paths like the one developed to bypass the lava, or will it stop at the first detected horizontal obstruction like the lava?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 89,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 18,
+    "new_questions": [
+      "Will moving directly onto an 'F' symbol block the agent's movement and prevent it from entering that square?",
+      "Will the 'far east' action automatically find a path around the lava (the '}' symbols) if a bypass route exists, or will it stop at the first lava tile in its direct horizontal line?",
+      "Will attempting to move into a wall ('-') located directly north from the agent's current position prevent movement and keep the agent in its current square?"
+    ],
+    "selected_question_index": null,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 94,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 19,
+    "new_questions": [
+      "Can the agent move onto the ':' symbol (fountain) without taking damage or experiencing a negative effect?",
+      "Does the game environment dynamically reveal new map areas or expand the visible map as the agent moves into previously unseen sections?",
+      "Is the stairs down ('>') symbol always directly visible on the map once the area containing it has been explored by the agent?",
+      "Will moving onto an existing 'x' symbol (identified as a trap) always result in the agent taking damage or receiving a negative status effect?",
+      "Will moving one step north, then one step east, from the agent's current position (29,10) to bypass the lava at (30,10) result in a walkable, safe tile at (31,9)?"
+    ],
+    "selected_question_index": null,
+    "step": 5
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 99,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 20,
+    "new_questions": [
+      "Does stepping on an 'x' symbol (trap) cause damage or any other negative status effect to the agent?",
+      "Can the agent walk onto a ':' symbol (fountain) tile without taking damage?",
+      "Will moving towards the edge of the visible map reveal new, previously unmapped areas?",
+      "Will the stairs down ('>') always appear on the map once the entire current level has been explored?",
+      "Do 'far' directional movements (e.g., 'far east') continue moving the agent until an obstruction is met, or do they move a fixed, predefined number of steps?"
+    ],
+    "selected_question_index": null,
+    "step": 6
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 104,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 21,
+    "new_questions": [
+      "Does stepping onto an 'x' symbol (trap) always cause damage or a negative status effect to the agent?",
+      "Will movement into a square containing an 'F' symbol block the agent's movement?",
+      "Does stepping onto a ':' symbol (fountain) always trigger a specific interaction or effect?",
+      "Will the stairs down ('>') become visible on the map as soon as the agent enters the same room or area containing them?",
+      "Do 'far' directional moves (e.g., 'far east') automatically stop if they encounter an obstruction (like a wall or lava) before reaching their maximum theoretical distance (if such a distance exists)?"
+    ],
+    "selected_question_index": null,
+    "step": 7
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 109,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 22,
+    "new_questions": [
+      "Does stepping on an 'x' symbol (trap) always disarm or remove it from the map after it is triggered?",
+      "Will using a 'far' directional move (e.g., 'far east') automatically stop the agent one tile short of a known dangerous obstruction (e.g., molten lava '}')?",
+      "Does stepping on a ':' symbol (fountain) destroy the fountain?",
+      "Will moving into a square containing an 'F' symbol interact with it, rather than just moving past it?",
+      "Does the visibility of map tiles expand by a larger radius than just immediately adjacent tiles when the agent moves to a previously unseen map section?"
+    ],
+    "selected_question_index": null,
+    "step": 8
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 113,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 23,
+    "new_questions": [
+      "Will moving onto an 'x' symbol (trap) tile cause damage to the agent?",
+      "Will moving onto a ':' symbol (fountain) tile block the agent's movement?",
+      "Will moving onto an 'F' symbol interact with it, rather than just moving past it?",
+      "Do 'far' directional moves (e.g., 'far east') continue moving the agent until an obstruction is met?"
+    ],
+    "selected_question_index": null,
+    "step": 9
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 118,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 24,
+    "new_questions": [
+      "Does moving into a square containing an 'F' symbol trigger an interaction or effect?",
+      "Do 'far' directional movements (e.g., 'far east') automatically stop if they encounter the stairs '>' before reaching their maximum theoretical distance?",
+      "Will moving onto a ':' symbol (fountain) directly trigger a positive or negative gameplay effect for the agent?",
+      "Will stepping on an 'x' symbol (trap) lead to the trap being removed from the map?",
+      "Does the stairs down ('>') symbol always become immediately visible and mapped as soon as the agent's view encompasses the tile it is on?"
+    ],
+    "selected_question_index": null,
+    "step": 10
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 123,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 25,
+    "new_questions": [
+      "Does the game environment dynamically reveal new map areas in a radius larger than just immediately adjacent tiles when the agent moves into a previously unseen section?",
+      "Do 'far' directional movements (e.g., 'far east') continue moving the agent until an obstruction (wall, lava, etc.) is met?",
+      "Do 'far' directional movements automatically stop one square short of a physical obstruction like a wall or lava?",
+      "Will the agent invariably take damage or suffer a negative status effect upon stepping on an 'x' symbol (trap)?",
+      "Does moving onto a ':' symbol (fountain) trigger a specific interaction or event that might interrupt movement or require an action from the agent?"
+    ],
+    "selected_question_index": null,
+    "step": 11
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 128,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 26,
+    "new_questions": [
+      "Does the 'F' symbol block the agent's movement?",
+      "Is the '>' symbol (stairs down) only revealed on the map when the agent is in an adjacent square?",
+      "Do 'far' directional movements automatically stop one square short of any impassable obstruction (like a wall or molten lava)?",
+      "Does moving onto an 'x' symbol (trap) block the agent's movement?",
+      "Does moving onto a ':' symbol (fountain) prevent the agent from occupying that square?"
+    ],
+    "selected_question_index": null,
+    "step": 12
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 133,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 27,
+    "new_questions": [
+      "Does a 'far' directional movement, if unobstructed, automatically stop the agent exactly one tile before encountering a wall ('-','|') or molten lava ('}')?",
+      "Will stepping on an 'x' symbol (trap) always decrease the agent's current hit points?",
+      "Will the stairs down ('>') only appear on the map when the agent is immediately adjacent to them (i.e., within one step in any direction)?",
+      "Does moving onto a ':' symbol (fountain) always trigger a specific action or message that requires an agent's response before further movement can occur?",
+      "Does the visible map area always expand by more than just the immediately adjacent tiles when the agent moves into an unrevealed section of the map?"
+    ],
+    "selected_question_index": null,
+    "step": 13
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 138,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 28,
+    "new_questions": [
+      "Does stepping onto an 'x' symbol (trap) always cause damage to the agent?",
+      "Do previously unseen map tiles only become visible when the agent moves directly adjacent to them?",
+      "Does moving onto an 'F' symbol block the agent's movement?",
+      "Will using a 'far' directional movement automatically stop the agent exactly one tile before encountering any type of obstruction (wall, lava, or monster)?",
+      "Does the game provide any descriptive text or message if the agent attempts to move onto an 'F' symbol?"
+    ],
+    "selected_question_index": null,
+    "step": 14
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 143,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 29,
+    "new_questions": [
+      "Will a 'far' directional movement automatically stop one tile short of a monster?",
+      "If a 'far' directional movement is executed in a clear path with no obstructions (walls, lava, monsters, etc.) for its full theoretical range, will the agent always travel that full distance?",
+      "If a new area of the map is revealed through exploration, will all features within that newly revealed area, such as fountains, traps, and stairs down, become immediately visible on the map?",
+      "Is a trap 'x' always triggered if the agent moves onto its square?",
+      "If the agent later moves away from where the 'stairs down' ('>') were last seen, will the '>' symbil disappear from the map until the agent is again within a certain proximity?"
+    ],
+    "selected_question_index": null,
+    "step": 15
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 148,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 30,
+    "new_questions": [
+      "Does stepping on a trap ('x' symbol) always result in a negative consequence (e.g., damage, status effect, teleportation)?",
+      "Does moving onto a fountain (':' symbol) always trigger a message or interaction that requires a decision from the agent, or can the agent pass through it passively?",
+      "When the agent reveals a new section of the map, are all features within the agent's typical line of sight (e.g., 8 cells radius) made visible, or only the tiles immediately adjacent to the agent's path?",
+      "If a 'far' directional movement would end on a '}' (molten lava) square, will the system automatically stop the agent one square short of the lava?",
+      "Will the stairs down ('>') remain at a fixed location on a dungeon level once discovered, or can its absolute coordinates change during the agent's exploration of that level?"
+    ],
+    "selected_question_index": null,
+    "step": 16
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 153,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 31,
+    "new_questions": [
+      "If the agent executes a 'far east' command from its current position (28,10), will it stop one square before the lava at (29,10)?",
+      "Will moving onto a square containing an 'x' symbol (trap) immediately cause damage to the agent?",
+      "Will a 'far' directional movement, if unobstructed, reveal all tiles along its path up to the movement's end point?",
+      "Does moving onto a ':' symbol (fountain) always result in a menu or prompt appearing, requiring player input to proceed?",
+      "If the agent attempts a 'far east' movement that would cross lethal molten lava, will the movement be prevented entirely, or will the agent move as far as possible before hitting the lava and dying?"
+    ],
+    "selected_question_index": null,
+    "step": 17
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 158,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 32,
+    "new_questions": [
+      "Does attempting to move into a wall keep the agent in its current square?",
+      "Do \"far\" directional movements stop exactly one tile short of a known dangerous obstruction (e.g., lava '}')?",
+      "Does stepping on a trap ('x' symbol) always result in a negative consequence (e.g., damage, status effect, or blocked movement)?",
+      "Does moving onto a fountain (':' symbol) always trigger a message or special interaction?",
+      "Can \"far\" movements be used to safely explore new areas without directly moving to potentially dangerous locations?"
+    ],
+    "selected_question_index": null,
+    "step": 18
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 163,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 33,
+    "new_questions": [
+      "If the agent executes a 'far east' command and encounters a wall ('|' or '-') before its full theoretical range, will it stop one tile before the wall?",
+      "If the agent executes a 'far south' command and encounters a molten lava ('}') before its full theoretical range, will it stop one tile before the molten lava?",
+      "If the agent moves to a new area of the map, will previously revealed portions of the map, including environmental elements like walls, lava, and fountains, remain visible on the map even if they are no longer in the agent's immediate vicinity?",
+      "Does using a 'far' movement action (e.g., 'far north') provide a more efficient path to bypass obstructions like molten lava by automatically navigating around corners or obstacles, or does it only move in a straight line until blocked?",
+      "Will previously identified 'x' symbols (traps) disappear from the map after the agent steps on them, or will they remain visible as a triggered trap?"
+    ],
+    "selected_question_index": null,
+    "step": 19
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 166,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 34,
+    "new_questions": [
+      "Does stepping on an 'x' symbol (trap) always result in a negative consequence (e.g., damage, status effect, or blocked movement)?",
+      "Does moving onto a ':' symbol (fountain) always trigger a message or special interaction?",
+      "Will a 'far' movement continue its path even after triggering a trap or interacting with a fountain, if the path remains otherwise clear?"
+    ],
+    "selected_question_index": null,
+    "step": 20
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 169,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 35,
+    "new_questions": [
+      "If the agent executes a 'far south' command and encounters molten lava ('}') before its full theoretical range, will it stop one tile *before* the molten lava?",
+      "If the agent executes a 'far east' command and encounters a wall ('|' or '-') before its full theoretical range, will it stop one tile *before* the wall?",
+      "Will a 'far' directional movement, if unobstructed, automatically stop the agent exactly one tile before encountering a visible monster?"
+    ],
+    "selected_question_index": null,
+    "step": 21
+  },
+  {
+    "cumulative_experiments": 5,
+    "cumulative_questions": 174,
+    "episode_idx": 2,
+    "experiment_plan": "From a safe distance, initiate a 'far south' or 'far north' movement towards the known X-coordinate of the lava (X=30). Observe if the agent automatically stops one tile short of the molten lava. Repeat with another 'far' directional movement directly towards the lava's X-coordinate, if the first...",
+    "global_step": 36,
+    "new_questions": [
+      "Does a 'far' directional movement automatically stop one tile before encountering a wall ('-' or '|')?",
+      "Does a 'far' directional movement automatically stop one tile before encountering molten lava ('}')?",
+      "Does moving onto an 'x' symbol (trap) always cause damage to the agent?",
+      "Does moving onto a ':' symbol (fountain) always cause damage to the agent?",
+      "If the stairs down ('>') are located in a newly revealed map area, will they be immediately visible on the map without the agent needing to step adjacent to them?"
+    ],
+    "selected_question_index": 51,
+    "step": 22
+  },
+  {
+    "cumulative_experiments": 6,
+    "cumulative_questions": 179,
+    "episode_idx": 2,
+    "experiment_plan": "From the current position at (26,11), attempt a 'far west' movement. Observe whether the agent moves into the wall at X=24 or stops one tile short, (25,11), or if the command is blocked entirely.",
+    "global_step": 37,
+    "new_questions": [
+      "Does moving onto an 'x' symbol (trap) ever result in instant death?",
+      "Is it possible to gain positive benefits (e.g., healing, stat boost) from interacting with a ':' symbol (fountain)?",
+      "If a \"far\" directional movement is executed towards a known impassable obstruction (such as a wall or molten lava), will it always stop exactly one tile away from that obstruction?",
+      "Can the stairs down (>) ever be located within the known lethal Y-span (9-13) of the molten lava at X=30?",
+      "If the agent moves into a previously unseen area, will hidden dangers like '}' (molten lava) or 'x' (traps) always be immediately visible on the map without needing to be adjacent or interact with them?"
+    ],
+    "selected_question_index": 36,
+    "step": 23
+  },
+  {
+    "cumulative_experiments": 7,
+    "cumulative_questions": 184,
+    "episode_idx": 2,
+    "experiment_plan": "From the current position at (25,11), execute 'far north'. Observe how far the agent travels and where it stops (if at a boundary or other obstruction) to understand its behavior in relatively open areas.",
+    "global_step": 38,
+    "new_questions": [
+      "If an \"far\" directional movement is initiated in an open area, with no walls, lava, or monsters in its path, will it continue until it hits the edge of the map?",
+      "If the agent steps on an 'x' symbol (trap), will it always take damage?",
+      "Will quaffing from a ':' symbol (fountain) always result in a positive, negative, or neutral effect?",
+      "Will the stairs down (>) always be visible on the map if they are within a 5x5 square centered on the agent?",
+      "Does the agent's full inventory get reset after death, or do specific crucial items (e.g., those marked as 'blessed') have a chance to persist?"
+    ],
+    "selected_question_index": 44,
+    "step": 24
+  },
+  {
+    "cumulative_experiments": 8,
+    "cumulative_questions": 189,
+    "episode_idx": 2,
+    "experiment_plan": "From the current position at (26,11), execute 'far north'. Observe if the agent stops at the stairs up ('<') at (26,10) or attempts to move past it, to understand how 'far' commands interact with stairs.",
+    "global_step": 39,
+    "new_questions": [
+      "Can any item in the agent's inventory be used to safely clear or cross molten lava ('}')?",
+      "If the agent moves onto a square marked with 'x' (trap), is there always a negative consequence (e.g., damage, status effect, or blocked movement)?",
+      "Does performing the 'wait' action always result in the agent staying in its current position with no change in HP, Pw, etc., assuming no external events occur?",
+      "If the stairs down ('>') exist on the current level, are they guaranteed to be visible on the map once the agent has physically explored every accessible '.' (floor) tile?",
+      "Will a 'far' directional movement, when moving towards an open door, stop one tile before the door's opening?"
+    ],
+    "selected_question_index": 29,
+    "step": 25
+  },
+  {
+    "cumulative_experiments": 9,
+    "cumulative_questions": 194,
+    "episode_idx": 2,
+    "experiment_plan": "Move the agent to a square adjacent to the trap at (31,13), for example to (31,12) or (30,13), and then move directly onto the trap at (31,13). Observe the consequences on the agent's HP, status, or any messages received.",
+    "global_step": 40,
+    "new_questions": [
+      "Will moving directly onto the 'x' symbol (trap) at (31,13) result in the agent taking damage?",
+      "Will quaffing from the ':' symbol (fountain) at (31,10) always produce a positive effect for the agent?",
+      "If the agent moves to an X-coordinate of 38, will both the path to safely NORTH (Y=8) and the path to safely SOUTH (Y=14) be clear (not blocked by walls)?",
+      "If the agent explores all currently visible floor tiles within the map, are the stairs down ('>') guaranteed to appear on the map if they exist on the level?",
+      "Does a 'far' directional movement automatically stop one tile short of a monster?"
+    ],
+    "selected_question_index": 54,
+    "step": 26
+  },
+  {
+    "cumulative_experiments": 9,
+    "cumulative_questions": 199,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 41,
+    "new_questions": [
+      "If the agent moves to X=38, will both the path to safely NORTH (Y=8) and the path to safely SOUTH (Y=14) be clear (not blocked by walls)?",
+      "Will moving onto the 'x' symbol (trap) at (31,12) always result in the agent taking damage?",
+      "Will moving onto the ':' symbol (fountain) result in an immediate interaction (positive, negative, or neutral) without requiring the 'quaff' action?",
+      "Is a direct north movement from (29,9) at X=29 possible (i.e. is (29,8) walkable and not blocked by a wall)?",
+      "Will interacting with the ':' symbol (fountain) using the 'quaff' action always produce a positive effect for the agent?"
+    ],
+    "selected_question_index": null,
+    "step": 27
+  },
+  {
+    "cumulative_experiments": 9,
+    "cumulative_questions": 204,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 42,
+    "new_questions": [
+      "If the tile immediately adjacent to the agent in the chosen direction of a 'far' command is an impassable wall, will the 'far' command cause the agent to attempt to move onto that wall and result in the message \"It's a wall.\" without changing the agent's position?",
+      "Does moving onto an 'x' symbol (trap) always result in instantaneous death?",
+      "Are the stairs down ('>') guaranteed to appear on the map if they are directly visible horizontally or vertically from the agent's current position, regardless of distance?",
+      "If the agent successfully moves to an X-coordinate that has a clear path for vertical bypass of the lava (e.g., X=23 or X=38), will a 'far north' command successfully move the agent to Y=8 (north of the lava's Y-span) and stop, and similarly for 'far south' to Y=14?",
+      "Will interacting with the ':' symbol (fountain) at (26,13) using the 'quaff' action always have a positive, negative, or neutral effect, rather than being blocked or having no effect at all?"
+    ],
+    "selected_question_index": null,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 9,
+    "cumulative_questions": 209,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 43,
+    "new_questions": [
+      "If the tile immediately adjacent to the agent in the chosen direction of a 'far' command is an impassable wall, will the 'far' command cause the agent to move onto that wall and stay in its current position, outputting \"It's a wall.\"?",
+      "Will attempting to 'apply' the 'pick-axe' on an adjacent wall ('-') or ('|') destroy it, creating a passable path?",
+      "Can the 'x' symbol, representing a trap, be detected (e.g., visually identified on the map or via a message) from an adjacent square without the agent moving into it?",
+      "Will the 'far east' command stop one tile before the stairs down ('>') if there are multiple clear tiles between the agent and the stairs?",
+      "Can the agent sustain damage from a trap ('x') without directly moving onto its square (e.g., from an adjacent tile or a ranged attack)?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 9,
+    "cumulative_questions": 214,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 44,
+    "new_questions": [
+      "When using an `apply` command, if a tool requires a direction, will the game prompt the agent for a direction if only `apply <tool_letter>` is entered?",
+      "Will using the pick-axe (item 'e') via the correct 'apply' command on an adjacent wall (e.g., '|') successfully destroy the wall, turning it into a '.' (floor) tile?",
+      "If the agent is blocked by an adjacent wall, and there is a clear path on the other side of that wall, can the agent bypass the wall using a 'far' command (e.g., 'far west') once the wall is destroyed?",
+      "Does the stairs up ('<') symbol at (26,10) represent a normal part of the map, or an unpassable feature when approached from the current floor?",
+      "If a tile is visually represented as a wall ('-' or '|'), does that imply that it is always an impassable obstruction, even if a tool like a pick-axe might be able to remove it?"
+    ],
+    "selected_question_index": null,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 10,
+    "cumulative_questions": 219,
+    "episode_idx": 3,
+    "experiment_plan": "Stand adjacent to the wall at (24,10) and execute the `kick west` action. Observe any messages or changes to the map that indicate the wall has been destroyed or becomes passable.",
+    "global_step": 45,
+    "new_questions": [
+      "Does the `kick` action work on an adjacent wall (e.g., '|') to destroy it or make it passable?",
+      "If the `apply` command prompts for a direction after entering `apply e`, would entering the direction (e.g., `west`) as a separate input line effectively use the pick-axe in that direction?",
+      "If the pick-axe is used successfully on a wall, will the wall character ('|' or '-') turn into a floor character ('.')?",
+      "Will moving onto the '<' symbol (stairs up) at (26,10) transport the agent to a different level?",
+      "Does wielding the pick-axe (item 'e') by using a 'wield e' action change the behavior or success rate of applying it to a wall?"
+    ],
+    "selected_question_index": 82,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 11,
+    "cumulative_questions": 224,
+    "episode_idx": 3,
+    "experiment_plan": "Execute the 'apply' action without specifying an item letter or direction. Observe if the game prompts for further input, such as \"Use which item?\".",
+    "global_step": 46,
+    "new_questions": [
+      "If the pick-axe (item 'e') is wielded first, will then attempting the action `apply e west` be a valid action (i.e., not result in \"Your previous output did not contain a valid action. Retry\")?",
+      "After wielding the pickaxe (item 'e'), will executing `apply west` (without further specifying the item-letter 'e') be a valid action to attempt to modify the west wall?",
+      "Will using the `zap` action with the `ebony wand` (item `j`) have a visible effect on the immediate environment, such as destroying a wall or revealing a hidden passage in any direction?",
+      "Will performing the `search` action from the current location (25,10) reveal a hidden door or passage within the currently visible wall structure (X=24 or Y=8/14)?",
+      "Does the `horn` (item `i`) have an effect when used with the `apply` action?"
+    ],
+    "selected_question_index": null,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 12,
+    "cumulative_questions": 229,
+    "episode_idx": 3,
+    "experiment_plan": "Enter 'e' (the letter corresponding to the pick-axe) as a response to the prompt \"What do you want to use or apply? [ae-j or ?*]\". Observe if the game then prompts for a direction to use the pick-axe.",
+    "global_step": 47,
+    "new_questions": [
+      "After typing 'apply' and receiving the prompt \"What do you want to use or apply? [ae-j or ?*]\", will entering 'e' (the pick-axe) lead to another prompt asking for a direction?",
+      "If the agent follows the steps to select the pick-axe and then specifies `west` as the direction, will the wall at (24,10) be destroyed?",
+      "If the wall at (24,10) is destroyed by the pick-axe, will the tile (24,10) transform into a '.' (floor) tile?",
+      "Does successfully using the pick-axe to destroy a wall consume a turn?",
+      "Does the `zap` action, when used with the `ebony wand` (item `j`), destroy adjacent walls?"
+    ],
+    "selected_question_index": 55,
+    "step": 5
+  },
+  {
+    "cumulative_experiments": 13,
+    "cumulative_questions": 234,
+    "episode_idx": 3,
+    "experiment_plan": "In response to the prompt \"In what direction do you want to dig? [hyb>]\", enter 'west' to attempt to dig through the wall at (24,10). Observe the map and messages for any changes indicating the wall's destruction or the outcome of the action.",
+    "global_step": 48,
+    "new_questions": [
+      "Will providing 'west' in response to \"In what direction do you want to dig?\" successfully cause the wall at (24,10) to be destroyed?",
+      "If the wall at (24,10) is destroyed by the pick-axe, will the map character at (24,10) change from '|' to '.' (floor)?",
+      "If the wall at (24,10) is successfully destroyed, will the agent be able to move into the newly opened tile (24,10) on the *next* turn by using a 'west' action?",
+      "Does using the `apply` command with the `tinning kit` (item `f`) require a further input to select a target or type of food?",
+      "Will applying the `horn` (item `i`) produce any change in the game state (e.g., message, map alteration, inventory change)?"
+    ],
+    "selected_question_index": 56,
+    "step": 6
+  },
+  {
+    "cumulative_experiments": 14,
+    "cumulative_questions": 239,
+    "episode_idx": 3,
+    "experiment_plan": "Initiate the `zap` action. If prompted for a direction, point the wand `west` to target the wall at (24,10). Observe the messages and map to determine if the ebony wand can create an opening in the \"too hard to dig into\" wall.",
+    "global_step": 49,
+    "new_questions": [
+      "Are all '*' (wall) characters on the map considered \"too hard to dig into\" by a pick-axe?",
+      "If the agent attempts to dig a different section of '-' (horizontal) wall, will it also be \"too hard to dig into\"?",
+      "Is there a specific character on the map visually representing walls that are *not* \"too hard to dig into\"?",
+      "Does any tool other than the pick-axe in the agent's current inventory possess the capability to destroy or bypass walls?",
+      "Could the wand ('j' ebony wand) in the agent's inventory be used to create an opening in a wall that is otherwise \"too hard to dig into\"?"
+    ],
+    "selected_question_index": 44,
+    "step": 7
+  },
+  {
+    "cumulative_experiments": 14,
+    "cumulative_questions": 244,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 50,
+    "new_questions": [
+      "After selecting the ebony wand ('j') in response to \"What do you want to zap?\", will the game prompt for a direction?",
+      "If the agent zaps the ebony wand ('j') in the 'west' direction towards the wall at (24,10), will the wall be destroyed?",
+      "If the ebony wand ('j') is zapped in a direction where there is no wall or other discernible target, will it consume a charge?",
+      "Does zapping a wand consume a turn?",
+      "Will the game provide a message indicating the ebony wand has limited charges if it has any, once selected for zapping?"
+    ],
+    "selected_question_index": null,
+    "step": 8
+  },
+  {
+    "cumulative_experiments": 14,
+    "cumulative_questions": 247,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 51,
+    "new_questions": [
+      "If the agent zaps the ebony wand ('j') in the 'west' direction towards the wall at (18,0), will the wall be destroyed?",
+      "Does zapping an ebony wand in the direction of a wall permanently destroy that wall?",
+      "Will the game provide a message indicating the ebony wand has limited charges if it has any, once zapped?"
+    ],
+    "selected_question_index": null,
+    "step": 9
+  },
+  {
+    "cumulative_experiments": 15,
+    "cumulative_questions": 252,
+    "episode_idx": 4,
+    "experiment_plan": "Initiate the `zap` action, select the 'steel wand' (n), and then choose a clear direction (e.g., 'north') where there are no adjacent obstructions or walls, observing if the agent takes damage or if any other effects occur.",
+    "global_step": 52,
+    "new_questions": [
+      "Will zapping the newly acquired 'steel wand' (n) at an adjacent wall cause the agent to take damage or die?",
+      "Will zapping the 'steel wand' (n) in a direction with no adjacent obstruction (e.g., to the north, if it is clear) cause the agent to take damage?",
+      "Will zapping the 'steel wand' (n) in a direction with no adjacent obstruction (e.g., to the north, if it is clear) destroy any part of the environment or cause some other effect?",
+      "Does zapping a 'blessed wand of cold' ('j' from previous life, but now just understanding the type of wand) into an open, empty tile (not adjacent to a wall or obstruction) cause self-damage?",
+      "Does the `apply` action, when used with a pick-axe, only fail with the \"too hard to dig into\" message when applied to walls ('|' or '-') that are visually presented as solid lines, and not other map features?"
+    ],
+    "selected_question_index": 57,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 15,
+    "cumulative_questions": 257,
+    "episode_idx": 4,
+    "experiment_plan": null,
+    "global_step": 53,
+    "new_questions": [
+      "Will zapping the 'steel wand' (n) at an adjacent wall cause damage to the agent?",
+      "Will zapping the 'steel wand' (n) in a direction with a clear path (no adjacent obstruction) cause damage to the agent?",
+      "Upon zapping the 'steel wand' (n), will its true nature (e.g., \"wand of <type>\") be revealed in the message log or inventory?",
+      "Will zapping the 'steel wand' (n) in a direction with a clear path (no adjacent obstruction) have any discernible effect on the environment or objects within range?",
+      "If the 'steel wand' (n) has charges, will a message indicating the remaining charges be displayed after it is zapped?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 15,
+    "cumulative_questions": 262,
+    "episode_idx": 4,
+    "experiment_plan": null,
+    "global_step": 54,
+    "new_questions": [
+      "Does zapping the 'steel wand' (n) in the 'north' direction (a clear path) cause the agent to take damage?",
+      "Upon zapping the 'steel wand' (n) in the 'north' direction, will its true nature (e.g., \"wand of <type>\") be revealed in the message log or inventory?",
+      "Does zapping the 'steel wand' (n) in the 'north' direction have any discernible effect on the environment or objects within range (e.g., creating a hole in a distant wall, or affecting a monster)?",
+      "Does the cursor's (x,y) position in the message log always represent the agent's current global position, even if it appears to change unexpectedly across turns relative to visible map features?",
+      "Will zapping the 'steel wand' (n) in an open direction consume one charge from the wand?"
+    ],
+    "selected_question_index": null,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 16,
+    "cumulative_questions": 267,
+    "episode_idx": 5,
+    "experiment_plan": "The agent should position itself beside a '-' (horizontal wall) and attempt to use the pick-axe (item 'e') to dig through it. Observe if the message \"This wall is too hard to dig into.\" appears, or if the wall is successfully destroyed and turns into a '.' (floor) tile.",
+    "global_step": 55,
+    "new_questions": [
+      "If the agent uses `far east` towards a molten lava tile (}) that is *not immediately adjacent* (i.e., there is at least one clear tile between the agent and the lava), will the `far east` command stop the agent one tile short of the molten lava?",
+      "Will moving directly onto a visible monster (lowercase letter) on the map result in the monster being automatically attacked and killed?",
+      "Will moving onto the stairs down (>) automatically transition the agent to the next dungeon level?",
+      "Will zapping the 'runed wand' in a clear direction (e.g., north into a '.' tile) identify its nature without causing self-damage?",
+      "Does the game environment feature any walls (represented by '-' or '|') that can be successfully dug through using a pick-axe?"
+    ],
+    "selected_question_index": 66,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 16,
+    "cumulative_questions": 272,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 56,
+    "new_questions": [
+      "Will zapping the 'runed wand' (f) in a clear direction (e.g., north into a '.' tile) identify its nature without causing self-damage?",
+      "Will attempting to 'apply' the 'horn' (e) an item in the inventory, produce a \"What do you want to apply?\" prompt, and then accept a direction?",
+      "Will attempting to 'apply' an inventory item that is not a tool (e.g., 'd' uncursed food ration) result in an error message?",
+      "Will `far east` successfully move the agent past the horizontal wall segment (relative X=11-13, global X=37-39) if the agent is to the west of it and there are no other obstructions?",
+      "If a \"far\" directional command would lead the agent to land directly on a monster, will the monster be attacked and killed, and the \"far\" command terminate on the monster's square?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 17,
+    "cumulative_questions": 277,
+    "episode_idx": 5,
+    "experiment_plan": "From current position (28,11), move two steps north to (28,9) to be adjacent to the horizontal wall at Y=8. Then, initiate the `apply` action, select item 'e' (the horn) when prompted, and then select 'north' as the direction to apply it, observing if it behaves as a pick-axe or provides an error...",
+    "global_step": 57,
+    "new_questions": [
+      "Will a 'far' directional movement always stop exactly one tile away from *any* lethal, non-wall obstruction (e.g., Molten Lava, monster, trap) if there are two or more clear tiles between the agent and the obstruction?",
+      "Will attempting to `apply e` (the horn) trigger a prompt for a tool (as if there were multiple tools) or an effect if 'e' is recognized as a valid 'apply' item type?",
+      "If an unidentified wand ('f' runed wand) is zapped in an open, clear direction (e.g., north, into a '.' tile), will it always reveal its true nature (e.g., \"wand of cold\") in the message log or inventory without causing self-damage?",
+      "Will `kick west` (towards the wall at (24,11)) be a valid action if the syntax includes a direction, or does `kick` have special requirements?",
+      "If a 'far' command stops one tile away from a wall, does that mean all further single-step movements in that cardinal direction will be blocked by that wall until the agent moves to a different X- or Y-coordinate to bypass the wall?"
+    ],
+    "selected_question_index": 66,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 17,
+    "cumulative_questions": 282,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 58,
+    "new_questions": [
+      "Will moving `east` from the agent's current position (28,11) into a tile indicated as `.` in the map string, but identified as lethal Molten Lava at global X=30 by the Perception Module, result in the agent's death?",
+      "Do the horizontal walls at global Y=8 and Y=14 permit vertical movement (i.e., contain gaps) at any X-coordinate between global X=24 and X=37, allowing the agent to move out of the Y=9-13 range at such X-coordinates?",
+      "Will zapping the 'runed wand' (f) in an open, clear direction (e.g., north into a '.' tile) always reveal its true nature in the message log or inventory without causing self-damage?",
+      "If the agent is at (X, Y), and there is deadly lava at (X+1, Y) and a wall at (X, Y+1), will attempting to move `southeast` to (X+1, Y+1) be successful if (X+1, Y+1) is a clear floor tile?",
+      "If the agent is positioned one step away from lethal lava, will executing the `wait` command have any detrimental or beneficial effect, or simply advance the turn without incident?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 17,
+    "cumulative_questions": 287,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 59,
+    "new_questions": [
+      "If the agent attempts a single `east` move from an adjacent non-lethal tile (e.g., (29,9)) onto a visible `}` (lava) tile (e.g., (30,9)), will this result in immediate death, overriding the Perception Module's `SAFE` classification for that move if observed from (29,9)?",
+      "When an agent uses a `far` directional command, and there is an impassable wall (e.g., '-') beyond a column of molten lava ('}') in that path, will the `far` command prioritize stopping one step from the lava or one step from the wall?",
+      "Can the agent successfully use the `apply` command with the `horn` (inventory item 'e') to interact with any adjacent environmental feature (e.g., an adjacent '-' wall)?",
+      "If vertical movement is blocked by horizontal walls at Y=8 and Y=14 for X-coordinates between 24 and 37, does any X-coordinate within this range (24 < X < 37) actually contain a gap in these horizontal walls that would allow the agent to move out of the lethal Y-span (Y=9-13)?",
+      "Can the agent move `south` from its current position (28,9) to (28,13), then `east` to (29,13), and from (29,13) successfully execute `far east` to bypass the X=30 lava column without landing on a lethal tile?"
+    ],
+    "selected_question_index": null,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 17,
+    "cumulative_questions": 292,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 60,
+    "new_questions": [
+      "Will entering 'e' in response to the \"What do you want to use or apply?\" prompt lead to a further prompt asking for a direction to apply the horn?",
+      "Assuming a direction prompt is given, will applying the horn ('e') in the 'north' direction successfully destroy the horizontal wall at Y=8?",
+      "If the horizontal wall at Y=8 is not destroyed, will applying the horn ('e') in the 'north' direction result in the message \"This wall is too hard to dig into.\"?",
+      "If the horn is applied 'north' towards the wall and the wall is not destroyed, will this action consume a turn?",
+      "Is the 'horn' (item 'e') usable with the 'apply' command in a direction that does not contain an adjacent wall or obstruction (e.g., towards an empty '.' floor tile)?"
+    ],
+    "selected_question_index": null,
+    "step": 5
+  },
+  {
+    "cumulative_experiments": 17,
+    "cumulative_questions": 297,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 61,
+    "new_questions": [
+      "Will responding 'y' to the \"Improvise? [ynq]\" prompt when applying the horn (e) cause some unique effect or action in the game world?",
+      "Will responding 'n' to the \"Improvise? [ynq]\" prompt when applying the horn (e) cancel the `apply` action without consuming a turn?",
+      "Will moving `east` from (28,9) to (29,9) then `far east` successfully bypass the molten lava (X=30) and place the agent at or beyond X=31 safely?",
+      "Does the 'horn' (item 'e'), when successfully applied (e.g., by answering 'y' to \"Improvise?\"), destroy an adjacent wall if applied toward it?",
+      "Can the agent safely use the `far east` command from global X=38, Y=8 to advance towards the stairs without encountering further obstructions within the visible map?"
+    ],
+    "selected_question_index": null,
+    "step": 6
+  },
+  {
+    "cumulative_experiments": 17,
+    "cumulative_questions": 302,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 62,
+    "new_questions": [
+      "If the agent chooses 'north' in response to \"In what direction?\" for the horn, will the adjacent horizontal wall at Y=8 be destroyed?",
+      "If the adjacent horizontal wall at Y=8 is not destroyed by applying the horn to the north, will the message \"This wall is too hard to dig into.\" be displayed?",
+      "Will applying the horn 'north' against the wall at Y=8, after responding 'y' to \"Improvise?\", result in any self-damage to the agent?",
+      "After applying the horn (e) to the north, if the wall at Y=8 is not destroyed, will subsequent single-step 'north' movements remain blocked, suggesting no change to the wall's traversability?",
+      "Following the current \"apply\" action for the horn, if the wall is not breached, will moving south from the current position (28,9) to (28,13) be a safe 4-step movement using `far south` without encountering unexpected lethal tiles?"
+    ],
+    "selected_question_index": null,
+    "step": 7
+  },
+  {
+    "cumulative_experiments": 18,
+    "cumulative_questions": 307,
+    "episode_idx": 5,
+    "experiment_plan": "From its current position (28,9), the agent will now `quaff` the identified 'frost horn' (e). This will determine if quaffing the frost horn has any discernible effect on the agent.",
+    "global_step": 63,
+    "new_questions": [
+      "If the agent executes `far south` from its current position (28,9), will it safely stop at (28,13), which is one tile short of the southern wall at (28,14)?",
+      "Are all 'wall' characters ('-' and '|') consistently impassable and indestructible by either a pick-axe or an identified 'frost horn', regardless of their specific location on the map?",
+      "Will `quaff`ing the identified 'frost horn' (e) have any discernible effect on the agent?",
+      "Will zapping the 'runed wand' (f) in a clear and empty direction (e.g., east from the current position (28,9) to the clear floor tile at (29,9)) always result in self-damage or death for the agent?",
+      "If the agent moves to (28,14) (south of the lava's vertical span), will a `far east` command from (28,14) successfully bypass the X=30 lava column and allow the agent to reach X=38 (or beyond) without landing on a lethal tile?"
+    ],
+    "selected_question_index": 101,
+    "step": 8
+  },
+  {
+    "cumulative_experiments": 18,
+    "cumulative_questions": 312,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 64,
+    "new_questions": [
+      "Will `quaff`ing the identified 'frost horn' (e) successfully execute, or will the game still produce a \"Your previous output did not contain a valid action. Retry\" message?",
+      "Assuming it successfully executes, will `quaff`ing the identified 'frost horn' (e) cause any change to the agent's current HP, PW, or AC?",
+      "If the 'runed wand' (f) is zapped in an open direction (e.g., east towards the '.' tile at (29,9)), will its true nature be revealed (e.g., identified as 'wand of cold' or another type)?",
+      "If the 'runed wand' (f) is zapped in an open direction (e.g., east towards the '.' tile at (29,9)), will it cause the agent to take damage or die?",
+      "Will moving `far south` from the current position (28,9) allow the agent to reach a Y-coordinate beyond 13, thus passing the southern lava boundary at X=30?"
+    ],
+    "selected_question_index": null,
+    "step": 9
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 317,
+    "episode_idx": 5,
+    "experiment_plan": "In response to \"What do you want to zap? [f or ?*]\", select 'f' (the runed wand) to determine if it prompts for a direction. This is a critical next step in the interactive 'zap' sequence.",
+    "global_step": 65,
+    "new_questions": [
+      "Does the `quaff` action typically require a specific inventory letter (e.g., `quaff e`) in a single line, or a prompt for inventory selection, as observed for `apply` and `zap`?",
+      "If the agent selects 'f' (the 'runed wand') in response to \"What do you want to zap? [f or ?*]\", will the game then prompt for a direction?",
+      "Will `quaff`ing the 'frost horn' (e) heal the agent or otherwise alter its current HP, PW, or AC?",
+      "Will zapping the 'runed wand' (f) in an open, clear direction (e.g., east towards the '.' tile) cause self-damage to the agent?",
+      "If the agent selects 'f' (the 'runed wand') and zaps it in an open, clear direction, will the wand's true nature (e.g., \"wand of cold\") be revealed in the message log or inventory?"
+    ],
+    "selected_question_index": 112,
+    "step": 10
+  },
+  {
+    "cumulative_experiments": 20,
+    "cumulative_questions": 322,
+    "episode_idx": 5,
+    "experiment_plan": "Respond with 'south' to the \"In what direction?\" prompt to zap the 'runed wand' (f). Observe if the wand's true nature is revealed or if any other effects occur.",
+    "global_step": 66,
+    "new_questions": [
+      "If the 'runed wand' (f) is zapped in an open, clear direction (e.g., east towards the '.' tile or south towards the '.' tile), will it cause self-damage to the agent?",
+      "If the 'runed wand' (f) is zapped in an open, clear direction (e.g., east towards the '.' tile or south towards the '.' tile), will its true nature (e.g., \"wand of cold\") be revealed in the message log or inventory?",
+      "If the 'runed wand' (f) is zapped directly at the molten lava ('}') to the east, will it cause any change to the lava or bypass it?",
+      "Will `quaff e` (the frost horn) successfully activate a drinking effect for the agent, or will it consistently return a \"Your previous output did not contain a valid action. Retry\" message?",
+      "Will zapping the 'runed wand' (f) at an adjacent wall ('-') cause the wall to be destroyed or altered?"
+    ],
+    "selected_question_index": 117,
+    "step": 11
+  },
+  {
+    "cumulative_experiments": 21,
+    "cumulative_questions": 327,
+    "episode_idx": 5,
+    "experiment_plan": "Initiate the `quaff` action, then, in response to the \"What do you want to quaff?\" prompt, enter 'e' to attempt to quaff the frost horn and observe the outcome.",
+    "global_step": 67,
+    "new_questions": [
+      "Can the 'frost horn' (e) be successfully quaffed by the agent?",
+      "Do all visible lowercase letters on the map universally represent hostile monsters that the agent can attack by moving adjacent or into them?",
+      "Is every instance of the '}' symbol on the map intrinsically lethal to the agent upon collision, regardless of the method of movement onto it?",
+      "Does the message \"The bolt of cold bounces!\" when zapping a wand of cold always indicate no direct self-damage to the agent?",
+      "Will executing the 'pray' action result in a discernible positive effect or message for the agent?"
+    ],
+    "selected_question_index": 54,
+    "step": 12
+  },
+  {
+    "cumulative_experiments": 22,
+    "cumulative_questions": 332,
+    "episode_idx": 5,
+    "experiment_plan": "Initiate the `zap` command. When prompted \"What do you want to zap?\", select 'f' (the wand of cold). Then, when prompted \"In what direction?\", select 'north' (towards the adjacent wall).",
+    "global_step": 68,
+    "new_questions": [
+      "Do all visible lowercase letters on the map (like 'a', 'e', 'g', etc.) universally represent hostile monsters that the agent can attack by moving *onto* them, not just adjacent to them?",
+      "If the agent moves directly onto a visible monster (lowercase letter) on the map, will that monster be automatically attacked and killed?",
+      "Does attempting to `eat` the \"uncursed food ration\" ('d') fully identify it, and does it restore HP or satiate hunger?",
+      "Does a 'far' command always stop one tile short of a perceived obstruction, even if that obstruction is another visible character (monster)?",
+      "Will zapping the 'wand of cold' ('f') in the direction `north` (towards a wall) cause self-damage to the agent, similar to when the 'ebony wand' (also a wand of cold) was zapped towards a wall in step 51?"
+    ],
+    "selected_question_index": 63,
+    "step": 13
+  },
+  {
+    "cumulative_experiments": 22,
+    "cumulative_questions": 334,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 69,
+    "new_questions": [
+      "Does moving directly onto a visible monster (lowercase letter) on the map result in the monster being automatically attacked and killed?",
+      "Will attempting to `eat` the \"uncursed food ration\" ('d') fully identify it and restore HP or satiate hunger?"
+    ],
+    "selected_question_index": null,
+    "step": 14
+  },
+  {
+    "cumulative_experiments": 22,
+    "cumulative_questions": 337,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 70,
+    "new_questions": [
+      "If a 'far' command stops one tile short of an impassable wall, will subsequent single-step movements in *other* cardinal or diagonal directions directly towards the wall (where there were at least two clear tiles for the 'far' command) also be blocked?",
+      "Will moving onto the stairs down ('>') automatically transition the agent to the next dungeon level?",
+      "When using the `apply` command for an item that requires a direction (like a pick-axe), will the game prompt for a direction if only `apply <item letter>` is entered and not `apply <item letter> <direction>`?"
+    ],
+    "selected_question_index": null,
+    "step": 15
+  },
+  {
+    "cumulative_experiments": 22,
+    "cumulative_questions": 342,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 71,
+    "new_questions": [
+      "Does applying the 'frost horn' ('e') consume a charge or have limited uses?",
+      "If the agent attempts a single movement (e.g., `east`) into a tile that is immediately adjacent to the known molten lava (X=30 at current Y), will this movement be instantly lethal?",
+      "If a 'far' directional movement is executed in a direction that appears unobstructed on the visible map, will the agent continuously move until it encounters an obstruction or the edge of the visible map?",
+      "When `f: a wand of cold` is displayed in the inventory without any numerical count (e.g., \"0:4\"), does this indicate that the wand currently has an indeterminate number of charges, not necessarily zero?",
+      "Does attempting to `eat` the \"uncursed food ration\" ('d') consume a turn?"
+    ],
+    "selected_question_index": null,
+    "step": 16
+  },
+  {
+    "cumulative_experiments": 22,
+    "cumulative_questions": 347,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 72,
+    "new_questions": [
+      "If a `far` command, when executed, results in no movement and no message, does this definitively indicate that the intended path (even if predicted as clear) was immediately obstructed by a trap that the perception module was unable to detect?",
+      "Will moving onto the stairs up ('<') automatically transition the agent to the previous dungeon level?",
+      "Does the `Agent's Current Global Position (Tracked by Perception)` consistently lag behind or inaccurately reflect the `cursor` position on the map after movement actions?",
+      "Will attempting a single `north` movement from global (28,12) (current location) successfully move the agent, given that the `far north` command resulted in no movement?",
+      "Does zapping an `identified` wand of cold ('f') in a clear cardinal direction (e.g., south) consume one charge from the wand?"
+    ],
+    "selected_question_index": null,
+    "step": 17
+  },
+  {
+    "cumulative_experiments": 22,
+    "cumulative_questions": 352,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 73,
+    "new_questions": [
+      "Does zapping an identified `wand of cold` (`f`) in the `north` direction, directly towards an adjacent trap (`x`), cause self-damage to the agent?",
+      "Does executing a single-step `north` movement directly onto an adjacent trap (`x`) cause the trap to activate or deal damage to the agent?",
+      "When an identified `wand of cold` (`f`) is zapped directly at an adjacent trap (`x`), does the game provide a specific message describing the interaction of the cold bolt with the trap?",
+      "Will a single-step `north` movement command be blocked if the directly adjacent square to the north contains a trap (`x`)?",
+      "Does moving onto an adjacent trap (`x`) consume a turn?"
+    ],
+    "selected_question_index": null,
+    "step": 18
+  },
+  {
+    "cumulative_experiments": 22,
+    "cumulative_questions": 353,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 74,
+    "new_questions": [
+      "Does zapping an identified `wand of cold` (`f`) in a clear cardinal direction (e.g., south, west, northwest) consume one charge from the wand?"
+    ],
+    "selected_question_index": null,
+    "step": 19
+  },
+  {
+    "cumulative_experiments": 23,
+    "cumulative_questions": 358,
+    "episode_idx": 5,
+    "experiment_plan": "Execute a single step `north` movement directly onto the adjacent trap 'x'. Observe if the trap activates, deals damage to the agent, or changes the map tile.",
+    "global_step": 75,
+    "new_questions": [
+      "When an identified `wand of cold` (`f`) is zapped directly at an adjacent trap (`x`), does the trap remain active and on the map visually?",
+      "Will moving one step `north` (from global (29,10) to (29,9)) directly onto the adjacent trap (`x`) cause the trap to disappear or disarm?",
+      "Will moving one step `north` (from global (29,10) to (29,9)) directly onto the adjacent trap (`x`) inflict damage on the agent?",
+      "Does zapping an identified `wand of cold` (`f`) at an adjacent trap (`x`) consume one charge from the wand?",
+      "Does the message \"The bolt of cold hits you! You don't feel cold.\" always appear when an identified `wand of cold` is zapped at a trap 'x'?"
+    ],
+    "selected_question_index": 52,
+    "step": 20
+  },
+  {
+    "cumulative_experiments": 24,
+    "cumulative_questions": 363,
+    "episode_idx": 5,
+    "experiment_plan": "Execute a `far northwest` command. Observe if the agent is automatically transported to the previous dungeon level or if it merely stops upon the stairs, allowing further movement once on the stairs tile.",
+    "global_step": 76,
+    "new_questions": [
+      "Does a 'far' directional movement, if it would end on 'Stairs up' ('<'), automatically transport the agent to the previous dungeon level, or does it merely stop upon the stairs?",
+      "Does an identified `wand of cold` (`f`) display its charge count in the inventory, or is it represented as having an indeterminate number of charges?",
+      "Will a 'far' directional movement, if it encounters molten lava ('}') that is not immediately adjacent but is along its path, stop one tile short of the lava?",
+      "Will moving directly onto a visible monster (lowercase letter) on the map always result in the monster being automatically attacked and killed?",
+      "Does zapping an identified `wand of cold` (`f`) in a cardinal direction towards a clear tile (e.g., south) consume one charge from the wand?"
+    ],
+    "selected_question_index": 62,
+    "step": 21
+  }
+]

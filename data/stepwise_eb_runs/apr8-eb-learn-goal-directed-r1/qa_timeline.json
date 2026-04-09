@@ -1,0 +1,618 @@
+[
+  {
+    "answered": 1,
+    "episode_idx": 0,
+    "global_step": 0,
+    "step": 0,
+    "total": 5,
+    "unanswered": 4
+  },
+  {
+    "answered": 2,
+    "episode_idx": 0,
+    "global_step": 1,
+    "step": 1,
+    "total": 10,
+    "unanswered": 8
+  },
+  {
+    "answered": 3,
+    "episode_idx": 0,
+    "global_step": 2,
+    "step": 2,
+    "total": 15,
+    "unanswered": 12
+  },
+  {
+    "answered": 5,
+    "episode_idx": 0,
+    "global_step": 3,
+    "step": 3,
+    "total": 21,
+    "unanswered": 16
+  },
+  {
+    "answered": 5,
+    "episode_idx": 0,
+    "global_step": 4,
+    "step": 4,
+    "total": 26,
+    "unanswered": 21
+  },
+  {
+    "answered": 6,
+    "episode_idx": 0,
+    "global_step": 5,
+    "step": 5,
+    "total": 28,
+    "unanswered": 22
+  },
+  {
+    "answered": 6,
+    "episode_idx": 0,
+    "global_step": 6,
+    "step": 6,
+    "total": 33,
+    "unanswered": 27
+  },
+  {
+    "answered": 8,
+    "episode_idx": 1,
+    "global_step": 7,
+    "step": 0,
+    "total": 40,
+    "unanswered": 32
+  },
+  {
+    "answered": 11,
+    "episode_idx": 1,
+    "global_step": 8,
+    "step": 1,
+    "total": 47,
+    "unanswered": 36
+  },
+  {
+    "answered": 13,
+    "episode_idx": 1,
+    "global_step": 9,
+    "step": 2,
+    "total": 53,
+    "unanswered": 40
+  },
+  {
+    "answered": 14,
+    "episode_idx": 1,
+    "global_step": 10,
+    "step": 3,
+    "total": 59,
+    "unanswered": 45
+  },
+  {
+    "answered": 14,
+    "episode_idx": 1,
+    "global_step": 11,
+    "step": 4,
+    "total": 64,
+    "unanswered": 50
+  },
+  {
+    "answered": 15,
+    "episode_idx": 1,
+    "global_step": 12,
+    "step": 5,
+    "total": 70,
+    "unanswered": 55
+  },
+  {
+    "answered": 19,
+    "episode_idx": 1,
+    "global_step": 13,
+    "step": 6,
+    "total": 36,
+    "unanswered": 17
+  },
+  {
+    "answered": 19,
+    "episode_idx": 2,
+    "global_step": 14,
+    "step": 0,
+    "total": 41,
+    "unanswered": 22
+  },
+  {
+    "answered": 19,
+    "episode_idx": 2,
+    "global_step": 15,
+    "step": 1,
+    "total": 46,
+    "unanswered": 27
+  },
+  {
+    "answered": 19,
+    "episode_idx": 2,
+    "global_step": 16,
+    "step": 2,
+    "total": 48,
+    "unanswered": 29
+  },
+  {
+    "answered": 19,
+    "episode_idx": 2,
+    "global_step": 17,
+    "step": 3,
+    "total": 52,
+    "unanswered": 33
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 18,
+    "step": 4,
+    "total": 56,
+    "unanswered": 36
+  },
+  {
+    "answered": 18,
+    "episode_idx": 2,
+    "global_step": 19,
+    "step": 5,
+    "total": 33,
+    "unanswered": 15
+  },
+  {
+    "answered": 18,
+    "episode_idx": 2,
+    "global_step": 20,
+    "step": 6,
+    "total": 38,
+    "unanswered": 20
+  },
+  {
+    "answered": 19,
+    "episode_idx": 2,
+    "global_step": 21,
+    "step": 7,
+    "total": 44,
+    "unanswered": 25
+  },
+  {
+    "answered": 19,
+    "episode_idx": 2,
+    "global_step": 22,
+    "step": 8,
+    "total": 49,
+    "unanswered": 30
+  },
+  {
+    "answered": 19,
+    "episode_idx": 2,
+    "global_step": 23,
+    "step": 9,
+    "total": 50,
+    "unanswered": 31
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 24,
+    "step": 10,
+    "total": 42,
+    "unanswered": 22
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 25,
+    "step": 11,
+    "total": 47,
+    "unanswered": 27
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 26,
+    "step": 12,
+    "total": 52,
+    "unanswered": 32
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 27,
+    "step": 13,
+    "total": 46,
+    "unanswered": 26
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 28,
+    "step": 14,
+    "total": 50,
+    "unanswered": 30
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 29,
+    "step": 15,
+    "total": 48,
+    "unanswered": 28
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 30,
+    "step": 16,
+    "total": 50,
+    "unanswered": 30
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 31,
+    "step": 17,
+    "total": 50,
+    "unanswered": 30
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 32,
+    "step": 18,
+    "total": 50,
+    "unanswered": 30
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 33,
+    "step": 19,
+    "total": 55,
+    "unanswered": 35
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 34,
+    "step": 20,
+    "total": 58,
+    "unanswered": 38
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 35,
+    "step": 21,
+    "total": 50,
+    "unanswered": 30
+  },
+  {
+    "answered": 20,
+    "episode_idx": 2,
+    "global_step": 36,
+    "step": 22,
+    "total": 55,
+    "unanswered": 35
+  },
+  {
+    "answered": 22,
+    "episode_idx": 2,
+    "global_step": 37,
+    "step": 23,
+    "total": 44,
+    "unanswered": 22
+  },
+  {
+    "answered": 22,
+    "episode_idx": 2,
+    "global_step": 38,
+    "step": 24,
+    "total": 49,
+    "unanswered": 27
+  },
+  {
+    "answered": 23,
+    "episode_idx": 2,
+    "global_step": 39,
+    "step": 25,
+    "total": 54,
+    "unanswered": 31
+  },
+  {
+    "answered": 24,
+    "episode_idx": 2,
+    "global_step": 40,
+    "step": 26,
+    "total": 58,
+    "unanswered": 34
+  },
+  {
+    "answered": 24,
+    "episode_idx": 2,
+    "global_step": 41,
+    "step": 27,
+    "total": 64,
+    "unanswered": 40
+  },
+  {
+    "answered": 26,
+    "episode_idx": 3,
+    "global_step": 42,
+    "step": 0,
+    "total": 70,
+    "unanswered": 44
+  },
+  {
+    "answered": 27,
+    "episode_idx": 3,
+    "global_step": 43,
+    "step": 1,
+    "total": 76,
+    "unanswered": 49
+  },
+  {
+    "answered": 28,
+    "episode_idx": 3,
+    "global_step": 44,
+    "step": 2,
+    "total": 82,
+    "unanswered": 54
+  },
+  {
+    "answered": 27,
+    "episode_idx": 3,
+    "global_step": 45,
+    "step": 3,
+    "total": 50,
+    "unanswered": 23
+  },
+  {
+    "answered": 27,
+    "episode_idx": 3,
+    "global_step": 46,
+    "step": 4,
+    "total": 55,
+    "unanswered": 28
+  },
+  {
+    "answered": 28,
+    "episode_idx": 3,
+    "global_step": 47,
+    "step": 5,
+    "total": 60,
+    "unanswered": 32
+  },
+  {
+    "answered": 34,
+    "episode_idx": 3,
+    "global_step": 48,
+    "step": 6,
+    "total": 40,
+    "unanswered": 6
+  },
+  {
+    "answered": 36,
+    "episode_idx": 3,
+    "global_step": 49,
+    "step": 7,
+    "total": 46,
+    "unanswered": 10
+  },
+  {
+    "answered": 37,
+    "episode_idx": 3,
+    "global_step": 50,
+    "step": 8,
+    "total": 51,
+    "unanswered": 14
+  },
+  {
+    "answered": 46,
+    "episode_idx": 3,
+    "global_step": 51,
+    "step": 9,
+    "total": 56,
+    "unanswered": 10
+  },
+  {
+    "answered": 46,
+    "episode_idx": 4,
+    "global_step": 52,
+    "step": 0,
+    "total": 62,
+    "unanswered": 16
+  },
+  {
+    "answered": 47,
+    "episode_idx": 4,
+    "global_step": 53,
+    "step": 1,
+    "total": 66,
+    "unanswered": 19
+  },
+  {
+    "answered": 49,
+    "episode_idx": 4,
+    "global_step": 54,
+    "step": 2,
+    "total": 62,
+    "unanswered": 13
+  },
+  {
+    "answered": 48,
+    "episode_idx": 5,
+    "global_step": 55,
+    "step": 0,
+    "total": 65,
+    "unanswered": 17
+  },
+  {
+    "answered": 48,
+    "episode_idx": 5,
+    "global_step": 56,
+    "step": 1,
+    "total": 70,
+    "unanswered": 22
+  },
+  {
+    "answered": 47,
+    "episode_idx": 5,
+    "global_step": 57,
+    "step": 2,
+    "total": 75,
+    "unanswered": 28
+  },
+  {
+    "answered": 50,
+    "episode_idx": 5,
+    "global_step": 58,
+    "step": 3,
+    "total": 80,
+    "unanswered": 30
+  },
+  {
+    "answered": 50,
+    "episode_idx": 5,
+    "global_step": 59,
+    "step": 4,
+    "total": 85,
+    "unanswered": 35
+  },
+  {
+    "answered": 55,
+    "episode_idx": 5,
+    "global_step": 60,
+    "step": 5,
+    "total": 90,
+    "unanswered": 35
+  },
+  {
+    "answered": 56,
+    "episode_idx": 5,
+    "global_step": 61,
+    "step": 6,
+    "total": 96,
+    "unanswered": 40
+  },
+  {
+    "answered": 62,
+    "episode_idx": 5,
+    "global_step": 62,
+    "step": 7,
+    "total": 103,
+    "unanswered": 41
+  },
+  {
+    "answered": 62,
+    "episode_idx": 5,
+    "global_step": 63,
+    "step": 8,
+    "total": 108,
+    "unanswered": 46
+  },
+  {
+    "answered": 63,
+    "episode_idx": 5,
+    "global_step": 64,
+    "step": 9,
+    "total": 111,
+    "unanswered": 48
+  },
+  {
+    "answered": 64,
+    "episode_idx": 5,
+    "global_step": 65,
+    "step": 10,
+    "total": 116,
+    "unanswered": 52
+  },
+  {
+    "answered": 47,
+    "episode_idx": 5,
+    "global_step": 66,
+    "step": 11,
+    "total": 54,
+    "unanswered": 7
+  },
+  {
+    "answered": 48,
+    "episode_idx": 5,
+    "global_step": 67,
+    "step": 12,
+    "total": 59,
+    "unanswered": 11
+  },
+  {
+    "answered": 48,
+    "episode_idx": 5,
+    "global_step": 68,
+    "step": 13,
+    "total": 64,
+    "unanswered": 16
+  },
+  {
+    "answered": 50,
+    "episode_idx": 5,
+    "global_step": 69,
+    "step": 14,
+    "total": 66,
+    "unanswered": 16
+  },
+  {
+    "answered": 51,
+    "episode_idx": 5,
+    "global_step": 70,
+    "step": 15,
+    "total": 70,
+    "unanswered": 19
+  },
+  {
+    "answered": 52,
+    "episode_idx": 5,
+    "global_step": 71,
+    "step": 16,
+    "total": 76,
+    "unanswered": 24
+  },
+  {
+    "answered": 51,
+    "episode_idx": 5,
+    "global_step": 72,
+    "step": 17,
+    "total": 75,
+    "unanswered": 24
+  },
+  {
+    "answered": 32,
+    "episode_idx": 5,
+    "global_step": 73,
+    "step": 18,
+    "total": 57,
+    "unanswered": 25
+  },
+  {
+    "answered": 36,
+    "episode_idx": 5,
+    "global_step": 74,
+    "step": 19,
+    "total": 59,
+    "unanswered": 23
+  },
+  {
+    "answered": 40,
+    "episode_idx": 5,
+    "global_step": 75,
+    "step": 20,
+    "total": 62,
+    "unanswered": 22
+  },
+  {
+    "answered": 40,
+    "episode_idx": 5,
+    "global_step": 76,
+    "step": 21,
+    "total": 67,
+    "unanswered": 27
+  }
+]

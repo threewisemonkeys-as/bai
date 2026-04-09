@@ -482,6 +482,7 @@ def run_stepwise_b_learn_episode(
     max_episode_steps: int | None = None,
     trajectory_buffer: list[dict] | None = None,
     past_experiments: list[str] | None = None,
+    cumulative_cost_offset: float = 0.0,
 ) -> tuple[str, str, list[QAPair], list[CriticalMoment], list[str], dict, int, list[dict], list[str]]:
     """Run a single episode with per-step B-learning.
 
@@ -944,7 +945,7 @@ def run_stepwise_b_learn_episode(
                 output_dir=os.path.dirname(output_dir),  # root run dir
                 step=global_step,
                 step_cost=step_total_cost,
-                cumulative_cost=cumulative_step_cost,
+                cumulative_cost=cumulative_cost_offset + cumulative_step_cost,
                 rollout_stats={
                     "episode_idx": episode_idx,
                     "episode_step": step,
@@ -1420,6 +1421,7 @@ For beliefs:
 
                 message = perception_from_analysis_prompt if turn == 0 else build_perception_followup_message(
                     perception, sample_obs, prev_obs_section_1c,
+                    current_turn=turn + 1, max_turns=bl_config.max_perception_iterations,
                 )
 
                 _beliefs_unused, perception, turn_cost, perception_conv_1c, response_text = asyncio.run(
@@ -1970,6 +1972,7 @@ def stepwise_b_learn(
                     max_episode_steps=remaining_steps,
                     trajectory_buffer=trajectory_buffer,
                     past_experiments=past_experiments,
+                    cumulative_cost_offset=cumulative_cost,
                 )
             )
 
@@ -2019,7 +2022,7 @@ def main(config: DictConfig):
         max_perception_iterations=evolve_cfg.get(
             "max_perception_iterations",
             evolve_cfg.get("max_steps_iterations",
-                           evolve_cfg.get("max_improve_iterations", evolve_cfg.get("num_improve_iterations", 1))),
+                           evolve_cfg.get("max_improve_iterations", evolve_cfg.get("num_improve_iterations", 5))),
         ),
         use_qa=evolve_cfg.get("use_qa_improve", True),
         use_moments=evolve_cfg.get("use_moments_improve", True),

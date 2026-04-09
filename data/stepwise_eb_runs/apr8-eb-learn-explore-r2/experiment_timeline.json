@@ -1,0 +1,1266 @@
+[
+  {
+    "cumulative_experiments": 1,
+    "cumulative_questions": 5,
+    "episode_idx": 0,
+    "experiment_plan": "The agent should use the 'pickup' action. Observe if horn 'f' and spiked wand 'g' are added to the agent's inventory.",
+    "global_step": 0,
+    "new_questions": [
+      "If the agent uses the 'apply' action with the horn (f), will it produce a sound or other effect?",
+      "If the agent uses the 'zap' action with the spiked wand (g), will it have a magical effect?",
+      "Can the agent move through the map symbols '---' or '|' if they are part of the drawn cavern walls?",
+      "If the agent uses the 'pickup' action, will items 'f' and 'g' be added to the inventory?",
+      "Does the spiked wand (g) function as a melee weapon if wielded?"
+    ],
+    "selected_question_index": 3,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 2,
+    "cumulative_questions": 10,
+    "episode_idx": 0,
+    "experiment_plan": "Use the 'down' action to attempt to descend the stairs. Observe the message and the agent's new location to determine if the action was successful and if the message \"The stairs are solidly fixed to the floor.\" implies any impediment to descending.",
+    "global_step": 1,
+    "new_questions": [
+      "Does the message \"f - a horn. g - a spiked wand.\" refer to items already in the agent's inventory?",
+      "If there are no items on the ground, does the `pickup` action always fail with a \"nothing to pick up\" message unless there are stairs at the current location?",
+      "Does the message \"The stairs are solidly fixed to the floor.\" indicate that the `down` action will fail?",
+      "If the agent attempts to `pickup` an item that is already in their inventory, will they receive a specific message indicating the item is already possessed?",
+      "Can the agent use the `eat` action on the horn (f) if it is an inventory item?"
+    ],
+    "selected_question_index": 8,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 15,
+    "episode_idx": 0,
+    "experiment_plan": "Use the 'apply' action and select the horn (f) from the inventory. Observe the message to determine if it produces a sound or any other effect.",
+    "global_step": 2,
+    "new_questions": [
+      "Can the agent successfully move to any adjacent '@' symbol on the map using a single directional movement action (e.g., 'north', 'east')?",
+      "Do the map symbols '---' and '|' always represent impassable walls, preventing movement through them?",
+      "If the agent attempts to use an inventory item with an inapplicable action (e.g., 'eat' a wand), will the environment provide a specific error message?",
+      "Does the message \"You can't go down here.\" universally indicate that there are no descendable stairs in the current location, even if stairs are visually present on the map?",
+      "If the agent attempts to move into a map space currently occupied by a colon (':') symbol, will it be able to move there?"
+    ],
+    "selected_question_index": 0,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 20,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 3,
+    "new_questions": [
+      "Is it possible to select the spiked wand (g) as an item when prompted by the 'apply' action?",
+      "If an inventory item with charges is successfully used with the 'apply' action, will one of its charges be consumed?",
+      "After the 'apply' action is completed with a selected item, will the inventory always update to reflect any changes to the item's state (e.g., identified, charges reduced, item consumed)?",
+      "Can the agent move through the door symbol '}' on the map using a directional movement action?",
+      "If the 'apply' action is unsuccessful for the chosen item (e.g., because it is not an 'appliable' item), will the environment provide a specific error message?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 25,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 4,
+    "new_questions": [
+      "Does selecting 'q' for the \"Improvise? [ynq] (q)\" prompt cancel the current 'apply' action without consuming a turn?",
+      "If no input is provided and Enter is pressed for the \"Improvise? [ynq] (q)\" prompt, will the 'q' (quit) option be automatically selected?",
+      "Does selecting 'y' for the \"Improvise? [ynq] (q)\" prompt lead to the horn being used or having an immediate effect?",
+      "Does selecting 'n' for the \"Improvise? [ynq] (q)\" prompt lead to the horn being used or having an immediate effect without improvisation?",
+      "Will the horn (f) be removed from the inventory if it is successfully applied, regardless of the improvisation choice?"
+    ],
+    "selected_question_index": null,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 30,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 5,
+    "new_questions": [
+      "Does selecting 'y' for the \"Improvise? [ynq] (q)\" prompt cause the horn (f) to be used or produce an immediate effect?",
+      "Will the horn (f) be removed from inventory if it is successfully applied, regardless of the improvisation choice?",
+      "If an inventory item *with charges* is successfully used with the 'apply' action, will one of its charges be consumed?",
+      "After an item is successfully applied (without cancellation), will the inventory always update to reflect any changes to the item's state (e.g., identified, charges reduced, item consumed)?",
+      "If the agent attempts to move through the door symbol '}' at coordinate (30,10) using a directional movement action (e.g., 'east'), will the movement be successful?"
+    ],
+    "selected_question_index": null,
+    "step": 5
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 35,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 6,
+    "new_questions": [
+      "Did the action of responding 'n' to the \"Improvise? [ynq] (q)\" prompt and receiving \"Never mind.\" consume one turn?",
+      "Can the agent use the 'open' action on the door symbol '}' on the map?",
+      "Does selecting an arbitrary item from the inventory for the 'apply' action (e.g., 'a: a +1 club') always lead to the \"Improvise? [ynq]\" prompt, or can it lead to a different outcome or error message?",
+      "When the spiked wand 'g' is used with the 'zap' action, will the environment immediately prompt for a target or further input?",
+      "If an item is successfully applied, will its effects always be described through a message, or can they manifest solely as changes in the environment (e.g., map changes, new entities)?"
+    ],
+    "selected_question_index": null,
+    "step": 6
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 40,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 7,
+    "new_questions": [
+      "If the agent responds 'y' to the \"Improvise? [ynq] (q)\" prompt, will the application of the horn (f) always proceed to a message describing an effect, rather than \"Never mind.\"?",
+      "Does the 'open' action consume a turn if attempted on a door symbol '}' that is currently locked?",
+      "Can the agent use the 'force' action as an alternative to 'open' on a door symbol '}' on the map?",
+      "If an 'apply' action produces a message indicating a successful effect (i.e., not \"Never mind.\"), does this action always consume one turn?",
+      "Does performing the 'zap' action with the spiked wand (g) always provide some message about the wand's properties or its effect, even if no target is specified or visible?"
+    ],
+    "selected_question_index": null,
+    "step": 7
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 45,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 8,
+    "new_questions": [
+      "Does entering a cardinal direction (e.g., 'east') in response to \"In what direction?\" consume a turn?",
+      "If an invalid directional input is provided to the \"In what direction?\" prompt, will the 'apply' action be cancelled with a \"Never mind.\" message?",
+      "Is there a directional input (e.g., '.' or '5') that signifies \"at current location\" or \"no specific direction\" when prompted with \"In what direction?\"?",
+      "If a directional input is chosen in response to \"In what direction?\" and there is no valid target for the horn's effect in that direction, will the action result in a specific failure message, or will it still consume a turn?",
+      "Does the 'apply' action, when successfully completed after directional input, always result in an explicit message detailing its effect, rather than just silently modifying the environment?"
+    ],
+    "selected_question_index": null,
+    "step": 8
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 50,
+    "episode_idx": 1,
+    "experiment_plan": "Use the 'pickup' action. Then, observe the inventory in the `auxiliary_observation` and the game message for confirmation that items 'n' and 'o' are added.",
+    "global_step": 9,
+    "new_questions": [
+      "If the agent uses the 'pickup' action when items 'n' and 'o' are explicitly listed on the ground, will those items be added to the agent's inventory?",
+      "If the agent uses the 'pickup' action when items 'n' and 'o' are explicitly listed on the ground, will a turn be consumed?",
+      "If the agent uses the 'pickup' action to pick up 'n - a horn', will the auxiliary observation immediately identify it as a \"blessed frost horn\" if it is indeed the same type as the previously identified horn 'f'?",
+      "Does using the 'pickup' action on items 'n' and 'o' cause any other message to appear beyond the inventory update?",
+      "Does the general message \"No specific items explicitly found on the ground. Items recognized as on the ground from message content: n - a horn, o - a curved wand\" indicate that the items 'n' and 'o' are available to be picked up by the `pickup` action?"
+    ],
+    "selected_question_index": 20,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 5,
+    "cumulative_questions": 55,
+    "episode_idx": 1,
+    "experiment_plan": "Attempt the 'down' action. Observe if the action is blocked or if it allows descent, and note any associated messages.",
+    "global_step": 10,
+    "new_questions": [
+      "Does the message \"The stairs are solidly fixed to the floor\" always prevent the use of the `down` action on the current dungeon level?",
+      "After a successful `pickup` action, will the environment always provide a direct message confirming the pickup of specific items, or is the inventory update the sole confirmation?",
+      "Will newly acquired items always be assigned the next available letter in the inventory (e.g., 'n' and 'o' if 'm' was the last letter before pickup)?",
+      "Will applying the \"curved wand\" (o) also prompt for directional input like the \"horn\" (f) did in the previous life?",
+      "Does the agent always respawn at the exact coordinates where their previous character died when starting a new game on the same dungeon level?"
+    ],
+    "selected_question_index": 20,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 6,
+    "cumulative_questions": 60,
+    "episode_idx": 1,
+    "experiment_plan": "The agent should use the `quaff` action, selecting item 'f' (an uncursed potion of polymorph) from its inventory. Observe if the potion's type is identified in the inventory after quaffing and if a turn is consumed.",
+    "global_step": 11,
+    "new_questions": [
+      "Does consuming a potion using the `quaff` action result in the potion type being identified in the inventory?",
+      "Does consuming a potion using the `quaff` action consume a turn?",
+      "Does reading a scroll using the `read` action result in the scroll type being identified in the inventory?",
+      "Does reading a scroll using the `read` action consume a turn?",
+      "Does a successful `apply` action on an unidentified wand result in the wand's type being identified in the inventory, regardless of the effect?"
+    ],
+    "selected_question_index": 20,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 6,
+    "cumulative_questions": 65,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 12,
+    "new_questions": [
+      "Does the `quaff` action, when targeting an inventory item (e.g., 'f'), require only the `quaff` command followed by the item letter (e.g., `quaff f`), or does it require an intermediate selection prompt?",
+      "Will attempting to `quaff` item 'f' (an uncursed potion of polymorph) result in a change to the agent's form or status?",
+      "Will attempting to `quaff` item 'g' (an uncursed potion of water) have any observable effect or message?",
+      "Will attempting to `quaff` item 'h' (an uncursed potion of booze) lead to a message about its effect?",
+      "Does the `quaff` action, if successful, always result in an explicit message detailing its effect, rather than just silently modifying the agent's status or inventory?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 7,
+    "cumulative_questions": 70,
+    "episode_idx": 1,
+    "experiment_plan": "The agent will attempt the `quaff` action without specifying an item. After pressing enter, the agent will observe if a prompt appears asking to select an item from the inventory. Note that the goal is to determine the two-step nature of `quaff` and not necessarily to consume the potion right away.",
+    "global_step": 13,
+    "new_questions": [
+      "Does the `quaff` action require two steps: first, inputting `quaff`, and then, in a subsequent prompt, selecting the item from the inventory?",
+      "If an invalid action (like 'quaff f') is provided, does the environment still prompt for an item selection for the `quaff` action?",
+      "If an invalid action is provided, does it consume a turn?",
+      "Does the `apply` action similarly require two steps: first, inputting `apply`, and then, in a subsequent prompt, selecting the item from the inventory?",
+      "Does the error message \"Your previous output did not contain a valid action. Retry\" indicate that the previously attempted action was completely ignored and the game state remains exactly as it was before the invalid action?"
+    ],
+    "selected_question_index": 20,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 8,
+    "cumulative_questions": 75,
+    "episode_idx": 1,
+    "experiment_plan": "The agent will select 'f' as the item to quaff from the current prompt. After performing the action, the agent will check if any visible game state change (like turn count, HP, messages, inventory, or the \"Yourself a [class]\" string) indicates that a turn has been consumed.",
+    "global_step": 14,
+    "new_questions": [
+      "Does successfully quaffing a potion consume a turn?",
+      "Will the quaffed potion 'f' be automatically removed from the agent's inventory after a successful `quaff` action?",
+      "Will a specific message appear describing the immediate effect or outcome of quaffing the uncursed potion of polymorph (f)?",
+      "After successfully quaffing a potion that is already identified (e.g., 'uncursed potion of polymorph'), will the game display any additional message regarding its identification status?",
+      "If quaffing item 'f' (uncursed potion of polymorph) causes polymorph, will the `Yourself a [class]` description immediately reflect the new form?"
+    ],
+    "selected_question_index": 20,
+    "step": 5
+  },
+  {
+    "cumulative_experiments": 9,
+    "cumulative_questions": 80,
+    "episode_idx": 1,
+    "experiment_plan": "Take a `wait` action and then observe if the agent's class, as indicated by the \"Yourself a [class]\" string, changes or if any other polymorph-related messages appear.",
+    "global_step": 15,
+    "new_questions": [
+      "Does consuming an uncursed potion of polymorph cause any immediate *stat* changes (like Strength, Dexterity, etc.) on the turn it is quaffed, in addition to the HP reduction and message?",
+      "Will waiting a turn after quaffing an uncursed potion of polymorph (and receiving the \"You feel a little strange. You shudder for a moment.\" message) cause the agent's class to change?",
+      "Will attempting to `apply` an item that is not a tool (e.g., a scroll or a simple horn) result in a specific error message preventing the action or a different interaction flow?",
+      "Will attempting to go 'down' the stairs after moving to a different location and then returning to the stairs still result in the \"You can't go down here.\" message, indicating a persistent block for this stairwell?",
+      "Does the act of `open`ing a door require a directional input after the `open` command?"
+    ],
+    "selected_question_index": 21,
+    "step": 6
+  },
+  {
+    "cumulative_experiments": 9,
+    "cumulative_questions": 85,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 16,
+    "new_questions": [
+      "Will using the `search` action while adjacent to the blocked stairs reveal a hidden passage or alternative descent option?",
+      "Does applying a horn (item 'n') with 'y' to improvise and 'west' as the direction always lead to immediate character death?",
+      "Does the `read` action for scrolls follow a two-step input process, first inputting \"read\" and then selecting the scroll from a prompt?",
+      "Will using the `zap` action on a wand (e.g., 'c: a wand of teleportation') immediately prompt for a direction, or does it trigger an effect directly?",
+      "Will taking an additional `wait` action (after the first `wait` action in step 15) cause the agent's class to change from \"wizard\" (as reflected in \"Yourself a wizard\")?"
+    ],
+    "selected_question_index": null,
+    "step": 7
+  },
+  {
+    "cumulative_experiments": 10,
+    "cumulative_questions": 90,
+    "episode_idx": 1,
+    "experiment_plan": "Execute the `zap` action. Observe if a prompt for wand selection appears, indicating a two-step action. If so, selectwand `c` (a wand of teleportation).",
+    "global_step": 17,
+    "new_questions": [
+      "Will waiting multiple turns after quaffing an uncursed potion of polymorph eventually cause the 'Yourself a [class]' description to change?",
+      "Is the message \"You can't go down here.\" a permanent blockage for the current stairs for the remainder of the game?",
+      "Does the `zap` action, similar to `quaff` and `apply`, require two steps: first `zap`, and then, in a subsequent prompt, selecting the wand from inventory?",
+      "Is there a specific `read` action used to interact with scrolls in the inventory?",
+      "Will quaffing an uncursed potion of water result in a specific message detailing its effect?"
+    ],
+    "selected_question_index": 22,
+    "step": 8
+  },
+  {
+    "cumulative_experiments": 10,
+    "cumulative_questions": 95,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 18,
+    "new_questions": [
+      "Does selecting a wand (e.g., 'c' or 'o') from the \"What do you want to zap?\" prompt immediately consume a turn before any directional input is requested?",
+      "After selecting a wand at the \"What do you want to zap?\" prompt, will the environment always prompt for a direction for the `zap` action?",
+      "Will zapping the identified wand of teleportation (c) be confirmed by a message describing the teleportation effect?",
+      "Does zapping an unidentified wand (like 'o', the curved wand) consume a charge from it?",
+      "Does the `zap` action consume a turn for the directional input phase, in addition to any turn consumed by the item selection phase?"
+    ],
+    "selected_question_index": null,
+    "step": 9
+  },
+  {
+    "cumulative_experiments": 11,
+    "cumulative_questions": 100,
+    "episode_idx": 1,
+    "experiment_plan": "Provide a valid directional input (e.g., 'east') to the \"In what direction?\" prompt for zapping the wand of teleportation. Observe if a turn is consumed, the wand's charges are reduced, and if the agent's position changes.",
+    "global_step": 19,
+    "new_questions": [
+      "Will providing a valid direction to the \"In what direction?\" prompt for a zapped wand consume a turn?",
+      "If an invalid direction is provided (e.g., 'z') to the \"In what direction?\" prompt for a zapped wand, will it consume a turn?",
+      "If an empty space is chosen for the `zap` direction, will the wand's charge still be consumed?",
+      "Will attempting to `apply` a ring (e.g., ring of stealth 'd') result in a \"What do you want to use or apply?\" prompt, similar to applying a horn?",
+      "Does zapping a wand of teleportation (c) in any valid direction result in the agent being teleported to a new, random location?"
+    ],
+    "selected_question_index": 20,
+    "step": 10
+  },
+  {
+    "cumulative_experiments": 12,
+    "cumulative_questions": 105,
+    "episode_idx": 1,
+    "experiment_plan": "Initiate the `zap` action, then select wand 'o' (curved wand) from the prompt. Observe if this action prompts for a direction, similar to the wand of teleportation previously zapped.",
+    "global_step": 20,
+    "new_questions": [
+      "If a wand of teleportation is zapped at an empty space (e.g., 'east' direction towards an empty tile), will the agent themselves be teleported to a random location on the map?",
+      "Will zapping the identified \"curved wand\" (o) also prompt for a direction, similar to the wand of teleportation?",
+      "Will zapping the \"curved wand\" (o) in a specific direction consume a charge?",
+      "Does the effect of quaffing an uncursed potion of polymorph (f) have a delayed effect on the agent's character class beyond the turn it's quaffed and the subsequent wait turn?",
+      "Does moving one step away from the current location (26,10) and then back to (26,10) reset the blocking status of the stairs, allowing the `down` action to succeed?"
+    ],
+    "selected_question_index": 21,
+    "step": 11
+  },
+  {
+    "cumulative_experiments": 12,
+    "cumulative_questions": 110,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 21,
+    "new_questions": [
+      "Will zapping the unidentified 'curved wand' (o) immediately identify it (i.e., change its description in the inventory from \"a curved wand\" to a specific type, like \"a wand of striking\")?",
+      "Will zapping the unidentified 'curved wand' (o) prompt for a directional input, similar to the wand of teleportation?",
+      "If zapping the unidentified 'curved wand' (o) results in no discernible effect (e.g., no damage, no movement, no message), will a message like \"Nothing happens\" be displayed?",
+      "Is it possible for zapping an unidentified wand, like 'a curved wand' (o), to have a direct negative effect on the agent (e.g., damage, status effect, or inventory loss) if it's not a beneficial wand?",
+      "If zapping the unidentified 'curved wand' (o) consumes a charge, will its charge count be updated in the inventory even if no specific effect or identification message is presented?"
+    ],
+    "selected_question_index": null,
+    "step": 12
+  },
+  {
+    "cumulative_experiments": 13,
+    "cumulative_questions": 115,
+    "episode_idx": 1,
+    "experiment_plan": "Provide a valid directional input (e.g., 'east') to complete the `zap` action for the unidentified 'curved wand' (o). Observe the wand's charge count in the inventory in the next state to determine if a charge was consumed.",
+    "global_step": 22,
+    "new_questions": [
+      "Will providing a directional input and thus completing the `zap` action for the unidentified 'curved wand' (o) consume one charge from the wand?",
+      "Will zapping the unidentified 'curved wand' (o) with a directional input cause the wand to become identified (i.e., its description in inventory changes from \"a curved wand\" to a specific type)?",
+      "Will zapping the unidentified 'curved wand' (o) produce any visible effect on the map, such as a beam, bolt, or change in the environment?",
+      "Will zapping the unidentified 'curved wand' (o) result in a message indicating what the wand did or saying \"Nothing happens\"?",
+      "Will zapping the unidentified 'curved wand' (o) have an immediate effect on the agent's HP or stats?"
+    ],
+    "selected_question_index": 20,
+    "step": 13
+  },
+  {
+    "cumulative_experiments": 14,
+    "cumulative_questions": 120,
+    "episode_idx": 2,
+    "experiment_plan": "Attempt to `pickup e` (the horn). Observe if the game responds with a message indicating the item is already in inventory, or if it attempts to pick up a non-existent item from the ground.",
+    "global_step": 23,
+    "new_questions": [
+      "If an item is listed in a general message as \"e - a horn.\" and also in the `auxiliary_observation` inventory as \"e: a horn\", does it mean it is already in the agent's inventory and does not need to be `pickup`'d?",
+      "Upon character death, does the game consistently generate a completely new character with fully reset stats, class, and inventory?",
+      "Will the newly acquired \"ebony wand\" (f) require directional input when the agent attempts to `zap` it?",
+      "Will zapping the newly acquired \"ebony wand\" (f) have a chance to inflict damage on or kill the agent, even if directed away from the agent's apparent position?",
+      "Does applying the \"horn\" (e) have any discernible effect on the environment or the agent?"
+    ],
+    "selected_question_index": 20,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 15,
+    "cumulative_questions": 125,
+    "episode_idx": 2,
+    "experiment_plan": "Execute the `pickup` command without any item arguments. Observe if any items are added to the inventory and what message, if any, is returned, specifically noting items 'e' and 'f' which are listed as on the ground but already in inventory.",
+    "global_step": 24,
+    "new_questions": [
+      "Does attempting to `pickup` an item by its letter (e.g., `pickup e`) when that item is already present in the agent's inventory always result in the message \"Your previous output did not contain a valid action. Retry\"?",
+      "Will using the `pickup` action without any arguments (i.e., just `pickup`) collect all items on the current map tile into the agent's inventory, regardless of whether they were listed in a message like \"e - a horn. f - an ebony wand.\"?",
+      "If an item is listed in the message (e.g., \"e - a horn\") and also appears in the `auxiliary_observation` inventory, is the `auxiliary_observation` always the authoritative source for whether the item is truly in the inventory?",
+      "Does the `loot` action behave identically to the `pickup` action without arguments when there are items on the current tile?",
+      "Will zapping the 'ebony wand' (f) also require a directional input like the 'wand of teleportation' and the 'curved wand' did in the previous character's life?"
+    ],
+    "selected_question_index": 21,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 16,
+    "cumulative_questions": 130,
+    "episode_idx": 2,
+    "experiment_plan": "Initiate the `zap` command, then select the 'ebony wand' (f) from the inventory prompt. Observe if the game prompts for a directional input (\"In what direction?\") after selecting the wand.",
+    "global_step": 25,
+    "new_questions": [
+      "Does applying the 'horn' (e) require selecting an item from the inventory after typing `apply`?",
+      "Will using the `apply` action with the 'horn' (e) consume a turn?",
+      "Will zapping the 'ebony wand' (f) always prompt for a directional input (e.g., \"In what direction?\") after selection from the inventory?",
+      "Will zapping the 'ebony wand' (f) identify its specific type (e.g., wand of striking, wand of magic missile) in the inventory?",
+      "Will zapping the 'ebony wand' (f) cause a visible effect on the map, such as a bolt or ray?"
+    ],
+    "selected_question_index": 22,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 16,
+    "cumulative_questions": 135,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 26,
+    "new_questions": [
+      "After selecting 'f' for the ebony wand from the \"What do you want to zap?\" prompt, will the wand's description in the inventory change, indicating it has been identified?",
+      "Will zapping the 'ebony wand' cause the agent to take any form of damage (e.g., HP reduction) or status effects?",
+      "Will zapping the 'ebony wand' (f) produce a visible effect on the map (e.g., a bolt, ray, or cloud)?",
+      "Will zapping the 'ebony wand' (f) result in a specific message detailing its effect, beyond a simple identification message or \"Nothing happens.\"?",
+      "If the 'ebony wand' (f) is zapped, will it be removed from the agent's inventory?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 17,
+    "cumulative_questions": 140,
+    "episode_idx": 2,
+    "experiment_plan": "Provide a directional input (e.g., 'east') to the \"In what direction?\" prompt. Observe if the ebony wand's charges change in the inventory (e.g., from (0:?) to (0:?-1)) in the next auxiliary observation, to confirm charge consumption.",
+    "global_step": 27,
+    "new_questions": [
+      "Will providing a valid direction to the \"In what direction?\" prompt for the ebony wand (f) cause a visible change on the map (e.g., a bolt, beam, or blast)?",
+      "Will zapping the unidentified 'ebony wand' (f) by providing a directional input immediately identify it (i.e., change its description in the inventory)?",
+      "Will zapping the unidentified 'ebony wand' (f) have an immediate, negative effect on the agent's HP or stats?",
+      "Will zapping the uncursed 'ebony wand' (f) consume one charge upon successfully providing a directional input?",
+      "Will the message \"Nothing happens\" appear if the ebony wand has no visible effect, after providing a directional input?"
+    ],
+    "selected_question_index": 23,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 18,
+    "cumulative_questions": 145,
+    "episode_idx": 2,
+    "experiment_plan": "Move the agent one step east onto the solidified lava tile to observe if the agent can move onto it, and if it has any immediate effects or messages. This will determine if the solidified lava behaves like a normal floor tile for movement. If accessible, future experiments can test if the...",
+    "global_step": 28,
+    "new_questions": [
+      "Can the agent move onto the solidified lava tile?",
+      "Will the solidified lava revert to liquid lava after a certain number of turns?",
+      "Does zapping any wand, whether identified or not, consistently consume one charge upon the successful execution of the `zap` action (i.e., after providing directional input if prompted)?",
+      "Will zapping the identified 'wand of cold' at a wall or other non-lava environmental feature produce a specific message, or will it result in \"Nothing happens\"?",
+      "Does walking onto the tile where lava has been solidified by a wand of cold cause it to revert to liquid lava?"
+    ],
+    "selected_question_index": 20,
+    "step": 5
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 150,
+    "episode_idx": 2,
+    "experiment_plan": "The agent will move to the stairs at (x=26, y=10) and attempt to go down to check if they are now unblocked and traversable for descent. This will directly answer if the environmental changes (solidified lava) or turn progression reset the blocked status of the stairs.",
+    "global_step": 29,
+    "new_questions": [
+      "Can the agent move onto a map tile that was previously a fountain and is now a floor tile ('.') without taking damage or encountering an obstacle?",
+      "If the agent steps onto a lava tile ('---'), will it take damage?",
+      "Can the wand of cold change a solid wall ('-') into a floor tile ('.')?",
+      "Does the 'wand of cold' in the agent's inventory now show 3 charges remaining (e.g., 'f: a wand of cold (0:3)')?",
+      "Are the stairs at (x=26, y=10) now unblocked and traversable for descent?"
+    ],
+    "selected_question_index": 24,
+    "step": 6
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 155,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 30,
+    "new_questions": [
+      "If the `Stairs descent status` is \"Potentially traversable\", will executing the `down` action always successfully take the agent to the next level?",
+      "Can the wand of cold directly convert a map tile explicitly represented as lava ('---') into a traversable floor tile ('.')?",
+      "Upon using the last charge of a wand, will the wand disappear from the inventory or become a \"broken\" item?",
+      "If the agent zaps the \"wand of cold\" directly at itself, will it cause damage or other negative effects?",
+      "Can the wand of cold affect permanent map features such as walls or doors?"
+    ],
+    "selected_question_index": null,
+    "step": 7
+  },
+  {
+    "cumulative_experiments": 20,
+    "cumulative_questions": 160,
+    "episode_idx": 2,
+    "experiment_plan": "The agent will attempt various actions around the stairs (e.g., waiting, moving around adjacent tiles) to see if any specific message or map change appears that definitively confirms the stairs are traversable for descent, overriding the 'You can't go down here' message. If no such indicator...",
+    "global_step": 31,
+    "new_questions": [
+      "Does the \"Stairs descent status: Potentially traversable\" message from perception_output guarantee that the `down` action will be successful?",
+      "Is there a specific visual or message-based indicator that definitively confirms stairs are traversable for descent, overriding the 'You can't go down here' message?",
+      "Can zapping a wand of cold (f) at a tile occupied by the agent or an enemy cause them damage or apply a status effect?",
+      "Will zapping the wand of cold (f) at a wall segment ('-') convert it into a floor tile ('.')?",
+      "Does the `more` action always display additional information if available, or can it consume a turn without any message being displayed?"
+    ],
+    "selected_question_index": 21,
+    "step": 8
+  },
+  {
+    "cumulative_experiments": 20,
+    "cumulative_questions": 165,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 32,
+    "new_questions": [
+      "Is there a monster on this level whose defeat is required to unblock the stairs?",
+      "Can the 'down' stairs be unblocked by reaching a specific coordinate on the current Dlvl?",
+      "Are there any hidden rooms or passages on Dlvl 1 that can be discovered through exploration *without* using the 'search' action?",
+      "Can the `kick` action be used on doors or other structural map features like walls to open or destroy them?",
+      "Can the `horn` (item e) be `apply`ed or `quaff`ed to produce an environmental effect?"
+    ],
+    "selected_question_index": null,
+    "step": 9
+  },
+  {
+    "cumulative_experiments": 20,
+    "cumulative_questions": 170,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 33,
+    "new_questions": [
+      "If the agent encounters a new type of environmental feature (e.g., a door, a chest, or a monster) while exploring, will attempting to interact with it (e.g., `open`, `kick`, `apply` a tool to it) potentially unblock the stairs?",
+      "Will continuously moving in one direction ultimately lead to encountering a wall, the edge of the map, or wrapping around to another known area?",
+      "Can the `search` command reveal hidden doors or passages on the current dungeon level that might lead to a different path or a trigger for the stairs?",
+      "Is there a specific type of monster or NPC on this level whose defeat or interaction might be a prerequisite for descending the stairs?",
+      "Can the agent permanently alter the map geometry (beyond solidifying lava or converting fountains) by interacting with other environmental features or objects?"
+    ],
+    "selected_question_index": null,
+    "step": 10
+  },
+  {
+    "cumulative_experiments": 20,
+    "cumulative_questions": 175,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 34,
+    "new_questions": [
+      "Does destroying all lava and fountains on the current level automatically unblock the stairs for descent?",
+      "Is it possible to find another set of stairs down on the current level, in addition to the one at (x=26, y=10)?",
+      "Will zapping a wand of cold at a solid wall ('-') or ('|') convert it into a traversable floor tile?",
+      "Does the game environment contain any hidden doors or passages that can be found using the `search` command?",
+      "Will attempting to move into a map tile occupied by a wall character (e.g., '-', '|') always result in the message \"You can't move through there.\" or similar, consuming a turn?"
+    ],
+    "selected_question_index": null,
+    "step": 11
+  },
+  {
+    "cumulative_experiments": 20,
+    "cumulative_questions": 180,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 35,
+    "new_questions": [
+      "Will attempting to `open` a map tile that is a solid wall (and not a door) result in a specific message indicating it's not a door (e.g., \"That's not a door\")?",
+      "Can hidden doors or passages be revealed by using the `search` action?",
+      "When the agent attempts to move into a map tile that is a solid, impassable obstacle (like a wall), will a message explicitly stating the inability to move (e.g., \"You can't go that way\") be displayed?",
+      "Does the `open` action, when successfully applied to an adjacent closed door, consume a turn?",
+      "Can previously hidden items on the ground be revealed on a tile after an environmental obstacle (like lava or a fountain) on that same tile has been removed?"
+    ],
+    "selected_question_index": null,
+    "step": 12
+  },
+  {
+    "cumulative_experiments": 21,
+    "cumulative_questions": 185,
+    "episode_idx": 2,
+    "experiment_plan": "The agent will move adjacent to the door ('d') at (x=36, y=10) and attempt to `open` it. The agent will observe the message for success or failure, and note any changes to the map or inventory.",
+    "global_step": 36,
+    "new_questions": [
+      "Can the agent open the door ('d') located at (x=36, y=10) by using the `open` action while adjacent to it?",
+      "Will using the `kick` action on a door ('d') located at (x=36, y=10) attempt to open it, even if it is locked?",
+      "Is it possible for the solid wall (represented by '|') at (x=37, y=10) to be broken or bypassed by any known means (e.g., using a tool, zap a specific wand, or kick)?",
+      "Will exploring further east (e.g., beyond x=37) lead to the discovery of another staircase or exit point on Dlvl:1, if the current stairs at (26,10) remain blocked?",
+      "Is there an unobserved mechanism or item on the current level necessary to unblock the stairs at (26,10) that is not directly related to environmental changes (like solidifying lava)?"
+    ],
+    "selected_question_index": 20,
+    "step": 13
+  },
+  {
+    "cumulative_experiments": 21,
+    "cumulative_questions": 190,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 37,
+    "new_questions": [
+      "Will an `open` action always be successful in opening a visible door symbol ('d')?",
+      "After successfully opening a door, does the door symbol ('d') on the map change to a floor symbol ('.')?",
+      "Can the agent open a door by simply moving into it, without using the explicit `open` command?",
+      "Is it possible for solid wall tiles ('|' or '-') to be destroyed or altered into traversable floor tiles by any agent action?",
+      "Will using the `search` command ever reveal hidden passages or doors on the current dungeon level?"
+    ],
+    "selected_question_index": null,
+    "step": 14
+  },
+  {
+    "cumulative_experiments": 21,
+    "cumulative_questions": 195,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 38,
+    "new_questions": [
+      "Does the `open` action, when executed while adjacent to a closed door, successfully open the door without requiring a specific direction?",
+      "If the `open` action fails for a door, will the `kick` action (when executed while adjacent to the same door) successfully open it?",
+      "Does applying the horn (e) produce an immediate, visible message or effect in the environment?",
+      "Will moving past the current visible map boundary (e.g., eastwards beyond x=79) reveal new map tiles, or will the map simply scroll, showing more of the *currently known* area?",
+      "Can the agent open a door if there is an item on the same tile as the door or between the agent and the door?"
+    ],
+    "selected_question_index": null,
+    "step": 15
+  },
+  {
+    "cumulative_experiments": 21,
+    "cumulative_questions": 200,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 39,
+    "new_questions": [
+      "Can a door represented by 'd' on the map be locked, requiring an action other than `open`?",
+      "Will attempting to open an adjacent door ('d') always succeed, or can it fail without a specific reason like being locked?",
+      "Once a door represented by 'd' is opened, will it remain permanently open, or can it close automatically or be manually closed by the agent?",
+      "Will opening the visible door at (x=36, y=10) reveal additional unexplored map areas immediately?",
+      "Does the act of opening a door consume a turn?"
+    ],
+    "selected_question_index": null,
+    "step": 16
+  },
+  {
+    "cumulative_experiments": 21,
+    "cumulative_questions": 205,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 40,
+    "new_questions": [
+      "Does attempting to `open` a door that is already open consume a turn?",
+      "Will attempting to `open` a door that is locked result in a specific message indicating it is locked?",
+      "If a door is closed, will a `kick` action reliably open it (assuming it's not locked)?",
+      "Will successfully `open`ing a door reveal the map on the other side of the door, even if the agent does not move into the newly revealed area in the same turn?",
+      "Does the `open` action consume a turn if the agent is not adjacent to a door?"
+    ],
+    "selected_question_index": null,
+    "step": 17
+  },
+  {
+    "cumulative_experiments": 22,
+    "cumulative_questions": 210,
+    "episode_idx": 2,
+    "experiment_plan": "The agent will attempt the action `open` (without a directional argument). It will observe if the game prompts for directional input, confirming whether `open` is a multi-step action similar to `zap`.",
+    "global_step": 41,
+    "new_questions": [
+      "Does the `open` action, when successfully invoked, always prompt for a directional input (e.g., \"In what direction?\") after being selected, similar to the `zap` action?",
+      "Will attempting to `open` a door that is already open (visually represented as 'd' on the map) result in an invalid action or a specific message indicating it's already open?",
+      "If a door is represented as 'd' on the map, is it always open and traversable, or can 'd' represent a closed but unlockable/openable door?",
+      "Does zapping a wand of cold at a fountain ('}') always convert it into a floor tile ('.') without any other discernible visual difference from natural floor tiles?",
+      "Can the character '-' on the map, which often appears as a wall boundary, be changed or interacted with using any known action or item?"
+    ],
+    "selected_question_index": 20,
+    "step": 18
+  },
+  {
+    "cumulative_experiments": 23,
+    "cumulative_questions": 215,
+    "episode_idx": 2,
+    "experiment_plan": "Provide the directional input 'east' in response to the \"In what direction?\" prompt. Observe if this successfully opens the door at (x=36, y=10) and whether the 'd' character changes to a '.' on the map.",
+    "global_step": 42,
+    "new_questions": [
+      "Will providing the 'east' directional input after the `open` command successfully open the door at (x=36, y=10)?",
+      "If the `open` action successfully opens the door, will the 'd' character on the map at (x=36, y=10) change to a '.' character, indicating an open and traversable tile?",
+      "If the door is successfully opened, will the `open` action consume a turn?",
+      "If the door is successfully opened, will the agent be able to move onto the tile (x=36, y=10) in the next turn?",
+      "Can a closed door, represented by 'd' on the map, be a 'locked' door that would require a different action (e.g., `force`) to open, even after attempting the `open` action?"
+    ],
+    "selected_question_index": 20,
+    "step": 19
+  },
+  {
+    "cumulative_experiments": 24,
+    "cumulative_questions": 220,
+    "episode_idx": 2,
+    "experiment_plan": "From the current position at (x=35, y=10), attempt to `kick east` to see if the 'd' symbol at (x=36, y=10) can be affected or opened this way. Observe the game's message and any map changes.",
+    "global_step": 43,
+    "new_questions": [
+      "Does the message \"You see no door there\" imply that the map symbol 'd' at (x=36, y=10) is not considered a door by the game mechanics (i.e., it cannot be opened by any means)?",
+      "Can the 'd' symbol at (x=36, y=10) be opened using the `kick` action?",
+      "Can the 'd' symbol at (x=36, y=10) be opened using the `force` action?",
+      "Will attempting to use the `close` action on the 'd' symbol at (x=36, y=10) also result in a \"You see no door there\" message?",
+      "Does the message \"You see no door there\" indicate that all 'd' symbols on Dlvl:1 are impassable using the `open` command?"
+    ],
+    "selected_question_index": 21,
+    "step": 20
+  },
+  {
+    "cumulative_experiments": 25,
+    "cumulative_questions": 225,
+    "episode_idx": 2,
+    "experiment_plan": "From the current position at (x=35, y=10), attempt the `force` action without a direction to see if it prompts for a directional input. If it does, then provide 'east' as input in the subsequent turn to attempt to open the 'd' symbol. Observe the game's messages and any map changes.",
+    "global_step": 44,
+    "new_questions": [
+      "Can the 'd' symbol at (x=36, y=10) be opened using the `force` action?",
+      "Will `force` on a tile that is not a 'd' symbol result in the same \"You see no door there.\" message?",
+      "Does the `force` action, after being selected, prompt for a directional input (e.g., \"In what direction?\") similar to `open` and `zap`?",
+      "Does the `pickup` action without arguments collect all items that are on the agent's current tile, even if they are listed as \"Monster or item on floor\" or other general descriptions in the perception output?",
+      "Can the agent move through a 'd' symbol if it can't be opened, kicked, or forced?"
+    ],
+    "selected_question_index": 20,
+    "step": 21
+  },
+  {
+    "cumulative_experiments": 26,
+    "cumulative_questions": 230,
+    "episode_idx": 2,
+    "experiment_plan": "Move away from the current 'd' symbol and search for another 'd' symbol on the map. Upon finding another 'd' symbol, attempt to interact with it using `open` as a two-step action, and if that fails, try `kick` then `force` to see if it behaves differently or yields further clues about 'd' symbols...",
+    "global_step": 45,
+    "new_questions": [
+      "Does the `open` action *ever* successfully open a 'd' symbol (door) on the map?",
+      "Can the agent initiate combat and attack a monster by moving into the same square as the monster?",
+      "Does the `search` action reveal hidden doors or passages in the environment?",
+      "Will using the `eat` action with the uncursed food ration (`d`) increase the agent's HP or provide other benefits?",
+      "Are all 'd' symbols found on the map impassable and immune to opening attempts by `open`, `kick`, or `force` actions, implying they are not functionally doors?"
+    ],
+    "selected_question_index": 24,
+    "step": 22
+  },
+  {
+    "cumulative_experiments": 26,
+    "cumulative_questions": 235,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 46,
+    "new_questions": [
+      "If the `force` action is unsuccessful in its primary intent (e.g., \"You decide not to force the issue.\"), does it always trigger a combat encounter or other negative side effect if a monster is present nearby but not visible?",
+      "Can the `search` action reveal hidden doors or passages when applied to a non-functional 'd' symbol like the one at (x=36, y=10)?",
+      "Will the `wait` action also trigger HP regeneration, similar to a movement action?",
+      "Is the 'd' symbol at (x=36, y=10) a permanent, unpassable barrier, or is there another action (beyond `open`, `kick`, or `force`) that can alter its state or allow passage?",
+      "Does zapping the `wand of cold` at an unopenable 'd' symbol (e.g., at x=36, y=10) convert it into a traversable floor tile?"
+    ],
+    "selected_question_index": null,
+    "step": 23
+  },
+  {
+    "cumulative_experiments": 26,
+    "cumulative_questions": 240,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 47,
+    "new_questions": [
+      "Can another 'd' symbol on the map (like the one at x=14, y=22) be opened using `open`, `kick`, or `force`?",
+      "Will monsters always appear on the map when they are adjacent to the agent, even if they have not yet attacked?",
+      "Does HP regenerate if the agent makes a move while a monster is actively in combat with the agent (e.g., within attack range)?",
+      "Can the `search` action reveal a hidden passage or door in the vicinity of a 'd' symbol which has been unresponsive to `open`, `kick`, or `force`?",
+      "Does the \"You decide not to force the issue\" message from the `force` command always imply that the targeted object is not forceable, even if there are other side effects like a monster attack?"
+    ],
+    "selected_question_index": null,
+    "step": 24
+  },
+  {
+    "cumulative_experiments": 26,
+    "cumulative_questions": 245,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 48,
+    "new_questions": [
+      "Does the 'd' symbol at (x=14, y=22) represent a closed door that can be opened using the `open` action, followed by a directional input?",
+      "Do monsters only appear on the map or become explicitly named in messages after they have initiated combat or interacted with the agent?",
+      "Is it possible to interact with a 'fountain' tile (denoted by '}') using the `quaff` action?",
+      "Does the agent's HP regenerate by 1 for every single turn consumed, regardless of the action taken (e.g., waiting, moving)?",
+      "Can a 'd' symbol representing a non-functional door (as at x=36, y=10) change its state or become functional later in the game?"
+    ],
+    "selected_question_index": null,
+    "step": 25
+  },
+  {
+    "cumulative_experiments": 26,
+    "cumulative_questions": 250,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 49,
+    "new_questions": [
+      "Does zapping the `wand of cold` at an adjacent `fountain` tile (represented by '}') always convert that specific tile into a traversable `floor` tile ('.')?",
+      "Will consuming an `uncursed food ration` restore the agent's health?",
+      "Is it possible for a 'd' symbol on the map to represent a functional door that can be opened using the `open` command, even if other 'd' symbols on the same map are not?",
+      "Does attempting to `force` a 'd' symbol always risk initiating combat with a monster, regardless of whether the 'd' symbol is functionally a door?",
+      "Can a monster be within the map's visible area but not be explicitly mentioned in the `perception_output`'s `Specific monsters mentioned` section until it engages in combat or takes another specific action?"
+    ],
+    "selected_question_index": null,
+    "step": 26
+  },
+  {
+    "cumulative_experiments": 27,
+    "cumulative_questions": 255,
+    "episode_idx": 2,
+    "experiment_plan": "Next turn, the agent will move east to attempt to disengage from the newt and jackal. If successful, the agent will move back west into the square where the combat was initiated, and observe whether the \"You miss the newt. The jackal bites!\" message repeats, or if only one monster is present, or if...",
+    "global_step": 50,
+    "new_questions": [
+      "Does attempting to move into a square occupied by a monster always result in an attack action against that monster?",
+      "Does the agent's HP regenerate by 1 after *every* successful movement action, assuming HP is not full?",
+      "Can a 'd' symbol that cannot be opened with `open`, `kick`, or `force` actions be a purely cosmetic map feature that serves no traversable purpose?",
+      "When a movement action is reinterpreted as an attack action due to a monster occupying the target square, does the agent always target the monster in the direction of the attempted movement?",
+      "Can two different monsters (e.g., a \"newt\" and a \"jackal\") occupy adjacent squares and simultaneously participate in combat messages from a single agent action?"
+    ],
+    "selected_question_index": 24,
+    "step": 27
+  },
+  {
+    "cumulative_experiments": 27,
+    "cumulative_questions": 260,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 51,
+    "new_questions": [
+      "Does HP regenerate after defeating a monster if the agent remains in the same spot, without moving?",
+      "Can the `wand of cold` be used to attack hostile monsters, in addition to changing environmental features?",
+      "Do all fountains, regardless of position, convert to floor tiles when zapped with the `wand of cold`?",
+      "If combat continues for multiple turns, does HP continue to regenerate between rounds, or only after the combat ceases and movement occurs?",
+      "Does a newt (or any other monster) have a specific attack pattern or damage range that can be identified through repeated combat encounters?"
+    ],
+    "selected_question_index": null,
+    "step": 28
+  },
+  {
+    "cumulative_experiments": 28,
+    "cumulative_questions": 265,
+    "episode_idx": 2,
+    "experiment_plan": "The agent will execute the `pickup` action without a direction to see if it picks up the food item left by the newt. This will address whether `pickup` works without a direction and potentially clears the square.",
+    "global_step": 52,
+    "new_questions": [
+      "Can the `pickup` action be used to pick up items from the agent's current location without specifying a direction?",
+      "If multiple items are on the same floor tile, will `pickup` attempt to pick up all of them, or only one specific item?",
+      "Does quaffing from a fountain have a positive or negative effect on the agent's status (e.g., HP, stats, inventory)?",
+      "Does an automatically spawned monster (like the jackal in the corridor) pursue the agent indefinitely through multiple rooms or only within a certain range?",
+      "Does the `open` command, when applied to a valid door, always succeed on the first attempt (assuming no monsters block the way)?"
+    ],
+    "selected_question_index": 20,
+    "step": 29
+  },
+  {
+    "cumulative_experiments": 28,
+    "cumulative_questions": 270,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 53,
+    "new_questions": [
+      "Does the `pickup` action successfully add items from the ground to the agent's inventory?",
+      "Does the `pickup` action consume a turn when there are no items on the ground?",
+      "Does eating a food ration restore a fixed amount of HP?",
+      "Does eating a food ration fully restore the agent's HP?",
+      "Does the `eat` action consume a turn?"
+    ],
+    "selected_question_index": null,
+    "step": 30
+  },
+  {
+    "cumulative_experiments": 29,
+    "cumulative_questions": 275,
+    "episode_idx": 2,
+    "experiment_plan": "To evaluate if all failed actions consume a turn, the agent will attempt to `close` a non-existent door. The outcome should indicate \"You see no door there,\" and we will observe if a turn is consumed.",
+    "global_step": 54,
+    "new_questions": [
+      "If the agent's inventory is full, will items dropped by a defeated monster still be automatically added to the inventory, or will they remain on the ground?",
+      "Does HP regeneration only occur when the agent performs a movement action, not when performing other actions like 'pickup'?",
+      "Do all failed actions, even those with explicit messages like \"There is nothing here to pick up.\", consume a turn?",
+      "Does zapping a fountain with the `wand of cold` always consume the wand's charge, even if the fountain cannot be changed (e.g., if it's already a floor tile)?",
+      "Can the agent consume a food ration at any time, even if not starving, to restore HP?"
+    ],
+    "selected_question_index": 22,
+    "step": 31
+  },
+  {
+    "cumulative_experiments": 29,
+    "cumulative_questions": 280,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 55,
+    "new_questions": [
+      "Does attempting to `close` an already closed door consume a turn?",
+      "Does attempting to `close` an already closed door result in a specific message indicating it was already closed?",
+      "Does using the `wait` action always cause HP to regenerate if HP is not at maximum?",
+      "Does eating a food ration (using `eat`) immediately restore the agent's HP?",
+      "Does the `open` action, when used on a visually identified closed door ('d' symbol, not a '+' symbol), always succeed in opening it and allowing passage without further interaction (e.g. combat initiation)?"
+    ],
+    "selected_question_index": null,
+    "step": 32
+  },
+  {
+    "cumulative_experiments": 30,
+    "cumulative_questions": 285,
+    "episode_idx": 2,
+    "experiment_plan": "Execute the `wait` action and observe if \"Turn_consumption_status: True\" appears in the perception output, confirming a turn was consumed. Simultaneously track HP changes to see if it triggers regeneration (Q24).",
+    "global_step": 56,
+    "new_questions": [
+      "Does the `close` action, when initiated, prompt the agent for a direction?",
+      "Does an attempt to `close` a 'd' symbol that is not an operable door consume a turn?",
+      "Does the `wait` action always consume a turn?",
+      "Does the `wait` action reliably trigger HP regeneration when the agent is below maximum HP?",
+      "Will zapping a `fountain` with the `wand of cold` turn the `fountain` into a `floor` tile?"
+    ],
+    "selected_question_index": 22,
+    "step": 33
+  },
+  {
+    "cumulative_experiments": 30,
+    "cumulative_questions": 290,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 57,
+    "new_questions": [
+      "Can monsters attack the agent when the agent performs a `wait` action?",
+      "Do monsters appear on the map only when they make an action, or can they be present but unseen until they engage in combat?",
+      "Will the `open` action, if successful, reveal any monsters on the other side of the door?",
+      "Does being attacked by a monster during a `wait` action prevent HP regeneration that would otherwise have occurred?",
+      "If the agent is attacked by a monster and does not move or attack, does the monster continue to attack on subsequent turns?"
+    ],
+    "selected_question_index": null,
+    "step": 34
+  },
+  {
+    "cumulative_experiments": 31,
+    "cumulative_questions": 295,
+    "episode_idx": 2,
+    "experiment_plan": "Attempt the `open` action without specifying a direction to observe the game's response. If the game prompts for a direction, provide the direction `east` to attempt opening the door at (x=30, y=10).",
+    "global_step": 58,
+    "new_questions": [
+      "Does the `open` action require a subsequent directional input to specify which door to open?",
+      "Can the `apply` action be used with a `wand of cold` to activate its effect?",
+      "Does the `zap` action require selecting a wand from the inventory before specifying a direction?",
+      "When a monster (like the jackal in step 56) attacks an agent, is the attacking monster's symbol always visually present on the map in an adjacent square to the agent?",
+      "Can the agent's HP regenerate when the agent moves successfully to an adjacent square and no combat occurs?"
+    ],
+    "selected_question_index": 20,
+    "step": 35
+  },
+  {
+    "cumulative_experiments": 31,
+    "cumulative_questions": 300,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 59,
+    "new_questions": [
+      "Does killing a monster always result in an item either being automatically added to inventory or appearing on the ground at the defeated monster's square?",
+      "Does an adjacent map tile marked with '.' (representing floor) always indicate that the tile is empty (i.e., contains no monster)?",
+      "Does the `eat` action consume one turn?",
+      "Does using the `eat` action always restore HP even if not fully to max HP?",
+      "Does the `open` action always prompt for a direction as a second step, or can it sometimes be a single-step action when directly adjacent to a door?"
+    ],
+    "selected_question_index": null,
+    "step": 36
+  },
+  {
+    "cumulative_experiments": 31,
+    "cumulative_questions": 305,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 60,
+    "new_questions": [
+      "Does consuming a food ration always restore hit points?",
+      "Does consuming a food ration restore hit points to their maximum value?",
+      "Does selecting an item from the `What do you want to eat?` prompt consume an additional turn after the initial `eat` command?",
+      "Does the environment provide a message indicating the amount of HP restored when eating a food ration?",
+      "Can consuming an uncursed food ration have any negative side effects?"
+    ],
+    "selected_question_index": null,
+    "step": 37
+  },
+  {
+    "cumulative_experiments": 31,
+    "cumulative_questions": 310,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 61,
+    "new_questions": [
+      "Does having the \"Satiated\" status guarantee HP regeneration on the next turn if HP is not full?",
+      "If a map tile displays a '.' (floor symbol), and that tile is known to contain a door, can the `open` action be successfully applied to that direction?",
+      "Does attempting to `open` a direction that corresponds to an empty floor tile consume a turn?",
+      "Does interacting with a fountain (e.g., by moving onto its square, or using an action like `apply` or `quaff`) always consume a turn?",
+      "If a monster is killed on a map tile that also visually displays a door symbol (e.g., '-'), does the door symbol remain visible on the map after the monster is defeated?"
+    ],
+    "selected_question_index": null,
+    "step": 38
+  },
+  {
+    "cumulative_experiments": 31,
+    "cumulative_questions": 315,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 62,
+    "new_questions": [
+      "Does providing a valid direction to the \"In what direction?\" prompt consume a turn?",
+      "Will attempting to `open` a direction where there is no door (e.g., an open passage or a wall) result in a specific failure message?",
+      "If an `open [direction]` command is successful, does it automatically move the agent into the newly opened space?",
+      "Has the agent's current position (x=29, y=10) changed since the last reliable location in step 59, despite no movement action being taken?",
+      "Will attempting to `open` a door that is already open result in a specific failure message?"
+    ],
+    "selected_question_index": null,
+    "step": 39
+  },
+  {
+    "cumulative_experiments": 32,
+    "cumulative_questions": 320,
+    "episode_idx": 2,
+    "experiment_plan": "Attempt to `apply` a tool to the adjacent fountain to test interaction possibilities. If that fails, consider `kick`ing the fountain to see its behavior.",
+    "global_step": 63,
+    "new_questions": [
+      "Does the message \"You see no door there.\" always imply that the `open` action will fail for that direction, regardless of the map symbol present (e.g., '-', '|', '+')?",
+      "Is it possible to interact with fountain symbols ('}') using an action other than 'eat'?",
+      "If an `open` action fails with the message \"You see no door there.\", does it consume an additional turn if the agent provided a direction to the prompt?",
+      "Does the presence of a 'd' symbol on the map (like at x=14, y=22) always indicate a functional door that can be opened?",
+      "Can a character symbol like 'd' change its meaning dynamically (e.g., sometimes a monster, sometimes a door)?"
+    ],
+    "selected_question_index": 21,
+    "step": 40
+  },
+  {
+    "cumulative_experiments": 32,
+    "cumulative_questions": 325,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 64,
+    "new_questions": [
+      "Does applying an item that has no effect consume the item?",
+      "If an item is 'applied' and no specific target is provided, does the environment implicitly select the agent's current location or an adjacent object as the target?",
+      "Does attempting to `apply` a tool to an object that cannot be interacted with by that tool (e.g., a horn to a fountain) result in a \"You see no _____ there\" type of message?",
+      "Does successfully applying an item, specifically to a fountain, always consume a turn?",
+      "Can a \"fountain\" symbol '}' on the map be interacted with using the `apply` action?"
+    ],
+    "selected_question_index": null,
+    "step": 41
+  },
+  {
+    "cumulative_experiments": 32,
+    "cumulative_questions": 330,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 65,
+    "new_questions": [
+      "If the agent responds 'y' to the \"Improvise? [ynq] (q)\" prompt, will the applied item (the horn in this case) be consumed?",
+      "If the agent responds 'q' to the \"Improvise? [ynq] (q)\" prompt, will the `apply` action be cancelled without consuming a turn for the 'q' input?",
+      "Does responding 'y' to \"Improvise?\" imply that the action of applying the horn could have a non-standard or unexpected effect?",
+      "Does the `apply` action, when followed by an \"Improvise?\" prompt, immediately target an adjacent object (like a fountain) or will it require a direction if 'y' is chosen?",
+      "Does the `kick` action result in feedback about its efficacy when used on environmental features like fountains?"
+    ],
+    "selected_question_index": null,
+    "step": 42
+  },
+  {
+    "cumulative_experiments": 32,
+    "cumulative_questions": 335,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 66,
+    "new_questions": [
+      "Does providing a direction to the \"In what direction?\" prompt after responding 'y' to \"Improvise? [ynq] (q)\" consume an additional turn?",
+      "If the agent attempts to \"improvise\" a horn in the direction of an adjacent fountain, will it result in a specific message confirming interaction with the fountain (e.g., \"The fountain gurgles...\")?",
+      "If the agent attempts to \"improvise\" a horn in the direction of an adjacent fountain and the action is successful, will the horn be consumed from the inventory?",
+      "If the agent attempts to \"improvise\" a horn in a direction where there is no interactive object (e.g., an empty floor tile), will there be a specific failure message like \"You can't do that there\"?",
+      "Does the act of improvising a horn in any valid direction have a chance to affect the agent's well-being (e.g., bless/curse, HP change)?"
+    ],
+    "selected_question_index": null,
+    "step": 43
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 340,
+    "episode_idx": 2,
+    "experiment_plan": "Apply the wand of cold (item 'f') to the remaining adjacent lava pool (at x=30, y=11). Observe if it solidifies the lava and if the wand loses a charge.",
+    "global_step": 67,
+    "new_questions": [
+      "Can the \"wand of cold\" (item 'f') be used to solidify the remaining lava pools (represented by '}')?",
+      "Will using the \"wand of cold\" (item 'f') to solidify lava consume a charge from the wand?",
+      "Does the newly transformed \"frost horn\" (item 'e') have a limited number of uses (charges)?",
+      "Will moving onto the newly solidified lava tile (at 30,9) have any adverse effects on the agent?",
+      "Was the \"bolt of cold bounces!\" message a result of the improvised use of the horn, or is it a general effect when applying cold to lava?"
+    ],
+    "selected_question_index": 20,
+    "step": 44
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 345,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 68,
+    "new_questions": [
+      "After transforming into a frost horn, does the item 'e' (frost horn) have a limited number of uses for its cold effect?",
+      "Will applying the 'wand of cold' (f) to '}' (lava) also cause the lava to solidify?",
+      "Upon successful application of a cold effect to lava, does the 'wand of cold' (f) lose charges?",
+      "If '}' represents lava in the currently visible area, does it consistently represent lava throughout the rest of this dungeon level?",
+      "If a solidified lava tile ('.') is targeted with a cold effect (e.g., from the frost horn or wand of cold), will there be any discernible environmental message or effect?"
+    ],
+    "selected_question_index": null,
+    "step": 45
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 350,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 69,
+    "new_questions": [
+      "Does responding 'n' to the \"Are you really sure you want to break your wand of cold? [yn] (n)\" prompt still allow the wand to be used for its intended purpose (e.g., casting a cold spell)?",
+      "If the wand of cold is used successfully without breaking it, will it consume a charge?",
+      "Can the 'frost horn' be used multiple times to solidify lava, or was its \"cold\" property a one-time effect from its transformation?",
+      "Does the map character 'd' still represent a potential monster or door in the current state, or has its interpretation been clarified by recent events or map updates?",
+      "Does the message \"The bolt of cold bounces!\" indicate the end of the action, or is there a further prompt expected, such as \"In what direction?\" for the wand?"
+    ],
+    "selected_question_index": null,
+    "step": 46
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 355,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 70,
+    "new_questions": [
+      "If an agent selected a wand to 'apply' and then declines to break it, will the interaction proceed to a directional prompt (e.g., \"In what direction?\") to use the wand's effect without breaking it?",
+      "If the agent successfully solidifies a lava tile (e.g., character '}'), does that tile visibly change on the map to a floor tile (e.g., character '.')?",
+      "Can the newly acquired 'frost horn' be applied directly to a lava tile without first being prompted with \"Improvise? [ynq]\"?",
+      "Does the \"bolt of cold bounces!\" message imply that an applied cold effect can potentially affect multiple tiles or reflect off the target?",
+      "If there are multiple '}' symbols on the map, do they all represent lava that can be solidified by cold effects, or could some be other features (e.g., non-interactable decorations)?"
+    ],
+    "selected_question_index": null,
+    "step": 47
+  },
+  {
+    "cumulative_experiments": 34,
+    "cumulative_questions": 360,
+    "episode_idx": 3,
+    "experiment_plan": "Move one step east to be adjacent to the lava at (25,9), (25,10), (25,11), (26,9), (26,11). Then, `apply` item 'j' (a horn) in the direction of the adjacent lava, specifically to the north or west of the agent, and observe if it transforms into a frost horn and solidifies the lava.",
+    "global_step": 71,
+    "new_questions": [
+      "Will `j - a horn` transform into a frost horn if applied to lava ('}')?",
+      "Will `k - a platinum wand` prompt about breaking it when first selected for application?",
+      "Is it possible to take damage from molten lava ('}') if the agent is two tiles away from it?",
+      "If the `horn` is applied in a direction that does not contain lava, will it result in an \"Improvise?\" prompt?",
+      "Is it always safe to descend stairs (`<`) when the agent is standing on them, provided no monsters are adjacent?"
+    ],
+    "selected_question_index": 20,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 34,
+    "cumulative_questions": 365,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 72,
+    "new_questions": [
+      "If 'y' is selected for the \"Are you really sure you want to break your [wand]?\" prompt, will the wand break and its primary effect be triggered?",
+      "Will applying the 'horn' (item 'j') to molten lava (character '}') transform it into a 'frost horn'?",
+      "If the agent is on a floor tile ('.') directly adjacent (non-diagonally) to a molten lava tile ('}'), will the agent take damage from the lava?",
+      "Will applying the 'platinum wand' (item 'k') prompt \"Are you really sure you want to break your [wand]?\", similar to the 'wand of cold'?",
+      "Can the agent use the `apply` action with the pick-axe (item 'e') to modify the environment (e.g., dig away a wall)?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 34,
+    "cumulative_questions": 370,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 73,
+    "new_questions": [
+      "Does responding 'q' to the \"Improvise? [ynq] (q)\" prompt consume a turn?",
+      "Does responding 'y' to \"Improvise? [ynq] (q)\" and then providing a direction where there is no interactable object cause the apply action to entirely fail its intended effect with no further prompts?",
+      "Does the \"Improvise? [ynq] (q)\" prompt appear for every item selected with the 'apply' action, regardless of the item's inherent properties?",
+      "Will applying the 'platinum wand' (item 'k') result in an \"Improvise? [ynq] (q)\" prompt?",
+      "If an improvisation is initiated (by responding 'y' to \"Improvise?\") and then a direction is given, does the agent receive a specific message if no interaction occurs in that direction (e.g., \"Nothing happens\")?"
+    ],
+    "selected_question_index": null,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 34,
+    "cumulative_questions": 375,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 74,
+    "new_questions": [
+      "If the agent applies the horn towards the `west` (from (26,10) to (25,10)) and there are lava tiles at (25,9), (25,10), and (25,11), will more than one lava tile solidify?",
+      "Will the 'horn' transform into a 'frost horn' upon any successful improvisation, or only specifically when successfully interacting with a cold-reactive environmental element like lava?",
+      "If the agent applies the horn in a direction that does not contain a lava tile, will it still produce the \"The bolt of cold bounces!\" message?",
+      "If the agent applies the 'platinum wand' (item 'k') through the 'Improvise?' prompt towards a lava tile, will the game then ask \"Are you really sure you want to break your [item]?\" before attempting to produce an effect?",
+      "When applying the horn to lava, is the message \"The bolt of cold bounces!\" always preceded by a message indicating a physical change to the environment (e.g., \"The lava cools and solidifies.\")?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 35,
+    "cumulative_questions": 380,
+    "episode_idx": 4,
+    "experiment_plan": "From the current position at (26,10), move two steps east to (28,10). Then, apply the horn (item 'h') towards the lava at (28,9) to assess if two steps of distance are sufficient to avoid damage from the bolt of cold while still modifying the environment.",
+    "global_step": 75,
+    "new_questions": [
+      "Does zapping a wand of cold (or any wand) always require a directional input?",
+      "Is there a safe distance (e.g., more than one tile away) from lava when applying a cold effect to avoid damage from the resulting \"bolt of cold\"?",
+      "Does casting a spell (assuming 'P' for power) (if available to the new class) require a directional input?",
+      "Does the oak wand (item 'i') change into a \"wand of cold\" if zapped at lava?",
+      "Does the new character class, Tenderfoot, possess any innate resistance or vulnerability to cold damage compared to previous classes?"
+    ],
+    "selected_question_index": 21,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 35,
+    "cumulative_questions": 385,
+    "episode_idx": 4,
+    "experiment_plan": null,
+    "global_step": 76,
+    "new_questions": [
+      "Does dying and respawning always place the agent at map coordinate (26,10)?",
+      "Is the initial inventory received upon respawning determined solely by the newly assigned character class?",
+      "Does the \"bolt of cold\" generated by applying a cold effect to lava have an effective range greater than one tile (i.e., can it hit the agent from two or more tiles away)?",
+      "Does the `open` action succeed on all map symbols represented as 'd' that the game intends to be openable doors?",
+      "Does the act of wearing an item, such as a 'cloak of displacement', provide any explicit, visible status message or indicator to the agent upon equipping it beyond the inventory change?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 35,
+    "cumulative_questions": 390,
+    "episode_idx": 4,
+    "experiment_plan": null,
+    "global_step": 77,
+    "new_questions": [
+      "Does an enemy's attack consume one turn for the agent, even if the attack misses the agent?",
+      "If the agent attempts to `apply` the `oak wand` (item 'i'), will the game prompt \"Improvise?\" before asking for a direction?",
+      "If the agent attempts to move onto an adjacent tile occupied by a hostile entity, will it automatically perform a melee attack with its currently wielded weapon?",
+      "Can wall symbols (e.g., `|` or `-`) on the map be permanently altered or damaged by applying the horn (which generates a cold effect) towards them?",
+      "When an `open` action successfully opens a door represented by 'd' or '+' on the map, will the map symbol at that location visibly change (e.g., from 'd' to '.') to reflect the opened state?"
+    ],
+    "selected_question_index": null,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 35,
+    "cumulative_questions": 395,
+    "episode_idx": 4,
+    "experiment_plan": null,
+    "global_step": 78,
+    "new_questions": [
+      "Does attempting to move onto a door ('d' or '+') without first explicitly opening it result in a specific message indicating the door is blocking the path?",
+      "Does an 'open' action on a door ('d' or '+') consume a turn, even if the door cannot be opened (e.g., if there's no door at the specified location)?",
+      "If the agent is standing at (27,10) and there is a door at (28,10) and lava at (28,9), will applying the horn to the northeast direction target the lava at (28,9)?",
+      "Does successfully opening a door ('d' or '+') change its map representation?",
+      "If the agent attempts to `open` a door at an invalid coordinate (e.g., a wall), will the game provide feedback indicating that there is no door there?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  }
+]

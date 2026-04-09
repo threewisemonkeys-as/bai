@@ -767,24 +767,22 @@ async def _qa_forward_batch(
         question_blocks.append(f"Q{i}: {qa.question}")
     questions_text = "\n".join(question_blocks)
 
-    response_format = "\n".join(
-        f"<Q{i}>\n<reasoning>Your step-by-step reasoning based on your knowledge</reasoning>\n"
-        f"<answer>YES or NO</answer>\n</Q{i}>"
-        for i in range(1, len(qa_pairs) + 1)
-    )
+    prompt = f"""You are an agent that has been interacting with an environment. Based on your current beliefs, answer each question below with YES or NO.
 
-    prompt = f"""You are an agent that has been interacting with an environment. Based on your current knowledge, answer each question below with YES or NO.
+=== CURRENT BELIEFS ===
+{beliefs if beliefs else "(empty - no beliefs yet)"}
+=== END CURRENT BELIEFS ===
 
-=== YOUR KNOWLEDGE ===
-{beliefs if beliefs else "(empty - no knowledge yet)"}
-=== END YOUR KNOWLEDGE ===
-
-For each question, reason step-by-step about what your knowledge says (or doesn't say), then give your answer.
+For each question, reason step-by-step about what your belief says (or doesn't say), then give your answer.
 
 {questions_text}
 
-For each question, respond in this format:
-{response_format}"""
+For each question Qn, respond in this format:
+<Qn>
+<reasoning>Your step-by-step reasoning based on your knowledge</reasoning>
+<answer>YES or NO</answer>
+</Qn>
+"""
 
     text, cost = await _llm_call(config, prompt)
 
@@ -871,12 +869,6 @@ async def _qa_feedback_batch(
         )
     items_text = "\n\n".join(item_blocks)
 
-    response_format = "\n".join(
-        f"<F{i}>\n<verdict>CORRECT or INCORRECT or INCONCLUSIVE</verdict>\n"
-        f"<feedback>Explanation of what the agent's knowledge got right or wrong</feedback>\n</F{i}>"
-        for i in range(1, len(qa_forward_results) + 1)
-    )
-
     prompt = f"""You are evaluating whether an agent's predicted answers to questions about an environment are correct.
 
 For each question below, you are given:
@@ -893,8 +885,11 @@ For INCORRECT predictions, explain what knowledge the agent was missing or had w
 
 {items_text}
 
-For each question, respond in this format:
-{response_format}"""
+For each question Qn, respond with feedback Fn in this format:
+<Fn>
+<verdict>CORRECT or INCORRECT or INCONCLUSIVE</verdict>
+<feedback>Explanation of what the agent's knowledge got right or wrong</feedback>
+</Fn>"""
 
     text, cost = await _llm_call(config, prompt)
 
@@ -994,15 +989,13 @@ The agent receives the following default instructions/knowledge:
 {perception if perception else "(empty - no perception module yet)"}
 === END CURRENT PERCEPTION MODULE ===
 {execution_report_section}
+
 We tested the agent's understanding by asking it factual questions about the environment.
 The agent answered based only on its current world knowledge.
 
 Results: {num_correct} correct, {num_incorrect} incorrect out of {len(qa_feedback_results)} evaluated.
 
 {qa_text}
-
-Recent episode summaries for additional context:
-{episode_summaries}
 
 Your task: Based on the QA feedback, improve the agent's world knowledge, policy, and perception module.
 

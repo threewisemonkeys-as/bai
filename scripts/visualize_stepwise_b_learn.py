@@ -122,7 +122,7 @@ def load_log_dir(log_dir):
 
     total_cost = 0
     if summary and "steps" in summary and len(summary["steps"]) > 0:
-        total_cost = summary["steps"][-1].get("cumulative_cost", 0)
+        total_cost = sum(s.get("step_cost", 0) for s in summary["steps"])
 
     return {
         "config": config,

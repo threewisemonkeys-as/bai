@@ -1,0 +1,53 @@
+{
+  "runs": [
+    {
+      "description": "EB Learn with specific goal to get to reach the stairs down",
+      "episodes": 6,
+      "exported_at": "2026-04-09T16:42:27.042175+00:00",
+      "id": "apr8-eb-learn-goal-directed-r2",
+      "log_dir_name": "2026-04-08_16-48-43_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn",
+      "path": "apr8-eb-learn-goal-directed-r2/",
+      "source_log_dir": "/home/ays57/bai/logs/dev/apr8/2026-04-08_16-48-43_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn",
+      "steps": 74,
+      "title": "EB Learn Goal Directed Run 2",
+      "total_cost": 48.85565209999999
+    },
+    {
+      "description": "EB Learn with specific goal to get to reach the stairs down",
+      "episodes": 6,
+      "exported_at": "2026-04-09T16:42:58.163819+00:00",
+      "id": "apr8-eb-learn-goal-directed-r1",
+      "log_dir_name": "2026-04-08_16-11-32_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn",
+      "path": "apr8-eb-learn-goal-directed-r1/",
+      "source_log_dir": "/home/ays57/bai/logs/dev/apr8/2026-04-08_16-11-32_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn",
+      "steps": 77,
+      "title": "EB Learn Goal Directed Run 1",
+      "total_cost": 68.8597128
+    },
+    {
+      "description": "EB Learn with exploratory goal",
+      "episodes": 6,
+      "exported_at": "2026-04-09T16:44:03.729976+00:00",
+      "id": "apr8-eb-learn-explore-r1",
+      "log_dir_name": "2026-04-08_15-30-56_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn",
+      "path": "apr8-eb-learn-explore-r1/",
+      "source_log_dir": "/home/ays57/bai/logs/dev/apr8/2026-04-08_15-30-56_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn",
+      "steps": 100,
+      "title": "EB Learn Exploratory Goal Run 1",
+      "total_cost": 56.93760340000001
+    },
+    {
+      "description": "EB Learn with exploratory goal",
+      "episodes": 5,
+      "exported_at": "2026-04-09T16:44:26.084986+00:00",
+      "id": "apr8-eb-learn-explore-r2",
+      "log_dir_name": "2026-04-08_15-31-17_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn",
+      "path": "apr8-eb-learn-explore-r2/",
+      "source_log_dir": "/home/ays57/bai/logs/dev/apr8/2026-04-08_15-31-17_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn",
+      "steps": 79,
+      "title": "EB Learn Exploratory Goal Run 2",
+      "total_cost": 52.007660600000015
+    }
+  ],
+  "version": 1
+}

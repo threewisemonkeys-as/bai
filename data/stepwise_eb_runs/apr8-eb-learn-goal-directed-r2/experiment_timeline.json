@@ -1,0 +1,1161 @@
+[
+  {
+    "cumulative_experiments": 1,
+    "cumulative_questions": 5,
+    "episode_idx": 0,
+    "experiment_plan": "Execute the 'far east' command. Observe if the agent moves directly to the end of the visible corridor (x=39, y=10) or stops short.",
+    "global_step": 0,
+    "new_questions": [
+      "Will the kobold (k) attack me if I move one square closer to it?",
+      "Does using the horn attract more monsters to my current location?",
+      "Does the ebony wand have offensive capabilities that can harm the kobold?",
+      "Does the 'open' command always successfully open an adjacent door?",
+      "Will using 'far east' move me to the end of the visible corridor if unobstructed?"
+    ],
+    "selected_question_index": 4,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 2,
+    "cumulative_questions": 10,
+    "episode_idx": 0,
+    "experiment_plan": "From the current position at (29,10), execute 'far south' to see if the agent attempts to navigate the corner in the corridor. Observe the final position and any messages about movement or obstructions.",
+    "global_step": 1,
+    "new_questions": [
+      "Does the kobold (k) actively move towards the agent if the agent stays in its current position?",
+      "Can the agent break down walls using a specific action (e.g., `kick` or `apply`)?",
+      "Does applying the ebony wand have an effect (e.g., spell, light, damage)?",
+      "Will the far movement commands (e.g., `far north`, `far east`) always move the agent until an obstruction, even if a turn is involved in the path?",
+      "Can the agent open or interact with the 'F' symbol shown on the map?"
+    ],
+    "selected_question_index": 8,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 15,
+    "episode_idx": 0,
+    "experiment_plan": "From the current position at (29,13), attempt to use the 'open' command to see if the wall at the current location is interactable as a door. Observe the message to determine if the wall can be opened.",
+    "global_step": 2,
+    "new_questions": [
+      "Can the agent open the wall at (29,13) using the 'open' command?",
+      "If a corridor has multiple bends but continues in the same general direction, will 'far' movement commands allow the agent to navigate all of them until an obstruction?",
+      "Will the kobold (k) move towards and attack the agent if the agent is within its line of sight and stops moving?",
+      "Can the agent interact with or 'loot' the 'F' symbol visible on the map?",
+      "Can the 'open' command be used to open a door that is not directly adjacent to the agent, for example, across a space or lava?"
+    ],
+    "selected_question_index": 11,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 20,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 3,
+    "new_questions": [
+      "Can the wall at (29,13) be opened using the `open south` command?",
+      "Does the `open <direction>` command only work on actual doors, or can it also open certain types of walls?",
+      "Will the kobold (k) attack the agent if the agent is directly adjacent to it?",
+      "Will performing the `loot` action at position (10,8) (where 'F' is located) yield items?",
+      "Do the 'far' movement commands stop exactly one step away from an impassable obstacle (like lava or a solid wall)?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 3,
+    "cumulative_questions": 25,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 4,
+    "new_questions": [
+      "If I enter 'south' now, will the wall at (29,13) open, revealing a path?",
+      "Will moving east from (29,10) (the lava edge) allow me to bypass the lava and continue towards the stairs?",
+      "Can the agent use any of its inventory items (horn or ebony wand) to clear or interact with the lava obstructing its path?",
+      "Is the 'F' symbol on the map representing a feature that can be interacted with to reveal a path or item?",
+      "If the wall at (29,13) cannot be opened, will the `open south` command result in a message indicating failure to open, or a message confirming it's not a door?"
+    ],
+    "selected_question_index": null,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 4,
+    "cumulative_questions": 30,
+    "episode_idx": 0,
+    "experiment_plan": "From the current position (29,13), execute the 'east' movement command. Observe the resulting position and message to determine if the path east is clear or if another obstacle is encountered.",
+    "global_step": 5,
+    "new_questions": [
+      "If I move east from my current position at (29,13), will I encounter a clear path or another obstacle?",
+      "Can I interact with the door/archway symbols (e.g., at (30,10) or (30,11)) by using the `open` command on them?",
+      "If I move to a position adjacent to the lava at (29,10) and then try to move east, will I be able to bypass the lava?",
+      "Will the kobold (k) move towards me if I stand still at my current position (29,13)?",
+      "Does the `kick` action have a chance to destroy the wall at (29,13)?"
+    ],
+    "selected_question_index": 26,
+    "step": 5
+  },
+  {
+    "cumulative_experiments": 5,
+    "cumulative_questions": 35,
+    "episode_idx": 0,
+    "experiment_plan": "From the current position (29,12), execute the 'far east' command. Observe whether the agent navigates around the corner at (29,10) and continues moving east, and where it stops.",
+    "global_step": 6,
+    "new_questions": [
+      "If I move 'far east' from my current position (29,12), will I navigate around the corner at (29,10) and continue moving until another obstruction or until the end of the corridor?",
+      "Will moving 'east' from my current position (29,12) lead me into an open corridor section at (30,12) or will it be blocked by a perceived door/archway?",
+      "If I use `open east` at my current position (29,12), will it open a door at (30,12) assuming it's a door/archway?",
+      "Will the kobold (k) move towards me if I initiate combat or get within a certain range?",
+      "Does the inventory item 'a horn' (e) have a specific effect when used with the 'apply' command?"
+    ],
+    "selected_question_index": 31,
+    "step": 6
+  },
+  {
+    "cumulative_experiments": 5,
+    "cumulative_questions": 40,
+    "episode_idx": 0,
+    "experiment_plan": null,
+    "global_step": 7,
+    "new_questions": [
+      "Does the kobold (k) at (28,11) have a ranged attack, or does it only attack in melee?",
+      "Will using `far east` from my current position (29,11) make me automatically walk around corners or through open archways in the eastward direction until finding an obstruction?",
+      "If I use `open east` at my current location (29,11) and the `---` at (30,11) represents an open archway (not necessarily a physical door), will the command return an error indicating no door to open?",
+      "Can the `kick` action be used to clear or interact with the obstruction represented by the '---' symbols, which might be a door or fragile wall?",
+      "Does the 'F' symbol at (10,8) represent a lootable item or feature that can be picked up with the `pickup` command?"
+    ],
+    "selected_question_index": null,
+    "step": 7
+  },
+  {
+    "cumulative_experiments": 6,
+    "cumulative_questions": 45,
+    "episode_idx": 1,
+    "experiment_plan": "Move one step east from the current position (26,9) to (27,9) and observe if the agent can pass through the '---' symbol without using an 'open' command. This will determine if the '---' symbol functions as an open passage or requires interaction.",
+    "global_step": 8,
+    "new_questions": [
+      "If I move one step east from (26,9), will I be able to walk through the '---' symbol at (27,9) without needing to use an 'open' command?",
+      "Will using the `open` command on the '---' symbol to the east (e.g., `open east` from (26,9) to interact with (27,9)) be successful in creating a traversable path?",
+      "If an adjacent cell appears as '.' (ground), but a different adjacent cell contains molten lava, can I safely move into the '.' cell without taking damage from the lava?",
+      "Does the kobold 'k' at (29,9) have a range of more than one square for its attacks?",
+      "Do the ':' symbols at (27,11) and (28,12) represent lootable items that can be collected using the `pickup` command?"
+    ],
+    "selected_question_index": 40,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 6,
+    "cumulative_questions": 50,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 9,
+    "new_questions": [
+      "Can the agent break down regular walls with the `kick` action?",
+      "Will moving towards the '---' symbol at (30,9) (east from (29,9), assuming the agent can get there) allow the agent to pass through without using `open`?",
+      "Do the ':' symbols on the map represent items that can be picked up using the `pickup` command?",
+      "Will the kobold ('k') actively pursue the agent if it is within its line of sight, even if the agent is not directly adjacent?",
+      "Will the 'far east' command eventually lead the agent through a turn in a corridor if there are no explicit obstacles (like walls or lava) directly blocking the straight 'far' path?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 7,
+    "cumulative_questions": 55,
+    "episode_idx": 1,
+    "experiment_plan": "Move one step south into the '}' symbol from the current position (28,10) to (28,11). Observe if the agent can pass through the '}' symbol without using an 'open' command.",
+    "global_step": 10,
+    "new_questions": [
+      "Can the agent move through the '}' symbol without using a specific command like `open`?",
+      "Can the `search` command reveal hidden doors or passages within normal `.` (ground) tiles?",
+      "Does moving into any '---' symbol on the map always result in successful traversal without needing to use `open`?",
+      "If a path consists only of traversable '---' or '}' symbols, will a 'far' movement command (e.g., `far east`) allow the agent to traverse the entire visible path until an obstruction or map edge?",
+      "Does the adjacent cell description \"ground\" always guarantee safety from lethal environmental hazards such as lava, even if lava is present in an adjacent row or column?"
+    ],
+    "selected_question_index": 51,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 8,
+    "cumulative_questions": 60,
+    "episode_idx": 1,
+    "experiment_plan": "Move south from the current position (28,11) to (28,12) and observe the result. This will determine if the agent can move onto a ':' symbol.",
+    "global_step": 11,
+    "new_questions": [
+      "If the agent follows a straight path marked by '---' symbols, will `far east` move the agent to the end of that visible straight path until an obstacle or map edge?",
+      "Can the agent move onto a ':' symbol on the map (e.g., at 33,10 or 28,12)?",
+      "Do the `|` symbols (e.g., at 29,14 or 30,13) represent traversable open passages similar to '---' or '}'?",
+      "If I move `east` from my current position (28,11), will I successfully move to (29,11)?",
+      "Will interacting with the `j` item (pine wand) using the `apply` command have a visible effect on the environment or the agent?"
+    ],
+    "selected_question_index": 54,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 9,
+    "cumulative_questions": 65,
+    "episode_idx": 1,
+    "experiment_plan": "If the agent stays in its current position (28,12) and executes `wait`, will the newt bite the agent again? This will determine if the newt attacks every turn the agent is on the same square.",
+    "global_step": 12,
+    "new_questions": [
+      "If the agent stays in its current position (28,12) and executes `wait`, will the newt bite the agent again?",
+      "Will moving off the ':' square (28,12) prevent the newt from biting the agent in the next turn?",
+      "Does the equipped `+1 long sword` automatically attack the newt if the agent and newt are on the same square?",
+      "Does the ':' symbol on the map always indicate the presence of a hostile creature that attacks upon entry?",
+      "If the agent moves to an adjacent empty square, will the newt follow it to attack?"
+    ],
+    "selected_question_index": 59,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 10,
+    "cumulative_questions": 69,
+    "episode_idx": 1,
+    "experiment_plan": "The agent will move one step east from its current position (28,12) to (29,12). After moving, the agent will observe if the newt at the previous position attacks, or if the newt follows, or if the agent avoids damage.",
+    "global_step": 13,
+    "new_questions": [
+      "If the agent moves to an adjacent square that is clear, will the newt follow it to attack?",
+      "Does the equipped `+1 long sword` automatically attack the newt if the agent and newt are on the same square and the agent performs an action other than 'wait'?",
+      "If the agent moves off the ':' square (28,12) to an empty adjacent square, will the newt attack the agent from its previous position?",
+      "Can the agent kill the newt by repeatedly moving onto its square (28,12)?"
+    ],
+    "selected_question_index": 60,
+    "step": 5
+  },
+  {
+    "cumulative_experiments": 11,
+    "cumulative_questions": 74,
+    "episode_idx": 1,
+    "experiment_plan": "The agent will attempt to move one square south from its current position (28,12). If successful, this will confirm that the tile is traversable after the newt's death. If the movement is unsuccessful, it indicates the tile might still be considered blocked or has another interaction occurring.",
+    "global_step": 14,
+    "new_questions": [
+      "Can the agent's current position (28,12) be considered a regular traversable tile after the newt was killed?",
+      "Will 'pickup' collect the item represented by ':' at the agent's current location (28,12)?",
+      "If the agent moves again after killing a newt and before picking up an item, will the item remain on the square or disappear?",
+      "Will a newt appear on the square (29,4) if the agent attempts to move there, similar to the newt encountered at (28,12)?",
+      "Does the `down` command only work when the agent is on the '>' symbol?"
+    ],
+    "selected_question_index": 32,
+    "step": 6
+  },
+  {
+    "cumulative_experiments": 12,
+    "cumulative_questions": 79,
+    "episode_idx": 1,
+    "experiment_plan": "The agent will move south from its current position (28,11) back to (28,12), which previously contained an item indicated by a ':'. Once on the tile, the agent will use the `pickup` command to see if the item is still present and can be collected, thus verifying if items persist after moving away...",
+    "global_step": 15,
+    "new_questions": [
+      "Can the agent successfully pick up the item represented by ':' at its current location (28,12) using the `pickup` command?",
+      "If the agent moves away from a square containing an item (':'), will the item remain on that square for later retrieval?",
+      "Does the `down` command specifically require the agent to be on the '>' symbol to successfully descend to the next level?",
+      "Do all visible ':' symbols on the map represent creatures that will engage the agent in combat if moved onto?",
+      "Does a ':' symbol on the map initially always denote a creature before an item, or can it represent a dropped item from the start?"
+    ],
+    "selected_question_index": 34,
+    "step": 7
+  },
+  {
+    "cumulative_experiments": 12,
+    "cumulative_questions": 82,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 16,
+    "new_questions": [
+      "Will attempting to move onto the ':' symbol at (31,10) initiate combat with a creature?",
+      "Does the 'F' symbol on the map represent a creature?",
+      "Can a ':' symbol appear on the map as an item from the moment a level is generated, rather than only appearing after a creature is slain?"
+    ],
+    "selected_question_index": null,
+    "step": 8
+  },
+  {
+    "cumulative_experiments": 12,
+    "cumulative_questions": 87,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 17,
+    "new_questions": [
+      "If the map shows '@:' (agent on a ':' symbol) but `perception_output.visible_items_on_map` is empty, will using the `pickup` command successfully retrieve an item?",
+      "Do all symbols on the map that are not explicitly recognized as walls, creatures, or known items (e.g., 'F') also represent traversable ground?",
+      "Will the `pickup` command display a message if there are no items to pick up, even if the map visual might suggest otherwise (e.g., with a ':' symbol)?",
+      "Will `far northwest` successfully navigate around the corner at (26,10) (stairs up) if the path beyond it is open?",
+      "Does the 'F' symbol on the map represent a traversable tile?"
+    ],
+    "selected_question_index": null,
+    "step": 9
+  },
+  {
+    "cumulative_experiments": 13,
+    "cumulative_questions": 92,
+    "episode_idx": 1,
+    "experiment_plan": "The agent will move to a tile displaying '@:' on the map, where the `perception_output.visible_items_on_map` is empty. The agent will then attempt to use the `pickup` command to see if any item is retrieved and what message is returned.",
+    "global_step": 18,
+    "new_questions": [
+      "Does moving onto the '>' symbol automatically take the agent to the next level down?",
+      "Will attempting to move onto the '>' symbol if already on it result in a message indicating the stairs are there but require a specific action (e.g., `down`)?",
+      "Is the '<' symbol (stairs up) always a traversable tile?",
+      "Is the '>' symbol (stairs down) always a traversable tile?",
+      "Does the `down` command require a direction input, similar to the `open` command?"
+    ],
+    "selected_question_index": 44,
+    "step": 10
+  },
+  {
+    "cumulative_experiments": 13,
+    "cumulative_questions": 97,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 19,
+    "new_questions": [
+      "Does moving onto the '>' symbol automatically take the agent to the next level down without requiring the 'down' command?",
+      "Does the 'down' command, when executed on the '>' symbol, require a direction input (e.g., 'down east')?",
+      "Is the stairs up ('<') symbol at (26,10) traversable by simply moving onto it?",
+      "Will attempting to move onto the ':' symbol at (31,10) result in an attack from a creature, indicating its presence?",
+      "Is the 'F' symbol on the map (e.g., near 29,4) a traversable tile?"
+    ],
+    "selected_question_index": null,
+    "step": 11
+  },
+  {
+    "cumulative_experiments": 13,
+    "cumulative_questions": 102,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 20,
+    "new_questions": [
+      "If the agent executes the `pickup` command on a tile marked as ':' on the map, but `perception_output.visible_items_on_map` is empty, will the `pickup` command successfully retrieve an item?",
+      "Will movement onto the '>' symbol automatically trigger descent to the next dungeon level without requiring the `down` command?",
+      "Is a tile marked with '<' (stairs up) traversable by simply moving onto it, or does it require a specific action (e.g., `up`)?",
+      "Will executing the `pickup` command when there are no items present (as indicated by `perception_output.visible_items_on_map` being empty) result in a message indicating that nothing was picked up?",
+      "Can a ':' symbol on the map represent a hostile creature even if `perception_output.visible_creatures_on_map` does not explicitly list a creature at that location?"
+    ],
+    "selected_question_index": null,
+    "step": 12
+  },
+  {
+    "cumulative_experiments": 14,
+    "cumulative_questions": 104,
+    "episode_idx": 1,
+    "experiment_plan": "The agent will move to the adjacent tile containing the stairs up symbol ('<') at (26,10). The agent will then observe whether the move is successful and if any message regarding the stairs is displayed.",
+    "global_step": 21,
+    "new_questions": [
+      "Will moving onto the '>' symbol automatically take the agent to the next level down?",
+      "Does the `down` command require a direction input (e.g., 'down south')?"
+    ],
+    "selected_question_index": 50,
+    "step": 13
+  },
+  {
+    "cumulative_experiments": 14,
+    "cumulative_questions": 109,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 22,
+    "new_questions": [
+      "Is the stairs up symbol ('<') traversable by simply moving onto it?",
+      "Does the 'down' command specifically require the agent to be on a '>' symbol to descend to the next level?",
+      "If the 'down' command is executed while the agent is not on a '>' symbol, will a specific error message be displayed?",
+      "Is the 'F' symbol on the map a traversable tile?",
+      "Can the 'F' symbol be interacted with using the 'open' command?"
+    ],
+    "selected_question_index": null,
+    "step": 14
+  },
+  {
+    "cumulative_experiments": 15,
+    "cumulative_questions": 114,
+    "episode_idx": 1,
+    "experiment_plan": "From the current position (26,10), the agent will move south to (26,11). After the movement, the agent will observe the updated map and `perception_output` to determine if new portions of the map to the immediate south have been revealed.",
+    "global_step": 23,
+    "new_questions": [
+      "Does a cardinal movement (e.g., `south`) from the current position (26,10) reveal additional portions of the map to the immediate south, currently obscured by the lower boundary of the visible map?",
+      "If the agent attempts to move onto the 'F' symbol on the map, will it cause an immediate attack from a creature?",
+      "Does the `pickup` command yield an item if executed on the 'F' symbol?",
+      "If the agent attempts to `kick` a wall, will it modify the wall, cause damage to the agent, or result in a message indicating no effect?",
+      "Does moving diagonally (e.g., `northeast`) from the current position reveal new portions of the map further out in that direction than moving individual cardinal steps (e.g., `north` then `east`)?"
+    ],
+    "selected_question_index": 59,
+    "step": 15
+  },
+  {
+    "cumulative_experiments": 16,
+    "cumulative_questions": 119,
+    "episode_idx": 1,
+    "experiment_plan": "Once the agent locates the stairs down ('>'), it should attempt to move onto the '>' symbol. After this movement, the agent will observe the game message and the updated dungeon level to determine if the descent was automatic or if a further command is required.",
+    "global_step": 24,
+    "new_questions": [
+      "If the agent is currently on the '>' symbol, does attempting a movement action (e.g., `north`, `wait`) automatically trigger descent to the next dungeon level, or must the `down` command be explicitly used?",
+      "Is the 'F' symbol on the map traversable by simply moving onto its square?",
+      "Does moving diagonally (e.g., `northeast`) reveal a wider area of the map or new map elements that are otherwise outside the perception range of two sequential cardinal moves (e.g., `north` then `east`)?",
+      "Does attempting to move onto the 'F' symbol on the map, if it is a creature, initiate combat like with the newt?",
+      "Can a door be opened by using the `kick` command with a specified direction (e.g., `kick east`)?"
+    ],
+    "selected_question_index": 43,
+    "step": 16
+  },
+  {
+    "cumulative_experiments": 16,
+    "cumulative_questions": 120,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 25,
+    "new_questions": [
+      "Will attempting to move onto the 'F' symbol on the map cause an immediate attack from a creature?"
+    ],
+    "selected_question_index": null,
+    "step": 17
+  },
+  {
+    "cumulative_experiments": 16,
+    "cumulative_questions": 125,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 26,
+    "new_questions": [
+      "Does executing the `down` command only work when the agent is specifically on the '>' symbol?",
+      "Will attempting to use the `down` command when not on the '>' symbol result in a specific error message?",
+      "Does applying the pine wand have any visible effect (e.g., lighting up an area, creating a magical effect, or dealing damage)?",
+      "Is the '|' symbol traversable, similar to '---' or '.'?",
+      "Does the `apply` command require a direction input, similar to `open`?"
+    ],
+    "selected_question_index": null,
+    "step": 18
+  },
+  {
+    "cumulative_experiments": 17,
+    "cumulative_questions": 130,
+    "episode_idx": 1,
+    "experiment_plan": "The agent is currently on the '>' symbol. Execute the `down` command. Observe the game message and the dungeon level to determine if the agent successfully descends to the next level.",
+    "global_step": 27,
+    "new_questions": [
+      "Does executing the `down` command while on the '>' symbol immediately take the agent to the next level?",
+      "If the agent executes the `down` command when not on a '>' symbol, will it display a specific error message (e.g., \"There are no stairs down here.\")?",
+      "Does the `down` command require a direction input, similar to the `open` command?",
+      "Is the '|' symbol on the map traversable (i.e., can the agent move onto it)?",
+      "Does the 'F' symbol on the map represent a creature (like 'k' for kobold, or 'n' for newt)?"
+    ],
+    "selected_question_index": 55,
+    "step": 19
+  },
+  {
+    "cumulative_experiments": 18,
+    "cumulative_questions": 135,
+    "episode_idx": 1,
+    "experiment_plan": "The agent will attempt to move east into the '|' symbol at (35,10) from (34,10). The outcome (successful movement, failure, or message) will determine if the '|' symbol is traversable.",
+    "global_step": 28,
+    "new_questions": [
+      "Can the agent move onto the 'F' symbol on the map?",
+      "Does the 'F' symbol represent a type of creature?",
+      "Will using the 'apply' command on the horn produce a sound or other environmental effect?",
+      "Is the '|' symbol on the map traversable (i.e., can the agent move onto it by just walking)?",
+      "If the agent is on the stairs up ('<') and `perception_output.stairs_up_visible` is true, will executing the `up` command successfully take the agent to the previous level?"
+    ],
+    "selected_question_index": 49,
+    "step": 20
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 140,
+    "episode_idx": 1,
+    "experiment_plan": "The agent will move south to the stairs up at (26,10). Then, the agent will execute the `up` command to determine if it successfully navigates to the previous level.",
+    "global_step": 29,
+    "new_questions": [
+      "Does consuming apples (inventory item 'g') restore the agent's HP?",
+      "Will moving 'far north' from the current position (26,9) reveal additional map tiles to the north beyond the current visible region if there are no obstructions?",
+      "Does applying the horn (inventory item 'i') require a direction or target?",
+      "Is the '|' symbol on the map (like the one at (34,10)) traversable by normal movement (e.g., `east`)?",
+      "Does the `more` command simply display more of the current message (if truncated) or does it reveal further details about the environment or inventory?"
+    ],
+    "selected_question_index": 49,
+    "step": 21
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 145,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 30,
+    "new_questions": [
+      "Does the `|` symbol on the map always represent a solid, impassable wall (meaning it cannot be moved through by simple cardinal movement)?",
+      "Can the `search` command reveal hidden passages or rooms that were not previously within the visible map boundaries, thus expanding the perceived map?",
+      "If a wall that is not a door is targeted with the `kick` command, will that wall be damaged or break open?",
+      "If an `open <direction>` command results in the message \"You see no door there.\", can a `kick <direction>` or `force <direction>` command be used to bypass the non-existent door obstacle?",
+      "Does the `Dlvl:` indicator in the status bar always accurately represent the current dungeon level, even if the map or other perception indicates stairs to a different level?"
+    ],
+    "selected_question_index": null,
+    "step": 22
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 149,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 31,
+    "new_questions": [
+      "Will the `search` command reliably reveal hidden doors or passages, if one is present within the current visible area?",
+      "Can the `kick` command be used to break down impassable walls, eventually creating a traversable path?",
+      "Can the `force` command be used to bypass impassable walls or obstacles that are not doors?",
+      "If the agent is standing on a tile that is a *functional* stairs down, will `perception_output.stairs_down_visible` report 'Yes'?"
+    ],
+    "selected_question_index": null,
+    "step": 23
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 154,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 32,
+    "new_questions": [
+      "Is the '|' symbol on the map traversable by simple cardinal movement?",
+      "What would be the outcome if the `apply` command was used with the pine wand (j)? Does it require a direction?",
+      "If the agent is on *functional* stairs down ('>' symbol where `perception_output.stairs_down_visible` is 'Yes'), will executing the `down` command successfully take the agent to the next level?",
+      "Does the '}' symbol on the map represent a traversable path with the same properties as '.' or '---' (i.e., no special interaction required beyond movement)?",
+      "Does the `zap` command require a direction, similar to `apply`?"
+    ],
+    "selected_question_index": null,
+    "step": 24
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 159,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 33,
+    "new_questions": [
+      "Can the agent use the `force` command to break down '---' or '|' symbols which represent walls, creating a path where there was none?",
+      "What happens if I use 'apply horn'? Does it produce a sound that alerts nearby monsters to my location?",
+      "Does \"apply pine wand\" have any effect related to illuminating dark areas or revealing hidden passages?",
+      "Does the '|' symbol on the map represent a solid, impassable wall that blocks movement, or can it be traversed using specific actions?",
+      "If the agent attempts to \"open\" an empty space or a wall (resulting in \"You see no door there.\"), will attempting \"kick\" on that same space have a different outcome, potentially breaking it or revealing something?"
+    ],
+    "selected_question_index": null,
+    "step": 25
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 164,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 34,
+    "new_questions": [
+      "Is the '|' symbol on the map an impassable wall, or can it be bypassed using certain actions or commands?",
+      "Can the `search` command reveal a hidden door or passage within the agent's immediate vicinity that is represented by a '|' or '-' symbol?",
+      "Does \"applying\" the pine wand (inventory item `j`) create any perceivable effect on the environment, such as lighting up a dark area or revealing hidden objects?",
+      "Will `apply` (using a specific item like the pine wand) require an additional directional input after the initial command?",
+      "Does the `horn` (inventory item `i`) have any special effect, such as attracting or deterring monsters, when used with the `apply` command?"
+    ],
+    "selected_question_index": null,
+    "step": 26
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 169,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 35,
+    "new_questions": [
+      "Will applying the horn (inventory item `i`) produce any observable effect (e.g., sound, message, or change in environmental state) when used with the `apply` command, aside from potentially attracting monsters?",
+      "Can the `kick` command successfully create a traversable opening in a map element represented by either a '|' (wall) or '---' (wall/boundary) symbol?",
+      "Will the `search` command ever cause a visible map symbol representing a wall or boundary (such as '|' or '---') to transform into a traversable passage or door?",
+      "Are the `apply` and `zap` commands distinct and functionally different when used with a wand, such that they produce different effects or target different entities?",
+      "If `perception_output.visible_items_on_map` explicitly lists an item on the agent's current tile, will the `pickup` command always successfully add that item to the agent's inventory?"
+    ],
+    "selected_question_index": null,
+    "step": 27
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 174,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 36,
+    "new_questions": [
+      "Can the `open` command be successfully used on a map element represented by a '|' symbol, assuming it might be a hidden door?",
+      "Does the `search` command, when executed in place, reveal hidden doors or passages within the current visible map area that are not immediately apparent as door symbols?",
+      "Does initiating an attack on a visible creature from a distance (e.g., using a wand with `zap`) cause that creature to become hostile and actively move towards the agent?",
+      "Will repeatedly using the `kick` command on a wall or non-door obstacle (e.g., symbols '|' or '---') eventually break it and create a traversable path?",
+      "Does the `wait` command have any beneficial effect, such as HP or Pw regeneration, beyond simply passing a turn?"
+    ],
+    "selected_question_index": null,
+    "step": 28
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 179,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 37,
+    "new_questions": [
+      "Can the `open` command be successfully used on a map element represented by a '---' (wall/boundary) symbol, if it's acting as a hidden door or archway, in the same way it would be used on a '|' symbol?",
+      "Will using the `apply` command with the pine wand (item `j`) reveal any hidden doors, passages, or expand the map visibility in the current area?",
+      "Can the agent create a traversable path by repeatedly using the `kick` command on a solid wall ('|')?",
+      "Does the `search` command, when executed within a corridor, have the potential to reveal a hidden side passage or door that is not initially visible on the map?",
+      "If the agent attempts a 'far' movement into a direction blocked by a solid wall (such as '|'), will it stop immediately adjacent to the wall, or will it report \"It's a wall.\" and remain in its current position?"
+    ],
+    "selected_question_index": null,
+    "step": 29
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 184,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 38,
+    "new_questions": [
+      "Does the `search` command, if executed at the current position, have the potential to reveal a hidden door or passage in an adjacent wall ('|' or '---')?",
+      "Will using the `kick` command on an adjacent wall (symbol '|' or '---') always result in the message \"It's a wall.\" without changing the wall's traversability?",
+      "Does applying the horn (inventory item `i`) with the `apply` command produce any sound that might attract visible or unseen hostile creatures to the agent's location?",
+      "Does using the `apply` command with the pine wand (inventory item `j`) reveal hidden areas or objects within the immediate vicinity, similar to a `search` command?",
+      "If the agent remains in its current position (25,13) and a monster is visible several tiles away, will the monster automatically move towards the agent or only if the agent moves closer to it?"
+    ],
+    "selected_question_index": null,
+    "step": 30
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 189,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 39,
+    "new_questions": [
+      "Can the `open` command successfully open a door hidden within a wall that is currently perceived as impassable, even if the \"You see no door there.\" message was previously received for a different wall?",
+      "Do `force` or `kick` commands apply to and potentially break open impassable wall sections (represented by '-', '|', or similar symbols) to create new paths?",
+      "Does the `search` command reveal hidden doors or passages, including those behind seemingly impassable wall symbols like '-', ':' or '|'?",
+      "If performing `search` reveals a hidden door or passage, will its symbol on the map (e.g., '-', ':' or '|') change to indicate its traversability?",
+      "Does the `open` command consume a turn even if it results in the \"You see no door there.\" message?"
+    ],
+    "selected_question_index": null,
+    "step": 31
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 194,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 40,
+    "new_questions": [
+      "If the agent is on *functional* stairs up ('<') and executes the `up` command, will it always successfully ascend to the previous level?",
+      "Does the `force` command apply to wall segments (represented by symbols like '---' or '|') making them traversable?",
+      "Does the `kick` command apply to solid wall segments (like '---' or '|') potentially creating a passage or opening?",
+      "Does the `search` command consume a turn even if no hidden doors or passages are found?",
+      "Does the `zap` command require a direction as input, similar to the `open` command?"
+    ],
+    "selected_question_index": null,
+    "step": 32
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 199,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 41,
+    "new_questions": [
+      "Does the `apply` command require explicit object selection (e.g., from inventory) in addition to a direction or target?",
+      "Do `force` or `kick` commands always consume a turn, even if they fail to open or break an obstacle?",
+      "If the agent is standing on a functional stairs up ('<') tile and executes the `up` command, will the `Dlvl` (dungeon level) stat always correctly reflect the change to the previous level?",
+      "Does the `search` command consume a turn even if no hidden doors or passages are found within the current percepts?",
+      "Does the `zap` command require an item from the inventory to be selected and consumed or used during its execution?"
+    ],
+    "selected_question_index": null,
+    "step": 33
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 204,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 42,
+    "new_questions": [
+      "If the agent executes the `up` command while at (26,10), where a '<' symbol was previously located but `perception_output.Stairs up locations (functional)` is currently empty, will the agent successfully ascend to the previous level?",
+      "Does executing the `apply` command always require the agent to specify an item from its inventory before providing a direction or target?",
+      "Does executing the `force` command consume a turn even if the target (e.g., a wall) cannot be forced open?",
+      "Does the `kick` command, when used on a perceived wall ('---', '|', ':'), always result in the same 'It's a wall.' message as a failed movement attempt, or can it yield a different message (e.g., about damage to the wall)?",
+      "Does the `zap` command require a direction as input when used, similar to `open` and `apply`?"
+    ],
+    "selected_question_index": null,
+    "step": 34
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 209,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 43,
+    "new_questions": [
+      "If the agent attempts to `kick` an otherwise impassable wall (e.g., a '-' or '|' symbol), will it always receive the same \"It's a wall.\" message as a failed movement attempt, or can it have a different outcome (e.g., damage to the wall or a specific \"Nothing happens\" message)?",
+      "Does the `force` command, when applied to a wall or a locked door, always consume a turn even if it fails to open or break the obstacle?",
+      "Does the `search` command consume a turn even if it does not reveal any hidden doors, passages, or items within the perceptual field?",
+      "Does the `apply` command require an item from the inventory to be selected and explicitly specified before a direction or target can be provided?",
+      "Does the `zap` command require an item (like a wand) to be selected from the inventory before a direction or target is specified for its use?"
+    ],
+    "selected_question_index": null,
+    "step": 35
+  },
+  {
+    "cumulative_experiments": 19,
+    "cumulative_questions": 214,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 44,
+    "new_questions": [
+      "Does the `Stairs up locations (functional)` output only report functional stairs up if they are visible and *not* on the agent's current tile, similar to `Stairs up symbols visible on map at`?",
+      "To successfully use the `up` command, does `perception_output.Agent is on functional stairs up` need to explicitly be 'Yes'?",
+      "If `perception_output.Agent is on functional stairs up` is 'No', but `perception_output.Stairs up locations (functional)` lists the agent's current coordinates, can the agent still successfully use the `up` command?",
+      "Can the ':' symbol on the map represent a valid traversable floor tile that does not contain any items?",
+      "Can the '.' symbol on the map represent a tile that *could* contain hidden items, even if `visible_items_on_map` is empty?"
+    ],
+    "selected_question_index": null,
+    "step": 36
+  },
+  {
+    "cumulative_experiments": 20,
+    "cumulative_questions": 219,
+    "episode_idx": 1,
+    "experiment_plan": "The agent will attempt to recreate a state where `perception_output.Agent is on functional stairs up` is 'No' but `perception_output.Stairs up locations (functional)` lists the agent's current coordinates. Once such a state is achieved, the agent will execute the `up` command to observe the outcome.",
+    "global_step": 45,
+    "new_questions": [
+      "If the `kick` command is used on an impassable obstacle like a wall, will a message other than \"It's a wall.\" be displayed, such as one indicating damage or an explicit failure to kick?",
+      "If the agent attempts to `loot` a tile that does not contain a visible box or items (i.e., `perception_output.visible_items_on_map` is empty and no box symbol is present), will a specific \"nothing to loot\" message be returned?",
+      "If the agent attempts to `puton` an item that cannot be worn (e.g., a weapon), will the command fail with a specific message indicating it is not wearable?",
+      "Does the `pray` command always consume a turn, even if there is no divine intervention or specific message returned?",
+      "If the `zap` command is used without a valid target or direction (e.g., pointing a wand at a solid wall where no effect is possible), will it simply fail silently (consuming a turn), or will a specific error message be provided?"
+    ],
+    "selected_question_index": 48,
+    "step": 37
+  },
+  {
+    "cumulative_experiments": 21,
+    "cumulative_questions": 224,
+    "episode_idx": 1,
+    "experiment_plan": "From the current position (26,11), if the `visible_items_on_map` is empty, execute the `search` command. Observe if any hidden items or passages are revealed, and whether the command consumes a turn and returns a message indicating success or failure to find anything.",
+    "global_step": 46,
+    "new_questions": [
+      "If the agent attempts to `kick` an adjacent impassable wall, will the environment return a message indicating damage to the wall or to the agent?",
+      "If the `force` command is used on an adjacent solid, impassable wall, will a specific message be returned beyond simply \"It's a wall.\" (e.g., related to the wall's integrity or the agent's effort)?",
+      "Does the `search` command, when executed, always generate some form of message (e.g., \"You find nothing,\" or \"You find a hidden door\") regardless of whether it discovers something?",
+      "If the `loot` command is attempted on a tile where `perception_output.visible_items_on_map` is empty and no box symbol is present, will the specific message \"There is nothing here to loot.\" be displayed?",
+      "Will the `zap` command, when used with a wand and directed towards an empty, traversable tile ('.'), produce a visible effect (e.g., a projectile symbol) on the map or a specific textual description of the wand's effect?"
+    ],
+    "selected_question_index": 50,
+    "step": 38
+  },
+  {
+    "cumulative_experiments": 22,
+    "cumulative_questions": 229,
+    "episode_idx": 1,
+    "experiment_plan": "From the current position (26,11), if `perception_output.visible_items_on_map` is empty and the tile is represented by a '.', execute the `search` command. Observe if any items appear in `visible_items_on_map` or if a relevant message is returned.",
+    "global_step": 47,
+    "new_questions": [
+      "Does the `search` command always consume a turn, even if the environment returns no message (i.e., nothing is found)?",
+      "If the agent attempts to `loot` a tile that does not contain any visible items, will a specific message such as \"There is nothing here to loot.\" be displayed?",
+      "If the agent attempts to `kick` an item that is on the floor (as indicated by `perception_output.visible_items_on_map`), will it interact with or move the item without picking it up?",
+      "If the agent attempts to `puton` an item from its inventory that is not wearable (e.g., a weapon or food), will a specific message be displayed indicating it cannot be worn?",
+      "Does the `apply` command require a direction or specific target *after* selecting an item from the inventory, or can it sometimes be used without further input if context allows (e.g., `apply a` where 'a' is a ring that is automatically worn)?"
+    ],
+    "selected_question_index": 50,
+    "step": 39
+  },
+  {
+    "cumulative_experiments": 23,
+    "cumulative_questions": 233,
+    "episode_idx": 1,
+    "experiment_plan": "From the current position (26,12), execute the `search` command. Observe if `perception_output.visible_items_on_map` displays any items, or if a message indicating the discovery of hidden items is returned. Repeat this process at various '.' tiles to gather more evidence.",
+    "global_step": 48,
+    "new_questions": [
+      "If the agent attempts to `kick` an item that is on the floor (as indicated by `perception_output.visible_items_on_map`), will it move the item or simply fail with a message?",
+      "If the `loot` command is attempted on a tile where `perception_output.visible_items_on_map` is empty and no box symbol is visible on the map, will the specific message \"There is nothing here to loot.\" be displayed?",
+      "Does the `pray` command always consume a turn and provide a message (e.g., about divine status, or lack thereof), even if no discernible effect occurs?",
+      "Does the ':' symbol on the map *always* indicate the presence of an item, even if `perception_output.visible_items_on_map` is empty for that tile?"
+    ],
+    "selected_question_index": 50,
+    "step": 40
+  },
+  {
+    "cumulative_experiments": 23,
+    "cumulative_questions": 238,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 49,
+    "new_questions": [
+      "Does the `search` command ever reveal hidden doors or passages, causing a change in the visible map or a message, even if no items are found?",
+      "If the `open` command is used on a `potentially traversable/obstacles` symbol like '-' or '|' that *is* functionally a door, will it succeed and reveal a passage, or will it return \"You see no door there.\"?",
+      "Does `perception_output.visible_items_on_map` only list items that are on the agent's current tile, or can it list items on adjacent (or even further away) visible tiles?",
+      "Will simply moving adjacent to a hidden door or passage cause it to become visible on the map, without requiring a `search` command?",
+      "Does the `more` command have any effect if the previous message was empty or a single line that fit on the screen?"
+    ],
+    "selected_question_index": null,
+    "step": 41
+  },
+  {
+    "cumulative_experiments": 24,
+    "cumulative_questions": 241,
+    "episode_idx": 1,
+    "experiment_plan": "From the current position (26,13), attempt to `open south` towards the '-' symbol at (26,14). Observe if the action succeeds, what message is returned, and how the map changes.",
+    "global_step": 50,
+    "new_questions": [
+      "If `search` reveals a hidden passage or door, will the corresponding area on the map instantly change to reflect the discovery (e.g., a wall becoming a passage) in the next perception output, even without an accompanying message like \"You find a hidden door.\"?",
+      "If `open <direction>` is attempted on a `|` or `---` symbol that is *actually* a functional door, will the command succeed and reveal an open passage?",
+      "If an `open` command successfully opens a door, will there always be a specific message in the `message` field (e.g., \"The door opens.\") confirming the door has been opened?"
+    ],
+    "selected_question_index": 43,
+    "step": 42
+  },
+  {
+    "cumulative_experiments": 24,
+    "cumulative_questions": 246,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 51,
+    "new_questions": [
+      "If a door is successfully opened using the `open` command, will the map symbol representing that door always change to indicate its open state (e.g., from '-' to '/') in the subsequent `map` output?",
+      "Can the `search` command reveal items on the current tile that were not listed in `perception_output.visible_items_on_map` prior to the search?",
+      "If an `open` command targets a tile that is not a door but is an impassable wall, will the returned message always be \"You see no door there.\"?",
+      "Does the `kick` command always cause the agent to move into the targeted tile, regardless of whether the target is a creature or an object (like a door or wall)?",
+      "If a door is locked, will attempting to `open` it result in a specific message indicating it is locked, rather than \"You see no door there.\" or immediate success?"
+    ],
+    "selected_question_index": null,
+    "step": 43
+  },
+  {
+    "cumulative_experiments": 24,
+    "cumulative_questions": 251,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 52,
+    "new_questions": [
+      "When using the `open` command, if the target is a `horizontal_wall_or_passage` (symbol `'-'`) but is actually a hidden door, will the `open` command succeed in opening it?",
+      "If the `open` command successfully opens a door (represented by `'-'`), will there be a specific message like \"The door opens\" in the `message` field?",
+      "If the `open` command is used on a `horizontal_wall_or_passage` (symbol `'-'`) that is *not* a door, will the message \"You see no door there.\" be displayed?",
+      "If a door is successfully opened using the `open` command, will its map symbol change (e.g., from `'-'` to `'/'`) in the subsequent `map` output?",
+      "Can the `kick` command be used to force open a locked door or destroy a non-door obstacle like a wall, resulting in a change in its traversability or map symbol?"
+    ],
+    "selected_question_index": null,
+    "step": 44
+  },
+  {
+    "cumulative_experiments": 25,
+    "cumulative_questions": 256,
+    "episode_idx": 1,
+    "experiment_plan": "From the current position (26,13), execute the `kick south` command. Observe if the action succeeds, what message is returned, and whether the map symbol at (26,14) changes, or if traversability is affected.",
+    "global_step": 53,
+    "new_questions": [
+      "If a door is locked, will attempting to `open` it result in a specific message indicating it is locked (e.g., \"The door is locked.\")?",
+      "Can the `kick` command successfully force open a `horizontal_wall_or_passage` (symbol `'-'`) that has previously been determined to not be a door by the `open` command?",
+      "If `kick` is successfully used on a previously impassable obstacle and creates a traversable path, will the map symbol of that obstacle change immediately in the subsequent perception output?",
+      "Does the `search` command, when executed on a tile adjacent to a hidden door, cause that hidden door to become visible on the map without explicit movement onto the door's tile?",
+      "Will the `search` command ever reveal an *item* on the current tile if that item was *not* already listed in `perception_output.visible_items_on_map` prior to the search?"
+    ],
+    "selected_question_index": 59,
+    "step": 45
+  },
+  {
+    "cumulative_experiments": 25,
+    "cumulative_questions": 261,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 54,
+    "new_questions": [
+      "Is the `kick` command a multi-step action, requiring a separate direction input after initiating the command, similar to the `open` command?",
+      "If the `kick` command is used on a `horizontal_wall` (char `'-'`) that is not a door, will it result in a specific message (e.g., \"Nothing happens.\" or \"You kick the wall.\") rather than a \"You see no door there.\" message?",
+      "Can the `kick` command successfully force open a locked door or break down a non-door obstacle (like a wall represented by `'-'`)?",
+      "If a door is locked and `open` returns \"The door is locked.\", will attempting to `kick` that locked door produce a different outcome or message compared to kicking a non-door wall?",
+      "If the `kick` command causes an obstacle to become traversable, will the map symbol representing that obstacle change in the subsequent `map` output?"
+    ],
+    "selected_question_index": null,
+    "step": 46
+  },
+  {
+    "cumulative_experiments": 25,
+    "cumulative_questions": 266,
+    "episode_idx": 1,
+    "experiment_plan": null,
+    "global_step": 55,
+    "new_questions": [
+      "Does the `kick` command with a specified direction (e.g., `kick south`) only work on locked doors or chests, or can it also interact with other types of wall obstacles that cannot be opened with `open`?",
+      "If the `kick` command is used towards an obstacle that is neither a locked door nor a chest, will it result in a specific failure message, or will it be a silent failure (e.g., agent stays put without message, or a general \"nothing happens\" message)?",
+      "Is it possible for a `horizontal_wall` symbol ('-') to represent a locked door or a kickable chest that needs to be broken open with `kick`?",
+      "If an obstacle is impenetrable by both `open` and `kick` commands, does that imply it's a permanent, impassable wall that cannot be circumvented or destroyed by any current agent capability?",
+      "Does the `force` command operate on the same types of targets as `kick` (e.g., locked doors or chests), or does it have a distinct set of interactable objects?"
+    ],
+    "selected_question_index": null,
+    "step": 47
+  },
+  {
+    "cumulative_experiments": 26,
+    "cumulative_questions": 271,
+    "episode_idx": 1,
+    "experiment_plan": "From the current position (26,13), now that the agent is burdened, attempt to move to an adjacent traversable tile (e.g., `north` to (26,12)) and observe the number of turns consumed by checking the step counter.",
+    "global_step": 56,
+    "new_questions": [
+      "If the agent is burdened, will moving to an adjacent traversable tile always consume more than one turn?",
+      "Will attempting to `kick` a solid wall ('-') always cause the agent to take damage and become burdened?",
+      "Does the `force` command have a specific syntax for direction input, or is it a two-step command like `open` and `kick`?",
+      "Will `search` ever reveal hidden doors or passages, causing a change in the visible map, *without* generating any message in the `message` field?",
+      "If a tile is adjacent to a hidden door or passage, will `search` (on the agent's current tile) always reveal it, or does `search` have a limited radius?"
+    ],
+    "selected_question_index": 56,
+    "step": 48
+  },
+  {
+    "cumulative_experiments": 27,
+    "cumulative_questions": 272,
+    "episode_idx": 1,
+    "experiment_plan": "From the current position (26,12), execute `kick south` again towards the known impassable wall at (26,13). Observe whether the agent takes damage and becomes burdened again, or if kicking a previously kicked wall acts differently.",
+    "global_step": 57,
+    "new_questions": [
+      "Does the `search` command ever reveal hidden doors or passages, causing a change in the visible map, *without* generating any message in the `message` field?"
+    ],
+    "selected_question_index": 57,
+    "step": 49
+  },
+  {
+    "cumulative_experiments": 27,
+    "cumulative_questions": 277,
+    "episode_idx": 2,
+    "experiment_plan": null,
+    "global_step": 58,
+    "new_questions": [
+      "If the agent is on a tile with visible items, will executing the `pickup` command always succeed in adding those items to the inventory if there is capacity?",
+      "If the agent executes `kick` directed at a solid wall (like '-'), will it always result in the agent taking damage, even with a new character and different stats?",
+      "If the agent executes `kick` directed at a solid wall (like '-'), will it always result in the agent becoming burdened, even with a new character and different stats, and a current normal burden status?",
+      "Does the `zap` command for a wand require a direction input, or is it a single-step action?",
+      "Does `perception_output.Agent is on functional stairs up` being `No` at the start of a new character's life always mean the '<' symbol at the starting location (26,10) is non-functional, or can functionality change between character instances even at the \"same\" environmental location?"
+    ],
+    "selected_question_index": null,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 28,
+    "cumulative_questions": 282,
+    "episode_idx": 2,
+    "experiment_plan": "Move to a nearby tile with no visible special features or known items, then attempt to use the `pickup` command. Observe if the message \"The stairs are solidly fixed to the floor.\" appears again, or if a different \"nothing to pick up\" message is received.",
+    "global_step": 59,
+    "new_questions": [
+      "Does the message \"The stairs are solidly fixed to the floor.\" appear only when attempting to pick up an item that is an explicit part of the map (like a stairs component), even if it's visually represented as a movable item?",
+      "Do items listed in `perception_output.visible_items_on_map` always represent freestanding items that can be picked up, or can they include items fixed to the floor, like horns or wands associated with the map tile?",
+      "If an item listed in `perception_output.visible_items_on_map` cannot be picked up (e.g., due to being \"fixed to the floor\"), will attempting to `force` or `kick` it have any different outcome than using `pickup`?",
+      "Does the message \"The stairs are solidly fixed to the floor.\" indicate that the functional status of stairs at the current location might change later, or that the current object cannot be moved or interacted with as an inventory item?",
+      "If the agent attempts to `pickup` an item and receives \"The stairs are solidly fixed to the floor.\", will subsequent `pickup` attempts on the same spot without moving always yield the same message?"
+    ],
+    "selected_question_index": 47,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 29,
+    "cumulative_questions": 287,
+    "episode_idx": 2,
+    "experiment_plan": "Execute the 'zap' command without specifying a direction. Observe if the agent is prompted for a direction or if the action is a single-step command.",
+    "global_step": 60,
+    "new_questions": [
+      "If an actual closed door (represented perhaps by a symbol like '+' or '-') is targeted by the `kick` command, will it always cause the agent to take damage and become burdened, regardless of whether the kick results in the door opening?",
+      "Will attempting to `open` a locked door result in the specific message \"The door is locked.\" or a similar indication that the door is locked?",
+      "Does being in a \"Burdened\" state (as seen in previous steps) consistently cause movement across a single traversable tile to consume more than one turn?",
+      "Does the `zap` command for a wand require a direction input, or is it a single-step action without directional input?",
+      "If `perception_output.visible_items_on_map` is empty on a tile where the environment states \"The stairs are solidly fixed to the floor.\" upon `pickup`, do subsequent re-checks of `visible_items_on_map` on that same tile (without the agent moving away and returning) continue to show an empty list?"
+    ],
+    "selected_question_index": 45,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 30,
+    "cumulative_questions": 292,
+    "episode_idx": 2,
+    "experiment_plan": "Select the steel wand by entering 'h' for the `zap` command. Observe if the next prompt is for a direction, or if the `zap` action concludes after item selection.",
+    "global_step": 61,
+    "new_questions": [
+      "Does the `zap` command require a direction input after a wand is selected from the inventory?",
+      "Can the `kick` command on a locked door successfully open it, changing its state to interactable as an open passage?",
+      "Will attempting to `open` a locked door result in a specific message indicating it is locked (e.g., \"The door is locked.\"), regardless of if the door's visible map symbol suggests it is locked?",
+      "Does being in a \"Burdened\" state always cause movement across a single traversable tile to consume more than one turn?",
+      "Is a locked door always represented by a specific map symbol (e.g., '+' or '#') that is distinct from a closed, unlockable wall ('-') or an open archway?"
+    ],
+    "selected_question_index": 54,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 31,
+    "cumulative_questions": 297,
+    "episode_idx": 2,
+    "experiment_plan": "Direct the current `zap` command (after 'In what direction?') at an adjacent impassable wall, such as west or northwest which are both `vertical_wall` ('|'). Observe the resulting message and any changes to the wall or agent status to see if it damages the wall, reflects, or simply states \"nothing...",
+    "global_step": 62,
+    "new_questions": [
+      "If the `zap` command is directed at an impassable wall (e.g., represented by '-' or '|'), will it always result in a specific message indicating the zap hit an obstacle, damage the wall, or reflect back at the agent?",
+      "What is the range of the `zap` command; does it affect creatures or objects beyond adjacent tiles in the specified direction?",
+      "Does attempting to `open` a locked door (assuming it's a door and not a wall) result in a specific message indicating it is locked (e.g., \"The door is locked.\")?",
+      "Does being in a \"Burdened\" state (S:0, Burden: Burdened) *always* cause movement across a single traversable tile to consume more than one turn?",
+      "Can the `kick` command successfully open a locked door (represented by any symbol other than '-' or '|') on its first attempt, changing its state to an open passage?"
+    ],
+    "selected_question_index": 59,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 32,
+    "cumulative_questions": 302,
+    "episode_idx": 3,
+    "experiment_plan": "The agent will move to an empty tile (with no visible items on the map) and then issue the `loot` command. The outcome (message received or lack thereof, and any changes in status) will be recorded to determine if `loot` fails silently or provides a message when no items are present.",
+    "global_step": 63,
+    "new_questions": [
+      "Are there ever items in the inventory upon respawn that are *not* explicitly mentioned in the initial respawn message (e.g., \"i - a horn. j - an iridium wand.\")?",
+      "If there are no items on the current tile, will the `loot` command fail silently or return a message indicating no items are present?",
+      "Is `apply` a multi-step action, requiring either a separate item selection or a direction input after the initial command (e.g., `apply` then an item/direction, rather than `apply <item> <direction>`)?",
+      "Do visible monsters on the map remain stationary at their locations until the agent moves onto their tile, or do they move independently on their own turns?",
+      "Can the `close` command be attempted on map features that are not explicitly identified as open doors (e.g., walls or other symbols)?"
+    ],
+    "selected_question_index": 51,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 306,
+    "episode_idx": 3,
+    "experiment_plan": "The agent will find a closed door, use the `open` command to open it, and then observe the map output to see if the door's symbol changes to reflect its open state.",
+    "global_step": 64,
+    "new_questions": [
+      "If the agent attempts to `pickup` on a tile with *functional* stairs up or down, and there are no `visible_items_on_map`, will it still receive the message \"The stairs are solidly fixed to the floor.\"?",
+      "Will attempting to `kick` a '---' symbol that is an impassable wall (as indicated by the \"It's a wall.\" message upon movement attempt) cause the agent to take damage and become burdened?",
+      "Do visible monsters move independently on their own turns, or do they only move or act when the agent interacts with them or moves onto their tile?",
+      "Does the `zap` command require the selected item to be a wand, or can other inventory items (e.g., a horn or a sword) also be selected and \"zapped\"?"
+    ],
+    "selected_question_index": 48,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 311,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 65,
+    "new_questions": [
+      "Does a monster (e.g., a newt or fighter) move from its perceived location to a different location on the map if the agent executes the `wait` command while not occupying the monster's tile?",
+      "If the agent moves onto a tile that is currently occupied by a visible monster (e.g., a newt), will the agent automatically initiate an attack against that monster?",
+      "If the agent attempts the `pickup` command on a tile that is identified as a feature other than stairs, such as an altar or fountain, will it also receive the message \"The [...] are solidly fixed to the floor.\" if no items are present?",
+      "Does the `search` command have the ability to reveal hidden doors or passages on a tile that is represented by '.' (ground) and is not adjacent to any visible walls or corridors?",
+      "When the `open` command is issued while the agent is adjacent to a visible '+' symbol representing a closed door, will the environment always prompt for a direction, even if the door might be locked or jammed?"
+    ],
+    "selected_question_index": null,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 316,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 66,
+    "new_questions": [
+      "Does the '}' symbol on the map always represent a traversable passage?",
+      "Do visible monsters always pursue the agent if the agent moves out of their immediate attack range?",
+      "Do some monsters (e.g., newts, fighters) possess ranged attacks that can hit the agent when not in an adjacent square?",
+      "Are diagonal movements inherently possible (e.g., `southeast`) for the agent when the paths are clear, or only cardinal movements are allowed?",
+      "If a multi-step command (like `open`, `kick`, `zap`) is initiated but the follow-up prompt for direction or item is not provided in the subsequent action, does the agent's turn still get consumed, or is there a way to cancel the command without penalty?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 321,
+    "episode_idx": 3,
+    "experiment_plan": null,
+    "global_step": 67,
+    "new_questions": [
+      "When the agent attempts to move beyond the visible map boundary (e.g., to the east edge of the currently displayed map), does the visible map automatically expand to reveal new areas of the dungeon?",
+      "Is the '---' map symbol always traversable when it spans across two open corridor tiles?",
+      "Can the agent successfully execute diagonal movement commands (e.g., `northeast`, `southwest`) through open, traversable tiles?",
+      "If the agent moves into a tile adjacent to a visible hostile monster, does the monster automatically take an attack action against the agent in that same turn?",
+      "If a multi-step command (e.g., `zap`) is initiated and the agent's next action is *not* to provide the requested follow-up input (e.g., an item or direction), will the initiated command be cancelled without consuming a game turn?"
+    ],
+    "selected_question_index": null,
+    "step": 4
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 324,
+    "episode_idx": 4,
+    "experiment_plan": null,
+    "global_step": 68,
+    "new_questions": [
+      "If a multi-step command (e.g., `open`, `kick`, or `zap`) is initiated and the agent's subsequent action does not provide the required follow-up input (item or direction), is that command automatically cancelled without consuming a game turn?",
+      "Does the visible map automatically expand to reveal new areas of the dungeon if the agent attempts to move beyond the current map's boundary?",
+      "If the agent moves into a tile adjacent to a visible hostile monster but not into the same tile, does the monster automatically attack the agent in that same turn?"
+    ],
+    "selected_question_index": null,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 329,
+    "episode_idx": 4,
+    "experiment_plan": null,
+    "global_step": 69,
+    "new_questions": [
+      "If a lava tile is present on the map, will it *always* be represented by a distinct symbol, or can it be represented by a generic traversable symbol (like '.' or '---')?",
+      "If the agent is adjacent to a visible hostile monster, will performing a non-movement action (e.g., `wait`, `search`, `pray`) always provoke an attack from the monster on that same turn?",
+      "If `visible_items_on_map` is `None` for the current tile, but the tile is not stairs, can `pickup` still reveal and acquire an unlisted item?",
+      "If the agent attempts to `zap` a wand in the direction of a *closed door* (not a solid wall), will the wand's effect reflect back and harm the agent?",
+      "When attacking with daggers (e.g., `q` to quaff something and then `throw` in a direction, or selecting item `b` and giving direction), does the agent throw a single dagger or all of its daggers at once?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 333,
+    "episode_idx": 4,
+    "experiment_plan": null,
+    "global_step": 70,
+    "new_questions": [
+      "Is the 'Z' symbol on the map a mobile entity (a creature or an NPC) that is simply not listed in `perception_output.Visible creatures (not on current tile)`?",
+      "What happens if the agent selects a direction for a multi-step command (e.g., `open`, `kick`) and then does not provide an input during the subsequent prompt (e.g., for an item selection for `zap`)? Does the turn still get consumed?",
+      "Can the agent use diagonal movement commands (e.g., `northeast`, `southeast`) to move across the map?",
+      "If the agent moves into a tile adjacent to a visible hostile monster (e.g., 'F') but not into the same tile, will the monster automatically attack the agent in that same turn?"
+    ],
+    "selected_question_index": null,
+    "step": 2
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 336,
+    "episode_idx": 4,
+    "experiment_plan": null,
+    "global_step": 71,
+    "new_questions": [
+      "Is the 'Z' symbol on the map a mobile entity (creature or NPC) that is simply not listed in `perception_output.Visible creatures (not on current tile)`?",
+      "Can the agent use diagonal movement commands (e.g., `northeast`, `southeast`) to traverse the map?",
+      "If a multi-step command (e.g., `zap` or `open`) is initiated but the follow-up prompt for direction or item is not provided in a subsequent action, does the agent's turn still get consumed?"
+    ],
+    "selected_question_index": null,
+    "step": 3
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 341,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 72,
+    "new_questions": [
+      "If the agent moves into a tile adjacent to a visible hostile creature (e.g., ':', 'F') but not into the same tile, does the creature automatically attack the agent in that same turn?",
+      "Is the 'Z' symbol on the map representing a hostile creature?",
+      "If a tile is visually represented only by `---`, and this `---` tile is adjacent to a confirmed lava tile, is the `---` tile always lethal terrain to move into?",
+      "Do hostile creatures, particularly those like ':', 'F' or 'Z', possess ranged attacks that can deal damage to the agent from a non-adjacent square?",
+      "If `perception_output.visible_items_on_map` is `None` for the current tile, and the tile is *not* identified as stairs, can the `pickup` command still reveal and acquire an unlisted item?"
+    ],
+    "selected_question_index": null,
+    "step": 0
+  },
+  {
+    "cumulative_experiments": 33,
+    "cumulative_questions": 345,
+    "episode_idx": 5,
+    "experiment_plan": null,
+    "global_step": 73,
+    "new_questions": [
+      "If the agent moves into a tile that is marked as traversable (e.g., '.', '}') and is adjacent to a tile marked as lethal lava ('---' or confirmed lava), will the agent always take damage or die from the lava?",
+      "If the agent moves into a tile adjacent to a visible hostile monster but not into the same tile as the monster, does the monster automatically attack the agent in that same turn?",
+      "Do some monsters (e.g., newts) possess ranged attacks that can hit the agent when not in an adjacent square?",
+      "Does death and respawning reset the state of previously opened doors (e.g., do they become closed again on the map)?"
+    ],
+    "selected_question_index": null,
+    "step": 1
+  }
+]
