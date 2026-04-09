@@ -76,8 +76,8 @@ from run_utils import setup_run, improve_logging, _update_summary_json
 @dataclass
 class StepwiseEBLearnConfig:
     n_environment_steps: int
-    max_perception_iterations: int     # Track 1b turns
-    max_qa_iterations: int             # Track 2 turns
+    max_perception_iterations: "int | list[list[int]]"  # Track 1b turns (int or schedule)
+    max_qa_iterations: "int | list[list[int]]"          # Track 2 turns (int or schedule)
     max_qa_per_forward: int
     max_total_qa_pairs: int
     num_questions: int                 # Questions per generation step
@@ -87,6 +87,32 @@ class StepwiseEBLearnConfig:
     improve_interval: int
     experiment_interval: int
     max_steps_context_chars: int
+
+
+def _resolve_schedule(value: "int | list[list[int]]", global_step: int) -> int:
+    """Resolve a schedule value based on global_step.
+
+    If value is an int, return it directly.
+    If value is a list of [step_threshold, count] pairs, return the count
+    for the first range that contains global_step. The last entry acts as
+    the default (its threshold is ignored).
+
+    Example: [[10, 10], [20, 5], [0, 3]]
+      - steps 0-9:  10
+      - steps 10-19: 5
+      - steps 20+:   3
+    """
+    if isinstance(value, int):
+        return value
+    cumulative = 0
+    for i, entry in enumerate(value):
+        threshold, count = entry[0], entry[1]
+        if i == len(value) - 1:
+            return count
+        if global_step < cumulative + threshold:
+            return count
+        cumulative += threshold
+    return value[-1][1]
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +286,9 @@ def _run_improve_loop_eb(
     feedback_history: list[dict] = []
     tag = f"[g{global_step}]"
 
+    max_perception_iters = _resolve_schedule(eb_config.max_perception_iterations, global_step)
+    max_qa_iters = _resolve_schedule(eb_config.max_qa_iterations, global_step)
+
     steps_context = format_steps_context(
         trajectory_buffer, perception, eb_config.max_steps_context_chars,
     )
@@ -269,8 +298,8 @@ def _run_improve_loop_eb(
 
     num_answered = sum(1 for q in qa_pairs if q.answer is not None)
     evolve_logger.info(
-        f"{tag} Improve loop: perception={eb_config.max_perception_iterations}, "
-        f"qa={eb_config.max_qa_iterations} iters, "
+        f"{tag} Improve loop: perception={max_perception_iters}, "
+        f"qa={max_qa_iters} iters, "
         f"{len(qa_pairs)} QA ({num_answered} answered), "
         f"{len(steps_context)} chars context"
     )
@@ -361,18 +390,18 @@ For beliefs:
                 default_knowledge=default_knowledge,
                 obs_section=obs_section_1b,
                 perception_analysis=perception_analysis,
-                max_iterations=eb_config.max_perception_iterations,
+                max_iterations=max_perception_iters,
             )
 
             perception_conv_1b: list[dict] = []
             prev_obs_section_1b = obs_section_1b
 
-            for turn in range(eb_config.max_perception_iterations):
-                evolve_logger.info(f"{tag}     Track 1b (perception from analysis) turn {turn + 1}/{eb_config.max_perception_iterations}")
+            for turn in range(max_perception_iters):
+                evolve_logger.info(f"{tag}     Track 1b (perception from analysis) turn {turn + 1}/{max_perception_iters}")
 
                 message = perception_from_analysis_prompt if turn == 0 else build_perception_followup_message(
                     perception, sample_obs, prev_obs_section_1b,
-                    current_turn=turn + 1, max_turns=eb_config.max_perception_iterations,
+                    current_turn=turn + 1, max_turns=max_perception_iters,
                 )
 
                 _beliefs_unused, perception, turn_cost, perception_conv_1b, response_text = asyncio.run(
@@ -529,7 +558,7 @@ Guidelines:
 - Balance safety with progress toward the objective.
 - Remove beliefs that are contradicted by the QA evidence.
 
-This is a multi-turn conversation. After each response, the QA pairs will be re-evaluated with your updated beliefs/perception. You can iterate up to {eb_config.max_qa_iterations} turns.
+This is a multi-turn conversation. After each response, the QA pairs will be re-evaluated with your updated beliefs/perception. You can iterate up to {max_qa_iters} turns.
 
 {PERCEPTION_INSTRUCTIONS}
 
@@ -539,8 +568,8 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                 prev_qa_correct = len(qa_correct)
                 prev_qa_incorrect = len(qa_incorrect)
 
-                for turn in range(eb_config.max_qa_iterations):
-                    evolve_logger.info(f"{tag}     Track 2 turn {turn + 1}/{eb_config.max_qa_iterations}")
+                for turn in range(max_qa_iters):
+                    evolve_logger.info(f"{tag}     Track 2 turn {turn + 1}/{max_qa_iters}")
 
                     message = initial_qa_prompt if turn == 0 else build_qa_followup_message(
                         qa_fb_results, prev_qa_correct, prev_qa_incorrect,
@@ -573,7 +602,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                         break
 
                     # Re-evaluate QA for next turn (unless this is the last turn)
-                    if turn + 1 < eb_config.max_qa_iterations:
+                    if turn + 1 < max_qa_iters:
                         prev_qa_correct = sum(1 for fr in qa_fb_results if fr.verdict == "CORRECT")
                         prev_qa_incorrect = sum(1 for fr in qa_fb_results if fr.verdict == "INCORRECT")
 
@@ -1028,9 +1057,11 @@ def run_stepwise_eb_learn_episode(
 
             # --- Improve loop (beliefs/perception + QA) ---
             if should_improve:
+                _perc_iters = _resolve_schedule(eb_config.max_perception_iterations, global_step)
+                _qa_iters = _resolve_schedule(eb_config.max_qa_iterations, global_step)
                 evolve_logger.info(
-                    f"[g{global_step}] Running improve loop (perception={eb_config.max_perception_iterations}, "
-                    f"qa={eb_config.max_qa_iterations} iters)..."
+                    f"[g{global_step}] Running improve loop (perception={_perc_iters}, "
+                    f"qa={_qa_iters} iters)..."
                 )
                 pre_improve_perception = perception
                 with improve_logging(step_dir):
@@ -1255,7 +1286,7 @@ def stepwise_eb_learn(
 
     evolve_logger.info(f"Stepwise EB-learn config:")
     evolve_logger.info(f"  Total env steps: {eb_config.n_environment_steps}")
-    evolve_logger.info(f"  Improve iterations: perception={eb_config.max_perception_iterations}, qa={eb_config.max_qa_iterations}")
+    evolve_logger.info(f"  Improve iterations: perception={eb_config.max_perception_iterations}, qa={eb_config.max_qa_iterations} (schedule or fixed)")
     evolve_logger.info(f"  Artifact update interval: {eb_config.artifact_update_interval}")
     evolve_logger.info(f"  Improve interval: {eb_config.improve_interval}")
     evolve_logger.info(f"  Experiment interval: {eb_config.experiment_interval}")
