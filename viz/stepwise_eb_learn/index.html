@@ -114,11 +114,17 @@ pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px
 }
 </style>
 <script>
-window.STEPWISE_EB_VIEWER_CONFIG = {
-  mode: "static",
-  allowDynamicInput: false,
-  dataIndexPath: "../../data/stepwise_eb_runs/index.json"
-};
+window.STEPWISE_EB_VIEWER_CONFIG = (function() {
+  // Compute data path relative to the /viz/ segment in the URL,
+  // so it works whether served from /bai/viz/ or /bai/viz/stepwise_eb_learn/
+  var vizIdx = window.location.pathname.indexOf('/viz/');
+  var basePath = vizIdx !== -1 ? window.location.pathname.substring(0, vizIdx) : '';
+  return {
+    mode: "static",
+    allowDynamicInput: false,
+    dataIndexPath: window.location.origin + basePath + "/data/stepwise_eb_runs/index.json"
+  };
+})();
 </script>
 <!-- CONFIG_INJECTION -->
 </head>
