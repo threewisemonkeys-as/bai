@@ -33,6 +33,7 @@ dependencies = [
     "google-genai==1.52.0",
     "vllm==0.11.0",
     "balrog",
+    "arc-agi>=0.0.7",
 ]
 
 [tool.uv]

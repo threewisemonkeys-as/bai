@@ -129,10 +129,13 @@ def load_log_dir(log_dir):
                 "has_feedback": os.path.exists(os.path.join(s_path, "feedback_history.json")),
                 "has_improve_log": os.path.exists(os.path.join(s_path, "improve.log")),
                 "has_extraction_log": os.path.exists(os.path.join(s_path, "extraction_log.json")),
+                "has_trim_log": os.path.exists(os.path.join(s_path, "trim_log.json")),
                 "has_experiment_log": os.path.exists(os.path.join(s_path, "experiment_log.json")),
                 "has_agent_messages": os.path.exists(os.path.join(s_path, "agent_messages.json")),
+                "trim_cost": step_log.get("trim_cost", 0),
                 "did_gen_questions": step_log.get("did_gen_questions", False),
                 "did_formulate_experiment": step_log.get("did_formulate_experiment", False),
+                "did_trim": step_log.get("did_trim", False),
                 "active_experiment": step_log.get("active_experiment"),
                 "selected_question": step_log.get("selected_question"),
                 "phase": step_log.get("phase", "complete"),
@@ -169,6 +172,7 @@ def load_step_detail(log_dir, episode_idx, step_idx):
         "qa_pairs": read_json(os.path.join(step_path, "qa_pairs.json")) or [],
         "feedback_history": read_json(os.path.join(step_path, "feedback_history.json")) or [],
         "extraction_log": read_json(os.path.join(step_path, "extraction_log.json")) or {},
+        "trim_log": read_json(os.path.join(step_path, "trim_log.json")) or {},
         "experiment_log": read_json(os.path.join(step_path, "experiment_log.json")) or {},
         "agent_messages": read_json(os.path.join(step_path, "agent_messages.json")) or [],
         "improve_log": read_file(os.path.join(step_path, "improve.log")),
@@ -204,6 +208,59 @@ def load_trajectory(log_dir, episode_idx):
             "reward": row.get("Reward", ""),
             "done": row.get("Done", ""),
         })
+
+    # Fallback for older runs whose CSV does not contain a terminal post-action
+    # row (only written when done=True). If trajectory_buffer.json exists, use
+    # the last buffer entry's `result_raw_*_term_context` to synthesize a
+    # terminal row showing the state *after* the final action.
+    def _has_terminal_row(rows):
+        if not rows:
+            return False
+        last = rows[-1]
+        return (not last.get("action")) and str(last.get("done", "")).strip().lower() == "true"
+
+    if not _has_terminal_row(steps):
+        buffer_path = os.path.join(episode_dir, "trajectory_buffer.json")
+        buffer = read_json(buffer_path)
+        if isinstance(buffer, list):
+            # Find the last non-boundary entry that belongs to this episode and
+            # has a captured post-action observation.
+            last_entry = None
+            for entry in reversed(buffer):
+                if not isinstance(entry, dict):
+                    continue
+                if entry.get("episode_boundary"):
+                    break  # earlier entries belong to a previous episode
+                if entry.get("result_raw_long_term_context") is not None:
+                    last_entry = entry
+                    break
+
+            if last_entry is not None:
+                result_long = last_entry.get("result_raw_long_term_context", "") or ""
+                result_short = last_entry.get("result_raw_short_term_context", "") or ""
+                # Format matches stepwise_eb_learn._compose_obs_text. Note: this
+                # is the *raw* post-action observation (pre-perception), since
+                # only the raw texts are persisted in trajectory_buffer.json.
+                sep = "=" * 10
+                obs_text = (
+                    f"{result_short}\n\n"
+                    f"{sep} Start of Direct Observation (post-action, raw) {sep}\n"
+                    f"{result_long}\n\n"
+                    f"{sep} End of Direct Observation {sep}"
+                )
+                try:
+                    next_step_num = int(steps[-1].get("step", len(steps) - 1)) + 1 if steps else 0
+                except (TypeError, ValueError):
+                    next_step_num = len(steps)
+                steps.append({
+                    "step": str(next_step_num),
+                    "action": "",
+                    "reasoning": "",
+                    "observation": obs_text,
+                    "auxiliary_observation": result_short,
+                    "reward": "0.0",
+                    "done": "True",
+                })
     return steps
 
 

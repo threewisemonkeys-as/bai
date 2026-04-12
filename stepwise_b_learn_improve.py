@@ -29,7 +29,8 @@ from mixed_improve import (
 PERCEPTION_INSTRUCTIONS = """For the perception module:
 - It should be a valid Python function `perceive(observation_text: str) -> str`.
 - Input `observation_text` contains everything from the direct environment observation as a string.
-- Output should be concise while containing all features useful for decision-making in the environment.
+- Output should only contain features important for decision-making in the environment.
+- Ensure the output does not exceed 2000 characters. Remove features that the agent does not use for decision-making.
 - The output should be consistent with the current world knowledge and policy and should not make any additional or contradictory assumptions to them.
 - Ensure that the perception module is working correctly — that it is correctly extracting the intended information from the raw environment state and presenting it clearly.
 """
@@ -621,59 +622,6 @@ def _extract_obs_message(raw_obs: str) -> str:
     return match.group(1).strip() if match else raw_obs.strip()
 
 
-def _format_step_history(
-    trajectory_buffer: list[dict],
-    perception_code: str,
-    max_text_history: int,
-    max_cot_history: int,
-) -> str:
-    """Format recent step history for the experiment generation prompt.
-
-    Mirrors the agent's view: last max_text_history observations, last
-    max_cot_history steps include reasoning.
-    """
-    if not trajectory_buffer:
-        return "(no steps recorded yet)"
-
-    # Take the last max_text_history steps
-    recent = trajectory_buffer[-max_text_history:]
-
-    # Only the last max_cot_history steps get reasoning
-    reasoning_cutoff = len(recent) - max_cot_history
-
-    blocks = []
-    for i, entry in enumerate(recent):
-        if entry.get("episode_boundary"):
-            continue
-
-        raw_obs = entry.get("raw_long_term_context", "")
-        raw_aux = entry.get("raw_short_term_context", "")
-        action = entry.get("action")
-        is_terminal = action is None
-
-        block = f"<step n=\"{entry['step']}\">\n"
-        if is_terminal:
-            block += f"<terminal_state>\n{_extract_obs_message(raw_obs)}\n</terminal_state>\n"
-            block += f"<auxiliary_observation>\n{raw_aux}\n</auxiliary_observation>\n"
-        else:
-            perc_out = (
-                _run_perception_on_observation(perception_code, raw_obs)
-                if perception_code
-                else ""
-            )
-            block += f"<state>\n{raw_obs}\n</state>\n\n"
-            block += f"<auxiliary_observation>\n{raw_aux}\n</auxiliary_observation>\n\n"
-            block += f"<perception_output>\n{perc_out if perc_out else '(no perception module)'}\n</perception_output>\n\n"
-            if i >= reasoning_cutoff:
-                reasoning = entry.get("reasoning", "")
-                if reasoning:
-                    block += f"<agent_reasoning>\n{reasoning}\n</agent_reasoning>\n"
-            block += f"<action>{action}</action>\n"
-        block += "</step>"
-        blocks.append(block)
-
-    return "\n".join(blocks)
-
 
 async def generate_experiments_from_steps(
     config: DictConfig,
@@ -681,12 +629,10 @@ async def generate_experiments_from_steps(
     beliefs: str,
     qa_pairs: list[QAPair],
     critical_moments: list[CriticalMoment],
-    trajectory_buffer: list[dict],
     perception_code: str,
     current_experiment: str | None,
     num_experiments: int,
-    max_text_history: int,
-    max_cot_history: int,
+    steps_context: str,
     current_observation: str | None = None,
     current_aux_observation: str | None = None,
     default_knowledge: str = "",
@@ -714,9 +660,7 @@ async def generate_experiments_from_steps(
         known_facts += "Known critical moments:\n" + "\n".join(lines) + "\n\n"
 
     # --- Section 5: Step history ---
-    step_history = _format_step_history(
-        trajectory_buffer, perception_code, max_text_history, max_cot_history,
-    )
+    step_history = steps_context
 
     # --- Section 6: Current experiment ---
     current_exp_text = current_experiment if current_experiment else "(no experiment set yet)"

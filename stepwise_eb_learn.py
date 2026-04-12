@@ -56,6 +56,7 @@ from stepwise_eb_learn_improve import (
     generate_questions_from_steps,
     formulate_experiment_from_question,
     update_qa_from_trajectory,
+    trim_qa_pairs,
 )
 from llm_utils import extract_xml_key
 from stepwise_b_learn import (
@@ -128,6 +129,7 @@ def _save_step_artifacts_eb(
     feedback_history: list[dict],
     extraction_log: dict | None = None,
     experiment_log: dict | None = None,
+    trim_log: dict | None = None,
 ):
     """Save all artifacts for a completed step."""
     step_dir.mkdir(parents=True, exist_ok=True)
@@ -144,6 +146,9 @@ def _save_step_artifacts_eb(
     if experiment_log:
         with open(step_dir / "experiment_log.json", "w") as f:
             json.dump(experiment_log, f, indent=4, default=str)
+    if trim_log:
+        with open(step_dir / "trim_log.json", "w") as f:
+            json.dump(trim_log, f, indent=4, default=str)
 
 
 def _save_step_log_eb(
@@ -158,10 +163,12 @@ def _save_step_log_eb(
     extract_cost: float,
     improve_cost: float,
     experiment_cost: float,
+    trim_cost: float,
     num_qa: int,
     num_unanswered: int,
     did_gen_questions: bool = False,
     did_formulate_experiment: bool = False,
+    did_trim: bool = False,
     active_experiment: str | None = None,
     phase: str = "complete",
 ):
@@ -178,11 +185,13 @@ def _save_step_log_eb(
         "extract_cost": extract_cost,
         "improve_cost": improve_cost,
         "experiment_cost": experiment_cost,
-        "step_total_cost": agent_cost + extract_cost + improve_cost + experiment_cost,
+        "trim_cost": trim_cost,
+        "step_total_cost": agent_cost + extract_cost + improve_cost + experiment_cost + trim_cost,
         "num_qa_pairs": num_qa,
         "num_unanswered_questions": num_unanswered,
         "did_gen_questions": did_gen_questions,
         "did_formulate_experiment": did_formulate_experiment,
+        "did_trim": did_trim,
         "active_experiment": active_experiment,
     }
     with open(step_dir / "step_log.json", "w") as f:
@@ -345,7 +354,7 @@ For beliefs:
   * <world_knowledge>: Facts about how the environment works — mechanics, properties, cause-and-effect relationships.
   * <policy>: Tactical approaches — what to do in specific situations, priorities, strategies for completing the objective.
 - Correct any wrong or misleading beliefs in either section.
-- Both sections should be consise, made up of at most 10 brief points, merging any redundant or stale information.
+- Both sections should be consise, made up of a few brief points, merging any redundant or stale information.
 - They should be grounded in the evidence present in the step sequence, only containing inferences from what we have observed so far.
 
 {PERCEPTION_INSTRUCTIONS}
@@ -704,8 +713,7 @@ def run_stepwise_eb_learn_episode(
     # Inform agent of death/respawn if this is not the first episode
     if episode_idx > 0:
         obs["text"]["short_term_context"] = (
-            "You died in your previous attempt and have respawned as a new character. "
-            "Use what you learned from your previous life to do better this time.\n\n"
+            "The previous episode was terminated and you have respawned.\n\n"
             + obs["text"]["short_term_context"]
         )
 
@@ -777,6 +785,9 @@ def run_stepwise_eb_learn_episode(
 
         action = None
         step = 0
+        result_obs_text: str | None = None
+        new_raw_short: str = ""
+        done = False
 
         for step in range(max_steps):
             global_step = global_step_start + step
@@ -788,8 +799,11 @@ def run_stepwise_eb_learn_episode(
             step_extract_cost = 0.0
             step_improve_cost = 0.0
             step_experiment_cost = 0.0
+            step_trim_cost = 0.0
             step_extraction_log = None
             step_experiment_log = None
+            step_trim_log: dict | None = None
+            did_trim_step = False
             step_feedback_records: list[dict] = []
             num_unanswered = sum(1 for q in qa_pairs if q.answer is None)
 
@@ -798,7 +812,9 @@ def run_stepwise_eb_learn_episode(
                 step_dir=step_dir, step=step, global_step=global_step,
                 action=None, reward=0.0, done=False, episode_return=episode_return,
                 agent_cost=0.0, extract_cost=0.0, improve_cost=0.0, experiment_cost=0.0,
-                num_qa=len(qa_pairs), num_unanswered=num_unanswered,                 did_gen_questions=False, did_formulate_experiment=False,
+                trim_cost=0.0,
+                num_qa=len(qa_pairs), num_unanswered=num_unanswered,
+                did_gen_questions=False, did_formulate_experiment=False,
                 active_experiment=current_experiment, phase="started",
             )
 
@@ -809,6 +825,9 @@ def run_stepwise_eb_learn_episode(
 
             if should_gen_experiments:
                 evolve_logger.info(f"[g{global_step}] Generating questions...")
+                exp_steps_context = format_steps_context(
+                    trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                )
                 with improve_logging(step_dir):
                     # Step 1: Generate questions
                     new_questions, q_cost, q_prompt, q_response = asyncio.run(
@@ -816,13 +835,11 @@ def run_stepwise_eb_learn_episode(
                             config=config,
                             beliefs=beliefs,
                             perception_code=perception,
-                            trajectory_buffer=trajectory_buffer,
+                            steps_context=exp_steps_context,
                             current_qa=qa_pairs,
                             current_observation=_pre_action_raw_long,
                             current_aux_observation=_pre_action_raw_short,
                             default_knowledge=default_knowledge,
-                            max_text_history=config.agent.max_text_history,
-                            max_cot_history=config.agent.max_cot_history,
                             num_questions=eb_config.num_questions,
                             current_step=global_step,
                         )
@@ -843,14 +860,12 @@ def run_stepwise_eb_learn_episode(
                             config=config,
                             beliefs=beliefs,
                             perception_code=perception,
-                            trajectory_buffer=trajectory_buffer,
+                            steps_context=exp_steps_context,
                             current_qa=qa_pairs,
                             current_experiment=current_experiment,
                             current_observation=_pre_action_raw_long,
                             current_aux_observation=_pre_action_raw_short,
                             default_knowledge=default_knowledge,
-                            max_text_history=config.agent.max_text_history,
-                            max_cot_history=config.agent.max_cot_history,
                         )
                     )
                     step_experiment_cost += e_cost
@@ -894,7 +909,9 @@ def run_stepwise_eb_learn_episode(
                 step_dir=step_dir, step=step, global_step=global_step,
                 action=None, reward=0.0, done=False, episode_return=episode_return,
                 agent_cost=0.0, extract_cost=0.0, improve_cost=0.0, experiment_cost=step_experiment_cost,
-                num_qa=len(qa_pairs), num_unanswered=num_unanswered,                 did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                trim_cost=0.0,
+                num_qa=len(qa_pairs), num_unanswered=num_unanswered,
+                did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
                 active_experiment=current_experiment, phase="acting",
             )
 
@@ -965,7 +982,9 @@ def run_stepwise_eb_learn_episode(
                 step_dir=step_dir, step=step, global_step=global_step,
                 action=action, reward=reward, done=done, episode_return=episode_return,
                 agent_cost=agent_step_cost, extract_cost=0.0, improve_cost=0.0, experiment_cost=step_experiment_cost,
-                num_qa=len(qa_pairs), num_unanswered=num_unanswered,                 did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                trim_cost=0.0,
+                num_qa=len(qa_pairs), num_unanswered=num_unanswered,
+                did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
                 active_experiment=current_experiment, phase="extracting",
             )
 
@@ -1045,13 +1064,44 @@ def run_stepwise_eb_learn_episode(
                     f"QA: {len(qa_pairs)} ({num_unanswered} unanswered), cost: ${extract_cost:.6f}"
                 )
 
+                # --- Trim Q if over limit ---
+                if len(qa_pairs) > eb_config.max_total_qa_pairs:
+                    evolve_logger.info(
+                        f"[g{global_step}] Trimming Q: {len(qa_pairs)} > {eb_config.max_total_qa_pairs}..."
+                    )
+                    with improve_logging(step_dir):
+                        qa_pairs, trim_cost_val, step_trim_log = asyncio.run(
+                            trim_qa_pairs(
+                                config=config,
+                                current_qa=qa_pairs,
+                                max_total_qa_pairs=eb_config.max_total_qa_pairs,
+                                current_step=global_step,
+                            )
+                        )
+                        step_trim_cost = trim_cost_val
+                        total_learn_cost += trim_cost_val
+                        did_trim_step = True
+
+                    with open(step_dir / "trim_log.json", "w") as f:
+                        json.dump(step_trim_log, f, indent=4, default=str)
+                    with open(step_dir / "qa_pairs.json", "w") as f:
+                        json.dump(serialize_eb_qa_pairs(qa_pairs), f, indent=4)
+
+                    num_unanswered = sum(1 for q in qa_pairs if q.answer is None)
+                    evolve_logger.info(
+                        f"[g{global_step}] Trim done — "
+                        f"QA: {len(qa_pairs)} ({num_unanswered} unanswered), cost: ${trim_cost_val:.6f}"
+                    )
+
                 # Update step_log: extraction done, improve starting
                 _save_step_log_eb(
                     step_dir=step_dir, step=step, global_step=global_step,
                     action=action, reward=reward, done=done, episode_return=episode_return,
                     agent_cost=agent_step_cost, extract_cost=step_extract_cost, improve_cost=0.0,
-                    experiment_cost=step_experiment_cost,
-                    num_qa=len(qa_pairs), num_unanswered=num_unanswered,                     did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                    experiment_cost=step_experiment_cost, trim_cost=step_trim_cost,
+                    num_qa=len(qa_pairs), num_unanswered=num_unanswered,
+                    did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                    did_trim=did_trim_step,
                     active_experiment=current_experiment, phase="improving",
                 )
 
@@ -1120,7 +1170,7 @@ def run_stepwise_eb_learn_episode(
                 )
 
             # --- Per-step artifact save ---
-            step_total_cost = agent_step_cost + step_extract_cost + step_improve_cost + step_experiment_cost
+            step_total_cost = agent_step_cost + step_extract_cost + step_improve_cost + step_experiment_cost + step_trim_cost
             cumulative_step_cost += step_total_cost
 
             did_learn = should_update_artifacts or should_improve or should_gen_experiments
@@ -1130,6 +1180,7 @@ def run_stepwise_eb_learn_episode(
                     step_feedback_records,
                     extraction_log=step_extraction_log,
                     experiment_log=step_experiment_log,
+                    trim_log=step_trim_log,
                 )
 
             num_unanswered = sum(1 for q in qa_pairs if q.answer is None)
@@ -1138,7 +1189,10 @@ def run_stepwise_eb_learn_episode(
                 action=action, reward=reward, done=done, episode_return=episode_return,
                 agent_cost=agent_step_cost, extract_cost=step_extract_cost,
                 improve_cost=step_improve_cost, experiment_cost=step_experiment_cost,
-                num_qa=len(qa_pairs), num_unanswered=num_unanswered,                 did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                trim_cost=step_trim_cost,
+                num_qa=len(qa_pairs), num_unanswered=num_unanswered,
+                did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                did_trim=did_trim_step,
                 active_experiment=current_experiment, phase="complete",
             )
 
@@ -1161,12 +1215,11 @@ def run_stepwise_eb_learn_episode(
                     "did_improve": should_improve,
                     "did_gen_questions": did_gen_questions,
                     "did_formulate_experiment": did_formulate_experiment,
+                    "did_trim": did_trim_step,
                 },
             )
 
             if done:
-                csv_writer.writerow([step + 1, "", "", result_obs_text, new_raw_short, 0.0, True])
-                csv_file.flush()
                 evolve_logger.info(
                     f"[g{global_step}] Episode {episode_idx} DONE — "
                     f"return={episode_return:.2f}, steps={step + 1}"
@@ -1175,6 +1228,13 @@ def run_stepwise_eb_learn_episode(
                     pbar.update(pbar.total - pbar.n)
                 pbar.set_postfix_str("DONE")
                 break
+
+        # Write terminal row with the post-action state from the last completed step,
+        # regardless of whether the episode ended via `done` or by hitting max_steps.
+        # This lets the viewer show the state *after* the final action.
+        if result_obs_text is not None:
+            csv_writer.writerow([step + 1, "", "", result_obs_text, new_raw_short, 0.0, done])
+            csv_file.flush()
 
     if pbar.n < pbar.total:
         pbar.update(pbar.total - pbar.n)

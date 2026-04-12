@@ -58,7 +58,6 @@ from stepwise_b_learn_improve import (
     build_moments_followup_message,
     _build_obs_section,
     _build_execution_report_section,
-    _extract_obs_message,
     PERCEPTION_INSTRUCTIONS,
     RESPONSE_FORMAT,
     BELIEFS_ONLY_RESPONSE_FORMAT,
@@ -121,44 +120,42 @@ def format_steps_context(
     if not trajectory_buffer:
         return ""
 
-    # Build formatted blocks for each step (newest last)
-    # Find the last non-terminal entry index so we can append its result state
-    last_action_idx = max(
-        (i for i, e in enumerate(trajectory_buffer) if e.get("action") is not None),
-        default=-1,
-    )
-
     blocks = []
     for i, entry in enumerate(trajectory_buffer):
         if entry.get("episode_boundary"):
             blocks.append(f"<episode_boundary episode=\"{entry.get('episode_idx', '?')}\" />\n")
             continue
 
-        raw_obs = entry.get("raw_long_term_context", "")
-        raw_aux = entry.get("raw_short_term_context", "")
-        action = entry.get("action")
-        is_terminal = action is None
-        reward = entry.get("reward", 0)
-
-        if is_terminal:
-            # Terminal entry is redundant: the resulting state is already shown on the
-            # last action step with full raw obs + perception output.
+        # Skip terminal entries — their obs is already in the preceding action
+        # entry's result_raw_long_term_context.
+        if entry.get("action") is None:
             continue
 
+        raw_obs = entry.get("raw_long_term_context", "")
+        raw_aux = entry.get("raw_short_term_context", "")
         perc_out = _run_perception_on_observation(perception_code, raw_obs) if perception_code else ""
         reasoning = entry.get("reasoning", "")
+        reward = entry.get("reward", 0)
+
         block = f"<step n=\"{entry['step']}\">\n"
         block += (
             f"<state>\n{raw_obs}\n</state>\n\n"
             f"<auxiliary_observation>\n{raw_aux}\n</auxiliary_observation>\n\n"
             f"<perception_output>\n{perc_out if perc_out else '(no perception module)'}\n</perception_output>\n\n"
             f"<agent_reasoning>\n{reasoning}\n</agent_reasoning>\n"
-            f"<action>{action}</action>\n"
+            f"<action>{entry['action']}</action>\n"
         )
         block += f"<reward>{reward}</reward>\n"
-        # For the last action step, append the resulting state (s_t) so the
-        # trajectory is complete: s0, a0, s1, a1, ..., s_{t-1}, a_{t-1}, s_t
-        if i == last_action_idx:
+
+        # Append resulting state when this is the last action before an episode
+        # boundary, a terminal entry, or the end of the buffer.
+        next_entry = trajectory_buffer[i + 1] if i + 1 < len(trajectory_buffer) else None
+        is_last_before_break = (
+            next_entry is None
+            or next_entry.get("episode_boundary")
+            or next_entry.get("action") is None
+        )
+        if is_last_before_break:
             result_raw = entry.get("result_raw_long_term_context", "")
             result_raw_aux = entry.get("result_raw_short_term_context", "")
             if result_raw:
@@ -516,8 +513,7 @@ def run_stepwise_b_learn_episode(
     # Inform agent of death/respawn if this is not the first episode
     if episode_idx > 0:
         obs["text"]["short_term_context"] = (
-            "You died in your previous attempt and have respawned as a new character. "
-            "Use what you learned from your previous life to do better this time.\n\n"
+            "The previous episode was terminated and you have respawned.\n\n"
             + obs["text"]["short_term_context"]
         )
 
@@ -620,6 +616,9 @@ def run_stepwise_b_learn_episode(
             if should_gen_experiments:
                 evolve_logger.info(f"[g{global_step}] Generating experiments...")
                 old_experiments = list(experiments)
+                exp_steps_context = format_steps_context(
+                    trajectory_buffer, perception, bl_config.max_steps_context_chars,
+                )
                 with improve_logging(step_dir):
                     forward_moments = [m for m in moments if m.raw_observation and m.raw_observation.strip()]
                     experiments, exp_cost, exp_prompt, exp_response = asyncio.run(
@@ -629,12 +628,10 @@ def run_stepwise_b_learn_episode(
                             beliefs=beliefs,
                             qa_pairs=qa_pairs,
                             critical_moments=forward_moments,
-                            trajectory_buffer=trajectory_buffer,
                             perception_code=perception,
                             current_experiment=current_experiment,
                             num_experiments=bl_config.num_experiments,
-                            max_text_history=config.agent.max_text_history,
-                            max_cot_history=config.agent.max_cot_history,
+                            steps_context=exp_steps_context,
                             current_observation=_pre_action_raw_long,
                             current_aux_observation=_pre_action_raw_short,
                             default_knowledge=default_knowledge,

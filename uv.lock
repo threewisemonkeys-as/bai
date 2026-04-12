@@ -256,6 +256,73 @@ wheels = [
 ]
 
 [[package]]
+name = "arc-agi"
+version = "0.0.7"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and sys_platform != 'linux'",
+]
+dependencies = [
+    { name = "arc-agi-core", marker = "python_full_version < '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/49/89/5f9c042825a75a06c838686cdfd0011a95f0a45ea1992f7e4839b01049b9/arc_agi-0.0.7.tar.gz", hash = "sha256:5b0d9938103a0e8dc7ea22cde407d4134d5c22022ac1779c094edcfda597f855", size = 759 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/34/2951a3d688b2fd62ce0a54e3aff6ad640641d5c17da5755f642cd1901f9b/arc_agi-0.0.7-py3-none-any.whl", hash = "sha256:031911f866abc74d7af5402a5bd8214abdbc56d97d51695b9b00425ec9f64343", size = 1068 },
+]
+
+[[package]]
+name = "arc-agi"
+version = "0.9.1"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and sys_platform == 'linux'",
+    "python_full_version >= '3.14' and sys_platform != 'linux'",
+    "python_full_version == '3.13.*' and sys_platform != 'linux'",
+    "python_full_version == '3.12.*' and sys_platform == 'linux'",
+    "python_full_version == '3.12.*' and sys_platform != 'linux'",
+]
+dependencies = [
+    { name = "arcengine", marker = "python_full_version >= '3.12'" },
+    { name = "matplotlib", marker = "python_full_version >= '3.12'" },
+    { name = "pydantic", marker = "python_full_version >= '3.12'" },
+    { name = "python-dotenv", marker = "python_full_version >= '3.12'" },
+    { name = "requests", marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c4/65/76676624411a9886b36bd9b31ad2abc6dfcd4fa4ed89da6ab8c8ef508369/arc_agi-0.9.1.tar.gz", hash = "sha256:9cb49cef953d5153e376f1b3550952f229fec0b34237dd5c1888ff4818205ff5", size = 26197 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/99/bc/5fdeb0f72a71057beb8b2e444f79781a17a480a9fc873115e6c4c546ecca/arc_agi-0.9.1-py3-none-any.whl", hash = "sha256:1cb694668ebb2791556d3acb211cd37381d418a069de1739f995f7255e64d44e", size = 30642 },
+]
+
+[[package]]
+name = "arc-agi-core"
+version = "0.1.14"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", marker = "python_full_version < '3.12'" },
+    { name = "requests", marker = "python_full_version < '3.12'" },
+    { name = "svg-py", marker = "python_full_version < '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/53/6f/392df92b5c9597a25551a2b8d66092dfb9bf4d4bc9273c930b99ae980837/arc_agi_core-0.1.14.tar.gz", hash = "sha256:4cc49bb6547ef309e651b8c30029f056aaa37a8c6342f7ca8c448c096a2ff525", size = 320885 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/66/e6/bbb06f08c1a56c4f308839331ccbc8ddf80ce14b749713b852fc64ac0e94/arc_agi_core-0.1.14-py3-none-any.whl", hash = "sha256:07f1a9149bc698820190c093bc1289a8957d624911d4fc89a2f3f7c9f971f80f", size = 22119 },
+]
+
+[[package]]
+name = "arcengine"
+version = "0.9.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", marker = "python_full_version >= '3.12'" },
+    { name = "pydantic", marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dd/16/35b3087ac0661f8373530d83e1d2907dc7f281255698f024bd4eb3fe548d/arcengine-0.9.3.tar.gz", hash = "sha256:76441c15fde092a071ca95edce5e643385ab270304f59c1172b460048fffcdfe", size = 29544 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/49/ce/efc5dcb66cacfe4c6ada2ba07ed7a6d9971110c9fd6d540793ed6748a12c/arcengine-0.9.3-py3-none-any.whl", hash = "sha256:5f9739d6d0055780a4581fd6fe09066bb08775c4c8212c9adcca2eb008aef59c", size = 38374 },
+]
+
+[[package]]
 name = "astor"
 version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
@@ -292,6 +359,8 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "arc-agi", version = "0.0.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "arc-agi", version = "0.9.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "baba" },
     { name = "balrog" },
     { name = "balrog-nle" },
@@ -324,6 +393,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = "==0.74.0" },
+    { name = "arc-agi", specifier = ">=0.0.7" },
     { name = "baba", git = "https://github.com/nacloos/baba-is-ai.git" },
     { name = "balrog", editable = "BALROG" },
     { name = "balrog-nle", specifier = "==0.9.0" },
@@ -5036,6 +5106,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ba/b8/73a0e6a6e079a9d9cfa64113d771e421640b6f679a52eeb9b32f72d871a1/starlette-0.50.0.tar.gz", hash = "sha256:a2a17b22203254bcbc2e1f926d2d55f3f9497f769416b3190768befe598fa3ca", size = 2646985 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl", hash = "sha256:9e5391843ec9b6e472eed1365a78c8098cfceb7a74bfd4d6b1c0c0095efb3bca", size = 74033 },
+]
+
+[[package]]
+name = "svg-py"
+version = "1.10.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/bc/1e/f36612d46266942c351de904bd9928610c485baee61220892277ac37be65/svg_py-1.10.0.tar.gz", hash = "sha256:2e1391411a205220a0e72ca303f3c2d11dbd564cb1dbc445406c5e11421bcc4b", size = 43808 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/18/9f/77a405e7b2a334ce774835263c3374d4ed307a3473f3925d9990a8c029e0/svg_py-1.10.0-py3-none-any.whl", hash = "sha256:54c7470347d5d79b30d059584a4f449da08b462903e8ce262981338bab755560", size = 15207 },
 ]
 
 [[package]]

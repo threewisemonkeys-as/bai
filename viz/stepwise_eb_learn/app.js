@@ -376,6 +376,9 @@ function buildSidebar() {
     if (step.improve_cost > 0) {
       dotColor = "var(--purple)";
       dotTitle = "improve loop ran";
+    } else if (step.did_trim) {
+      dotColor = "var(--accent2)";
+      dotTitle = "Q&A trimmed";
     } else if (step.extract_cost > 0) {
       dotColor = "var(--accent)";
       dotTitle = "Q&A extraction";
@@ -598,6 +601,18 @@ function renderArtifacts(data) {
     }
     extHtml += promptResponseBlock("Q Update", extLog.prompt, extLog.response);
     html += collapsible("Q&A Update from Trajectory", extHtml, false);
+  }
+
+  const trimLog = data.trim_log || {};
+  if (trimLog.prompt || trimLog.response) {
+    let trimHtml = "";
+    if (trimLog.pre_trim_count != null) {
+      trimHtml += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' +
+        "Q: " + trimLog.pre_trim_count + " → " + (trimLog.post_trim_count != null ? trimLog.post_trim_count : "?") +
+        " (dropped " + (trimLog.dropped_count || 0) + ", limit: " + (trimLog.max_total_qa_pairs || "?") + ")" + "</div>";
+    }
+    trimHtml += promptResponseBlock("Q Trim", trimLog.prompt, trimLog.response);
+    html += collapsible("Q&A Trim", trimHtml, false);
   }
 
   const qa = data.qa_pairs || [];

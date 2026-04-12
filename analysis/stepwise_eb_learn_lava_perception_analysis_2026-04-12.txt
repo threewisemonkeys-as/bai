@@ -1,0 +1,122 @@
+Stepwise EB Learn Analysis
+Run inspected:
+logs/dev/apr10/2026-04-10_14-59-03_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn
+
+Summary
+
+The main failure is not just that perception misses immediate neighbors. By the lava death, the learner already had local neighborhood information. In episode_2/step_057/agent_messages.json, the perception output includes:
+
+- adjacent_tiles_information with '}' immediately west at (30, 12)
+- closest_interactive_symbol = that same '}'
+- closest_interactive_symbol_direction = west
+
+But the policy still said "when approaching a '}' symbol, always move onto it directly." You can see that stale belief in episode_2/step_057/feedback_history.json, and the death happens immediately after the experiment explicitly probes the '}' tile in episode_2/step_057/step_log.json. Later, the system does eventually learn the right thing: episode_4/step_011/beliefs.txt says to search before stepping on '}', and episode_4/step_011/perception.py maps '}' to door/passage/lethal trap.
+
+So the bottleneck is more: evidence reaches the system too late, gets diluted, and does not reliably overwrite risky policy.
+
+Ways To Improve
+
+1. Make the improve loop event-focused, not evenly sampled.
+
+stepwise_eb_learn.py uses sampled observations for perception improvement around lines 301-306, and _sample_observations_from_buffer in stepwise_b_learn.py picks evenly spaced states and drops the last one. That is a bad fit for rare failures. It should always include:
+
+- the most recent pre-terminal state
+- the terminal or resulting state
+- negative-reward steps
+- steps with non-empty messages
+- steps where an adjacent interactive symbol was acted on
+
+2. Feed transitions, not isolated observations, into perception improvement.
+
+Track 1b currently only shows raw observations plus current perception output via _build_obs_section. For hazards like '}', the key evidence is not a single frame but a transition:
+
+- before: '}' adjacent
+- action: west
+- after: death by molten lava
+
+Perception learning should see (state, action, resulting_state) tuples and be asked what local features would have predicted that outcome.
+
+3. Add a dedicated contradiction-removal pass for beliefs and policy.
+
+Track 1a updates beliefs once from step context, but stale rules survive. There should be an explicit pass that extracts beliefs invalidated by the latest evidence and forces deletion or downgrade. The '}' failure is the clearest example: old policy "walk onto '}'" should have been removed immediately after the counterexample appeared.
+
+4. Treat safety knowledge as hard constraints, not free-form prose.
+
+Track 2 improves beliefs and perception through QA, but the acting policy still remains soft and internally contradictory. Add a small structured safety memory, for example:
+
+- never step onto symbol or context X until searched or tested safely
+- never repeat an action that just produced a lethal outcome on an analogous tile
+
+This should be separate from narrative beliefs text.
+
+5. Make experiment generation risk-aware.
+
+The planner kept selecting experiments of the form "step onto '}' and see what happens," even right before a lethal outcome. Experiment selection should reject plans with obvious lethal downside when safer probes exist, such as:
+
+- search
+- open
+- ranged use
+- mitigation first, then test
+
+6. Keep local features minimal and action-facing.
+
+The learned perception becomes very verbose, but the highest-value fields are the simple ones:
+
+- 8-neighbor characters
+- cardinal traversability
+- adjacent unknown hazard candidates
+- prompt state
+- enemy-on-tile
+- action-relevant messages
+
+A compact required schema would likely help more than adding more prose fields.
+
+7. Represent uncertainty explicitly.
+
+Mapping '}' to door/passage invited overconfident action. Later, door/passage/lethal trap is better, but still overloaded. Better outputs would separate:
+
+- observed_symbol = '}'
+- semantic_class = unknown passage-like feature
+- traversability = unconfirmed
+- hazard_possible = true
+- recommended_safe_probe = search
+
+8. Weight recency more heavily than old generic knowledge.
+
+format_steps_context keeps a suffix of steps, but the final policy still carries older generic rules. Recent direct counterexamples should override earlier symbol heuristics. A direct lethal contradiction should receive much more weight than older exploratory generalizations.
+
+9. Add a post-improve consistency check.
+
+After Track 1 and Track 2, run a cheap consistency pass over beliefs. The system should detect contradictions like:
+
+- '}' can be lethal
+- always move onto '}'
+
+and remove or rewrite one of them before the next acting step.
+
+10. Store tile-level episodic memories for lethal outcomes.
+
+The system only half-generalizes symbol-level facts. It would help to persist memories like:
+
+- stepping onto '}' at (30,12) killed me
+
+and use them directly in acting and planning, even before the broader symbol semantics are fully learned.
+
+Concrete diagnosis from the logs
+
+- episode_2/step_057/agent_messages.json shows the system had enough local information to know there was an adjacent '}' tile west of the agent
+- episode_2/step_057/feedback_history.json still contains policy guidance pushing direct traversal of '}'
+- episode_2/step_057/step_log.json records the fatal experiment
+- episode_4/step_011/beliefs.txt eventually learns the safer rule: search before stepping onto '}'
+- episode_4/step_011/perception.py eventually upgrades '}' from a simple passage category to a possible lethal trap category
+
+Bottom line
+
+The core issue is not simply missing immediate-neighbor extraction. Immediate-neighbor extraction was present by the critical failure point. The larger issue is that the learning loop is too weak at:
+
+- selecting the right evidence for improvement
+- prioritizing failure transitions
+- deleting contradicted policy
+- enforcing safety-critical conclusions in a structured way
+
+If those are fixed, the system should stop making repeated locally well-observed but globally foolish moves like stepping onto an unverified '}'.

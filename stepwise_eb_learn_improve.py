@@ -22,9 +22,6 @@ from mixed_improve import (
     _llm_call,
     _run_perception_on_observation,
 )
-from stepwise_b_learn_improve import (
-    _format_step_history,
-)
 
 
 # ---------------------------------------------------------------------------
@@ -91,13 +88,11 @@ async def generate_questions_from_steps(
     config: DictConfig,
     beliefs: str,
     perception_code: str,
-    trajectory_buffer: list[dict],
+    steps_context: str,
     current_qa: list[EBQAPair],
     current_observation: str | None,
     current_aux_observation: str | None,
     default_knowledge: str,
-    max_text_history: int,
-    max_cot_history: int,
     num_questions: int,
     current_step: int = 0,
 ) -> tuple[list[EBQAPair], float, str, str]:
@@ -109,9 +104,7 @@ async def generate_questions_from_steps(
 
     Returns: (new_questions, cost, prompt, raw_response)
     """
-    step_history = _format_step_history(
-        trajectory_buffer, perception_code, max_text_history, max_cot_history,
-    )
+    step_history = steps_context
 
     current_obs_section = ""
     if current_observation:
@@ -121,7 +114,7 @@ async def generate_questions_from_steps(
             else ""
         )
         current_obs_section = f"""
-=== CURRENT STATE (agent has not yet acted) ===
+=== CURRENT STATE ===
 <state>
 {current_observation}
 </state>
@@ -148,9 +141,7 @@ async def generate_questions_from_steps(
 {beliefs if beliefs else "(empty - no beliefs yet)"}
 === END CURRENT BELIEFS ===
 
-=== RECENT HISTORY OF STATES AND ACTIONS ===
-{step_history}
-=== END RECENT HISTORY ==={current_obs_section}
+{current_obs_section}
 
 === CURRENT QUESTIONS ===
 {qa_list_text}
@@ -159,9 +150,8 @@ async def generate_questions_from_steps(
 Your task: Generate new binary (yes/no) questions about how the environment works.
 
 Guidelines:
-- Each question should be about environment mechanics, rules, or cause-and-effect relationships.
-- Questions should be answerable by interacting with the environment and observing the results.
-- Do NOT duplicate questions already in the current questions list.
+- Questions should be general in scope, asking about how the world works.
+- Do not duplicate questions already in the current questions list.
 - Focus on questions whose answers would be most useful for improving the agent's current beliefs.
 - Each question must be a specific yes/no question, not open-ended.
 
@@ -171,8 +161,6 @@ What aspects of the environment are we most uncertain about? What questions woul
 </think>
 <questions>
 QUESTION 1: [A specific yes/no question about how the environment works]
-
-QUESTION 2: [Another specific yes/no question]
 ...
 (Generate questions)
 </questions>"""
@@ -218,14 +206,12 @@ async def formulate_experiment_from_question(
     config: DictConfig,
     beliefs: str,
     perception_code: str,
-    trajectory_buffer: list[dict],
+    steps_context: str,
     current_qa: list[EBQAPair],
     current_experiment: str | None,
     current_observation: str | None,
     current_aux_observation: str | None,
     default_knowledge: str,
-    max_text_history: int,
-    max_cot_history: int,
 ) -> tuple[str | None, int | None, float, str, str]:
     """Select an unanswered question from Q and formulate an experiment to answer it.
 
@@ -233,9 +219,7 @@ async def formulate_experiment_from_question(
     If the LLM returns "null", returns (None, None, cost, prompt, response) to keep
     the current experiment.
     """
-    step_history = _format_step_history(
-        trajectory_buffer, perception_code, max_text_history, max_cot_history,
-    )
+    step_history = steps_context
 
     current_obs_section = ""
     if current_observation:
@@ -381,8 +365,6 @@ Your task: Update the questions list based on evidence from the trajectory.
 3. If the trajectory reveals important aspects of how the environment works that aren't covered by existing questions, add NEW questions (with answers if evidence is available, otherwise as UNANSWERED).
 4. If any existing questions are redundant, no longer useful, or superseded by better questions, you may DROP them.
 
-Maintain at most{max_total_qa_pairs} questions. Drop less useful questions if this is exceeded.
-
 Only answer questions when the trajectory provides clear evidence. Do not guess or infer beyond what is directly observed.
 
 Format your response as:
@@ -470,3 +452,123 @@ Review the trajectory and each question. What can we learn?
     )
 
     return updated_qa, cost, extraction_log
+
+
+# ---------------------------------------------------------------------------
+# Q&A trimming
+# ---------------------------------------------------------------------------
+
+
+async def trim_qa_pairs(
+    config: DictConfig,
+    current_qa: list[EBQAPair],
+    max_total_qa_pairs: int,
+    current_step: int = 0,
+) -> tuple[list[EBQAPair], float, dict]:
+    """Trim the Q&A list down to at most *max_total_qa_pairs* entries.
+
+    Asks the LLM to decide which questions to keep based on usefulness.
+    Should only be called when ``len(current_qa) > max_total_qa_pairs``.
+
+    Returns: (trimmed_qa_pairs, cost, trim_log)
+    """
+    qa_list_text = _format_qa_list(current_qa)
+
+    prompt = f"""You are maintaining a knowledge base of questions and answers about an environment.
+
+The knowledge base currently has {len(current_qa)} questions, but we need to trim it to at most {max_total_qa_pairs}.
+
+=== CURRENT QUESTIONS ===
+{qa_list_text}
+=== END CURRENT QUESTIONS ===
+
+Your task: Select the {max_total_qa_pairs} most useful questions to keep. Drop questions that are:
+- Redundant (covered by other questions)
+- No longer useful or too narrow in scope
+- Superseded by better questions on the same topic
+
+Prefer to keep:
+- Answered questions with clear evidence (they represent confirmed knowledge)
+- Unanswered questions that would be most valuable to answer next
+- Questions that cover distinct, important aspects of the environment
+
+Format your response as:
+<think>
+Which questions are most valuable? Which can be dropped?
+</think>
+<trimmed_questions>
+<q n="1">
+<question>[question text]</question>
+<answer>YES or NO or UNANSWERED</answer>
+<evidence>[evidence, or empty if unanswered]</evidence>
+</q>
+<q n="2">
+...
+</q>
+...
+(Include at most {max_total_qa_pairs} questions)
+</trimmed_questions>"""
+
+    text, cost = await _llm_call(config, prompt)
+
+    trim_log: dict = {
+        "prompt": prompt,
+        "response": text,
+        "pre_trim_count": len(current_qa),
+        "max_total_qa_pairs": max_total_qa_pairs,
+    }
+
+    trimmed_text = extract_xml_key(text, "trimmed_questions")
+    if not trimmed_text:
+        trim_log["parse_error"] = "No <trimmed_questions> block found"
+        return current_qa, cost, trim_log
+
+    trimmed_qa: list[EBQAPair] = []
+    for q_match in re.finditer(
+        r'<q\s+n="(\d+)">(.*?)</q>',
+        trimmed_text,
+        re.DOTALL,
+    ):
+        q_content = q_match.group(2)
+        question = extract_xml_key(q_content, "question")
+        answer_str = extract_xml_key(q_content, "answer")
+        evidence = extract_xml_key(q_content, "evidence") or ""
+
+        if not question:
+            continue
+
+        answer: bool | None = None
+        if answer_str:
+            answer_upper = answer_str.strip().upper()
+            if answer_upper == "YES":
+                answer = True
+            elif answer_upper == "NO":
+                answer = False
+
+        # Preserve source_step from existing Q; use current_step for unknown
+        source_step = current_step
+        for existing in current_qa:
+            if existing.question.strip().lower() == question.strip().lower():
+                source_step = existing.source_step
+                break
+
+        trimmed_qa.append(EBQAPair(
+            question=question.strip(),
+            answer=answer,
+            evidence=evidence.strip(),
+            source_step=source_step,
+        ))
+
+    if not trimmed_qa:
+        trim_log["parse_error"] = "No valid <q> entries parsed"
+        return current_qa, cost, trim_log
+
+    trim_log["post_trim_count"] = len(trimmed_qa)
+    trim_log["dropped_count"] = len(current_qa) - len(trimmed_qa)
+
+    logging.info(
+        f"Q&A trim: {len(current_qa)} -> {len(trimmed_qa)} questions "
+        f"(dropped {len(current_qa) - len(trimmed_qa)})"
+    )
+
+    return trimmed_qa, cost, trim_log
