@@ -47,6 +47,18 @@
       "steps": 79,
       "title": "EB Learn Exploratory Goal Run 2",
       "total_cost": 52.007660600000015
+    },
+    {
+      "description": "",
+      "episodes": 3,
+      "exported_at": "2026-04-13T15:51:38.034291+00:00",
+      "id": "apr12-eb-learn-skip3-r1",
+      "log_dir_name": "2026-04-12_17-59-31_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn",
+      "path": "apr12-eb-learn-skip3-r1/",
+      "source_log_dir": "/home/ays57/bai/logs/dev/apr12/2026-04-12_17-59-31_robust_cot_google_gemini-2.5-flash_stepwise_eb_learn",
+      "steps": 100,
+      "title": "Stepwise EB Learn (Skipping 3)",
+      "total_cost": 9.890360600000001
     }
   ],
   "version": 1
