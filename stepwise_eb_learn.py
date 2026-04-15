@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import random
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,7 +26,7 @@ from balrog.agents import AgentFactory
 from balrog.environments import make_env
 from balrog.utils import get_unique_seed
 
-from explore import get_default_actions, get_default_knowledge, override_temperature, evolve_logger
+from explore import get_default_knowledge, override_temperature, evolve_logger
 from mixed_improve import (
     QAPair,
     _run_perception_on_observation,
@@ -117,6 +118,105 @@ def _resolve_schedule(value: "int | list[list[int]]", global_step: int) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Image helpers: trajectory_buffer entries carry obs PIL images under the
+# "image" key. JSON serialization strips them; lookups match by step number.
+# ---------------------------------------------------------------------------
+
+
+def _buffer_for_json(trajectory_buffer: list[dict]) -> list[dict]:
+    """Return a copy of trajectory_buffer safe for JSON serialization (drops PIL images)."""
+    return [
+        {k: v for k, v in e.items() if k not in ("image", "result_image")}
+        for e in trajectory_buffer
+    ]
+
+
+def _images_for_sample_obs(
+    trajectory_buffer: list[dict],
+    sample_obs: list[tuple[str, int]],
+) -> list:
+    """Return the PIL image for each (raw_obs, step_num) sample, aligned by index.
+
+    Uses the trajectory_buffer's stored pre-action image for the matching step.
+    """
+    images = []
+    for _raw_obs, step_num in sample_obs:
+        img = None
+        for entry in trajectory_buffer:
+            if entry.get("episode_boundary"):
+                continue
+            if entry.get("step") == step_num:
+                img = entry.get("image")
+                break
+        images.append(img)
+    return images
+
+
+def _images_for_steps_context(
+    trajectory_buffer: list[dict],
+    steps_context_text: str,
+) -> tuple[str, list]:
+    """Return ``(annotated_text, images)`` for the step blocks in ``steps_context_text``.
+
+    Each ``<raw_state>`` opening tag is annotated with ``(image K)`` and, when a
+    block also contains ``<resulting_state>``, that tag likewise. ``image K`` is
+    1-indexed and refers to position K in the returned images list so the LLM
+    can cross-reference the textual step with the attached screenshot. Pre-action
+    images come from each buffer entry's ``image`` field; post-action images
+    (for ``<resulting_state>``) come from ``result_image``.
+    """
+    if not steps_context_text:
+        return steps_context_text, []
+    images: list = []
+    seen: set[int] = set()
+
+    def annotate_block(m: re.Match) -> str:
+        n = int(m.group(1))
+        block_inner = m.group(2)
+        if n in seen:
+            return m.group(0)
+        seen.add(n)
+
+        entry = None
+        for e in trajectory_buffer:
+            if e.get("episode_boundary"):
+                continue
+            if e.get("step") == n:
+                entry = e
+                break
+        if entry is None:
+            return m.group(0)
+
+        new_inner = block_inner
+        img = entry.get("image")
+        if img is not None:
+            images.append(img)
+            idx = len(images)
+            new_inner = new_inner.replace(
+                "<raw_state>", f"<raw_state> (image {idx})", 1
+            )
+
+        if "<resulting_state>" in block_inner:
+            result_img = entry.get("result_image")
+            if result_img is not None:
+                images.append(result_img)
+                idx = len(images)
+                new_inner = new_inner.replace(
+                    "<resulting_state>", f"<resulting_state> (image {idx})", 1
+                )
+
+        return f'<step n="{n}">{new_inner}</step>'
+
+    annotated = re.sub(
+        r'<step n="(\d+)">(.*?)</step>',
+        annotate_block,
+        steps_context_text,
+        flags=re.DOTALL,
+    )
+    return annotated, images
+
+
+# ---------------------------------------------------------------------------
 # Artifact saving helpers
 # ---------------------------------------------------------------------------
 
@@ -171,6 +271,7 @@ def _save_step_log_eb(
     did_trim: bool = False,
     active_experiment: str | None = None,
     phase: str = "complete",
+    env_info: dict | None = None,
 ):
     """Write a per-step JSON log with action, costs, and artifact counts."""
     step_log = {
@@ -194,6 +295,9 @@ def _save_step_log_eb(
         "did_trim": did_trim,
         "active_experiment": active_experiment,
     }
+    # Persist environment-specific info (e.g. ARC-AGI game_id, levels, state)
+    if env_info:
+        step_log["env_info"] = env_info
     with open(step_dir / "step_log.json", "w") as f:
         json.dump(step_log, f, indent=4)
 
@@ -214,7 +318,7 @@ def _save_episode_artifacts_eb(
         json.dump(serialize_eb_qa_pairs(qa_pairs), f, indent=4)
     if trajectory_buffer is not None:
         with open(episode_dir / "trajectory_buffer.json", "w") as f:
-            json.dump(trajectory_buffer, f, indent=2, default=str)
+            json.dump(_buffer_for_json(trajectory_buffer), f, indent=2, default=str)
     if past_experiments is not None:
         with open(episode_dir / "past_experiments.json", "w") as f:
             json.dump(past_experiments, f, indent=4)
@@ -304,6 +408,10 @@ def _run_improve_loop_eb(
     sample_obs = _sample_observations_from_buffer(
         trajectory_buffer, eb_config.num_sample_obs,
     )
+    steps_context, steps_context_images = _images_for_steps_context(
+        trajectory_buffer, steps_context,
+    )
+    sample_obs_images = _images_for_sample_obs(trajectory_buffer, sample_obs)
 
     num_answered = sum(1 for q in qa_pairs if q.answer is not None)
     evolve_logger.info(
@@ -335,6 +443,7 @@ We maintain the following current beliefs about the environment:
 
 Below is the actual sequence of the agent's recent interactions with the environment.
 Each step shows: the raw state observation, the perception module's output on that state, the agent's reasoning, and the action taken.
+Each ``<raw_state>`` (and ``<resulting_state>``, when present) is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
 
 === SEQUENCE OF STEPS ===
 {steps_context}
@@ -367,6 +476,7 @@ For beliefs:
                     beliefs=beliefs,
                     conversation_history=[],
                     user_message=steps_beliefs_prompt,
+                    images=steps_context_images,
                 )
             )
             total_cost += turn_cost
@@ -413,6 +523,9 @@ For beliefs:
                     current_turn=turn + 1, max_turns=max_perception_iters,
                 )
 
+                # Attach sample images on the first turn only; subsequent turns rely on history.
+                turn_images = sample_obs_images if turn == 0 else None
+
                 _beliefs_unused, perception, turn_cost, perception_conv_1b, response_text = asyncio.run(
                     _improve_with_perception_validation_conversational(
                         config=config,
@@ -421,6 +534,7 @@ For beliefs:
                         conversation_history=perception_conv_1b,
                         user_message=message,
                         sample_observations=sample_obs,
+                        images=turn_images,
                     )
                 )
                 total_cost += turn_cost
@@ -448,6 +562,9 @@ For beliefs:
             if perception != pre_perception_track1b:
                 steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                )
+                steps_context, steps_context_images = _images_for_steps_context(
+                    trajectory_buffer, steps_context,
                 )
         else:
             evolve_logger.info(f"{tag}     Track 1b: No sample observations, skipping")
@@ -551,6 +668,8 @@ Results: {len(qa_correct)} correct, {len(qa_incorrect)} incorrect out of {len(qa
 {qa_text}
 </qa_feedback_results>
 
+Each ``<raw_state>`` (and ``<resulting_state>``, when present) in the sequence below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
+
 === SEQUENCE OF STEPS (for additional context) ===
 {steps_context if steps_context else "(no steps recorded yet)"}
 === END SEQUENCE OF STEPS ===
@@ -584,6 +703,12 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                         qa_fb_results, prev_qa_correct, prev_qa_incorrect,
                     )
 
+                    # Initial turn's prompt contains both steps_context and sample_obs
+                    # raw states — attach their images. Followups re-reference via history.
+                    turn_images = None
+                    if turn == 0:
+                        turn_images = list(steps_context_images) + list(sample_obs_images)
+
                     beliefs, perception, turn_cost, qa_conversation, response_text = asyncio.run(
                         _improve_with_perception_validation_conversational(
                             config=config,
@@ -592,6 +717,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                             conversation_history=qa_conversation,
                             user_message=message,
                             sample_observations=sample_obs if sample_obs else None,
+                            images=turn_images,
                         )
                     )
                     total_cost += turn_cost
@@ -653,6 +779,9 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                 steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
                 )
+                steps_context, steps_context_images = _images_for_steps_context(
+                    trajectory_buffer, steps_context,
+                )
 
     except Exception as e:
         evolve_logger.error(f"{tag}     Improve loop failed: {e}")
@@ -677,8 +806,6 @@ def run_stepwise_eb_learn_episode(
     qa_pairs: list[EBQAPair],
     current_experiment: str | None,
     default_knowledge: str,
-    default_actions: str,
-    original_cwd: str,
     output_dir: str,
     episode_idx: int = 0,
     global_step_start: int = 0,
@@ -695,10 +822,15 @@ def run_stepwise_eb_learn_episode(
     """
     # --- Setup environment and agent ---
     env_name = config.envs.names.split("-")[0]
-    tasks = config.tasks[f"{env_name}_tasks"]
-    task = tasks[0]
 
-    env = make_env(env_name, task, config)
+    if env_name == "arc_agi":
+        from arc_agi_env import make_arc_env
+        task = config.tasks.arc_agi_tasks[0]
+        env = make_arc_env(task, config)
+    else:
+        tasks = config.tasks[f"{env_name}_tasks"]
+        task = tasks[0]
+        env = make_env(env_name, task, config)
     agent_factory = AgentFactory(config)
     agent = agent_factory.create_agent()
     agent.reset()
@@ -724,6 +856,7 @@ def run_stepwise_eb_learn_episode(
     # Save raw initial obs before apply_perception modifies long_term_context in-place
     _pre_action_raw_long = obs["text"]["long_term_context"]
     _pre_action_raw_short = obs["text"].get("short_term_context", "")
+    _pre_action_image = obs.get("image")  # PIL Image or None
 
     # Setup perception
     perception_fn = load_perception_fn(perception)
@@ -828,6 +961,9 @@ def run_stepwise_eb_learn_episode(
                 exp_steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
                 )
+                exp_steps_context, exp_steps_context_images = _images_for_steps_context(
+                    trajectory_buffer, exp_steps_context,
+                )
                 with improve_logging(step_dir):
                     # Step 1: Generate questions
                     new_questions, q_cost, q_prompt, q_response = asyncio.run(
@@ -842,6 +978,8 @@ def run_stepwise_eb_learn_episode(
                             default_knowledge=default_knowledge,
                             num_questions=eb_config.num_questions,
                             current_step=global_step,
+                            current_image=_pre_action_image,
+                            steps_context_images=exp_steps_context_images,
                         )
                     )
                     qa_pairs.extend(new_questions)
@@ -866,6 +1004,8 @@ def run_stepwise_eb_learn_episode(
                             current_observation=_pre_action_raw_long,
                             current_aux_observation=_pre_action_raw_short,
                             default_knowledge=default_knowledge,
+                            current_image=_pre_action_image,
+                            steps_context_images=exp_steps_context_images,
                         )
                     )
                     step_experiment_cost += e_cost
@@ -973,6 +1113,19 @@ def run_stepwise_eb_learn_episode(
             with open(step_dir / "agent_messages.json", "w") as amf:
                 json.dump(agent_messages, amf, indent=2, default=str)
 
+            # Save observation images if available
+            if _pre_action_image is not None:
+                try:
+                    _pre_action_image.save(step_dir / "obs_before.png")
+                except Exception:
+                    pass
+            _post_action_image = obs.get("image")
+            if _post_action_image is not None:
+                try:
+                    _post_action_image.save(step_dir / "obs_after.png")
+                except Exception:
+                    pass
+
             # Write CSV row immediately
             csv_writer.writerow([step, action, reasoning, _pre_action_obs_text, _pre_action_raw_short, reward, done])
             csv_file.flush()
@@ -986,9 +1139,11 @@ def run_stepwise_eb_learn_episode(
                 num_qa=len(qa_pairs), num_unanswered=num_unanswered,
                 did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
                 active_experiment=current_experiment, phase="extracting",
+                env_info=info if isinstance(info, dict) else None,
             )
 
-            # Append buffer entry
+            # Append buffer entry (image is the pre-action obs image;
+            # result_image is the post-action obs image).
             trajectory_buffer.append({
                 "step": global_step,
                 "obs_text": _pre_action_obs_text,
@@ -996,6 +1151,8 @@ def run_stepwise_eb_learn_episode(
                 "raw_short_term_context": _pre_action_raw_short,
                 "result_raw_long_term_context": new_raw_long,
                 "result_raw_short_term_context": new_raw_short,
+                "image": _pre_action_image,
+                "result_image": _post_action_image,
                 "action": action,
                 "reward": reward,
                 "reasoning": reasoning,
@@ -1008,6 +1165,7 @@ def run_stepwise_eb_learn_episode(
                     "obs_text": result_obs_text,
                     "raw_long_term_context": new_raw_long,
                     "raw_short_term_context": new_raw_short,
+                    "image": _post_action_image,
                     "action": None,
                     "reward": 0.0,
                     "reasoning": "",
@@ -1039,6 +1197,9 @@ def run_stepwise_eb_learn_episode(
                 steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
                 )
+                steps_context, steps_context_images_update = _images_for_steps_context(
+                    trajectory_buffer, steps_context,
+                )
                 with improve_logging(step_dir):
                     qa_pairs, extract_cost, step_extraction_log = asyncio.run(
                         update_qa_from_trajectory(
@@ -1047,6 +1208,7 @@ def run_stepwise_eb_learn_episode(
                             steps_context=steps_context,
                             max_total_qa_pairs=eb_config.max_total_qa_pairs,
                             current_step=global_step,
+                            steps_context_images=steps_context_images_update,
                         )
                     )
                     step_extract_cost = extract_cost
@@ -1103,6 +1265,7 @@ def run_stepwise_eb_learn_episode(
                     did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
                     did_trim=did_trim_step,
                     active_experiment=current_experiment, phase="improving",
+                    env_info=info if isinstance(info, dict) else None,
                 )
 
             # --- Improve loop (beliefs/perception + QA) ---
@@ -1164,6 +1327,7 @@ def run_stepwise_eb_learn_episode(
             if not done:
                 _pre_action_raw_long = new_raw_long
                 _pre_action_raw_short = new_raw_short
+                _pre_action_image = obs.get("image")
                 _pre_action_obs_text = _compose_obs_text(
                     obs["text"]["short_term_context"],
                     obs["text"]["long_term_context"],
@@ -1194,6 +1358,7 @@ def run_stepwise_eb_learn_episode(
                 did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
                 did_trim=did_trim_step,
                 active_experiment=current_experiment, phase="complete",
+                env_info=info if isinstance(info, dict) else None,
             )
 
             # Per-step summary update
@@ -1341,8 +1506,6 @@ def stepwise_eb_learn(
 
     default_knowledge = get_default_knowledge(config)
     evolve_logger.info(f"Default knowledge: {len(default_knowledge)} chars")
-    default_actions = get_default_actions(config)
-    evolve_logger.info(f"Default actions: {len(default_actions)} chars")
 
     evolve_logger.info(f"Stepwise EB-learn config:")
     evolve_logger.info(f"  Total env steps: {eb_config.n_environment_steps}")
@@ -1386,8 +1549,6 @@ def stepwise_eb_learn(
                     qa_pairs=qa_pairs,
                     current_experiment=current_experiment,
                     default_knowledge=default_knowledge,
-                    default_actions=default_actions,
-                    original_cwd=original_cwd,
                     output_dir=str(episode_dir),
                     episode_idx=episode_idx,
                     global_step_start=global_steps_used,

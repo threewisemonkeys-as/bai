@@ -90,12 +90,14 @@ function collapsible(title, content, open) {
     '<div class="card-body ' + (open ? "" : "collapsed") + '">' + content + "</div></div>";
 }
 
-function promptResponseBlock(label, prompt, response) {
+function promptResponseBlock(label, prompt, response, imageOpts) {
   let html = "";
   if (prompt) {
+    const imgs = imageOpts ? promptImagesHtml(prompt, imageOpts) : "";
     html += '<div class="extraction-section"><div class="extraction-header" onclick="toggleBody(this)"><span style="color:var(--text-muted)">' +
-      esc(label) + ' Prompt</span><span style="margin-left:auto;font-size:11px">&#9654;</span></div><div class="extraction-body"><pre style="max-height:400px">' +
-      esc(prompt) + "</pre></div></div>";
+      esc(label) + ' Prompt</span><span style="margin-left:auto;font-size:11px">&#9654;</span></div><div class="extraction-body">' +
+      imgs +
+      '<pre style="max-height:400px">' + esc(prompt) + "</pre></div></div>";
   }
   if (response) {
     html += '<div class="extraction-section"><div class="extraction-header" onclick="toggleBody(this)"><span style="color:var(--accent2)">' +
@@ -136,6 +138,151 @@ function staticTrajectoryPath(epIdx) {
 
 function staticStepDetailPath(epIdx, stepIdx) {
   return "step_details/ep_" + String(epIdx).padStart(3, "0") + "_step_" + String(stepIdx).padStart(3, "0") + ".json";
+}
+
+function stepImageUrl(epIdx, stepIdx, name) {
+  if (isDynamicMode()) return apiUrl("/api/step_image", { episode: epIdx, step: stepIdx, name: name });
+  return staticUrl("images/ep_" + String(epIdx).padStart(3, "0") + "_step_" + String(stepIdx).padStart(3, "0") + "_" + name);
+}
+
+function obsImageHtml(epIdx, stepIdx, data, step) {
+  const hasBefore = (data && data.has_obs_before) || (step && step.has_obs_before);
+  const hasAfter = (data && data.has_obs_after) || (step && step.has_obs_after);
+  if (!hasBefore && !hasAfter) return "";
+  let html = '<div style="display:flex;gap:12px;margin:8px 0;flex-wrap:wrap">';
+  if (hasBefore) {
+    html += '<div style="text-align:center"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Before action</div>' +
+      '<img src="' + stepImageUrl(epIdx, stepIdx, "obs_before.png") + '" style="max-width:256px;image-rendering:pixelated;border:1px solid var(--border);border-radius:4px" /></div>';
+  }
+  if (hasAfter) {
+    html += '<div style="text-align:center"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">After action</div>' +
+      '<img src="' + stepImageUrl(epIdx, stepIdx, "obs_after.png") + '" style="max-width:256px;image-rendering:pixelated;border:1px solid var(--border);border-radius:4px" /></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function resolveStepByGlobal(gs) {
+  if (!DATA || !DATA.steps) return null;
+  for (const s of DATA.steps) {
+    if (s.global_step === gs) return s;
+  }
+  return null;
+}
+
+function makePromptImagePart(slot, stepMeta, kind, label, accent) {
+  if (!stepMeta) return null;
+  const isAfter = kind === "after";
+  const hasImage = isAfter ? stepMeta.has_obs_after : stepMeta.has_obs_before;
+  if (!hasImage) return null;
+  return {
+    slot: slot,
+    label: label,
+    url: stepImageUrl(stepMeta.episode_idx, stepMeta.step, isAfter ? "obs_after.png" : "obs_before.png"),
+    accent: !!accent,
+  };
+}
+
+function parseNumberedPromptImages(promptText, opts) {
+  if (!promptText) return [];
+  opts = opts || {};
+  const parts = [];
+  const seenSlots = new Set();
+
+  const stepBlockRe = /<step\s+n="(\d+)">([\s\S]*?)<\/step>/g;
+  let stepMatch;
+  while ((stepMatch = stepBlockRe.exec(promptText)) !== null) {
+    const gs = parseInt(stepMatch[1], 10);
+    const stepMeta = resolveStepByGlobal(gs);
+    if (!stepMeta) continue;
+    const body = stepMatch[2];
+    const rawMatch = /<raw_state>\s*\(image\s+(\d+)\)/.exec(body);
+    if (rawMatch) {
+      const slot = parseInt(rawMatch[1], 10);
+      if (!seenSlots.has(slot)) {
+        const part = makePromptImagePart(slot, stepMeta, "before", "Image " + slot + " - g" + gs + " raw", false);
+        if (part) parts.push(part);
+        seenSlots.add(slot);
+      }
+    }
+    const resultMatch = /<resulting_state>\s*\(image\s+(\d+)\)/.exec(body);
+    if (resultMatch) {
+      const slot = parseInt(resultMatch[1], 10);
+      if (!seenSlots.has(slot)) {
+        const part = makePromptImagePart(slot, stepMeta, "after", "Image " + slot + " - g" + gs + " result", false);
+        if (part) parts.push(part);
+        seenSlots.add(slot);
+      }
+    }
+  }
+
+  if (opts.currentStep) {
+    const currentBlockRe = /=== CURRENT STATE[\s\S]*?<raw_state>\s*\(image\s+(\d+)\)/;
+    const currentMatch = currentBlockRe.exec(promptText);
+    if (currentMatch) {
+      const slot = parseInt(currentMatch[1], 10);
+      if (!seenSlots.has(slot)) {
+        const part = makePromptImagePart(
+          slot,
+          opts.currentStep,
+          "before",
+          "Image " + slot + " - current (g" + opts.currentStep.global_step + ")",
+          true
+        );
+        if (part) parts.push(part);
+        seenSlots.add(slot);
+      }
+    }
+  }
+
+  parts.sort((a, b) => a.slot - b.slot);
+  return parts;
+}
+
+function parseSamplePromptImages(promptText) {
+  if (!promptText) return [];
+  const parts = [];
+  const sampleRe = /<(?:perception_example|execution_sample)\s+step="(\d+)">/g;
+  let sampleIdx = 0;
+  let sampleMatch;
+  while ((sampleMatch = sampleRe.exec(promptText)) !== null) {
+    const gs = parseInt(sampleMatch[1], 10);
+    const stepMeta = resolveStepByGlobal(gs);
+    const part = makePromptImagePart(
+      Number.MAX_SAFE_INTEGER,
+      stepMeta,
+      "before",
+      "Sample " + (sampleIdx + 1) + " - g" + gs,
+      false
+    );
+    if (part) {
+      part.sampleIdx = sampleIdx;
+      parts.push(part);
+      sampleIdx += 1;
+    }
+  }
+  return parts;
+}
+
+// Build a thumbnail strip for the images sent alongside a prompt. Reconstructs
+// the actual attachment sequence from numbered image tags in the prompt plus
+// sampled observation blocks for prompts that attach perception examples.
+function promptImagesHtml(promptText, opts) {
+  opts = opts || {};
+  const parts = parseNumberedPromptImages(promptText, opts);
+  const samples = parseSamplePromptImages(promptText);
+  samples.forEach((part) => parts.push(part));
+  if (parts.length === 0) return "";
+  let html = '<div style="margin:6px 0 10px"><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;font-weight:600">Images attached (' +
+    parts.length + ')</div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:4px">';
+  parts.forEach((p) => {
+    const borderColor = p.accent ? "var(--accent)" : "var(--border)";
+    html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">' + esc(p.label) + '</div>' +
+      '<img src="' + p.url + '" style="max-width:112px;image-rendering:pixelated;border:1px solid ' + borderColor + ';border-radius:3px" /></div>';
+  });
+  html += '</div></div>';
+  return html;
 }
 
 async function fetchReport() {
@@ -394,9 +541,15 @@ function buildSidebar() {
     const phaseBadge = isInProgress ? '<span class="phase-badge">' + (phaseLabels[step.phase] || step.phase) + "</span>" : "";
     const actionText = step.action || (isInProgress ? "..." : "");
 
+    // Show level progress for ARC-AGI steps
+    const ei2 = step.env_info || {};
+    const lvlBadge = (ei2.levels_completed != null && ei2.win_levels)
+      ? '<span style="font-size:9px;color:var(--text-muted);margin-left:2px" title="levels completed">' + ei2.levels_completed + '/' + ei2.win_levels + '</span>'
+      : '';
+
     el.innerHTML = '<span class="gs">g' + step.global_step + "</span>" +
       '<span class="act" title="' + esc(actionText) + '">' + esc(actionText) + "</span>" +
-      statusDot + doneMark + phaseBadge +
+      statusDot + doneMark + phaseBadge + lvlBadge +
       '<span class="rw ' + rewardClass + '">' + (isInProgress && !step.action ? "" : rewardVal.toFixed(2)) + "</span>";
     el.onclick = () => {
       currentTab = "overview";
@@ -425,9 +578,21 @@ function renderStep(idx) {
     ? ' <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(210,153,34,0.15);color:' + phaseColor + ';font-weight:600;vertical-align:middle">' + (step.phase || "") + "</span>"
     : "";
 
+  // Build env info badge (ARC-AGI: game_id, levels, state)
+  const ei = step.env_info || {};
+  let envBadge = "";
+  if (ei.game_id) {
+    const stateColor = ei.state === "WIN" ? "var(--accent2)" : ei.state === "GAME_OVER" ? "#e55" : "var(--text-muted)";
+    envBadge = ' <span style="font-size:11px;color:var(--text-muted);font-weight:400">| ' +
+      esc(ei.game_id) +
+      (ei.levels_completed != null ? " lvl " + ei.levels_completed + "/" + (ei.win_levels || "?") : "") +
+      (ei.state ? ' <span style="color:' + stateColor + '">' + esc(ei.state) + "</span>" : "") +
+      "</span>";
+  }
+
   let html = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">' +
     '<button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px" onclick="showStep(' + Math.max(0, idx - 1) + ')" ' + (idx === 0 ? "disabled" : "") + ">&#8592;</button>" +
-    '<h1 style="margin:0;font-size:18px">Step ' + step.step + phasePill + ' <span style="color:var(--text-muted);font-size:14px;font-weight:400">ep' + step.episode_idx + " | global " + step.global_step + "</span></h1>" +
+    '<h1 style="margin:0;font-size:18px">Step ' + step.step + phasePill + ' <span style="color:var(--text-muted);font-size:14px;font-weight:400">ep' + step.episode_idx + " | global " + step.global_step + envBadge + "</span></h1>" +
     '<span style="font-size:12px;color:var(--text-muted);margin-left:auto">action: <b>' + esc(step.action || "...") + "</b> | reward: " + (step.action ? Number(step.reward).toFixed(2) : "—") + " | cost: $" + Number(step.step_total_cost).toFixed(4) + "</span>" +
     '<button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px" onclick="showStep(' + Math.min(total - 1, idx + 1) + ')" ' + (idx >= total - 1 ? "disabled" : "") + ">&#8594;</button>" +
     "</div>";
@@ -521,6 +686,12 @@ function renderOverview(data, step) {
     }
   }
 
+  // Observation images
+  const imgHtml = obsImageHtml(step.episode_idx, step.step, data, step);
+  if (imgHtml) {
+    html += collapsible("Observation Images", imgHtml, true);
+  }
+
   // Active Experiment with selected questions
   if (step.active_experiment) {
     const genLabel = step.did_formulate_experiment ? "formulated at start of this step" : "carried over from previous step";
@@ -599,7 +770,7 @@ function renderArtifacts(data) {
         " | Unanswered: " + extLog.prev_unanswered + " → " + extLog.new_unanswered +
         " | Newly answered: " + (extLog.newly_answered || 0) + "</div>";
     }
-    extHtml += promptResponseBlock("Q Update", extLog.prompt, extLog.response);
+    extHtml += promptResponseBlock("Q Update", extLog.prompt, extLog.response, {});
     html += collapsible("Q&A Update from Trajectory", extHtml, false);
   }
 
@@ -671,6 +842,7 @@ function renderExperiments(data) {
   if (expLog.question_gen_prompt || expLog.question_gen_response) {
     let qGenHtml = "";
     if (expLog.question_gen_prompt) {
+      qGenHtml += promptImagesHtml(expLog.question_gen_prompt, { currentStep: stepMeta });
       qGenHtml += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:4px">Prompt</div>' +
         '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.question_gen_prompt) + "</pre></div>";
     }
@@ -726,6 +898,7 @@ function renderExperiments(data) {
   if (expLog.experiment_prompt || expLog.experiment_response) {
     let expHtml = "";
     if (expLog.experiment_prompt) {
+      expHtml += promptImagesHtml(expLog.experiment_prompt, { currentStep: stepMeta });
       expHtml += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:4px">Prompt</div>' +
         '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.experiment_prompt) + "</pre></div>";
     }
@@ -817,6 +990,8 @@ function renderFeedback(data) {
           ? '<span style="background:rgba(63,185,80,0.15);color:var(--accent2);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">SUBMITTED</span>'
           : '<span style="background:rgba(88,166,255,0.1);color:var(--accent);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">CONTINUE</span>';
 
+        const turnImagesHtml = promptImagesHtml(turn.prompt || "");
+
         turnsHtml += '<div class="extraction-section" style="margin-bottom:8px">' +
           '<div class="extraction-header" onclick="toggleBody(this)" style="padding:8px 12px">' +
           '<span style="font-weight:600;color:' + meta.color + '">Turn ' + turn.turn + '</span>' +
@@ -825,6 +1000,7 @@ function renderFeedback(data) {
           '<span style="margin-left:auto;font-size:11px;color:var(--text-muted)">&#9654;</span>' +
           "</div>" +
           '<div class="extraction-body">' +
+          turnImagesHtml +
           '<div style="margin-bottom:10px"><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;font-weight:600">Prompt</div>' +
           '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px">' +
           '<pre style="max-height:400px;margin:0;border:none;padding:0;background:transparent">' + esc(turn.prompt || "") + "</pre></div></div>" +

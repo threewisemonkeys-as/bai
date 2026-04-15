@@ -625,7 +625,6 @@ def _extract_obs_message(raw_obs: str) -> str:
 
 async def generate_experiments_from_steps(
     config: DictConfig,
-    default_actions: str,
     beliefs: str,
     qa_pairs: list[QAPair],
     critical_moments: list[CriticalMoment],
@@ -679,9 +678,9 @@ async def generate_experiments_from_steps(
         )
         current_obs_section = f"""
 === CURRENT STATE (agent has not yet acted) ===
-<state>
+<raw_state>
 {current_observation}
-</state>
+</raw_state>
 
 <auxiliary_observation>
 {current_aux_observation or ""}
@@ -697,9 +696,9 @@ async def generate_experiments_from_steps(
     default_knowledge_section = ""
     if default_knowledge:
         default_knowledge_section = f"""
-=== OVERALL GOAL / DEFAULT KNOWLEDGE ===
+=== DEFAULT KNOWLEDGE ===
 {default_knowledge}
-=== END OVERALL GOAL / DEFAULT KNOWLEDGE ===
+=== END EFAULT KNOWLEDGE ===
 """
 
     # --- Past experiments section ---

@@ -126,40 +126,6 @@ def _compute_rollout_cost(rollout_results: dict[str, dict]) -> float:
     return cost
 
 
-def get_default_actions(config: DictConfig) -> str:
-    """Get only the available actions for the environment (no goal).
-
-    Args:
-        config: BALROG configuration
-
-    Returns:
-        String listing the available actions.
-    """
-    env_name = config.envs.names.split("-")[0]
-    tasks = config.tasks[f"{env_name}_tasks"]
-    if not tasks:
-        return ""
-
-    task = tasks[0]
-
-    try:
-        if env_name == "minihack":
-            from balrog.environments.minihack import get_available_actions
-            env = make_env(env_name, task, config)
-            available_actions = get_available_actions(env)
-            env.close()
-        else:
-            from balrog.environments.nle import ACTIONS as available_actions
-        action_strings = ",\n".join(
-            f"{action}: {description}"
-            for action, description in available_actions.items()
-        )
-        return f"Available actions:\n<actions>\n{action_strings}.\n</actions>"
-    except Exception as e:
-        logging.warning(f"Failed to extract default actions: {e}")
-        return ""
-
-
 def get_default_knowledge(config: DictConfig) -> str:
     """Get the default instructions/knowledge for the environment.
 
@@ -170,14 +136,19 @@ def get_default_knowledge(config: DictConfig) -> str:
         String containing default instructions (actions, goal, etc.)
     """
     env_name = config.envs.names.split("-")[0]
+
+    if env_name == "arc_agi":
+        from arc_agi_prompts import get_arc_instruction_prompt
+        return get_arc_instruction_prompt()
+
     # Get the first task for this environment
     tasks = config.tasks[f"{env_name}_tasks"]
     if not tasks:
         return ""
-    
+
     task = tasks[0]
     logging.info(f"Extracting default knowledge for env: {env_name}, task: {task}")
-    
+
     try:
         if env_name == "minihack":
             from balrog.environments.minihack import get_instruction_prompt

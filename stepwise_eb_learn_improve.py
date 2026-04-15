@@ -75,7 +75,7 @@ def _format_qa_list(qa_pairs: list[EBQAPair]) -> str:
         else:
             status = "NO"
         evidence_part = f" (evidence: {qa.evidence})" if qa.evidence else ""
-        lines.append(f"  Q{i}: {qa.question} -> {status}{evidence_part}")
+        lines.append(f"Q{i}: {qa.question} -> {status}{evidence_part}")
     return "\n".join(lines)
 
 
@@ -95,6 +95,8 @@ async def generate_questions_from_steps(
     default_knowledge: str,
     num_questions: int,
     current_step: int = 0,
+    current_image=None,
+    steps_context_images: list | None = None,
 ) -> tuple[list[EBQAPair], float, str, str]:
     """Generate new unanswered questions about the environment.
 
@@ -105,6 +107,7 @@ async def generate_questions_from_steps(
     Returns: (new_questions, cost, prompt, raw_response)
     """
     step_history = steps_context
+    num_steps_images = len(steps_context_images) if steps_context_images else 0
 
     current_obs_section = ""
     if current_observation:
@@ -113,11 +116,14 @@ async def generate_questions_from_steps(
             if perception_code
             else ""
         )
+        current_state_img_tag = ""
+        if current_image is not None:
+            current_state_img_tag = f" (image {num_steps_images + 1})"
         current_obs_section = f"""
 === CURRENT STATE ===
-<state>
+<raw_state>{current_state_img_tag}
 {current_observation}
-</state>
+</raw_state>
 
 <auxiliary_observation>
 {current_aux_observation or ""}
@@ -133,13 +139,19 @@ async def generate_questions_from_steps(
 
     prompt = f"""You are generating questions to guide an agent's exploration of an environment.
 
-=== OVERALL GOAL / DEFAULT KNOWLEDGE ===
+=== DEFAULT KNOWLEDGE ===
 {default_knowledge}
-=== END OVERALL GOAL / DEFAULT KNOWLEDGE ===
+=== END DEFAULT KNOWLEDGE ===
 
 === CURRENT BELIEFS ===
 {beliefs if beliefs else "(empty - no beliefs yet)"}
 === END CURRENT BELIEFS ===
+
+Each ``<raw_state>`` (and ``<resulting_state>``, when present) below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
+
+=== RECENT HISTORY OF STATES AND ACTIONS ===
+{step_history if step_history else "(no steps recorded yet)"}
+=== END RECENT HISTORY ===
 
 {current_obs_section}
 
@@ -165,7 +177,13 @@ QUESTION 1: [A specific yes/no question about how the environment works]
 (Generate questions)
 </questions>"""
 
-    text, cost = await _llm_call(config, prompt)
+    images: list = []
+    if steps_context_images:
+        images.extend(steps_context_images)
+    if current_image is not None:
+        images.append(current_image)
+
+    text, cost = await _llm_call(config, prompt, images=images or None)
 
     questions_text = extract_xml_key(text, "questions")
     new_questions: list[EBQAPair] = []
@@ -212,6 +230,8 @@ async def formulate_experiment_from_question(
     current_observation: str | None,
     current_aux_observation: str | None,
     default_knowledge: str,
+    current_image=None,
+    steps_context_images: list | None = None,
 ) -> tuple[str | None, int | None, float, str, str]:
     """Select an unanswered question from Q and formulate an experiment to answer it.
 
@@ -220,6 +240,7 @@ async def formulate_experiment_from_question(
     the current experiment.
     """
     step_history = steps_context
+    num_steps_images = len(steps_context_images) if steps_context_images else 0
 
     current_obs_section = ""
     if current_observation:
@@ -228,11 +249,14 @@ async def formulate_experiment_from_question(
             if perception_code
             else ""
         )
+        current_state_img_tag = ""
+        if current_image is not None:
+            current_state_img_tag = f" (image {num_steps_images + 1})"
         current_obs_section = f"""
 === CURRENT STATE (agent has not yet acted) ===
-<state>
+<raw_state>{current_state_img_tag}
 {current_observation}
-</state>
+</raw_state>
 
 <auxiliary_observation>
 {current_aux_observation or ""}
@@ -249,13 +273,15 @@ async def formulate_experiment_from_question(
 
     prompt = f"""You are designing the next experiment for an agent interacting with an environment.
 
-=== OVERALL GOAL / DEFAULT KNOWLEDGE ===
+=== DEFAULT KNOWLEDGE ===
 {default_knowledge}
-=== END OVERALL GOAL / DEFAULT KNOWLEDGE ===
+=== END DEFAULT KNOWLEDGE ===
 
 === CURRENT BELIEFS ===
 {beliefs if beliefs else "(empty - no beliefs yet)"}
 === END CURRENT BELIEFS ===
+
+Each ``<raw_state>`` (and ``<resulting_state>``, when present) below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
 
 === RECENT HISTORY OF STATES AND ACTIONS ===
 {step_history}
@@ -287,7 +313,13 @@ If formulating a new experiment:
 <experiment_plan>[1-3 sentence actionable experiment to answer the selected question]</experiment_plan>
 </experiment>"""
 
-    text, cost = await _llm_call(config, prompt)
+    images: list = []
+    if steps_context_images:
+        images.extend(steps_context_images)
+    if current_image is not None:
+        images.append(current_image)
+
+    text, cost = await _llm_call(config, prompt, images=images or None)
 
     experiment_text_raw = extract_xml_key(text, "experiment")
     if not experiment_text_raw or experiment_text_raw.strip().lower() == "null":
@@ -333,6 +365,7 @@ async def update_qa_from_trajectory(
     steps_context: str,
     max_total_qa_pairs: int,
     current_step: int = 0,
+    steps_context_images: list | None = None,
 ) -> tuple[list[EBQAPair], float, dict]:
     """Update Q&A pairs from trajectory evidence.
 
@@ -349,6 +382,8 @@ async def update_qa_from_trajectory(
     qa_list_text = _format_qa_list(current_qa)
 
     prompt = f"""You are analyzing an agent's trajectory to update our knowledge base of questions and answers about the environment.
+
+Each ``<raw_state>`` (and ``<resulting_state>``, when present) in the sequence below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
 
 === SEQUENCE OF STEPS ===
 {steps_context}
@@ -374,17 +409,19 @@ Review the trajectory and each question. What can we learn?
 <updated_questions>
 <q n="1">
 <question>[question text]</question>
-<answer>YES or NO or UNANSWERED</answer>
 <evidence>[evidence from trajectory, or empty if unanswered]</evidence>
+<answer>YES or NO or UNANSWERED</answer>
 </q>
 <q n="2">
 ...
 </q>
 ...
-(Include ALL existing questions plus any new ones)
+(Include all existing questions plus any new ones)
 </updated_questions>"""
 
-    text, cost = await _llm_call(config, prompt)
+    text, cost = await _llm_call(
+        config, prompt, images=steps_context_images or None,
+    )
 
     extraction_log = {
         "prompt": prompt,

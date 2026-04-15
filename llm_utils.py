@@ -1,23 +1,43 @@
 """Utility functions for LLM interactions."""
 
+import base64
+import io
 from typing import Any
 
 
-def build_llm_input(prompt: str) -> list[Any]:
-    """Build LLM input with text prompt.
+def _pil_to_input_image_part(image) -> dict:
+    """Convert a PIL.Image to a responses-API input_image content part."""
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return {
+        "type": "input_image",
+        "image_url": f"data:image/png;base64,{b64}",
+    }
+
+
+def build_llm_input(prompt: str, images: list | None = None) -> list[Any]:
+    """Build LLM input with text prompt and optional images.
 
     Args:
         prompt: Text prompt for the LLM
+        images: Optional list of PIL.Image objects to attach as input_image parts
 
     Returns:
         Formatted input list for LiteLLM
     """
-    content = [
+    content: list[dict] = [
         {
             "type": "input_text",
             "text": prompt,
         }
     ]
+
+    if images:
+        for img in images:
+            if img is None:
+                continue
+            content.append(_pil_to_input_image_part(img))
 
     return [
         {
@@ -81,20 +101,31 @@ def extract_xml_kv(data: str, keys: list[str]) -> dict[str, Any]:
     return extracted
 
 
-def build_llm_input_multiturn(history: list[dict], user_message: str) -> list[dict]:
+def build_llm_input_multiturn(
+    history: list[dict],
+    user_message: str,
+    images: list | None = None,
+) -> list[dict]:
     """Build multi-turn LLM input by appending a user message to conversation history.
 
     Args:
         history: Existing conversation history (list of message dicts)
         user_message: New user message text to append
+        images: Optional list of PIL.Image objects to attach to the new user turn
 
     Returns:
         Updated message list with the new user message appended
     """
+    content: list[dict] = [{"type": "input_text", "text": user_message}]
+    if images:
+        for img in images:
+            if img is None:
+                continue
+            content.append(_pil_to_input_image_part(img))
     return history + [
         {
             "role": "user",
-            "content": [{"type": "input_text", "text": user_message}],
+            "content": content,
         }
     ]
 

@@ -72,11 +72,19 @@ def _get_model_name(config: DictConfig) -> str:
     return f"{config.client.client_name}/{config.client.model_id}"
 
 
-async def _llm_call(config: DictConfig, prompt: str) -> tuple[str, float]:
-    """Make an async LLM call and return (response_text, cost)."""
-    input_data = build_llm_input(prompt)
+async def _llm_call(
+    config: DictConfig,
+    prompt: str,
+    images: list | None = None,
+) -> tuple[str, float]:
+    """Make an async LLM call and return (response_text, cost).
+
+    Optional ``images`` are attached to the user turn as input_image parts.
+    """
+    input_data = build_llm_input(prompt, images=images)
     model_name = _get_model_name(config)
-    logging.info(f"LLM prompt:\n{prompt}")
+    num_imgs = sum(1 for i in (images or []) if i is not None)
+    logging.info(f"LLM prompt (images={num_imgs}):\n{prompt}")
     response = await asyncio.to_thread(
         litellm.responses,
         model=model_name,
@@ -93,16 +101,19 @@ async def _llm_call_conversational(
     config: DictConfig,
     conversation_history: list[dict],
     user_message: str,
+    images: list | None = None,
 ) -> tuple[str, float, list[dict]]:
     """Multi-turn LLM call that maintains conversation history.
 
-    Appends user_message to history, calls the LLM, appends assistant reply.
+    Appends user_message (with optional images) to history, calls the LLM,
+    appends assistant reply.
 
     Returns: (response_text, cost, updated_conversation_history)
     """
-    input_data = build_llm_input_multiturn(conversation_history, user_message)
+    input_data = build_llm_input_multiturn(conversation_history, user_message, images=images)
     model_name = _get_model_name(config)
-    logging.info(f"LLM conversational prompt (turn {len(input_data)}):\n{user_message}")
+    num_imgs = sum(1 for i in (images or []) if i is not None)
+    logging.info(f"LLM conversational prompt (turn {len(input_data)}, images={num_imgs}):\n{user_message}")
     response = await asyncio.to_thread(
         litellm.responses,
         model=model_name,
@@ -112,8 +123,8 @@ async def _llm_call_conversational(
     text = extract_llm_response_text(response)
     logging.info(f"LLM conversational response:\n{text}")
     cost = _get_response_cost(response, config.client.model_id)
-    # Build updated history with both the user message and assistant response
-    updated_history = build_llm_input_multiturn(conversation_history, user_message)
+    # Build updated history with the user message (w/ images) and assistant response
+    updated_history = build_llm_input_multiturn(conversation_history, user_message, images=images)
     updated_history = append_assistant_message(updated_history, text)
     return text, cost, updated_history
 
@@ -458,7 +469,7 @@ async def extract_qa_and_moments_from_trajectory(
    Format each as:
    <moment>
    <step_number>The exact Step number from the trajectory CSV</step_number>
-   <state>The actual observed game state at this moment, described using the trajectory's own terms</state>
+   <raw_state>The actual observed game state at this moment, described using the trajectory's own terms</raw_state>
    <goal>Brief goal (one sentence)</goal>
    <good_actions>action1, action2 (or NONE)</good_actions>
    <bad_actions>action1, action2 (or NONE)</bad_actions>

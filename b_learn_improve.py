@@ -886,16 +886,20 @@ For INCORRECT predictions, explain what knowledge the agent was missing or had w
 {items_text}
 
 For each question Qn, respond with feedback Fn in this format:
-<Fn>
+<F n=<question number>>
 <verdict>CORRECT or INCORRECT or INCONCLUSIVE</verdict>
 <feedback>Explanation of what the agent's knowledge got right or wrong</feedback>
-</Fn>"""
+</F n=<question number>>"""
 
     text, cost = await _llm_call(config, prompt)
 
     results = []
     for i, fr in enumerate(qa_forward_results, 1):
-        f_block = extract_xml_key(text, f"F{i}")
+        # The prompt requests tags like `<F n=1>...</F n=1>`, not `<F1>...</F1>`.
+        # Parse that exact shape so feedback verdicts don't all fall back to
+        # INCONCLUSIVE when the model follows instructions correctly.
+        m = re.search(rf"<F\s+n={i}>\s*(.*?)\s*</F\s+n={i}>", text, re.DOTALL)
+        f_block = m.group(1) if m else None
         if f_block:
             verdict_str = extract_xml_key(f_block, "verdict") or "INCONCLUSIVE"
             feedback_str = extract_xml_key(f_block, "feedback") or ""
@@ -1149,11 +1153,16 @@ async def _improve_with_perception_validation_conversational(
     user_message: str,
     sample_observations: list[tuple[str, int]] | None = None,
     max_retries: int = 3,
+    images: list | None = None,
 ) -> tuple[str, str, float, list[dict], str]:
     """Run an improve prompt with perception validation using multi-turn conversation.
 
     Like _improve_with_perception_validation but maintains conversation history.
     Perception validation retries are appended as additional turns.
+
+    If ``images`` is provided, they are attached to the initial user_message only.
+    Retry turns (perception errors) are text-only; the images remain visible via
+    the conversation history.
 
     Returns: (new_beliefs, new_perception, total_cost, updated_history, llm_response)
     """
@@ -1164,6 +1173,7 @@ async def _improve_with_perception_validation_conversational(
     current_history = conversation_history
     current_message = user_message
     text = ""
+    initial_images = images
 
     for attempt in range(max_retries):
         if perception_error:
@@ -1174,8 +1184,11 @@ async def _improve_with_perception_validation_conversational(
                 f"updated beliefs and perception in the same format as before."
             )
 
+        # Only attach images on the first attempt; retries are text-only.
+        turn_images = initial_images if attempt == 0 else None
+
         text, cost, current_history = await _llm_call_conversational(
-            config, current_history, current_message,
+            config, current_history, current_message, images=turn_images,
         )
         total_cost += cost
 
@@ -1245,15 +1258,17 @@ async def _improve_beliefs_only_conversational(
     beliefs: str,
     conversation_history: list[dict],
     user_message: str,
+    images: list | None = None,
 ) -> tuple[str, float, list[dict], str]:
     """Run a beliefs-only improve prompt using multi-turn conversation.
 
     Only extracts <updated_beliefs>; no perception extraction or validation.
+    Optional ``images`` are attached to the new user_message turn.
 
     Returns: (new_beliefs, total_cost, updated_history, llm_response)
     """
     text, cost, current_history = await _llm_call_conversational(
-        config, conversation_history, user_message,
+        config, conversation_history, user_message, images=images,
     )
 
     updated_beliefs = extract_xml_key(text, "updated_beliefs")

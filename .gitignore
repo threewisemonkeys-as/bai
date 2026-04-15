@@ -234,3 +234,4 @@ logs/
 SECRETS
 
 nle_data/
+environment_files/

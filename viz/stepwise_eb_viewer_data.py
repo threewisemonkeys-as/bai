@@ -8,6 +8,7 @@ import io
 import json
 import os
 import re
+import shutil
 from datetime import datetime, timezone
 
 
@@ -132,6 +133,9 @@ def load_log_dir(log_dir):
                 "has_trim_log": os.path.exists(os.path.join(s_path, "trim_log.json")),
                 "has_experiment_log": os.path.exists(os.path.join(s_path, "experiment_log.json")),
                 "has_agent_messages": os.path.exists(os.path.join(s_path, "agent_messages.json")),
+                "has_obs_before": os.path.exists(os.path.join(s_path, "obs_before.png")),
+                "has_obs_after": os.path.exists(os.path.join(s_path, "obs_after.png")),
+                "env_info": step_log.get("env_info"),
                 "trim_cost": step_log.get("trim_cost", 0),
                 "did_gen_questions": step_log.get("did_gen_questions", False),
                 "did_formulate_experiment": step_log.get("did_formulate_experiment", False),
@@ -166,7 +170,7 @@ def load_step_detail(log_dir, episode_idx, step_idx):
     step_path = os.path.join(log_dir, f"episode_{episode_idx}", f"step_{step_idx:03d}")
     if not os.path.isdir(step_path):
         return {"error": f"Step dir not found: {step_path}"}
-    return {
+    detail = {
         "beliefs": read_file(os.path.join(step_path, "beliefs.txt")),
         "perception": read_file(os.path.join(step_path, "perception.py")),
         "qa_pairs": read_json(os.path.join(step_path, "qa_pairs.json")) or [],
@@ -178,6 +182,10 @@ def load_step_detail(log_dir, episode_idx, step_idx):
         "improve_log": read_file(os.path.join(step_path, "improve.log")),
         "step_log": read_json(os.path.join(step_path, "step_log.json")) or {},
     }
+    # Include image availability flags
+    detail["has_obs_before"] = os.path.exists(os.path.join(step_path, "obs_before.png"))
+    detail["has_obs_after"] = os.path.exists(os.path.join(step_path, "obs_after.png"))
+    return detail
 
 
 def load_trajectory(log_dir, episode_idx):
@@ -450,6 +458,17 @@ def export_static_report(log_dir, export_root, run_id=None, title=None, descript
             os.path.join(run_dir, "step_details", detail_name),
             load_step_detail(resolved, step["episode_idx"], step["step"]),
         )
+        # Copy observation images for static export
+        src_step_dir = os.path.join(resolved, f"episode_{step['episode_idx']}", f"step_{step['step']:03d}")
+        for img_name in ("obs_before.png", "obs_after.png"):
+            src_img = os.path.join(src_step_dir, img_name)
+            if os.path.isfile(src_img):
+                dst_img = os.path.join(
+                    run_dir, "images",
+                    f"ep_{step['episode_idx']:03d}_step_{step['step']:03d}_{img_name}",
+                )
+                os.makedirs(os.path.dirname(dst_img), exist_ok=True)
+                shutil.copy2(src_img, dst_img)
 
     index_path = os.path.join(os.path.abspath(export_root), "index.json")
     index_data = read_json(index_path) or {"version": STATIC_INDEX_VERSION, "runs": []}

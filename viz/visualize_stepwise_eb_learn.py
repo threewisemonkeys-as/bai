@@ -90,6 +90,19 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/qa_timeline":
                 log_dir = self._get_log_dir(params)
                 self._json_response(load_qa_timeline(log_dir))
+            elif path == "/api/step_image":
+                log_dir = self._get_log_dir(params)
+                episode = int(params.get("episode", [0])[0])
+                step = int(params.get("step", [0])[0])
+                name = params.get("name", ["obs_before.png"])[0]
+                if name not in ("obs_before.png", "obs_after.png"):
+                    self.send_error(400)
+                    return
+                img_path = Path(log_dir) / f"episode_{episode}" / f"step_{step:03d}" / name
+                if img_path.is_file():
+                    self._image_response(img_path)
+                else:
+                    self.send_error(404)
             else:
                 self.send_error(404)
         except Exception as exc:
@@ -120,6 +133,14 @@ class Handler(BaseHTTPRequestHandler):
         data = text.encode()
         self.send_response(200)
         self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", len(data))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _image_response(self, img_path):
+        data = img_path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
         self.send_header("Content-Length", len(data))
         self.end_headers()
         self.wfile.write(data)

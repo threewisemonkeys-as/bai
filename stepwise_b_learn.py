@@ -24,7 +24,7 @@ from balrog.agents import AgentFactory
 from balrog.environments import make_env
 from balrog.utils import get_unique_seed
 
-from explore import get_default_actions, get_default_knowledge, override_temperature, evolve_logger
+from explore import get_default_knowledge, override_temperature, evolve_logger
 from mixed_improve import (
     QAPair,
     CriticalMoment,
@@ -139,7 +139,7 @@ def format_steps_context(
 
         block = f"<step n=\"{entry['step']}\">\n"
         block += (
-            f"<state>\n{raw_obs}\n</state>\n\n"
+            f"<raw_state>\n{raw_obs}\n</raw_state>\n\n"
             f"<auxiliary_observation>\n{raw_aux}\n</auxiliary_observation>\n\n"
             f"<perception_output>\n{perc_out if perc_out else '(no perception module)'}\n</perception_output>\n\n"
             f"<agent_reasoning>\n{reasoning}\n</agent_reasoning>\n"
@@ -471,7 +471,6 @@ def run_stepwise_b_learn_episode(
     moments: list[CriticalMoment],
     experiments: list[str],
     default_knowledge: str,
-    default_actions: str,
     original_cwd: str,
     output_dir: str,
     episode_idx: int = 0,
@@ -624,7 +623,6 @@ def run_stepwise_b_learn_episode(
                     experiments, exp_cost, exp_prompt, exp_response = asyncio.run(
                         generate_experiments_from_steps(
                             config=config,
-                            default_actions=default_actions,
                             beliefs=beliefs,
                             qa_pairs=qa_pairs,
                             critical_moments=forward_moments,
@@ -1912,8 +1910,6 @@ def stepwise_b_learn(
 
     default_knowledge = get_default_knowledge(config)
     evolve_logger.info(f"Default knowledge: {len(default_knowledge)} chars")
-    default_actions = get_default_actions(config)
-    evolve_logger.info(f"Default actions: {len(default_actions)} chars")
 
     evolve_logger.info(f"Stepwise B-learn config:")
     evolve_logger.info(f"  Total env steps: {bl_config.n_environment_steps}")
@@ -1961,7 +1957,6 @@ def stepwise_b_learn(
                     moments=moments,
                     experiments=experiments,
                     default_knowledge=default_knowledge,
-                    default_actions=default_actions,
                     original_cwd=original_cwd,
                     output_dir=str(episode_dir),
                     episode_idx=episode_idx,
