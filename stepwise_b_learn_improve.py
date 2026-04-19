@@ -111,12 +111,25 @@ def build_perception_followup_message(
     prev_obs_section: str,
     current_turn: int = 0,
     max_turns: int = 0,
+    sample_histories: list[list[str]] | None = None,
+    history_window: int | None = None,
+    display_tail: int | None = None,
+    perception_instructions: str | None = None,
+    response_format: str | None = None,
 ) -> str:
     """Build followup message for perception-only track showing updated perception outputs."""
     if not sample_observations:
         return "No sample observations available for re-evaluation. Please review your previous changes and decide whether to SUBMIT or CONTINUE."
+    if perception_instructions is None:
+        perception_instructions = PERCEPTION_INSTRUCTIONS
+    if response_format is None:
+        response_format = PERCEPTION_ONLY_RESPONSE_FORMAT
 
-    new_obs_section = _build_obs_section(perception, sample_observations)
+    new_obs_section = _build_obs_section(
+        perception, sample_observations,
+        sample_histories=sample_histories, history_window=history_window,
+        display_tail=display_tail,
+    )
 
     turns_remaining = max_turns - current_turn
     turns_note = f"You have {turns_remaining} turn(s) remaining (turn {current_turn}/{max_turns}). " if max_turns > 0 else ""
@@ -125,12 +138,12 @@ def build_perception_followup_message(
 
 {new_obs_section}
 
-{PERCEPTION_INSTRUCTIONS}
+{perception_instructions}
 
 {turns_note}Review whether the perception changes improved, degraded, or had no effect on the output quality.
 Then provide an updated perception module (or keep it unchanged if satisfied).
 
-{PERCEPTION_ONLY_RESPONSE_FORMAT}"""
+{response_format}"""
 
 
 def build_steps_beliefs_followup_message() -> str:
@@ -148,12 +161,22 @@ def build_perception_with_analysis_prompt(
     obs_section: str,
     perception_analysis: str,
     max_iterations: int,
+    perception_instructions: str | None = None,
+    response_format: str | None = None,
 ) -> str:
     """Build the initial prompt for the post-beliefs perception improvement loop (Track 1c).
 
     Identical in structure to the Track 1a perception prompt but includes
     the perception_analysis from Track 1b as additional guidance.
+
+    `perception_instructions` and `response_format` default to the single-obs
+    module-level constants but may be overridden (e.g. by stepwise_eb_learn
+    to teach the LLM the list-based perceive signature).
     """
+    if perception_instructions is None:
+        perception_instructions = PERCEPTION_INSTRUCTIONS
+    if response_format is None:
+        response_format = PERCEPTION_ONLY_RESPONSE_FORMAT
     analysis_section = ""
     if perception_analysis and perception_analysis.strip():
         analysis_section = f"""
@@ -190,34 +213,105 @@ The following are examples of sampled inputs to and outputs from the current per
 
 Your task is to improve the perception module so that it extracts useful information from the raw environment observations.
 
-{PERCEPTION_INSTRUCTIONS}
+{perception_instructions}
 
 Only update the perception module if it can be improved based on the examples above. Do not modify world knowledge or policy.
 
 This is a multi-turn conversation. After each response, you will receive updated perception examples to review. You can iterate up to {max_iterations} rounds of improvement.
 
 
-{PERCEPTION_ONLY_RESPONSE_FORMAT}"""
+{response_format}"""
+
+
+def _render_history_input(history: list[str], display_tail: int) -> str:
+    """Render a list history as elision marker + last K frames.
+
+    The last frame is always the current observation (marked current="true").
+    If len(history) <= K (or K <= 0), shows all frames without elision.
+    """
+    n = len(history)
+    if n == 0:
+        return "(empty history)"
+    k = max(0, int(display_tail))
+    if k <= 0 or n <= k:
+        tail_idxs = list(range(n))
+        elided = 0
+    else:
+        tail_idxs = list(range(n - k, n))
+        elided = n - k
+
+    def _frame(i: int) -> str:
+        rel = i - (n - 1)
+        attrs = f'index="{i}" relative="{rel}"'
+        if i == n - 1:
+            attrs += ' current="true"'
+        return f"<frame {attrs}>\n{history[i]}\n</frame>"
+
+    parts: list[str] = []
+    if elided > 0:
+        parts.append(
+            f"<!-- {elided} earlier frame(s) elided; perceive() receives the full history -->"
+        )
+    parts.extend(_frame(i) for i in tail_idxs)
+    return "\n".join(parts)
 
 
 def _build_obs_section(
     perception: str,
     sample_observations: list[tuple[str, int]] | None,
+    sample_histories: list[list[str]] | None = None,
+    history_window: int | None = None,
+    display_tail: int | None = None,
 ) -> str:
-    """Build the sampled perception examples section for prompts."""
+    """Build the sampled perception examples section for prompts.
+
+    If sample_histories and history_window are provided (aligned with
+    sample_observations), perception is invoked via _run_perception_on_history
+    on each step's windowed history. Otherwise legacy single-obs behavior.
+
+    When history mode is active and display_tail is set, <perception_input>
+    shows only the last K frames with an elision marker noting that perceive()
+    saw earlier frames too. If display_tail is None, only the current raw_obs
+    is shown (legacy display).
+    """
     if not sample_observations:
         return ""
+    from mixed_improve import _run_perception_on_history
+    use_history = (
+        sample_histories is not None
+        and history_window is not None
+        and len(sample_histories) == len(sample_observations)
+    )
+    tail_note = ""
+    if use_history and display_tail is not None:
+        tail_note = (
+            f"Note: Each <perception_input> below shows only the last {display_tail} frame(s) "
+            f"of the observation history for display purposes (the most recent frame is marked "
+            f'current="true"). The actual perceive() call receives the full history '
+            f"(up to {history_window} frames).\n\n"
+        )
+
     obs_blocks = []
-    for raw_obs, step_num in sample_observations:
-        perc_out = _run_perception_on_observation(perception, raw_obs)
+    for idx, (raw_obs, step_num) in enumerate(sample_observations):
+        if use_history:
+            history = sample_histories[idx]
+            perc_out = _run_perception_on_history(perception, history, history_window)
+            if display_tail is not None:
+                input_block = _render_history_input(history, display_tail)
+            else:
+                input_block = raw_obs
+        else:
+            perc_out = _run_perception_on_observation(perception, raw_obs)
+            input_block = raw_obs
         obs_blocks.append(
             f"<perception_example step=\"{step_num}\">\n"
-            f"<perception_input>\n{raw_obs}\n</perception_input>\n"
+            f"<perception_input>\n{input_block}\n</perception_input>\n"
             f"<perception_output>\n{perc_out if perc_out else '(empty)'}\n</perception_output>\n"
             f"</perception_example>"
         )
     return (
         "\n<sampled_perception_examples>\n"
+        + tail_note
         + "\n\n".join(obs_blocks)
         + "\n</sampled_perception_examples>\n"
     )
@@ -226,8 +320,16 @@ def _build_obs_section(
 def _build_execution_report_section(
     perception: str,
     sample_observations: list[tuple[str, int]] | None,
+    sample_histories: list[list[str]] | None = None,
+    history_window: int | None = None,
 ) -> str:
-    """Build execution report section for prompts."""
+    """Build execution report section for prompts.
+
+    History-aware variant currently renders the same legacy execution report
+    (raw_obs → single-obs perception output). The history-aware perception
+    output already appears in `_build_obs_section`, which is where the LLM
+    reviews the current module's behavior.
+    """
     if not sample_observations:
         return ""
     exec_report = _build_execution_report(perception, sample_observations)

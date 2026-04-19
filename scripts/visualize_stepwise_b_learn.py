@@ -124,6 +124,15 @@ def load_log_dir(log_dir):
     if summary and "steps" in summary and len(summary["steps"]) > 0:
         total_cost = sum(s.get("step_cost", 0) for s in summary["steps"])
 
+    # Detect mock_mode from saved config.yaml (stepwise_eb_learn only).
+    mock_mode = False
+    for line in config.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("mock_mode:"):
+            val = stripped.split(":", 1)[1].strip().lower()
+            mock_mode = val in ("true", "yes", "1")
+            break
+
     return {
         "config": config,
         "summary": summary,
@@ -133,6 +142,7 @@ def load_log_dir(log_dir):
         "steps": all_steps,
         "total_cost": total_cost,
         "log_dir_name": os.path.basename(log_dir),
+        "mock_mode": mock_mode,
     }
 
 
@@ -488,6 +498,7 @@ pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px
   <div class="topbar">
     <div class="topbar-title">Stepwise B-Learn Viewer</div>
     <div class="topbar-info" id="topbar-dir"></div>
+    <div class="topbar-mock" id="topbar-mock" style="display:none;font-size:11px;font-weight:600;padding:2px 8px;margin-left:8px;border-radius:3px;background:rgba(210,153,34,0.2);color:var(--accent3);border:1px solid var(--accent3)" title="mock_mode=true: no LLM calls were made — actions and artifact updates are random">MOCK MODE</div>
     <div class="topbar-cost" id="topbar-cost"></div>
     <button class="topbar-new-tab" onclick="openNewTab()" title="Open a new tab to view a different log directory">+ New Tab</button>
     <button class="topbar-btn" onclick="reloadData()" title="Reload data from disk">Reload</button>
@@ -554,7 +565,8 @@ async function init() {
       return;
     }
     document.getElementById('topbar-dir').textContent = DATA.log_dir_name;
-    document.title = DATA.log_dir_name + ' — Stepwise B-Learn Viewer';
+    document.title = (DATA.mock_mode ? '[MOCK] ' : '') + DATA.log_dir_name + ' — Stepwise B-Learn Viewer';
+    document.getElementById('topbar-mock').style.display = DATA.mock_mode ? '' : 'none';
     document.getElementById('topbar-cost').textContent = 'Total cost: $' + (DATA.total_cost || 0).toFixed(4);
     buildSidebar();
     if (DATA.steps.length > 0) showStep(selectedStepIdx != null ? selectedStepIdx : 0);
@@ -617,6 +629,26 @@ function showStep(idx) {
 }
 
 function esc(s) { if (s == null) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+function perceptionSignatureBadge(src) {
+  if (!src) return '';
+  const m = src.match(/def\\s+perceive\\s*\\(([^)]*)\\)/);
+  if (!m) return '';
+  const param = m[1].trim();
+  const lc = param.toLowerCase();
+  const isHistory =
+    /:\\s*list\\b/.test(lc) || /:\\s*sequence\\b/.test(lc) || /:\\s*tuple\\b/.test(lc) ||
+    /\\blist\\[/.test(lc) || /\\bsequence\\[/.test(lc) ||
+    /\\bhistory\\b/.test(lc);
+  const cfg = (typeof DATA !== 'undefined' && DATA.config) || '';
+  const win = cfg.match(/perception_history_window:\\s*(\\d+)/);
+  const tail = cfg.match(/perception_input_tail:\\s*(\\d+)/);
+  const winTxt = win ? (' \u00b7 window ' + win[1]) : '';
+  const tailTxt = tail ? (' \u00b7 tail ' + tail[1]) : '';
+  if (isHistory) {
+    return '<span style="font-size:11px;font-weight:400;padding:2px 6px;margin-left:6px;border:1px solid var(--accent2);border-radius:3px;color:var(--accent2)">history' + winTxt + tailTxt + '</span>';
+  }
+  return '<span style="font-size:11px;font-weight:400;padding:2px 6px;margin-left:6px;border:1px solid var(--border);border-radius:3px;color:var(--text-muted)">single-obs</span>';
+}
 function toggleCard(h) { const b = h.nextElementSibling; const t = h.querySelector('.toggle'); b.classList.toggle('collapsed'); t.innerHTML = b.classList.contains('collapsed') ? '&#9654;' : '&#9660;'; }
 function toggleBody(h) { h.nextElementSibling.classList.toggle('open'); }
 function collapsible(title, content, open) {
@@ -757,7 +789,7 @@ function renderOverview(data, s) {
 
   // Beliefs and Perception
   html += '<div class="side-by-side" style="margin-bottom:16px"><div><h3>Beliefs</h3><pre>' + esc(data.beliefs || '(empty)') + '</pre></div>';
-  html += '<div><h3>Perception</h3><pre>' + esc(data.perception || '(empty)') + '</pre></div></div>';
+  html += '<div><h3>Perception ' + perceptionSignatureBadge(data.perception) + '</h3><pre>' + esc(data.perception || '(empty)') + '</pre></div></div>';
 
   // Cost over time chart
   html += renderCostChart();

@@ -2,11 +2,13 @@
 
 import asyncio
 import csv
+import inspect
 import json
 import logging
 import os
 import re
 import random
+import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -134,6 +136,71 @@ def apply_perception(obs: dict, perception_fn) -> None:
     long_term_text = obs["text"]["long_term_context"]
     try:
         perception_output = perception_fn(long_term_text)
+    except Exception as e:
+        perception_output = f"Perception code failed with error -\n{e}"
+        logging.warning(f"Perception module failed: {e}")
+    obs["text"]["short_term_context"] = (
+        f"\n{'='*10} Start of features from Perception Module {'='*10}\n"
+        f"{perception_output}\n\n"
+        f"{'='*10} End of features from Perception Module {'='*10}\n\n"
+        f"{'='*10} Start of Auxilliary Observation {'='*10}\n"
+        f"{obs['text']['short_term_context']}\n\n"
+        f"{'='*10} End of Auxilliary Observation {'='*10}"
+    )
+
+
+def _perceive_signature_mode(perception_fn) -> str:
+    """Return 'history' if perceive expects list[str]-like input, else 'single'."""
+    if perception_fn is None:
+        return "single"
+    try:
+        sig = inspect.signature(perception_fn)
+    except (TypeError, ValueError):
+        return "single"
+    params = [p for p in sig.parameters.values()
+              if p.kind in (inspect.Parameter.POSITIONAL_ONLY,
+                            inspect.Parameter.POSITIONAL_OR_KEYWORD)]
+    if not params:
+        return "single"
+    first = params[0]
+    if "history" in first.name.lower() or "list" in first.name.lower():
+        return "history"
+    ann = first.annotation
+    if ann is inspect.Parameter.empty:
+        return "single"
+    if ann is list or ann is tuple:
+        return "history"
+    origin = typing.get_origin(ann)
+    if origin in (list, tuple):
+        return "history"
+    ann_str = str(ann).lower()
+    if "list[" in ann_str or "sequence[" in ann_str or "tuple[" in ann_str:
+        return "history"
+    return "single"
+
+
+def apply_perception_with_history(
+    obs: dict,
+    perception_fn,
+    history: list,
+    window: int,
+) -> None:
+    """Like apply_perception, but dispatches on perceive's signature.
+
+    If perceive expects a list, it gets the last `window` entries of `history`.
+    Legacy single-arg perceive gets history[-1].
+    """
+    if perception_fn is None:
+        return
+    if not history:
+        history = [obs["text"]["long_term_context"]]
+    mode = _perceive_signature_mode(perception_fn)
+    try:
+        if mode == "history":
+            windowed = history[-window:] if window and window > 0 else list(history)
+            perception_output = perception_fn(windowed)
+        else:
+            perception_output = perception_fn(history[-1])
     except Exception as e:
         perception_output = f"Perception code failed with error -\n{e}"
         logging.warning(f"Perception module failed: {e}")

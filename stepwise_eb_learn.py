@@ -23,6 +23,10 @@ from omegaconf import DictConfig
 from tqdm import tqdm
 
 from balrog.agents import AgentFactory
+from balrog.client import (
+    set_mock_mode as set_client_mock_mode,
+    set_mock_action_provider,
+)
 from balrog.environments import make_env
 from balrog.utils import get_unique_seed
 
@@ -30,6 +34,7 @@ from explore import get_default_knowledge, override_temperature, evolve_logger
 from mixed_improve import (
     QAPair,
     _run_perception_on_observation,
+    set_mock_mode,
 )
 from b_learn_improve import (
     qa_forward_pass,
@@ -45,8 +50,6 @@ from stepwise_b_learn_improve import (
     build_qa_followup_message,
     _build_obs_section,
     _build_execution_report_section,
-    PERCEPTION_INSTRUCTIONS,
-    RESPONSE_FORMAT,
     BELIEFS_ONLY_RESPONSE_FORMAT,
 )
 from stepwise_eb_learn_improve import (
@@ -65,14 +68,79 @@ from stepwise_b_learn import (
     _compose_obs_text,
     _refresh_buffer_with_perception,
     _sample_observations_from_buffer,
+    _histories_for_samples,
     _inject_beliefs,
     _flush_improve_progress,
 )
 from stepwise_explore import (
     load_perception_fn,
     apply_perception,
+    apply_perception_with_history,
 )
 from run_utils import setup_run, improve_logging, _update_summary_json
+
+
+# ---------------------------------------------------------------------------
+# EB-local prompt templates: teach the LLM that perceive() takes a list of raw
+# observations (most recent N, chronological) rather than a single string.
+# Scoped to stepwise_eb_learn so stepwise_b_learn's prompts are unaffected.
+# ---------------------------------------------------------------------------
+
+EB_PERCEPTION_INSTRUCTIONS = """For the perception module:
+- It should be a valid Python function `perceive(observation_history: list[str]) -> str`.
+- Input `observation_history` is a list of the most recent raw environment observations from the current episode, in chronological order. `observation_history[-1]` is the current observation; earlier entries are prior steps.
+- Output should only contain features important for decision-making in the environment.
+- Ensure the output does not exceed 2000 characters. Remove features that the agent does not use for decision-making.
+- The output should be consistent with the current world knowledge and policy and should not make any additional or contradictory assumptions to them.
+- Ensure that the perception module is working correctly — that it is correctly extracting the intended information from the raw environment state and presenting it clearly.
+"""
+
+EB_RESPONSE_FORMAT = """Format your response as:
+<think>
+Analyze the step sequence and determine what needs to change.
+</think>
+
+<updated_beliefs>
+<world_knowledge>
+- [fact about mechanics, environmental properties, cause-and-effect relationships, etc ...]
+- ...
+</world_knowledge>
+<policy>
+- [what to do in specific situations, priorities, strategies for completing the objective etc ...]
+- ...
+</policy>
+</updated_beliefs>
+
+<updated_perception>
+```python
+def perceive(observation_history: list[str]) -> str:
+    # Your implementation here. observation_history[-1] is the current observation;
+    # earlier entries are prior observations from the same episode (capped).
+    pass
+```
+</updated_perception>
+
+<status>CONTINUE or SUBMIT</status>
+
+Set status to SUBMIT if you believe your current beliefs and perception are sufficient given the available evidence. Set status to CONTINUE if you want to receive re-evaluation results and iterate further. When in doubt, prefer CONTINUE."""
+
+EB_PERCEPTION_ONLY_RESPONSE_FORMAT = """Format your response as:
+<think>
+Analyze the perception input/output examples and determine what the perception module should extract differently.
+</think>
+
+<updated_perception>
+```python
+def perceive(observation_history: list[str]) -> str:
+    # Your implementation here. observation_history[-1] is the current observation;
+    # earlier entries are prior observations from the same episode (capped).
+    pass
+```
+</updated_perception>
+
+<status>CONTINUE or SUBMIT</status>
+
+Set status to SUBMIT if you believe your current perception module is extracting information well. Set status to CONTINUE if you want to see updated examples and iterate further. When in doubt, prefer CONTINUE."""
 
 
 @dataclass
@@ -89,6 +157,10 @@ class StepwiseEBLearnConfig:
     improve_interval: int
     experiment_interval: int
     max_steps_context_chars: int
+    perception_history_window: int = 10
+    perception_input_tail: int = 2
+    hide_obs_when_image: bool = False
+    mock_mode: bool = False
 
 
 def _resolve_schedule(value: "int | list[list[int]]", global_step: int) -> int:
@@ -115,6 +187,36 @@ def _resolve_schedule(value: "int | list[list[int]]", global_step: int) -> int:
             return count
         cumulative += threshold
     return value[-1][1]
+
+
+# ---------------------------------------------------------------------------
+# Mock mode helpers. In mock mode every LLM call is short-circuited at its
+# respective client layer:
+#   - Improve/QA/experiment LLM calls go through mixed_improve._llm_call /
+#     _llm_call_conversational, gated by mixed_improve.set_mock_mode().
+#   - Agent LLM calls go through balrog.client.LLMClientWrapper.generate,
+#     gated by balrog.client.set_mock_mode() + set_mock_action_provider().
+# In both cases the real prompt is still constructed and logged; only the
+# network call is replaced with a synthesized response. Gated end-to-end by
+# StepwiseEBLearnConfig.mock_mode.
+# ---------------------------------------------------------------------------
+
+
+def _mock_available_actions(env) -> list[str]:
+    """Return a list of valid action strings for the given env."""
+    actions = getattr(env, "language_action_space", None)
+    if actions is None and hasattr(env, "env"):
+        actions = getattr(env.env, "language_action_space", None)
+    # Some wrappers expose a Strings object (crafter); unwrap if needed.
+    values = getattr(actions, "_values", None)
+    if values is not None:
+        actions = values
+    if not actions:
+        actions = ["wait"]
+    try:
+        return list(actions)
+    except TypeError:
+        return ["wait"]
 
 
 # ---------------------------------------------------------------------------
@@ -402,12 +504,16 @@ def _run_improve_loop_eb(
     max_perception_iters = _resolve_schedule(eb_config.max_perception_iterations, global_step)
     max_qa_iters = _resolve_schedule(eb_config.max_qa_iterations, global_step)
 
+    hist_window = eb_config.perception_history_window
+    display_tail = eb_config.perception_input_tail
     steps_context = format_steps_context(
         trajectory_buffer, perception, eb_config.max_steps_context_chars,
+        history_window=hist_window,
     )
     sample_obs = _sample_observations_from_buffer(
         trajectory_buffer, eb_config.num_sample_obs,
     )
+    sample_obs_histories = _histories_for_samples(trajectory_buffer, sample_obs)
     steps_context, steps_context_images = _images_for_steps_context(
         trajectory_buffer, steps_context,
     )
@@ -454,8 +560,7 @@ Your task is to:
 2. Update our beliefs about the environment based on confirmed knowledge from the steps.
 
 Provide analysis highlighting:
-- Belief learning: What beliefs can we infer from the observations.
-- Belief update: How should we update our current beliefs so that they more accurately reflect how the world works.
+- Belief learning: What can we infer from the observations and how should we update our current beliefs so that they more accurately reflect how the world works.
 - Perception analysis: What information was presented in output of the perception module. What part of that information was helpful, what information was misleading / incorrect and what additional information would have helped if extracted by the perception module?
 
 For beliefs:
@@ -466,7 +571,7 @@ For beliefs:
 - Both sections should be consise, made up of a few brief points, merging any redundant or stale information.
 - They should be grounded in the evidence present in the step sequence, only containing inferences from what we have observed so far.
 
-{PERCEPTION_INSTRUCTIONS}
+{EB_PERCEPTION_INSTRUCTIONS}
 
 {BELIEFS_ONLY_RESPONSE_FORMAT}"""
 
@@ -501,7 +606,11 @@ For beliefs:
         if sample_obs:
             track1b_record = {"track": "perception_from_analysis", "step": step, "global_step": global_step, "turns": []}
             pre_perception_track1b = perception
-            obs_section_1b = _build_obs_section(perception, sample_obs)
+            obs_section_1b = _build_obs_section(
+                perception, sample_obs,
+                sample_histories=sample_obs_histories, history_window=hist_window,
+                display_tail=display_tail,
+            )
 
             perception_from_analysis_prompt = build_perception_with_analysis_prompt(
                 beliefs=beliefs,
@@ -510,6 +619,8 @@ For beliefs:
                 obs_section=obs_section_1b,
                 perception_analysis=perception_analysis,
                 max_iterations=max_perception_iters,
+                perception_instructions=EB_PERCEPTION_INSTRUCTIONS,
+                response_format=EB_PERCEPTION_ONLY_RESPONSE_FORMAT,
             )
 
             perception_conv_1b: list[dict] = []
@@ -521,6 +632,10 @@ For beliefs:
                 message = perception_from_analysis_prompt if turn == 0 else build_perception_followup_message(
                     perception, sample_obs, prev_obs_section_1b,
                     current_turn=turn + 1, max_turns=max_perception_iters,
+                    sample_histories=sample_obs_histories, history_window=hist_window,
+                    display_tail=display_tail,
+                    perception_instructions=EB_PERCEPTION_INSTRUCTIONS,
+                    response_format=EB_PERCEPTION_ONLY_RESPONSE_FORMAT,
                 )
 
                 # Attach sample images on the first turn only; subsequent turns rely on history.
@@ -552,7 +667,11 @@ For beliefs:
                 if submitted:
                     break
 
-                prev_obs_section_1b = _build_obs_section(perception, sample_obs)
+                prev_obs_section_1b = _build_obs_section(
+                    perception, sample_obs,
+                    sample_histories=sample_obs_histories, history_window=hist_window,
+                    display_tail=display_tail,
+                )
 
             feedback_history.append(track1b_record)
             if step_dir is not None:
@@ -562,6 +681,7 @@ For beliefs:
             if perception != pre_perception_track1b:
                 steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                    history_window=hist_window,
                 )
                 steps_context, steps_context_images = _images_for_steps_context(
                     trajectory_buffer, steps_context,
@@ -642,7 +762,10 @@ For beliefs:
                     )
                 qa_text = "\n\n".join(qa_blocks)
 
-                execution_report_section = _build_execution_report_section(perception, sample_obs)
+                execution_report_section = _build_execution_report_section(
+                    perception, sample_obs,
+                    sample_histories=sample_obs_histories, history_window=hist_window,
+                )
 
                 initial_qa_prompt = f"""You are improving an agent's knowledge and perception based on testing its understanding of the environment via question-answering.
 
@@ -688,9 +811,9 @@ Guidelines:
 
 This is a multi-turn conversation. After each response, the QA pairs will be re-evaluated with your updated beliefs/perception. You can iterate up to {max_qa_iters} turns.
 
-{PERCEPTION_INSTRUCTIONS}
+{EB_PERCEPTION_INSTRUCTIONS}
 
-{RESPONSE_FORMAT}"""
+{EB_RESPONSE_FORMAT}"""
 
                 qa_conversation: list[dict] = []
                 prev_qa_correct = len(qa_correct)
@@ -778,6 +901,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
             if perception != pre_track_perception:
                 steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                    history_window=hist_window,
                 )
                 steps_context, steps_context_images = _images_for_steps_context(
                     trajectory_buffer, steps_context,
@@ -835,6 +959,13 @@ def run_stepwise_eb_learn_episode(
     agent = agent_factory.create_agent()
     agent.reset()
 
+    # In mock mode, install a closure that samples a random valid action from
+    # *this* episode's env. balrog.client's mock hook calls it when synthesizing
+    # the agent's LLM response. Set only when mock_mode is on; the flag itself
+    # is toggled once in stepwise_eb_learn() below.
+    if eb_config.mock_mode:
+        set_mock_action_provider(lambda: random.choice(_mock_available_actions(env)))
+
     seed = config.envs.env_kwargs.seed
     if seed is None:
         seed = get_unique_seed(process_num=0, episode_idx=episode_idx)
@@ -858,10 +989,15 @@ def run_stepwise_eb_learn_episode(
     _pre_action_raw_short = obs["text"].get("short_term_context", "")
     _pre_action_image = obs.get("image")  # PIL Image or None
 
+    # Per-episode raw observation history for history-aware perception modules.
+    raw_obs_history: list[str] = [_pre_action_raw_long]
+
     # Setup perception
     perception_fn = load_perception_fn(perception)
     if perception_fn is not None:
-        apply_perception(obs, perception_fn)
+        apply_perception_with_history(
+            obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+        )
 
     # Build initial obs_text (with perception applied) for the first buffer entry
     _pre_action_obs_text = _compose_obs_text(
@@ -960,6 +1096,7 @@ def run_stepwise_eb_learn_episode(
                 evolve_logger.info(f"[g{global_step}] Generating questions...")
                 exp_steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                    history_window=eb_config.perception_history_window,
                 )
                 exp_steps_context, exp_steps_context_images = _images_for_steps_context(
                     trajectory_buffer, exp_steps_context,
@@ -980,6 +1117,7 @@ def run_stepwise_eb_learn_episode(
                             current_step=global_step,
                             current_image=_pre_action_image,
                             steps_context_images=exp_steps_context_images,
+                            hide_raw_obs=eb_config.hide_obs_when_image,
                         )
                     )
                     qa_pairs.extend(new_questions)
@@ -1006,6 +1144,7 @@ def run_stepwise_eb_learn_episode(
                             default_knowledge=default_knowledge,
                             current_image=_pre_action_image,
                             steps_context_images=exp_steps_context_images,
+                            hide_raw_obs=eb_config.hide_obs_when_image,
                         )
                     )
                     step_experiment_cost += e_cost
@@ -1056,6 +1195,12 @@ def run_stepwise_eb_learn_episode(
             )
 
             # --- Agent acts ---
+            # Even in mock mode we call agent.act() so the full prompt is
+            # constructed and logged; balrog.client's mock hook short-circuits
+            # the API call and returns a synthesized response containing a
+            # random valid action from the action provider installed below.
+            if eb_config.hide_obs_when_image and _pre_action_image is not None and perception_fn is None:
+                obs["text"]["long_term_context"] = ""
             response = agent.act(obs, prev_action=action)
             action = response.completion
             reasoning = response.reasoning if hasattr(response, "reasoning") else ""
@@ -1087,9 +1232,14 @@ def run_stepwise_eb_learn_episode(
             new_raw_long = obs["text"]["long_term_context"]
             new_raw_short = obs["text"].get("short_term_context", "")
 
+            # Grow the per-episode raw-obs history with this step's post-action obs.
+            raw_obs_history.append(new_raw_long)
+
             # Apply perception to new obs
             if perception_fn is not None:
-                apply_perception(obs, perception_fn)
+                apply_perception_with_history(
+                    obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+                )
 
             result_obs_text = _compose_obs_text(
                 obs["text"]["short_term_context"],
@@ -1196,6 +1346,7 @@ def run_stepwise_eb_learn_episode(
                 evolve_logger.info(f"[g{global_step}] Updating Q from {len(trajectory_buffer)} buffered steps...")
                 steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                    history_window=eb_config.perception_history_window,
                 )
                 steps_context, steps_context_images_update = _images_for_steps_context(
                     trajectory_buffer, steps_context,
@@ -1209,6 +1360,7 @@ def run_stepwise_eb_learn_episode(
                             max_total_qa_pairs=eb_config.max_total_qa_pairs,
                             current_step=global_step,
                             steps_context_images=steps_context_images_update,
+                            hide_raw_obs=eb_config.hide_obs_when_image,
                         )
                     )
                     step_extract_cost = extract_cost
@@ -1305,11 +1457,16 @@ def run_stepwise_eb_learn_episode(
                     obs["text"]["long_term_context"] = new_raw_long
                     obs["text"]["short_term_context"] = new_raw_short
                     if perception_fn is not None:
-                        apply_perception(obs, perception_fn)
+                        apply_perception_with_history(
+                            obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+                        )
 
                 # Rebuild all buffered observations with the latest perception
                 if perception_changed:
-                    _refresh_buffer_with_perception(trajectory_buffer, perception_fn)
+                    _refresh_buffer_with_perception(
+                        trajectory_buffer, perception_fn,
+                        history_window=eb_config.perception_history_window,
+                    )
 
                 # Inject updated beliefs for next step
                 if not done:
@@ -1446,6 +1603,13 @@ def stepwise_eb_learn(
     """Run stepwise EB-learning: experiment-driven per-step improvement across episodes."""
     evolve_logger.info("Starting stepwise EB-learning")
 
+    # In mock mode, intercept all LLM calls at their client layer — both the
+    # mixed_improve _llm_call path (improve/QA/experiment) and the BALROG
+    # LLMClientWrapper.generate path (agent). Real prompts are still fully
+    # constructed and logged; only the API call is short-circuited.
+    set_mock_mode(bool(eb_config.mock_mode))
+    set_client_mock_mode(bool(eb_config.mock_mode))
+
     # Check for resume
     last_ep, beliefs, perception, qa_pairs = _find_last_completed_episode_eb(output_dir)
     start_episode = last_ep + 1
@@ -1516,6 +1680,8 @@ def stepwise_eb_learn(
     evolve_logger.info(f"  Num questions per gen: {eb_config.num_questions}")
     evolve_logger.info(f"  Max steps context chars: {eb_config.max_steps_context_chars}")
     evolve_logger.info(f"  Explore temp: {eb_config.explore_temp}")
+    if eb_config.mock_mode:
+        evolve_logger.info(f"  MOCK MODE: enabled — no LLM calls; random actions and artifact perturbations")
 
     cumulative_cost = 0.0
     episode_idx = start_episode
@@ -1617,6 +1783,10 @@ def main(config: DictConfig):
         improve_interval=evolve_cfg.get("improve_interval", 5),
         experiment_interval=evolve_cfg.get("experiment_interval", 10),
         max_steps_context_chars=evolve_cfg.get("max_steps_context_chars", 50000),
+        perception_history_window=evolve_cfg.get("perception_history_window", 10),
+        perception_input_tail=evolve_cfg.get("perception_input_tail", 2),
+        hide_obs_when_image=evolve_cfg.get("hide_obs_when_image", False),
+        mock_mode=evolve_cfg.get("mock_mode", False),
     )
 
     stepwise_eb_learn(

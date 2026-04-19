@@ -109,6 +109,7 @@ def format_steps_context(
     trajectory_buffer: list[dict],
     perception_code: str,
     max_chars: int,
+    history_window: int | None = None,
 ) -> str:
     """Format the trajectory buffer as a step sequence for improvement prompts.
 
@@ -116,14 +117,24 @@ def format_steps_context(
     s_{n+1} is shown as the next step's State, and s_t (the current state after the
     last action) is appended as "Resulting state" on the final step.
     Trimmed to longest suffix that fits max_chars.
+
+    When history_window is set (e.g. >=1), perception is invoked via
+    _run_perception_on_history with a per-episode rolling window, enabling
+    history-aware perception modules. When None (default), behavior is unchanged.
     """
     if not trajectory_buffer:
         return ""
+
+    from mixed_improve import _run_perception_on_history as _run_perc_hist
+
+    # Rolling per-episode raw-obs history (reset on each episode_boundary)
+    ep_history: list[str] = []
 
     blocks = []
     for i, entry in enumerate(trajectory_buffer):
         if entry.get("episode_boundary"):
             blocks.append(f"<episode_boundary episode=\"{entry.get('episode_idx', '?')}\" />\n")
+            ep_history = []
             continue
 
         # Skip terminal entries — their obs is already in the preceding action
@@ -133,7 +144,15 @@ def format_steps_context(
 
         raw_obs = entry.get("raw_long_term_context", "")
         raw_aux = entry.get("raw_short_term_context", "")
-        perc_out = _run_perception_on_observation(perception_code, raw_obs) if perception_code else ""
+        if raw_obs:
+            ep_history.append(raw_obs)
+        if perception_code:
+            if history_window is not None:
+                perc_out = _run_perc_hist(perception_code, ep_history, history_window)
+            else:
+                perc_out = _run_perception_on_observation(perception_code, raw_obs)
+        else:
+            perc_out = ""
         reasoning = entry.get("reasoning", "")
         reward = entry.get("reward", 0)
 
@@ -159,7 +178,14 @@ def format_steps_context(
             result_raw = entry.get("result_raw_long_term_context", "")
             result_raw_aux = entry.get("result_raw_short_term_context", "")
             if result_raw:
-                result_perc = _run_perception_on_observation(perception_code, result_raw) if perception_code else ""
+                if perception_code:
+                    if history_window is not None:
+                        result_hist = ep_history + [result_raw]
+                        result_perc = _run_perc_hist(perception_code, result_hist, history_window)
+                    else:
+                        result_perc = _run_perception_on_observation(perception_code, result_raw)
+                else:
+                    result_perc = ""
                 block += (
                     f"\n<resulting_state>\n{result_raw}\n</resulting_state>\n\n"
                     f"<auxiliary_observation>\n{result_raw_aux}\n</auxiliary_observation>\n\n"
@@ -202,10 +228,18 @@ def _compose_obs_text(short_term_context: str, long_term_context: str) -> str:
 def _refresh_buffer_with_perception(
     trajectory_buffer: list[dict],
     perception_fn,
+    history_window: int | None = None,
 ) -> None:
-    """Rebuild all buffered obs_text entries using the latest perception function."""
+    """Rebuild all buffered obs_text entries using the latest perception function.
+
+    When history_window is set, perception receives a per-episode rolling history
+    via apply_perception_with_history; otherwise legacy apply_perception is used.
+    """
+    from stepwise_explore import apply_perception_with_history
+    ep_history: list[str] = []
     for entry in trajectory_buffer:
         if entry.get("episode_boundary"):
+            ep_history = []
             continue
         raw_long = entry.get("raw_long_term_context", "")
         raw_short = entry.get("raw_short_term_context", "")
@@ -216,7 +250,14 @@ def _refresh_buffer_with_perception(
             }
         }
         if perception_fn is not None:
-            apply_perception(obs_like, perception_fn)
+            if history_window is not None:
+                if raw_long:
+                    ep_history.append(raw_long)
+                apply_perception_with_history(
+                    obs_like, perception_fn, ep_history, history_window
+                )
+            else:
+                apply_perception(obs_like, perception_fn)
         entry["obs_text"] = _compose_obs_text(
             obs_like["text"]["short_term_context"],
             obs_like["text"]["long_term_context"],
@@ -262,6 +303,37 @@ def _sample_observations_from_buffer(
         idx = int(j * (len(valid) - 1) / (num_samples - 1))
         picks.append(valid[idx])
     return picks
+
+
+def _histories_for_samples(
+    trajectory_buffer: list[dict],
+    sample_observations: list[tuple[str, int]],
+) -> list[list[str]]:
+    """For each sampled (raw_obs, step_num), return the per-episode raw-obs history
+    from episode start up to and including that step.
+
+    Walk buffer linearly, track per-episode rolling history, and capture a snapshot
+    for each step number we were asked about. Steps not found fall back to [raw_obs].
+    """
+    if not sample_observations or not trajectory_buffer:
+        return [[raw] if raw else [] for raw, _ in sample_observations]
+
+    wanted_steps = {step for _, step in sample_observations}
+    snapshots: dict[int, list[str]] = {}
+    ep_history: list[str] = []
+    for e in trajectory_buffer:
+        if e.get("episode_boundary"):
+            ep_history = []
+            continue
+        raw = e.get("raw_long_term_context", "")
+        if not raw or not raw.strip():
+            continue
+        ep_history.append(raw)
+        step_num = e.get("step")
+        if step_num in wanted_steps and step_num not in snapshots:
+            snapshots[step_num] = list(ep_history)
+
+    return [snapshots.get(step, [raw] if raw else []) for raw, step in sample_observations]
 
 
 async def extract_knowledge_from_buffer(

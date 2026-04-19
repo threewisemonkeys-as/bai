@@ -58,6 +58,32 @@ def eb_qa_to_qa(eb_qa: EBQAPair) -> QAPair:
 
 
 # ---------------------------------------------------------------------------
+# Raw-obs stripping helper
+# ---------------------------------------------------------------------------
+
+
+def _strip_raw_state_text(steps_context: str) -> str:
+    """Replace <raw_state> and <resulting_state> text content with a placeholder.
+
+    Image annotations on the opening tag (e.g. ``<raw_state> (image 3)``) are
+    preserved so the LLM can still cross-reference screenshots.
+    """
+    steps_context = re.sub(
+        r"(<raw_state[^>]*>)\n.*?(\n</raw_state>)",
+        r"\1\n(see attached image)\2",
+        steps_context,
+        flags=re.DOTALL,
+    )
+    steps_context = re.sub(
+        r"(<resulting_state[^>]*>)\n.*?(\n</resulting_state>)",
+        r"\1\n(see attached image)\2",
+        steps_context,
+        flags=re.DOTALL,
+    )
+    return steps_context
+
+
+# ---------------------------------------------------------------------------
 # Question formatting helpers
 # ---------------------------------------------------------------------------
 
@@ -97,6 +123,7 @@ async def generate_questions_from_steps(
     current_step: int = 0,
     current_image=None,
     steps_context_images: list | None = None,
+    hide_raw_obs: bool = False,
 ) -> tuple[list[EBQAPair], float, str, str]:
     """Generate new unanswered questions about the environment.
 
@@ -107,6 +134,8 @@ async def generate_questions_from_steps(
     Returns: (new_questions, cost, prompt, raw_response)
     """
     step_history = steps_context
+    if hide_raw_obs and steps_context_images:
+        step_history = _strip_raw_state_text(step_history)
     num_steps_images = len(steps_context_images) if steps_context_images else 0
 
     current_obs_section = ""
@@ -119,10 +148,11 @@ async def generate_questions_from_steps(
         current_state_img_tag = ""
         if current_image is not None:
             current_state_img_tag = f" (image {num_steps_images + 1})"
+        raw_state_content = "(see attached image)" if (hide_raw_obs and current_image is not None) else current_observation
         current_obs_section = f"""
 === CURRENT STATE ===
 <raw_state>{current_state_img_tag}
-{current_observation}
+{raw_state_content}
 </raw_state>
 
 <auxiliary_observation>
@@ -232,6 +262,7 @@ async def formulate_experiment_from_question(
     default_knowledge: str,
     current_image=None,
     steps_context_images: list | None = None,
+    hide_raw_obs: bool = False,
 ) -> tuple[str | None, int | None, float, str, str]:
     """Select an unanswered question from Q and formulate an experiment to answer it.
 
@@ -240,6 +271,8 @@ async def formulate_experiment_from_question(
     the current experiment.
     """
     step_history = steps_context
+    if hide_raw_obs and steps_context_images:
+        step_history = _strip_raw_state_text(step_history)
     num_steps_images = len(steps_context_images) if steps_context_images else 0
 
     current_obs_section = ""
@@ -252,10 +285,11 @@ async def formulate_experiment_from_question(
         current_state_img_tag = ""
         if current_image is not None:
             current_state_img_tag = f" (image {num_steps_images + 1})"
+        raw_state_content = "(see attached image)" if (hide_raw_obs and current_image is not None) else current_observation
         current_obs_section = f"""
 === CURRENT STATE (agent has not yet acted) ===
 <raw_state>{current_state_img_tag}
-{current_observation}
+{raw_state_content}
 </raw_state>
 
 <auxiliary_observation>
@@ -366,6 +400,7 @@ async def update_qa_from_trajectory(
     max_total_qa_pairs: int,
     current_step: int = 0,
     steps_context_images: list | None = None,
+    hide_raw_obs: bool = False,
 ) -> tuple[list[EBQAPair], float, dict]:
     """Update Q&A pairs from trajectory evidence.
 
@@ -379,6 +414,10 @@ async def update_qa_from_trajectory(
     if not steps_context:
         return current_qa, 0.0, {}
 
+    display_steps_context = steps_context
+    if hide_raw_obs and steps_context_images:
+        display_steps_context = _strip_raw_state_text(display_steps_context)
+
     qa_list_text = _format_qa_list(current_qa)
 
     prompt = f"""You are analyzing an agent's trajectory to update our knowledge base of questions and answers about the environment.
@@ -386,7 +425,7 @@ async def update_qa_from_trajectory(
 Each ``<raw_state>`` (and ``<resulting_state>``, when present) in the sequence below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
 
 === SEQUENCE OF STEPS ===
-{steps_context}
+{display_steps_context}
 === END SEQUENCE OF STEPS ===
 
 === CURRENT QUESTIONS ===

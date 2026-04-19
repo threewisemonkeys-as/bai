@@ -61,6 +61,5 @@ Available actions:
 {actions_block}
 </actions>
 
-Notes:
-- Call exactly one action per turn.
+Call exactly one action per turn.
 {complex_note}"""

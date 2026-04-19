@@ -3,12 +3,199 @@
 import asyncio
 import json
 import logging
+import random
 import re
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
 import litellm
 from omegaconf import DictConfig
+
+
+# ---------------------------------------------------------------------------
+# Mock mode: when enabled, _llm_call / _llm_call_conversational skip the real
+# LLM API call and return a canned response sniffed from the prompt's format
+# instructions.  Prompts are constructed normally, so callers (and logs) see
+# the exact text that would have been sent.
+# ---------------------------------------------------------------------------
+
+_MOCK_MODE = False
+
+
+def set_mock_mode(enabled: bool) -> None:
+    """Enable or disable mock mode globally (affects all _llm_call* calls)."""
+    global _MOCK_MODE
+    _MOCK_MODE = enabled
+
+
+def is_mock_mode() -> bool:
+    return _MOCK_MODE
+
+
+def _mock_llm_response(prompt: str) -> str:
+    """Return a plausible LLM response for the given prompt by sniffing format hints.
+
+    Used only when _MOCK_MODE is True.  The goal is to produce output that the
+    downstream parsers accept so the full pipeline exercises its control flow.
+    """
+    p = prompt
+
+    # --- Question generation (stepwise_eb_learn_improve.generate_questions_from_steps) ---
+    if "generating questions to guide an agent" in p or "Generate new binary" in p:
+        n = random.randint(2, 4)
+        lines = [f"QUESTION {i + 1}: [mock] Generated question {i + 1} at random?" for i in range(n)]
+        return (
+            "<think>[mock] reasoning about what to ask next</think>\n"
+            "<questions>\n" + "\n".join(lines) + "\n</questions>"
+        )
+
+    # --- Experiment formulation (formulate_experiment_from_question) ---
+    if "designing the next experiment" in p:
+        if random.random() < 0.3:
+            return "<think>[mock] keep current experiment</think>\n<experiment>null</experiment>"
+        # Pick an existing question number from the prompt if possible
+        q_numbers = re.findall(r"^Q(\d+):", p, re.MULTILINE)
+        q_idx = random.choice(q_numbers) if q_numbers else "1"
+        return (
+            "<think>[mock] propose new experiment</think>\n"
+            "<experiment>\n"
+            f"<question_index>{q_idx}</question_index>\n"
+            "<experiment_plan>[mock] Try a candidate action and observe the outcome.</experiment_plan>\n"
+            "</experiment>"
+        )
+
+    # --- Update QA from trajectory (update_qa_from_trajectory) ---
+    if "<updated_questions>" in p:
+        qs = re.findall(r"^Q(\d+):\s*(.+?)(?:\s*->|\s*$)", p, re.MULTILINE)
+        inner_blocks = []
+        for idx_str, q_text in qs[:20]:
+            # Drop the status tail if present
+            q_text = re.split(r"\s*->\s*", q_text, maxsplit=1)[0].strip()
+            status = random.choice(["YES", "NO", "UNANSWERED"])
+            ev = "[mock] evidence from trajectory" if status != "UNANSWERED" else ""
+            inner_blocks.append(
+                f'<q n="{idx_str}">\n'
+                f"<question>{q_text}</question>\n"
+                f"<evidence>{ev}</evidence>\n"
+                f"<answer>{status}</answer>\n"
+                "</q>"
+            )
+        if not inner_blocks or random.random() < 0.3:
+            new_idx = len(qs) + 1
+            inner_blocks.append(
+                f'<q n="{new_idx}">\n'
+                f"<question>[mock] newly discovered question {new_idx}?</question>\n"
+                f"<evidence></evidence>\n"
+                f"<answer>UNANSWERED</answer>\n"
+                "</q>"
+            )
+        return (
+            "<think>[mock] reviewed trajectory</think>\n"
+            "<updated_questions>\n" + "\n".join(inner_blocks) + "\n</updated_questions>"
+        )
+
+    # --- Trim QA (trim_qa_pairs) ---
+    if "<trimmed_questions>" in p:
+        qs = re.findall(r"^Q(\d+):\s*(.+?)(?:\s*->|\s*$)", p, re.MULTILINE)
+        max_match = re.search(r"trim it to at most (\d+)", p)
+        max_total = int(max_match.group(1)) if max_match else len(qs)
+        kept = random.sample(qs, min(max_total, len(qs))) if qs else []
+        inner_blocks = []
+        for idx_str, q_text in kept:
+            q_text = re.split(r"\s*->\s*", q_text, maxsplit=1)[0].strip()
+            status = random.choice(["YES", "NO", "UNANSWERED"])
+            ev = "[mock] kept evidence" if status != "UNANSWERED" else ""
+            inner_blocks.append(
+                f'<q n="{idx_str}">\n'
+                f"<question>{q_text}</question>\n"
+                f"<answer>{status}</answer>\n"
+                f"<evidence>{ev}</evidence>\n"
+                "</q>"
+            )
+        if not inner_blocks:
+            inner_blocks.append(
+                '<q n="1">\n<question>[mock] placeholder</question>\n'
+                '<answer>UNANSWERED</answer>\n<evidence></evidence>\n</q>'
+            )
+        return (
+            "<think>[mock] trimming</think>\n"
+            "<trimmed_questions>\n" + "\n".join(inner_blocks) + "\n</trimmed_questions>"
+        )
+
+    # --- QA forward pass (_qa_forward_batch) ---
+    if "answer each question below with YES or NO" in p:
+        nums = re.findall(r"^Q(\d+):", p, re.MULTILINE)
+        blocks = []
+        for n in nums:
+            ans = random.choice(["YES", "NO"])
+            blocks.append(
+                f"<Q n={n}>\n<reasoning>[mock] reasoning for Q{n}</reasoning>\n<answer>{ans}</answer>\n</Q n={n}>"
+            )
+        return "\n".join(blocks) if blocks else "<Q n=1>\n<reasoning>[mock]</reasoning>\n<answer>YES</answer>\n</Q n=1>"
+
+    # --- QA feedback (_qa_feedback_batch) ---
+    if "evaluating whether an agent's predicted answers" in p:
+        nums = re.findall(r"--- Question (\d+) ---", p)
+        blocks = []
+        for n in nums:
+            v = random.choices(
+                ["CORRECT", "INCORRECT", "INCONCLUSIVE"], weights=[5, 4, 1]
+            )[0]
+            blocks.append(
+                f"<F n={n}>\n<verdict>{v}</verdict>\n<feedback>[mock] feedback for Q{n}</feedback>\n</F n={n}>"
+            )
+        return "\n".join(blocks) if blocks else "<F n=1>\n<verdict>INCONCLUSIVE</verdict>\n<feedback>[mock]</feedback>\n</F n=1>"
+
+    # --- Perception error / retry message ---
+    if "previous perception code had an error" in p:
+        return _mock_improve_response(p, include_beliefs=False, include_perception=True)
+
+    # --- Improve prompts (conversational) ---
+    has_beliefs_fmt = "<updated_beliefs>" in p
+    has_perc_fmt = "<updated_perception>" in p
+    if has_beliefs_fmt or has_perc_fmt:
+        return _mock_improve_response(p, include_beliefs=has_beliefs_fmt, include_perception=has_perc_fmt)
+
+    # --- Fallback ---
+    return "<think>[mock] response for unrecognized prompt</think>"
+
+
+def _mock_improve_response(prompt: str, include_beliefs: bool, include_perception: bool) -> str:
+    """Build an improve-style response with optional beliefs/perception blocks and a status tag."""
+    parts = ["<think>[mock] improve analysis</think>"]
+    # Some improve prompts (beliefs-only Track 1a) expect a <perception_analysis> sibling
+    if "<perception_analysis>" in prompt:
+        parts.append("<perception_analysis>[mock] perception analysis notes</perception_analysis>")
+    if include_beliefs:
+        parts.append(
+            "<updated_beliefs>\n"
+            "<world_knowledge>\n"
+            f"- [mock] world fact {random.randint(1000, 9999)}\n"
+            "- [mock] additional environment mechanic observed\n"
+            "</world_knowledge>\n"
+            "<policy>\n"
+            f"- [mock] policy item {random.randint(1000, 9999)}\n"
+            "</policy>\n"
+            "</updated_beliefs>"
+        )
+    if include_perception:
+        parts.append(
+            "<updated_perception>\n"
+            "```python\n"
+            "def perceive(observation_history: list[str]) -> str:\n"
+            f"    # [mock] perception v{random.randint(100, 999)}\n"
+            "    if not observation_history:\n"
+            "        return \"\"\n"
+            "    obs = observation_history[-1]\n"
+            "    return obs[:2000]\n"
+            "```\n"
+            "</updated_perception>"
+        )
+    # Only improve prompts with a <status> tag in their format request it
+    if "<status>" in prompt:
+        status = "SUBMIT" if random.random() < 0.4 else "CONTINUE"
+        parts.append(f"<status>{status}</status>")
+    return "\n".join(parts)
 
 from improve import (
     _get_response_cost,
@@ -80,10 +267,18 @@ async def _llm_call(
     """Make an async LLM call and return (response_text, cost).
 
     Optional ``images`` are attached to the user turn as input_image parts.
+    When mock mode is enabled, prompts are still fully constructed and logged
+    but the response is synthesized locally with zero cost.
     """
+    num_imgs = sum(1 for i in (images or []) if i is not None)
+    if _MOCK_MODE:
+        logging.info(f"LLM prompt [MOCK] (images={num_imgs}):\n{prompt}")
+        text = _mock_llm_response(prompt)
+        logging.info(f"LLM response [MOCK]:\n{text}")
+        return text, 0.0
+
     input_data = build_llm_input(prompt, images=images)
     model_name = _get_model_name(config)
-    num_imgs = sum(1 for i in (images or []) if i is not None)
     logging.info(f"LLM prompt (images={num_imgs}):\n{prompt}")
     response = await asyncio.to_thread(
         litellm.responses,
@@ -106,13 +301,26 @@ async def _llm_call_conversational(
     """Multi-turn LLM call that maintains conversation history.
 
     Appends user_message (with optional images) to history, calls the LLM,
-    appends assistant reply.
+    appends assistant reply.  In mock mode, the prompt is still built and
+    logged, and the conversation history is still extended with both the user
+    message and a synthesized assistant reply.
 
     Returns: (response_text, cost, updated_conversation_history)
     """
+    num_imgs = sum(1 for i in (images or []) if i is not None)
+
+    if _MOCK_MODE:
+        logging.info(
+            f"LLM conversational prompt [MOCK] (turn {len(conversation_history) + 1}, images={num_imgs}):\n{user_message}"
+        )
+        text = _mock_llm_response(user_message)
+        logging.info(f"LLM conversational response [MOCK]:\n{text}")
+        updated_history = build_llm_input_multiturn(conversation_history, user_message, images=images)
+        updated_history = append_assistant_message(updated_history, text)
+        return text, 0.0, updated_history
+
     input_data = build_llm_input_multiturn(conversation_history, user_message, images=images)
     model_name = _get_model_name(config)
-    num_imgs = sum(1 for i in (images or []) if i is not None)
     logging.info(f"LLM conversational prompt (turn {len(input_data)}, images={num_imgs}):\n{user_message}")
     response = await asyncio.to_thread(
         litellm.responses,
@@ -285,6 +493,37 @@ def _run_perception_on_observation(perception: str, raw_observation: str) -> str
         if "perceive" in namespace and callable(namespace["perceive"]):
             result = namespace["perceive"](raw_observation)
             return result if isinstance(result, str) else ""
+    except Exception as e:
+        logging.warning(f"Perception execution failed: {e}")
+    return ""
+
+
+def _run_perception_on_history(
+    perception: str,
+    history: list,
+    window: int,
+) -> str:
+    """Run perception on an observation history, auto-detecting signature.
+
+    If perceive expects a list, passes the last `window` items. Legacy single-arg
+    perceive gets history[-1]. Returns empty string on failure or empty history.
+    """
+    from stepwise_explore import _perceive_signature_mode
+    if not perception or not perception.strip() or not history:
+        return ""
+    try:
+        namespace = {}
+        exec(perception, namespace)
+        fn = namespace.get("perceive")
+        if not callable(fn):
+            return ""
+        mode = _perceive_signature_mode(fn)
+        if mode == "history":
+            windowed = history[-window:] if window and window > 0 else list(history)
+            result = fn(windowed)
+        else:
+            result = fn(history[-1])
+        return result if isinstance(result, str) else ""
     except Exception as e:
         logging.warning(f"Perception execution failed: {e}")
     return ""

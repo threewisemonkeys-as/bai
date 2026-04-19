@@ -777,18 +777,19 @@ For each question, reason step-by-step about what your belief says (or doesn't s
 
 {questions_text}
 
-For each question Qn, respond in this format:
-<Qn>
+For each question, respond in this format:
+<Q n=<question number>>
 <reasoning>Your step-by-step reasoning based on your knowledge</reasoning>
 <answer>YES or NO</answer>
-</Qn>
+</Q n=<question number>>
 """
 
     text, cost = await _llm_call(config, prompt)
 
     results = []
     for i, qa in enumerate(qa_pairs, 1):
-        q_block = extract_xml_key(text, f"Q{i}")
+        m = re.search(rf"<Q\s+n={i}>\s*(.*?)\s*</Q\s+n={i}>", text, re.DOTALL)
+        q_block = m.group(1) if m else None
         if q_block:
             reasoning = extract_xml_key(q_block, "reasoning") or ""
             answer = extract_xml_key(q_block, "answer") or "MISSING"
