@@ -110,6 +110,7 @@ def format_steps_context(
     perception_code: str,
     max_chars: int,
     history_window: int | None = None,
+    hide_raw_obs_when_image: bool = False,
 ) -> str:
     """Format the trajectory buffer as a step sequence for improvement prompts.
 
@@ -155,10 +156,15 @@ def format_steps_context(
             perc_out = ""
         reasoning = entry.get("reasoning", "")
         reward = entry.get("reward", 0)
+        display_raw_obs = (
+            "(see attached image)"
+            if hide_raw_obs_when_image and entry.get("image") is not None
+            else raw_obs
+        )
 
         block = f"<step n=\"{entry['step']}\">\n"
         block += (
-            f"<raw_state>\n{raw_obs}\n</raw_state>\n\n"
+            f"<raw_state>\n{display_raw_obs}\n</raw_state>\n\n"
             f"<auxiliary_observation>\n{raw_aux}\n</auxiliary_observation>\n\n"
             f"<perception_output>\n{perc_out if perc_out else '(no perception module)'}\n</perception_output>\n\n"
             f"<agent_reasoning>\n{reasoning}\n</agent_reasoning>\n"
@@ -178,6 +184,11 @@ def format_steps_context(
             result_raw = entry.get("result_raw_long_term_context", "")
             result_raw_aux = entry.get("result_raw_short_term_context", "")
             if result_raw:
+                display_result_raw = (
+                    "(see attached image)"
+                    if hide_raw_obs_when_image and entry.get("result_image") is not None
+                    else result_raw
+                )
                 if perception_code:
                     if history_window is not None:
                         result_hist = ep_history + [result_raw]
@@ -187,7 +198,7 @@ def format_steps_context(
                 else:
                     result_perc = ""
                 block += (
-                    f"\n<resulting_state>\n{result_raw}\n</resulting_state>\n\n"
+                    f"\n<resulting_state>\n{display_result_raw}\n</resulting_state>\n\n"
                     f"<auxiliary_observation>\n{result_raw_aux}\n</auxiliary_observation>\n\n"
                     f"<perception_output>\n{result_perc if result_perc else '(no perception module)'}\n</perception_output>\n"
                 )

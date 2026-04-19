@@ -509,6 +509,7 @@ def _run_improve_loop_eb(
     steps_context = format_steps_context(
         trajectory_buffer, perception, eb_config.max_steps_context_chars,
         history_window=hist_window,
+        hide_raw_obs_when_image=eb_config.hide_obs_when_image,
     )
     sample_obs = _sample_observations_from_buffer(
         trajectory_buffer, eb_config.num_sample_obs,
@@ -682,6 +683,7 @@ For beliefs:
                 steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
                     history_window=hist_window,
+                    hide_raw_obs_when_image=eb_config.hide_obs_when_image,
                 )
                 steps_context, steps_context_images = _images_for_steps_context(
                     trajectory_buffer, steps_context,
@@ -902,6 +904,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                 steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
                     history_window=hist_window,
+                    hide_raw_obs_when_image=eb_config.hide_obs_when_image,
                 )
                 steps_context, steps_context_images = _images_for_steps_context(
                     trajectory_buffer, steps_context,
@@ -951,6 +954,10 @@ def run_stepwise_eb_learn_episode(
         from arc_agi_env import make_arc_env
         task = config.tasks.arc_agi_tasks[0]
         env = make_arc_env(task, config)
+    elif env_name == "autumn":
+        from autumn_env import make_autumn_env
+        task = config.tasks.autumn_tasks[0]
+        env = make_autumn_env(task, config)
     else:
         tasks = config.tasks[f"{env_name}_tasks"]
         task = tasks[0]
@@ -1097,6 +1104,7 @@ def run_stepwise_eb_learn_episode(
                 exp_steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
                     history_window=eb_config.perception_history_window,
+                    hide_raw_obs_when_image=eb_config.hide_obs_when_image,
                 )
                 exp_steps_context, exp_steps_context_images = _images_for_steps_context(
                     trajectory_buffer, exp_steps_context,
@@ -1199,7 +1207,7 @@ def run_stepwise_eb_learn_episode(
             # constructed and logged; balrog.client's mock hook short-circuits
             # the API call and returns a synthesized response containing a
             # random valid action from the action provider installed below.
-            if eb_config.hide_obs_when_image and _pre_action_image is not None and perception_fn is None:
+            if eb_config.hide_obs_when_image and _pre_action_image is not None:
                 obs["text"]["long_term_context"] = ""
             response = agent.act(obs, prev_action=action)
             action = response.completion
@@ -1347,6 +1355,7 @@ def run_stepwise_eb_learn_episode(
                 steps_context = format_steps_context(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
                     history_window=eb_config.perception_history_window,
+                    hide_raw_obs_when_image=eb_config.hide_obs_when_image,
                 )
                 steps_context, steps_context_images_update = _images_for_steps_context(
                     trajectory_buffer, steps_context,

@@ -34,6 +34,13 @@ dependencies = [
     "vllm==0.11.0",
     "balrog",
     "arc-agi>=0.0.7",
+    "maraprotocol",
+    "pybind11>=3.0.1",
+    "grpcio-tools>=1.67.1",
+    "grpcio>=1.67.1",
+    "protobuf>=5.29.5",
+    "tabulate>=0.10.0",
+    "pyyaml>=6.0.3",
 ]
 
 [tool.uv]
@@ -101,3 +108,4 @@ constraint-dependencies = [
 [tool.uv.sources]
 minihack = { git = "https://github.com/balrog-ai/minihack.git" }
 balrog = { path = "./BALROG", editable = true }
+maraprotocol = { path = "./MARAProtocol", editable = true }

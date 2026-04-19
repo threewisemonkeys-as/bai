@@ -69,18 +69,35 @@ def _strip_raw_state_text(steps_context: str) -> str:
     preserved so the LLM can still cross-reference screenshots.
     """
     steps_context = re.sub(
-        r"(<raw_state[^>]*>)\n.*?(\n</raw_state>)",
+        r"(<raw_state[^>]*>[^\n]*)\n.*?(\n</raw_state>)",
         r"\1\n(see attached image)\2",
         steps_context,
         flags=re.DOTALL,
     )
     steps_context = re.sub(
-        r"(<resulting_state[^>]*>)\n.*?(\n</resulting_state>)",
+        r"(<resulting_state[^>]*>[^\n]*)\n.*?(\n</resulting_state>)",
         r"\1\n(see attached image)\2",
         steps_context,
         flags=re.DOTALL,
     )
     return steps_context
+
+
+def _strip_raw_grid_text(text: str) -> str:
+    """Remove raw grid dumps from persisted evidence before reusing it in prompts."""
+    text = re.sub(
+        r"<grid_\d+>\n.*?\n</grid_\d+>",
+        "(raw grid omitted)",
+        text,
+        flags=re.DOTALL,
+    )
+    text = re.sub(
+        r"=+ Start of Direct Observation =+\n.*?\n=+ End of Direct Observation =+",
+        "(raw observation omitted)",
+        text,
+        flags=re.DOTALL,
+    )
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +117,8 @@ def _format_qa_list(qa_pairs: list[EBQAPair]) -> str:
             status = "YES"
         else:
             status = "NO"
-        evidence_part = f" (evidence: {qa.evidence})" if qa.evidence else ""
+        evidence = _strip_raw_grid_text(qa.evidence) if qa.evidence else ""
+        evidence_part = f" (evidence: {evidence})" if evidence else ""
         lines.append(f"Q{i}: {qa.question} -> {status}{evidence_part}")
     return "\n".join(lines)
 

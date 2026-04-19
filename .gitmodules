@@ -1,3 +1,10 @@
 [submodule "BALROG"]
 	path = BALROG
 	url = git@github.com:threewisemonkeys-as/BALROG.git
+[submodule "MARAProtocol"]
+	path = MARAProtocol
+	url = git@github.com:threewisemonkeys-as/MARAProtocol.git
+	branch = bai-integration
+[submodule "Autumn.cpp"]
+	path = Autumn.cpp
+	url = https://github.com/BasisResearch/Autumn.cpp.git

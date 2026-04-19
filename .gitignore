@@ -235,3 +235,6 @@ SECRETS
 
 nle_data/
 environment_files/
+
+# MARAProtocol writes this at import time from the CWD
+log_environment_interfaces.txt
