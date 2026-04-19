@@ -5,6 +5,8 @@ MFP / Planning) and exposes the dict-style (obs, reward, terminated, truncated, 
 interface used by stepwise_eb_learn / arc_agi_env.
 """
 
+import io
+import json
 import logging
 import os
 from typing import Any, Optional
@@ -16,6 +18,7 @@ from python_examples.autumnbench.concrete_envs import (
     CDSliderEnvironment,
     InteractiveEnvironment,
 )
+from python_examples.autumnbench.env_utils import parse_grid, render_grid
 
 logger = logging.getLogger(__name__)
 
@@ -44,22 +47,29 @@ Your goal is to interact with the environment to understand its underlying dynam
 
 
 def _obs_to_balrog(
-    obs_pb: env_pb2.Observation, step_count: int, task_type: str
+    obs_pb: env_pb2.Observation,
+    step_count: int,
+    task_type: str,
+    text_grid: Optional[str] = None,
 ) -> dict:
     """Convert protobuf Observation into BALROG's dict-shape observation.
 
-    The grid is JSON-encoded as a 2D list of color-name strings (via
-    env_utils.render_grid called inside concrete_envs).  We put that JSON
-    into long_term_context and a short state header into short_term_context.
+    The grid is JSON-encoded as a 2D list of color-name strings. In text mode
+    the inner env packs that JSON into ``obs_pb.text_data``. In image mode the
+    inner env only sets an optional instruction header on ``text_data`` and
+    puts PNG bytes in ``image_data`` — in that case the caller passes a
+    pre-rendered ``text_grid`` so both modalities reach the prompt.
     """
-    long_term = obs_pb.text_data or ""
+    header = obs_pb.text_data or ""
+    if text_grid is not None:
+        long_term = header + text_grid if header else text_grid
+    else:
+        long_term = header
     short_term = f"Task: {task_type}\nStep: {step_count}"
 
     image = None
     if obs_pb.image_data:
         try:
-            import io
-
             image = Image.open(io.BytesIO(obs_pb.image_data)).convert("RGB")
         except Exception:
             image = None
@@ -114,7 +124,13 @@ class AutumnBenchEnvWrapper:
         self.task_type = task_type
         self._seed = seed
         self._max_steps = max_episode_steps
+        # Wrapper-level render_mode semantics:
+        #   "text"  — text only; inner env in text mode; no image attached.
+        #   "image" — dual mode (text + image); inner env in image mode (so
+        #             PNG bytes are populated) and we synthesize the text grid
+        #             ourselves so both modalities reach the prompt.
         self._render_mode = render_mode
+        self._inner_render_mode = "image" if render_mode == "image" else "text"
 
         os.makedirs(logging_path, exist_ok=True)
 
@@ -123,7 +139,7 @@ class AutumnBenchEnvWrapper:
                 env_name=env_name,
                 stack_frames=stack_frames,
                 skip_frames=skip_frames,
-                render_mode=render_mode,
+                render_mode=self._inner_render_mode,
                 logging_path=logging_path,
                 data_dir=data_dir,
                 seed=seed,
@@ -131,7 +147,7 @@ class AutumnBenchEnvWrapper:
         elif task_type == "cd":
             self._env = CDSliderEnvironment(
                 env_name=env_name,
-                render_mode=render_mode,
+                render_mode=self._inner_render_mode,
                 stack_frames=stack_frames,
                 skip_frames=skip_frames,
                 logging_path=logging_path,
@@ -152,6 +168,27 @@ class AutumnBenchEnvWrapper:
     @property
     def max_steps(self) -> int:
         return self._max_steps
+
+    def _render_text_grid(self) -> Optional[str]:
+        """JSON-encode the current grid as a 2D color-name matrix.
+
+        Mirrors what concrete_envs.InteractiveEnvironment.get_observation
+        embeds in text_data in text mode, so we can attach it ourselves when
+        the inner env is running in image mode.
+        """
+        try:
+            render_str = self._env.interpreter.render_all()
+            render_dict = json.loads(render_str)
+            self._grid_size = render_dict.get("GRID_SIZE", self._grid_size)
+            matrix = render_grid(
+                render_dict,
+                background_color=self._env.interpreter.get_background(),
+                color_dict=self._env.color_dict_str_to_int,
+            )
+            return json.dumps(matrix)
+        except Exception as e:
+            logger.warning(f"Failed to synthesize text grid: {e}")
+            return None
 
     @property
     def language_action_space(self) -> list[str]:
@@ -178,13 +215,16 @@ class AutumnBenchEnvWrapper:
 
         obs_pb = self._env.get_observation()
         try:
-            from python_examples.autumnbench.env_utils import parse_grid
-
             _, self._grid_size = parse_grid(self._env.interpreter.render_all())
         except Exception:
             pass
 
-        obs = _obs_to_balrog(obs_pb, self._steps_taken, self.task_type)
+        text_grid = (
+            self._render_text_grid() if self._inner_render_mode == "image" else None
+        )
+        obs = _obs_to_balrog(
+            obs_pb, self._steps_taken, self.task_type, text_grid=text_grid
+        )
         info = {"env_name": self.env_name, "task_type": self.task_type}
         return obs, info
 
@@ -223,7 +263,12 @@ class AutumnBenchEnvWrapper:
         self._last_info = dict(info) if info else {}
 
         truncated = (not terminated) and (self._steps_taken >= self._max_steps)
-        obs = _obs_to_balrog(obs_pb, self._steps_taken, self.task_type)
+        text_grid = (
+            self._render_text_grid() if self._inner_render_mode == "image" else None
+        )
+        obs = _obs_to_balrog(
+            obs_pb, self._steps_taken, self.task_type, text_grid=text_grid
+        )
         return obs, self._last_reward, bool(terminated), truncated, self._last_info
 
     def check_action_validity(self, candidate_action: str) -> str:
