@@ -50,7 +50,6 @@ from stepwise_b_learn_improve import (
     build_qa_followup_message,
     _build_obs_section,
     _build_execution_report_section,
-    BELIEFS_ONLY_RESPONSE_FORMAT,
 )
 from stepwise_eb_learn_improve import (
     EBQAPair,
@@ -86,21 +85,22 @@ from run_utils import setup_run, improve_logging, _update_summary_json
 # Scoped to stepwise_eb_learn so stepwise_b_learn's prompts are unaffected.
 # ---------------------------------------------------------------------------
 
-EB_PERCEPTION_INSTRUCTIONS = """For the perception module:
+def _eb_perception_instructions(include_policy: bool = True) -> str:
+    belief_ref = "world knowledge and policy" if include_policy else "world knowledge"
+    return f"""For the perception module:
 - It should be a valid Python function `perceive(observation_history: list[str]) -> str`.
 - Input `observation_history` is a list of the most recent raw environment observations from the current episode, in chronological order. `observation_history[-1]` is the current observation; earlier entries are prior steps.
 - Output should only contain features important for decision-making in the environment.
 - Ensure the output does not exceed 2000 characters. Remove features that the agent does not use for decision-making.
-- The output should be consistent with the current world knowledge and policy and should not make any additional or contradictory assumptions to them.
+- The output should be consistent with the current {belief_ref} and should not make any additional or contradictory assumptions to them.
 - Ensure that the perception module is working correctly — that it is correctly extracting the intended information from the raw environment state and presenting it clearly.
 """
 
-EB_RESPONSE_FORMAT = """Format your response as:
-<think>
-Analyze the step sequence and determine what needs to change.
-</think>
 
-<updated_beliefs>
+def _eb_beliefs_block_template(include_policy: bool) -> str:
+    """Return the <updated_beliefs>...</updated_beliefs> schema block."""
+    if include_policy:
+        return """<updated_beliefs>
 <world_knowledge>
 - [fact about mechanics, environmental properties, cause-and-effect relationships, etc ...]
 - ...
@@ -109,7 +109,23 @@ Analyze the step sequence and determine what needs to change.
 - [what to do in specific situations, priorities, strategies for completing the objective etc ...]
 - ...
 </policy>
-</updated_beliefs>
+</updated_beliefs>"""
+    return """<updated_beliefs>
+<world_knowledge>
+- [fact about mechanics, environmental properties, cause-and-effect relationships, etc ...]
+- ...
+</world_knowledge>
+</updated_beliefs>"""
+
+
+def _build_eb_response_format(include_policy: bool = True) -> str:
+    beliefs_block = _eb_beliefs_block_template(include_policy)
+    return f"""Format your response as:
+<think>
+Analyze the step sequence and determine what needs to change.
+</think>
+
+{beliefs_block}
 
 <updated_perception>
 ```python
@@ -123,6 +139,45 @@ def perceive(observation_history: list[str]) -> str:
 <status>CONTINUE or SUBMIT</status>
 
 Set status to SUBMIT if you believe your current beliefs and perception are sufficient given the available evidence. Set status to CONTINUE if you want to receive re-evaluation results and iterate further. When in doubt, prefer CONTINUE."""
+
+
+def _build_eb_beliefs_only_response_format(include_policy: bool = True) -> str:
+    beliefs_block = _eb_beliefs_block_template(include_policy)
+    think_line = (
+        "Analyze the step sequence and determine what world knowledge and policy need to change."
+        if include_policy
+        else "Analyze the step sequence and determine what world knowledge needs to change."
+    )
+    return f"""Format your response as:
+<think>
+{think_line}
+</think>
+
+{beliefs_block}
+
+<perception_analysis>
+Analysis of how the perception module could be improved:
+- What extracted information was misleading or incorrect?
+- What kind of information can be extracted that would help the agent make better decisions?
+</perception_analysis>"""
+
+
+def _build_beliefs_section_guidance(include_policy: bool = True) -> str:
+    """Inline guidance describing how to structure the beliefs output."""
+    if include_policy:
+        return """For beliefs:
+- Overall the beliefs should be split into two sections:
+  * <world_knowledge>: Facts about how the environment works — mechanics, properties, cause-and-effect relationships.
+  * <policy>: Tactical approaches — what to do in specific situations, priorities, strategies for completing the objective.
+- Correct any wrong or misleading beliefs in either section.
+- Both sections should be consise, made up of a few brief points, merging any redundant or stale information.
+- They should be grounded in the evidence present in the step sequence, only containing inferences from what we have observed so far."""
+    return """For beliefs:
+- Beliefs should consist of a single <world_knowledge> section containing facts about how the environment works — mechanics, properties, cause-and-effect relationships.
+- Correct any wrong or misleading beliefs.
+- Keep it consise, made up of a few brief points, merging any redundant or stale information.
+- They should be grounded in the evidence present in the step sequence, only containing inferences from what we have observed so far."""
+
 
 EB_PERCEPTION_ONLY_RESPONSE_FORMAT = """Format your response as:
 <think>
@@ -149,7 +204,8 @@ class StepwiseEBLearnConfig:
     max_perception_iterations: "int | list[list[int]]"  # Track 1b turns (int or schedule)
     max_qa_iterations: "int | list[list[int]]"          # Track 2 turns (int or schedule)
     max_qa_per_forward: int
-    max_total_qa_pairs: int
+    max_answered_qa_pairs: int
+    max_unanswered_qa_pairs: int
     num_questions: int                 # Questions per generation step
     num_sample_obs: int
     explore_temp: float
@@ -160,6 +216,8 @@ class StepwiseEBLearnConfig:
     perception_history_window: int = 10
     perception_input_tail: int = 2
     hide_obs_when_image: bool = False
+    question_gen_current_state_only: bool = False
+    include_policy: bool = True
     mock_mode: bool = False
 
 
@@ -233,6 +291,31 @@ def _buffer_for_json(trajectory_buffer: list[dict]) -> list[dict]:
     ]
 
 
+def _save_prompt_images(images: list, step_dir: Path, subdir: str) -> list[str]:
+    """Save each PIL image under ``step_dir/subdir/image_N.png`` (1-indexed).
+
+    Returns relative paths (relative to ``step_dir``) for inclusion in log JSON,
+    so the viz can render them alongside the prompt via the same ``(image K)``
+    numbering used in the prompt text.
+    """
+    if not images:
+        return []
+    out_dir = step_dir / subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rel_paths: list[str] = []
+    for i, img in enumerate(images, 1):
+        if img is None:
+            continue
+        rel = f"{subdir}/image_{i}.png"
+        try:
+            img.save(step_dir / rel)
+        except Exception as e:
+            evolve_logger.warning(f"Failed to save prompt image {i} to {rel}: {e}")
+            continue
+        rel_paths.append(rel)
+    return rel_paths
+
+
 def _images_for_sample_obs(
     trajectory_buffer: list[dict],
     sample_obs: list[tuple[str, int]],
@@ -247,6 +330,8 @@ def _images_for_sample_obs(
         for entry in trajectory_buffer:
             if entry.get("episode_boundary"):
                 continue
+            if entry.get("action") is None:
+                continue
             if entry.get("step") == step_num:
                 img = entry.get("image")
                 break
@@ -260,12 +345,12 @@ def _images_for_steps_context(
 ) -> tuple[str, list]:
     """Return ``(annotated_text, images)`` for the step blocks in ``steps_context_text``.
 
-    Each ``<raw_state>`` opening tag is annotated with ``(image K)`` and, when a
-    block also contains ``<resulting_state>``, that tag likewise. ``image K`` is
+    Each ``<pre_state>`` opening tag is annotated with ``(image K)`` and, when a
+    block also contains ``<post_state>``, that tag likewise. ``image K`` is
     1-indexed and refers to position K in the returned images list so the LLM
     can cross-reference the textual step with the attached screenshot. Pre-action
     images come from each buffer entry's ``image`` field; post-action images
-    (for ``<resulting_state>``) come from ``result_image``.
+    (for ``<post_state>``) come from ``result_image``.
     """
     if not steps_context_text:
         return steps_context_text, []
@@ -283,6 +368,8 @@ def _images_for_steps_context(
         for e in trajectory_buffer:
             if e.get("episode_boundary"):
                 continue
+            if e.get("action") is None:
+                continue
             if e.get("step") == n:
                 entry = e
                 break
@@ -295,16 +382,16 @@ def _images_for_steps_context(
             images.append(img)
             idx = len(images)
             new_inner = new_inner.replace(
-                "<raw_state>", f"<raw_state> (image {idx})", 1
+                "<pre_state>", f"<pre_state> (image {idx})", 1
             )
 
-        if "<resulting_state>" in block_inner:
+        if "<post_state>" in block_inner:
             result_img = entry.get("result_image")
             if result_img is not None:
                 images.append(result_img)
                 idx = len(images)
                 new_inner = new_inner.replace(
-                    "<resulting_state>", f"<resulting_state> (image {idx})", 1
+                    "<post_state>", f"<post_state> (image {idx})", 1
                 )
 
         return f'<step n="{n}">{new_inner}</step>'
@@ -391,6 +478,7 @@ def _save_step_log_eb(
         "trim_cost": trim_cost,
         "step_total_cost": agent_cost + extract_cost + improve_cost + experiment_cost + trim_cost,
         "num_qa_pairs": num_qa,
+        "num_answered_questions": num_qa - num_unanswered,
         "num_unanswered_questions": num_unanswered,
         "did_gen_questions": did_gen_questions,
         "did_formulate_experiment": did_formulate_experiment,
@@ -504,6 +592,17 @@ def _run_improve_loop_eb(
     max_perception_iters = _resolve_schedule(eb_config.max_perception_iterations, global_step)
     max_qa_iters = _resolve_schedule(eb_config.max_qa_iterations, global_step)
 
+    include_policy = eb_config.include_policy
+    perception_instructions = _eb_perception_instructions(include_policy)
+    eb_response_format = _build_eb_response_format(include_policy)
+    beliefs_only_response_format = _build_eb_beliefs_only_response_format(include_policy)
+    beliefs_section_guidance = _build_beliefs_section_guidance(include_policy)
+    policy_task_phrase = (
+        "world knowledge, policy, and perception module"
+        if include_policy
+        else "world knowledge and perception module"
+    )
+
     hist_window = eb_config.perception_history_window
     display_tail = eb_config.perception_input_tail
     steps_context = format_steps_context(
@@ -549,8 +648,8 @@ We maintain the following current beliefs about the environment:
 === END CURRENT BELIEFS ===
 
 Below is the actual sequence of the agent's recent interactions with the environment.
-Each step shows: the raw state observation, the perception module's output on that state, the agent's reasoning, and the action taken.
-Each ``<raw_state>`` (and ``<resulting_state>``, when present) is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
+Each step shows: the pre-action observation, the perception module's output on it, the agent's reasoning, and the action taken.
+Each ``<pre_state>`` (and ``<post_state>``, when present) is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state. ``<pre_state>`` is the observation before the step's action; ``<post_state>`` is the observation after the last action of an episode segment.
 
 === SEQUENCE OF STEPS ===
 {steps_context}
@@ -564,17 +663,11 @@ Provide analysis highlighting:
 - Belief learning: What can we infer from the observations and how should we update our current beliefs so that they more accurately reflect how the world works.
 - Perception analysis: What information was presented in output of the perception module. What part of that information was helpful, what information was misleading / incorrect and what additional information would have helped if extracted by the perception module?
 
-For beliefs:
-- Overall they beliefs should be split into two sections:
-  * <world_knowledge>: Facts about how the environment works — mechanics, properties, cause-and-effect relationships.
-  * <policy>: Tactical approaches — what to do in specific situations, priorities, strategies for completing the objective.
-- Correct any wrong or misleading beliefs in either section.
-- Both sections should be consise, made up of a few brief points, merging any redundant or stale information.
-- They should be grounded in the evidence present in the step sequence, only containing inferences from what we have observed so far.
+{beliefs_section_guidance}
 
-{EB_PERCEPTION_INSTRUCTIONS}
+{perception_instructions}
 
-{BELIEFS_ONLY_RESPONSE_FORMAT}"""
+{beliefs_only_response_format}"""
 
             beliefs, turn_cost, _, response_text = asyncio.run(
                 _improve_beliefs_only_conversational(
@@ -620,7 +713,7 @@ For beliefs:
                 obs_section=obs_section_1b,
                 perception_analysis=perception_analysis,
                 max_iterations=max_perception_iters,
-                perception_instructions=EB_PERCEPTION_INSTRUCTIONS,
+                perception_instructions=perception_instructions,
                 response_format=EB_PERCEPTION_ONLY_RESPONSE_FORMAT,
             )
 
@@ -635,7 +728,7 @@ For beliefs:
                     current_turn=turn + 1, max_turns=max_perception_iters,
                     sample_histories=sample_obs_histories, history_window=hist_window,
                     display_tail=display_tail,
-                    perception_instructions=EB_PERCEPTION_INSTRUCTIONS,
+                    perception_instructions=perception_instructions,
                     response_format=EB_PERCEPTION_ONLY_RESPONSE_FORMAT,
                 )
 
@@ -793,13 +886,13 @@ Results: {len(qa_correct)} correct, {len(qa_incorrect)} incorrect out of {len(qa
 {qa_text}
 </qa_feedback_results>
 
-Each ``<raw_state>`` (and ``<resulting_state>``, when present) in the sequence below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
+Each ``<pre_state>`` (and ``<post_state>``, when present) in the sequence below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state. ``<pre_state>`` is the observation before the step's action; ``<post_state>`` is the observation after the last action of an episode segment.
 
 === SEQUENCE OF STEPS (for additional context) ===
 {steps_context if steps_context else "(no steps recorded yet)"}
 === END SEQUENCE OF STEPS ===
 
-Your task: Based on the QA feedback, improve the agent's world knowledge, policy, and perception module.
+Your task: Based on the QA feedback, improve the agent's {policy_task_phrase}.
 
 For INCORRECT predictions, analyze:
 1. Was the agent's world knowledge missing the relevant fact? If so, add it.
@@ -813,9 +906,9 @@ Guidelines:
 
 This is a multi-turn conversation. After each response, the QA pairs will be re-evaluated with your updated beliefs/perception. You can iterate up to {max_qa_iters} turns.
 
-{EB_PERCEPTION_INSTRUCTIONS}
+{perception_instructions}
 
-{EB_RESPONSE_FORMAT}"""
+{eb_response_format}"""
 
                 qa_conversation: list[dict] = []
                 prev_qa_correct = len(qa_correct)
@@ -826,6 +919,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
 
                     message = initial_qa_prompt if turn == 0 else build_qa_followup_message(
                         qa_fb_results, prev_qa_correct, prev_qa_incorrect,
+                        response_format=eb_response_format,
                     )
 
                     # Initial turn's prompt contains both steps_context and sample_obs
@@ -1105,9 +1199,16 @@ def run_stepwise_eb_learn_episode(
                     trajectory_buffer, perception, eb_config.max_steps_context_chars,
                     history_window=eb_config.perception_history_window,
                     hide_raw_obs_when_image=eb_config.hide_obs_when_image,
+                    include_trailing_state=False,
                 )
                 exp_steps_context, exp_steps_context_images = _images_for_steps_context(
                     trajectory_buffer, exp_steps_context,
+                )
+                q_steps_context = (
+                    "" if eb_config.question_gen_current_state_only else exp_steps_context
+                )
+                q_steps_context_images = (
+                    [] if eb_config.question_gen_current_state_only else exp_steps_context_images
                 )
                 with improve_logging(step_dir):
                     # Step 1: Generate questions
@@ -1116,7 +1217,7 @@ def run_stepwise_eb_learn_episode(
                             config=config,
                             beliefs=beliefs,
                             perception_code=perception,
-                            steps_context=exp_steps_context,
+                            steps_context=q_steps_context,
                             current_qa=qa_pairs,
                             current_observation=_pre_action_raw_long,
                             current_aux_observation=_pre_action_raw_short,
@@ -1124,8 +1225,9 @@ def run_stepwise_eb_learn_episode(
                             num_questions=eb_config.num_questions,
                             current_step=global_step,
                             current_image=_pre_action_image,
-                            steps_context_images=exp_steps_context_images,
+                            steps_context_images=q_steps_context_images,
                             hide_raw_obs=eb_config.hide_obs_when_image,
+                            include_recent_history=not eb_config.question_gen_current_state_only,
                         )
                     )
                     qa_pairs.extend(new_questions)
@@ -1165,12 +1267,34 @@ def run_stepwise_eb_learn_episode(
                         current_experiment = experiment_plan
                         did_formulate_experiment = True
 
+                    # Experiment prompts always use trajectory images plus the
+                    # current pre-action image. Question prompts normally share
+                    # that sequence, but current-state-only question prompts
+                    # renumber the current image to image 1, so save a separate
+                    # one-image sequence for viewer alignment.
+                    shared_prompt_images = list(exp_steps_context_images or [])
+                    if _pre_action_image is not None:
+                        shared_prompt_images.append(_pre_action_image)
+                    exp_image_paths = _save_prompt_images(
+                        shared_prompt_images, step_dir, "experiment_log_images",
+                    )
+                    if eb_config.question_gen_current_state_only:
+                        q_image_paths = _save_prompt_images(
+                            [_pre_action_image] if _pre_action_image is not None else [],
+                            step_dir,
+                            "question_gen_log_images",
+                        )
+                    else:
+                        q_image_paths = exp_image_paths
+
                     step_experiment_log = {
                         "question_gen_prompt": q_prompt,
                         "question_gen_response": q_response,
+                        "question_gen_image_paths": q_image_paths,
                         "new_questions": [q.question for q in new_questions],
                         "experiment_prompt": e_prompt,
                         "experiment_response": e_response,
+                        "experiment_image_paths": exp_image_paths,
                         "experiment_plan": experiment_plan,
                         "selected_question_index": q_idx,
                     }
@@ -1366,7 +1490,6 @@ def run_stepwise_eb_learn_episode(
                             config=config,
                             current_qa=qa_pairs,
                             steps_context=steps_context,
-                            max_total_qa_pairs=eb_config.max_total_qa_pairs,
                             current_step=global_step,
                             steps_context_images=steps_context_images_update,
                             hide_raw_obs=eb_config.hide_obs_when_image,
@@ -1374,6 +1497,12 @@ def run_stepwise_eb_learn_episode(
                     )
                     step_extract_cost = extract_cost
                     total_learn_cost += extract_cost
+
+                # Save images attached to the extraction prompt so the viz can
+                # render them alongside.
+                step_extraction_log["prompt_image_paths"] = _save_prompt_images(
+                    steps_context_images_update, step_dir, "extraction_log_images",
+                )
 
                 # Write extraction artifacts immediately
                 with open(step_dir / "extraction_log.json", "w") as f:
@@ -1387,17 +1516,25 @@ def run_stepwise_eb_learn_episode(
                     f"QA: {len(qa_pairs)} ({num_unanswered} unanswered), cost: ${extract_cost:.6f}"
                 )
 
-                # --- Trim Q if over limit ---
-                if len(qa_pairs) > eb_config.max_total_qa_pairs:
+                # --- Trim Q if over either status-specific limit ---
+                num_answered = sum(1 for q in qa_pairs if q.answer is not None)
+                num_unanswered = sum(1 for q in qa_pairs if q.answer is None)
+                if (
+                    num_answered > eb_config.max_answered_qa_pairs
+                    or num_unanswered > eb_config.max_unanswered_qa_pairs
+                ):
                     evolve_logger.info(
-                        f"[g{global_step}] Trimming Q: {len(qa_pairs)} > {eb_config.max_total_qa_pairs}..."
+                        f"[g{global_step}] Trimming Q: answered "
+                        f"{num_answered}/{eb_config.max_answered_qa_pairs}, "
+                        f"unanswered {num_unanswered}/{eb_config.max_unanswered_qa_pairs}..."
                     )
                     with improve_logging(step_dir):
                         qa_pairs, trim_cost_val, step_trim_log = asyncio.run(
                             trim_qa_pairs(
                                 config=config,
                                 current_qa=qa_pairs,
-                                max_total_qa_pairs=eb_config.max_total_qa_pairs,
+                                max_answered_qa_pairs=eb_config.max_answered_qa_pairs,
+                                max_unanswered_qa_pairs=eb_config.max_unanswered_qa_pairs,
                                 current_step=global_step,
                             )
                         )
@@ -1580,6 +1717,7 @@ def run_stepwise_eb_learn_episode(
     episode_log["total_learn_cost"] = total_learn_cost
     episode_log["cumulative_step_cost"] = cumulative_step_cost
     episode_log["num_qa_pairs"] = len(qa_pairs)
+    episode_log["num_answered_questions"] = sum(1 for q in qa_pairs if q.answer is not None)
     episode_log["num_unanswered_questions"] = sum(1 for q in qa_pairs if q.answer is None)
 
 
@@ -1687,8 +1825,12 @@ def stepwise_eb_learn(
     evolve_logger.info(f"  Improve interval: {eb_config.improve_interval}")
     evolve_logger.info(f"  Experiment interval: {eb_config.experiment_interval}")
     evolve_logger.info(f"  Num questions per gen: {eb_config.num_questions}")
+    evolve_logger.info(f"  Max answered QA pairs: {eb_config.max_answered_qa_pairs}")
+    evolve_logger.info(f"  Max unanswered QA pairs: {eb_config.max_unanswered_qa_pairs}")
     evolve_logger.info(f"  Max steps context chars: {eb_config.max_steps_context_chars}")
     evolve_logger.info(f"  Explore temp: {eb_config.explore_temp}")
+    evolve_logger.info(f"  Question gen current-state only: {eb_config.question_gen_current_state_only}")
+    evolve_logger.info(f"  Include policy: {eb_config.include_policy}")
     if eb_config.mock_mode:
         evolve_logger.info(f"  MOCK MODE: enabled — no LLM calls; random actions and artifact perturbations")
 
@@ -1773,6 +1915,7 @@ def main(config: DictConfig):
 
     evolve_cfg = config.eval.evolve
 
+    legacy_max_total_qa_pairs = evolve_cfg.get("max_total_qa_pairs", 50)
     eb_config = StepwiseEBLearnConfig(
         n_environment_steps=evolve_cfg.get("n_environment_steps", 100),
         max_perception_iterations=evolve_cfg.get(
@@ -1784,7 +1927,12 @@ def main(config: DictConfig):
             evolve_cfg.get("max_improve_iterations", evolve_cfg.get("num_improve_iterations", 5)),
         ),
         max_qa_per_forward=evolve_cfg.get("max_qa_per_forward", 10),
-        max_total_qa_pairs=evolve_cfg.get("max_total_qa_pairs", 50),
+        max_answered_qa_pairs=evolve_cfg.get(
+            "max_answered_qa_pairs", legacy_max_total_qa_pairs
+        ),
+        max_unanswered_qa_pairs=evolve_cfg.get(
+            "max_unanswered_qa_pairs", legacy_max_total_qa_pairs
+        ),
         num_questions=evolve_cfg.get("num_questions", 5),
         num_sample_obs=evolve_cfg.get("num_sample_obs", 3),
         explore_temp=evolve_cfg.get("explore_temp", 1.0),
@@ -1795,6 +1943,8 @@ def main(config: DictConfig):
         perception_history_window=evolve_cfg.get("perception_history_window", 10),
         perception_input_tail=evolve_cfg.get("perception_input_tail", 2),
         hide_obs_when_image=evolve_cfg.get("hide_obs_when_image", False),
+        question_gen_current_state_only=evolve_cfg.get("question_gen_current_state_only", False),
+        include_policy=evolve_cfg.get("include_policy", True),
         mock_mode=evolve_cfg.get("mock_mode", False),
     )
 

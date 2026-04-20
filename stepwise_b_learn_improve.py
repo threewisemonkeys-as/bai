@@ -375,8 +375,11 @@ def build_qa_followup_message(
     qa_feedback_results: list,
     prev_num_correct: int,
     prev_num_incorrect: int,
+    response_format: str | None = None,
 ) -> str:
     """Build followup message for QA track showing re-evaluation delta."""
+    if response_format is None:
+        response_format = RESPONSE_FORMAT
     num_correct = sum(1 for fr in qa_feedback_results if fr.verdict == "CORRECT")
     num_incorrect = sum(1 for fr in qa_feedback_results if fr.verdict == "INCORRECT")
     num_inconclusive = sum(1 for fr in qa_feedback_results if fr.verdict == "INCONCLUSIVE")
@@ -409,7 +412,7 @@ Remaining failures:
 
 Based on these updated results, refine your beliefs and perception further, or SUBMIT if satisfied.
 
-{RESPONSE_FORMAT}"""
+{response_format}"""
 
 
 def build_moments_followup_message(
@@ -771,28 +774,13 @@ async def generate_experiments_from_steps(
 {beliefs if beliefs else "(empty - no beliefs yet)"}
 === END CURRENT BELIEFS ==="""
 
-    current_obs_section = ""
-    if current_observation:
-        current_perception = (
-            _run_perception_on_observation(perception_code, current_observation)
-            if perception_code
-            else ""
-        )
-        current_obs_section = f"""
-=== CURRENT STATE (agent has not yet acted) ===
-<raw_state>
-{current_observation}
-</raw_state>
-
-<auxiliary_observation>
-{current_aux_observation or ""}
-</auxiliary_observation>
-
-<perception_output>
-{current_perception if current_perception else "(no perception module)"}
-</perception_output>
-=== END CURRENT STATE ===
-"""
+    from stepwise_b_learn import format_current_state  # deferred to avoid cycle
+    current_obs_section = format_current_state(
+        observation=current_observation,
+        aux_observation=current_aux_observation,
+        perception_code=perception_code,
+        section_title="CURRENT STATE (agent has not yet acted)",
+    )
 
     # --- Default knowledge section ---
     default_knowledge_section = ""

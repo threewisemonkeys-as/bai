@@ -13,6 +13,11 @@ from datetime import datetime, timezone
 
 
 STATIC_INDEX_VERSION = 1
+PROMPT_IMAGE_PATH_KEYS = {
+    "prompt_image_paths",
+    "question_gen_image_paths",
+    "experiment_image_paths",
+}
 
 
 def read_file(path):
@@ -36,6 +41,40 @@ def write_json(path, obj):
     with open(path, "w") as f:
         json.dump(obj, f, indent=2, sort_keys=True)
         f.write("\n")
+
+
+def is_safe_step_image_path(path):
+    """Return True for step-local PNG paths that are safe to serve/copy."""
+    if not isinstance(path, str) or not path:
+        return False
+    normalized = path.replace("\\", "/")
+    if normalized.startswith("/") or normalized.startswith("../") or "/../" in normalized:
+        return False
+    parts = [part for part in normalized.split("/") if part]
+    if any(part in (".", "..") for part in parts):
+        return False
+    return normalized.lower().endswith(".png")
+
+
+def collect_prompt_image_paths(obj):
+    """Collect explicit prompt-image relative paths from nested log objects."""
+    paths = []
+
+    def walk(value, key=None):
+        if isinstance(value, dict):
+            for child_key, child_value in value.items():
+                walk(child_value, child_key)
+        elif isinstance(value, list):
+            if key in PROMPT_IMAGE_PATH_KEYS:
+                for item in value:
+                    if is_safe_step_image_path(item) and item not in paths:
+                        paths.append(item)
+            else:
+                for item in value:
+                    walk(item, key)
+
+    walk(obj)
+    return paths
 
 
 def resolve_log_dir(raw_path):
@@ -454,9 +493,10 @@ def export_static_report(log_dir, export_root, run_id=None, title=None, descript
 
     for step in report["steps"]:
         detail_name = f"ep_{step['episode_idx']:03d}_step_{step['step']:03d}.json"
+        step_detail = load_step_detail(resolved, step["episode_idx"], step["step"])
         write_json(
             os.path.join(run_dir, "step_details", detail_name),
-            load_step_detail(resolved, step["episode_idx"], step["step"]),
+            step_detail,
         )
         # Copy observation images for static export
         src_step_dir = os.path.join(resolved, f"episode_{step['episode_idx']}", f"step_{step['step']:03d}")
@@ -469,6 +509,21 @@ def export_static_report(log_dir, export_root, run_id=None, title=None, descript
                 )
                 os.makedirs(os.path.dirname(dst_img), exist_ok=True)
                 shutil.copy2(src_img, dst_img)
+
+        for rel_img in collect_prompt_image_paths(step_detail):
+            src_img = os.path.normpath(os.path.join(src_step_dir, rel_img))
+            src_root = os.path.abspath(src_step_dir)
+            src_abs = os.path.abspath(src_img)
+            if not src_abs.startswith(src_root + os.sep) or not os.path.isfile(src_abs):
+                continue
+            dst_img = os.path.join(
+                run_dir,
+                "images",
+                f"ep_{step['episode_idx']:03d}_step_{step['step']:03d}",
+                rel_img.replace("\\", "/"),
+            )
+            os.makedirs(os.path.dirname(dst_img), exist_ok=True)
+            shutil.copy2(src_abs, dst_img)
 
     index_path = os.path.join(os.path.abspath(export_root), "index.json")
     index_data = read_json(index_path) or {"version": STATIC_INDEX_VERSION, "runs": []}

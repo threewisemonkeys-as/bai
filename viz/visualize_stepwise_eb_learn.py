@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
 
 from stepwise_eb_viewer_data import (
+    is_safe_step_image_path,
     load_combined_trajectory,
     load_experiment_timeline,
     load_log_dir,
@@ -95,10 +96,14 @@ class Handler(BaseHTTPRequestHandler):
                 episode = int(params.get("episode", [0])[0])
                 step = int(params.get("step", [0])[0])
                 name = params.get("name", ["obs_before.png"])[0]
-                if name not in ("obs_before.png", "obs_after.png"):
+                if name not in ("obs_before.png", "obs_after.png") and not is_safe_step_image_path(name):
                     self.send_error(400)
                     return
-                img_path = Path(log_dir) / f"episode_{episode}" / f"step_{step:03d}" / name
+                step_dir = (Path(log_dir) / f"episode_{episode}" / f"step_{step:03d}").resolve()
+                img_path = (step_dir / name).resolve()
+                if step_dir not in img_path.parents and img_path != step_dir:
+                    self.send_error(400)
+                    return
                 if img_path.is_file():
                     self._image_response(img_path)
                 else:

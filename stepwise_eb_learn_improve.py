@@ -22,6 +22,7 @@ from mixed_improve import (
     _llm_call,
     _run_perception_on_observation,
 )
+from stepwise_b_learn import format_current_state
 
 
 # ---------------------------------------------------------------------------
@@ -63,19 +64,19 @@ def eb_qa_to_qa(eb_qa: EBQAPair) -> QAPair:
 
 
 def _strip_raw_state_text(steps_context: str) -> str:
-    """Replace <raw_state> and <resulting_state> text content with a placeholder.
+    """Replace <pre_state> and <post_state> text content with a placeholder.
 
-    Image annotations on the opening tag (e.g. ``<raw_state> (image 3)``) are
+    Image annotations on the opening tag (e.g. ``<pre_state> (image 3)``) are
     preserved so the LLM can still cross-reference screenshots.
     """
     steps_context = re.sub(
-        r"(<raw_state[^>]*>[^\n]*)\n.*?(\n</raw_state>)",
+        r"(<pre_state[^>]*>[^\n]*)\n.*?(\n</pre_state>)",
         r"\1\n(see attached image)\2",
         steps_context,
         flags=re.DOTALL,
     )
     steps_context = re.sub(
-        r"(<resulting_state[^>]*>[^\n]*)\n.*?(\n</resulting_state>)",
+        r"(<post_state[^>]*>[^\n]*)\n.*?(\n</post_state>)",
         r"\1\n(see attached image)\2",
         steps_context,
         flags=re.DOTALL,
@@ -142,48 +143,45 @@ async def generate_questions_from_steps(
     current_image=None,
     steps_context_images: list | None = None,
     hide_raw_obs: bool = False,
+    include_recent_history: bool = True,
 ) -> tuple[list[EBQAPair], float, str, str]:
     """Generate new unanswered questions about the environment.
 
-    Prompts the LLM with the agent's current beliefs, perception, trajectory
-    history, current state, and existing Q.  Returns N new EBQAPair with
-    answer=None.
+    Prompts the LLM with the agent's current beliefs, perception, optional
+    trajectory history, current state, and existing Q.  Returns N new EBQAPair
+    with answer=None.
 
     Returns: (new_questions, cost, prompt, raw_response)
     """
     step_history = steps_context
-    if hide_raw_obs and steps_context_images:
+    if hide_raw_obs and include_recent_history and steps_context_images:
         step_history = _strip_raw_state_text(step_history)
-    num_steps_images = len(steps_context_images) if steps_context_images else 0
+    num_steps_images = (
+        len(steps_context_images)
+        if include_recent_history and steps_context_images
+        else 0
+    )
 
-    current_obs_section = ""
-    if current_observation:
-        current_perception = (
-            _run_perception_on_observation(perception_code, current_observation)
-            if perception_code
-            else ""
-        )
-        current_state_img_tag = ""
-        if current_image is not None:
-            current_state_img_tag = f" (image {num_steps_images + 1})"
-        raw_state_content = "(see attached image)" if (hide_raw_obs and current_image is not None) else current_observation
-        current_obs_section = f"""
-=== CURRENT STATE ===
-<raw_state>{current_state_img_tag}
-{raw_state_content}
-</raw_state>
-
-<auxiliary_observation>
-{current_aux_observation or ""}
-</auxiliary_observation>
-
-<perception_output>
-{current_perception if current_perception else "(no perception module)"}
-</perception_output>
-=== END CURRENT STATE ===
-"""
+    current_image_index = num_steps_images + 1 if current_image is not None else None
+    current_obs_section = format_current_state(
+        observation=current_observation,
+        aux_observation=current_aux_observation,
+        perception_code=perception_code,
+        image=current_image,
+        image_index=current_image_index,
+        hide_raw_obs=hide_raw_obs,
+    )
 
     qa_list_text = _format_qa_list(current_qa)
+    recent_history_section = ""
+    if include_recent_history:
+        recent_history_section = f"""
+Each ``<pre_state>`` (and ``<post_state>``, when present) below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state. ``<pre_state>`` is the observation before the step's action; ``<post_state>`` is the final observation of a past episode segment.
+
+=== RECENT HISTORY OF STATES AND ACTIONS ===
+{step_history if step_history else "(no steps recorded yet)"}
+=== END RECENT HISTORY ===
+"""
 
     prompt = f"""You are generating questions to guide an agent's exploration of an environment.
 
@@ -194,15 +192,8 @@ async def generate_questions_from_steps(
 === CURRENT BELIEFS ===
 {beliefs if beliefs else "(empty - no beliefs yet)"}
 === END CURRENT BELIEFS ===
-
-Each ``<raw_state>`` (and ``<resulting_state>``, when present) below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
-
-=== RECENT HISTORY OF STATES AND ACTIONS ===
-{step_history if step_history else "(no steps recorded yet)"}
-=== END RECENT HISTORY ===
-
+{recent_history_section}
 {current_obs_section}
-
 === CURRENT QUESTIONS ===
 {qa_list_text}
 === END CURRENT QUESTIONS ===
@@ -226,7 +217,7 @@ QUESTION 1: [A specific yes/no question about how the environment works]
 </questions>"""
 
     images: list = []
-    if steps_context_images:
+    if include_recent_history and steps_context_images:
         images.extend(steps_context_images)
     if current_image is not None:
         images.append(current_image)
@@ -293,32 +284,16 @@ async def formulate_experiment_from_question(
         step_history = _strip_raw_state_text(step_history)
     num_steps_images = len(steps_context_images) if steps_context_images else 0
 
-    current_obs_section = ""
-    if current_observation:
-        current_perception = (
-            _run_perception_on_observation(perception_code, current_observation)
-            if perception_code
-            else ""
-        )
-        current_state_img_tag = ""
-        if current_image is not None:
-            current_state_img_tag = f" (image {num_steps_images + 1})"
-        raw_state_content = "(see attached image)" if (hide_raw_obs and current_image is not None) else current_observation
-        current_obs_section = f"""
-=== CURRENT STATE (agent has not yet acted) ===
-<raw_state>{current_state_img_tag}
-{raw_state_content}
-</raw_state>
-
-<auxiliary_observation>
-{current_aux_observation or ""}
-</auxiliary_observation>
-
-<perception_output>
-{current_perception if current_perception else "(no perception module)"}
-</perception_output>
-=== END CURRENT STATE ===
-"""
+    current_image_index = num_steps_images + 1 if current_image is not None else None
+    current_obs_section = format_current_state(
+        observation=current_observation,
+        aux_observation=current_aux_observation,
+        perception_code=perception_code,
+        image=current_image,
+        image_index=current_image_index,
+        hide_raw_obs=hide_raw_obs,
+        section_title="CURRENT STATE (agent has not yet acted)",
+    )
 
     qa_list_text = _format_qa_list(current_qa)
     current_exp_text = current_experiment if current_experiment else "(no experiment set yet)"
@@ -333,12 +308,11 @@ async def formulate_experiment_from_question(
 {beliefs if beliefs else "(empty - no beliefs yet)"}
 === END CURRENT BELIEFS ===
 
-Each ``<raw_state>`` (and ``<resulting_state>``, when present) below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
+Each ``<pre_state>`` (and ``<post_state>``, when present) below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state. ``<pre_state>`` is the observation before the step's action; ``<post_state>`` is the final observation of a past episode segment.
 
 === RECENT HISTORY OF STATES AND ACTIONS ===
 {step_history}
 === END RECENT HISTORY ==={current_obs_section}
-
 === CURRENT QUESTIONS ===
 {qa_list_text}
 === END CURRENT QUESTIONS ===
@@ -415,7 +389,6 @@ async def update_qa_from_trajectory(
     config: DictConfig,
     current_qa: list[EBQAPair],
     steps_context: str,
-    max_total_qa_pairs: int,
     current_step: int = 0,
     steps_context_images: list | None = None,
     hide_raw_obs: bool = False,
@@ -440,7 +413,7 @@ async def update_qa_from_trajectory(
 
     prompt = f"""You are analyzing an agent's trajectory to update our knowledge base of questions and answers about the environment.
 
-Each ``<raw_state>`` (and ``<resulting_state>``, when present) in the sequence below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state.
+Each ``<pre_state>`` (and ``<post_state>``, when present) in the sequence below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state. ``<pre_state>`` is the observation before the step's action; ``<post_state>`` is the observation after the step's action (shown for the final step of each episode segment).
 
 === SEQUENCE OF STEPS ===
 {display_steps_context}
@@ -556,27 +529,36 @@ Review the trajectory and each question. What can we learn?
 async def trim_qa_pairs(
     config: DictConfig,
     current_qa: list[EBQAPair],
-    max_total_qa_pairs: int,
+    max_answered_qa_pairs: int,
+    max_unanswered_qa_pairs: int,
     current_step: int = 0,
 ) -> tuple[list[EBQAPair], float, dict]:
-    """Trim the Q&A list down to at most *max_total_qa_pairs* entries.
+    """Trim the Q&A list to the answered and unanswered caps.
 
     Asks the LLM to decide which questions to keep based on usefulness.
-    Should only be called when ``len(current_qa) > max_total_qa_pairs``.
+    Should only be called when either status-specific cap is exceeded.
 
     Returns: (trimmed_qa_pairs, cost, trim_log)
     """
     qa_list_text = _format_qa_list(current_qa)
+    num_answered = sum(1 for q in current_qa if q.answer is not None)
+    num_unanswered = sum(1 for q in current_qa if q.answer is None)
 
     prompt = f"""You are maintaining a knowledge base of questions and answers about an environment.
 
-The knowledge base currently has {len(current_qa)} questions, but we need to trim it to at most {max_total_qa_pairs}.
+The knowledge base currently has {len(current_qa)} questions:
+- {num_answered} ANSWERED questions
+- {num_unanswered} UNANSWERED questions
+
+We need to trim it so that it has at most:
+- {max_answered_qa_pairs} ANSWERED questions
+- {max_unanswered_qa_pairs} UNANSWERED questions
 
 === CURRENT QUESTIONS ===
 {qa_list_text}
 === END CURRENT QUESTIONS ===
 
-Your task: Select the {max_total_qa_pairs} most useful questions to keep. Drop questions that are:
+Your task: Select the most useful questions to keep while satisfying both caps. Drop questions that are:
 - Redundant (covered by other questions)
 - No longer useful or too narrow in scope
 - Superseded by better questions on the same topic
@@ -600,7 +582,7 @@ Which questions are most valuable? Which can be dropped?
 ...
 </q>
 ...
-(Include at most {max_total_qa_pairs} questions)
+(Include at most {max_answered_qa_pairs} ANSWERED questions and at most {max_unanswered_qa_pairs} UNANSWERED questions)
 </trimmed_questions>"""
 
     text, cost = await _llm_call(config, prompt)
@@ -609,7 +591,10 @@ Which questions are most valuable? Which can be dropped?
         "prompt": prompt,
         "response": text,
         "pre_trim_count": len(current_qa),
-        "max_total_qa_pairs": max_total_qa_pairs,
+        "pre_trim_answered": num_answered,
+        "pre_trim_unanswered": num_unanswered,
+        "max_answered_qa_pairs": max_answered_qa_pairs,
+        "max_unanswered_qa_pairs": max_unanswered_qa_pairs,
     }
 
     trimmed_text = extract_xml_key(text, "trimmed_questions")
@@ -658,11 +643,15 @@ Which questions are most valuable? Which can be dropped?
         return current_qa, cost, trim_log
 
     trim_log["post_trim_count"] = len(trimmed_qa)
+    trim_log["post_trim_answered"] = sum(1 for q in trimmed_qa if q.answer is not None)
+    trim_log["post_trim_unanswered"] = sum(1 for q in trimmed_qa if q.answer is None)
     trim_log["dropped_count"] = len(current_qa) - len(trimmed_qa)
 
     logging.info(
         f"Q&A trim: {len(current_qa)} -> {len(trimmed_qa)} questions "
-        f"(dropped {len(current_qa) - len(trimmed_qa)})"
+        f"(answered: {num_answered} -> {trim_log['post_trim_answered']}, "
+        f"unanswered: {num_unanswered} -> {trim_log['post_trim_unanswered']}, "
+        f"dropped {len(current_qa) - len(trimmed_qa)})"
     )
 
     return trimmed_qa, cost, trim_log

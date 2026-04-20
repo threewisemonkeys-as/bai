@@ -141,6 +141,10 @@ def get_default_knowledge(config: DictConfig) -> str:
         from arc_agi_prompts import get_arc_instruction_prompt
         return get_arc_instruction_prompt()
 
+    if env_name == "autumn":
+        from autumn_env import INSTRUCTION_PROMPT
+        return INSTRUCTION_PROMPT
+
     # Get the first task for this environment
     tasks = config.tasks[f"{env_name}_tasks"]
     if not tasks:
@@ -155,9 +159,11 @@ def get_default_knowledge(config: DictConfig) -> str:
             env = make_env(env_name, task, config)
             instruction_prompt = get_instruction_prompt(env, task=task)
             env.close()
-        else:
+        elif env_name == "nle":
             from balrog.environments.nle import get_instruction_prompt
             instruction_prompt = get_instruction_prompt(task=task)
+        else:
+            return ""
         return instruction_prompt
     except Exception as e:
         logging.warning(f"Failed to extract default knowledge: {e}")

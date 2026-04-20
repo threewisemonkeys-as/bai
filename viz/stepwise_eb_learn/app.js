@@ -145,6 +145,11 @@ function stepImageUrl(epIdx, stepIdx, name) {
   return staticUrl("images/ep_" + String(epIdx).padStart(3, "0") + "_step_" + String(stepIdx).padStart(3, "0") + "_" + name);
 }
 
+function stepLocalImageUrl(epIdx, stepIdx, relPath) {
+  if (isDynamicMode()) return apiUrl("/api/step_image", { episode: epIdx, step: stepIdx, name: relPath });
+  return staticUrl("images/ep_" + String(epIdx).padStart(3, "0") + "_step_" + String(stepIdx).padStart(3, "0") + "/" + relPath);
+}
+
 function obsImageHtml(epIdx, stepIdx, data, step) {
   const hasBefore = (data && data.has_obs_before) || (step && step.has_obs_before);
   const hasAfter = (data && data.has_obs_after) || (step && step.has_obs_after);
@@ -183,6 +188,23 @@ function makePromptImagePart(slot, stepMeta, kind, label, accent) {
   };
 }
 
+function explicitPromptImageParts(imagePaths, opts) {
+  opts = opts || {};
+  const stepMeta = opts.stepMeta || opts.currentStep || (DATA && DATA.steps ? DATA.steps[selectedStepIdx] : null);
+  if (!stepMeta || !Array.isArray(imagePaths) || imagePaths.length === 0) return [];
+  const prefix = opts.labelPrefix || "Image";
+  return imagePaths.map((path, i) => {
+    const match = /(?:^|\/)image_(\d+)\.png$/i.exec(path || "");
+    const slot = match ? parseInt(match[1], 10) : i + 1;
+    return {
+      slot: slot,
+      label: prefix + " " + slot,
+      url: stepLocalImageUrl(stepMeta.episode_idx, stepMeta.step, path),
+      accent: !!opts.accentCurrent && i === imagePaths.length - 1,
+    };
+  });
+}
+
 function parseNumberedPromptImages(promptText, opts) {
   if (!promptText) return [];
   opts = opts || {};
@@ -196,18 +218,20 @@ function parseNumberedPromptImages(promptText, opts) {
     const stepMeta = resolveStepByGlobal(gs);
     if (!stepMeta) continue;
     const body = stepMatch[2];
-    const rawMatch = /<raw_state>\s*\(image\s+(\d+)\)/.exec(body);
-    if (rawMatch) {
-      const slot = parseInt(rawMatch[1], 10);
+    const preRe = /<(?:pre_state|raw_state)>\s*\(image\s+(\d+)\)/g;
+    let preMatch;
+    while ((preMatch = preRe.exec(body)) !== null) {
+      const slot = parseInt(preMatch[1], 10);
       if (!seenSlots.has(slot)) {
-        const part = makePromptImagePart(slot, stepMeta, "before", "Image " + slot + " - g" + gs + " raw", false);
+        const part = makePromptImagePart(slot, stepMeta, "before", "Image " + slot + " - g" + gs + " pre", false);
         if (part) parts.push(part);
         seenSlots.add(slot);
       }
     }
-    const resultMatch = /<resulting_state>\s*\(image\s+(\d+)\)/.exec(body);
-    if (resultMatch) {
-      const slot = parseInt(resultMatch[1], 10);
+    const postRe = /<(?:post_state|resulting_state)>\s*\(image\s+(\d+)\)/g;
+    let postMatch;
+    while ((postMatch = postRe.exec(body)) !== null) {
+      const slot = parseInt(postMatch[1], 10);
       if (!seenSlots.has(slot)) {
         const part = makePromptImagePart(slot, stepMeta, "after", "Image " + slot + " - g" + gs + " result", false);
         if (part) parts.push(part);
@@ -217,7 +241,7 @@ function parseNumberedPromptImages(promptText, opts) {
   }
 
   if (opts.currentStep) {
-    const currentBlockRe = /=== CURRENT STATE[\s\S]*?<raw_state>\s*\(image\s+(\d+)\)/;
+    const currentBlockRe = /=== CURRENT STATE[^\n]* ===[\s\S]*?<(?:pre_state|raw_state)>\s*\(image\s+(\d+)\)/;
     const currentMatch = currentBlockRe.exec(promptText);
     if (currentMatch) {
       const slot = parseInt(currentMatch[1], 10);
@@ -269,9 +293,12 @@ function parseSamplePromptImages(promptText) {
 // sampled observation blocks for prompts that attach perception examples.
 function promptImagesHtml(promptText, opts) {
   opts = opts || {};
-  const parts = parseNumberedPromptImages(promptText, opts);
-  const samples = parseSamplePromptImages(promptText);
-  samples.forEach((part) => parts.push(part));
+  let parts = explicitPromptImageParts(opts.imagePaths, opts);
+  if (parts.length === 0) {
+    parts = parseNumberedPromptImages(promptText, opts);
+    const samples = parseSamplePromptImages(promptText);
+    samples.forEach((part) => parts.push(part));
+  }
   if (parts.length === 0) return "";
   let html = '<div style="margin:6px 0 10px"><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;font-weight:600">Images attached (' +
     parts.length + ')</div>' +
@@ -770,7 +797,10 @@ function renderArtifacts(data) {
         " | Unanswered: " + extLog.prev_unanswered + " → " + extLog.new_unanswered +
         " | Newly answered: " + (extLog.newly_answered || 0) + "</div>";
     }
-    extHtml += promptResponseBlock("Q Update", extLog.prompt, extLog.response, {});
+    extHtml += promptResponseBlock("Q Update", extLog.prompt, extLog.response, {
+      imagePaths: extLog.prompt_image_paths,
+      stepMeta: DATA.steps[selectedStepIdx] || {},
+    });
     html += collapsible("Q&A Update from Trajectory", extHtml, false);
   }
 
@@ -842,7 +872,12 @@ function renderExperiments(data) {
   if (expLog.question_gen_prompt || expLog.question_gen_response) {
     let qGenHtml = "";
     if (expLog.question_gen_prompt) {
-      qGenHtml += promptImagesHtml(expLog.question_gen_prompt, { currentStep: stepMeta });
+      qGenHtml += promptImagesHtml(expLog.question_gen_prompt, {
+        currentStep: stepMeta,
+        stepMeta: stepMeta,
+        imagePaths: expLog.question_gen_image_paths,
+        accentCurrent: true,
+      });
       qGenHtml += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:4px">Prompt</div>' +
         '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.question_gen_prompt) + "</pre></div>";
     }
@@ -898,7 +933,12 @@ function renderExperiments(data) {
   if (expLog.experiment_prompt || expLog.experiment_response) {
     let expHtml = "";
     if (expLog.experiment_prompt) {
-      expHtml += promptImagesHtml(expLog.experiment_prompt, { currentStep: stepMeta });
+      expHtml += promptImagesHtml(expLog.experiment_prompt, {
+        currentStep: stepMeta,
+        stepMeta: stepMeta,
+        imagePaths: expLog.experiment_image_paths,
+        accentCurrent: true,
+      });
       expHtml += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:4px">Prompt</div>' +
         '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.experiment_prompt) + "</pre></div>";
     }

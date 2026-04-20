@@ -32,7 +32,7 @@ _DEFAULT_DATA_DIR = os.path.join(
 )
 
 
-_INSTRUCTION_PROMPT = """You are interacting with a new environment. 
+INSTRUCTION_PROMPT = """You are interacting with a new environment.
 Each observation is a 2D grid of color-name strings (rows x cols). At each step you choose an action.
 
 Actions:
@@ -276,7 +276,7 @@ class AutumnBenchEnvWrapper:
         return coerced
 
     def get_instruction_prompt(self, instructions=None) -> str:
-        return _INSTRUCTION_PROMPT
+        return INSTRUCTION_PROMPT
 
     def get_stats(self) -> dict:
         return {

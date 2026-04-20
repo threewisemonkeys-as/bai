@@ -111,17 +111,29 @@ def format_steps_context(
     max_chars: int,
     history_window: int | None = None,
     hide_raw_obs_when_image: bool = False,
+    include_trailing_state: bool = True,
 ) -> str:
     """Format the trajectory buffer as a step sequence for improvement prompts.
 
-    Produces: s0, a0, s1, a1, ..., s_{t-1}, a_{t-1}, s_t — where each intermediate
-    s_{n+1} is shown as the next step's State, and s_t (the current state after the
-    last action) is appended as "Resulting state" on the final step.
-    Trimmed to longest suffix that fits max_chars.
+    Emits per step: ``<pre_state>`` (observation before the action) + action +
+    reward. At the end of each episode segment (episode_boundary, terminal, or
+    end-of-buffer), a ``<post_state>`` block is appended inside the last step.
 
-    When history_window is set (e.g. >=1), perception is invoked via
-    _run_perception_on_history with a per-episode rolling window, enabling
-    history-aware perception modules. When None (default), behavior is unchanged.
+    ``include_trailing_state`` controls only the end-of-buffer tail (the ongoing
+    episode's latest observation). When ``True`` (default), the tail post_state
+    is inlined — appropriate for retrospective callers that have no separate
+    "current state" section. When ``False``, the tail post_state is omitted —
+    use this when the caller renders its own ``CURRENT STATE`` block via
+    ``format_current_state``, so the same observation is not duplicated.
+
+    Mid-buffer episode endings (boundary or terminal) always include
+    ``<post_state>``; they are the only place a past episode's final state
+    appears in the prompt.
+
+    Trimmed to longest suffix that fits ``max_chars``.
+
+    When ``history_window`` is set (>=1), perception is invoked with a
+    per-episode rolling window via ``_run_perception_on_history``.
     """
     if not trajectory_buffer:
         return ""
@@ -164,7 +176,7 @@ def format_steps_context(
 
         block = f"<step n=\"{entry['step']}\">\n"
         block += (
-            f"<raw_state>\n{display_raw_obs}\n</raw_state>\n\n"
+            f"<pre_state>\n{display_raw_obs}\n</pre_state>\n\n"
             f"<auxiliary_observation>\n{raw_aux}\n</auxiliary_observation>\n\n"
             f"<perception_output>\n{perc_out if perc_out else '(no perception module)'}\n</perception_output>\n\n"
             f"<agent_reasoning>\n{reasoning}\n</agent_reasoning>\n"
@@ -172,15 +184,18 @@ def format_steps_context(
         )
         block += f"<reward>{reward}</reward>\n"
 
-        # Append resulting state when this is the last action before an episode
-        # boundary, a terminal entry, or the end of the buffer.
+        # Append <post_state> at the end of each episode segment. The end-of-
+        # buffer tail is gated by include_trailing_state so callers that render
+        # their own CURRENT STATE block can suppress the duplicate.
         next_entry = trajectory_buffer[i + 1] if i + 1 < len(trajectory_buffer) else None
-        is_last_before_break = (
-            next_entry is None
-            or next_entry.get("episode_boundary")
+        is_end_of_buffer = next_entry is None
+        is_mid_buffer_break = next_entry is not None and (
+            next_entry.get("episode_boundary")
             or next_entry.get("action") is None
         )
-        if is_last_before_break:
+        include_post = is_mid_buffer_break or (is_end_of_buffer and include_trailing_state)
+
+        if include_post:
             result_raw = entry.get("result_raw_long_term_context", "")
             result_raw_aux = entry.get("result_raw_short_term_context", "")
             if result_raw:
@@ -198,7 +213,7 @@ def format_steps_context(
                 else:
                     result_perc = ""
                 block += (
-                    f"\n<resulting_state>\n{display_result_raw}\n</resulting_state>\n\n"
+                    f"\n<post_state>\n{display_result_raw}\n</post_state>\n\n"
                     f"<auxiliary_observation>\n{result_raw_aux}\n</auxiliary_observation>\n\n"
                     f"<perception_output>\n{result_perc if result_perc else '(no perception module)'}\n</perception_output>\n"
                 )
@@ -224,6 +239,53 @@ def format_steps_context(
         # At least include the latest step, truncated
         return blocks[-1][:max_chars]
     return "\n".join(trimmed)
+
+
+def format_current_state(
+    observation: str | None,
+    aux_observation: str | None,
+    perception_code: str,
+    *,
+    image=None,
+    image_index: int | None = None,
+    hide_raw_obs: bool = False,
+    section_title: str = "CURRENT STATE",
+) -> str:
+    """Render the current-state section used by prompts that show both history
+    and a separate "where we are now" observation.
+
+    Pairs with ``format_steps_context(..., include_trailing_state=False)``: the
+    trajectory stops at the last completed action, and this block supplies the
+    single observation that would otherwise have been duplicated as the tail
+    ``<post_state>``.
+
+    ``image_index`` (1-indexed) is added as an ``(image K)`` annotation on the
+    ``<pre_state>`` tag so the caller can keep image attachments aligned with
+    the rest of the prompt. Pass ``None`` when there is no image.
+    """
+    if not observation:
+        return ""
+
+    current_perception = (
+        _run_perception_on_observation(perception_code, observation)
+        if perception_code
+        else ""
+    )
+    img_tag = f" (image {image_index})" if image_index is not None else ""
+    raw_state_content = (
+        "(see attached image)"
+        if hide_raw_obs and image is not None
+        else observation
+    )
+    return (
+        f"\n=== {section_title} ===\n"
+        f"<pre_state>{img_tag}\n"
+        f"{raw_state_content}\n"
+        f"</pre_state>\n\n"
+        f"<auxiliary_observation>\n{aux_observation or ''}\n</auxiliary_observation>\n\n"
+        f"<perception_output>\n{current_perception if current_perception else '(no perception module)'}\n</perception_output>\n"
+        f"=== END {section_title} ===\n"
+    )
 
 
 def _compose_obs_text(short_term_context: str, long_term_context: str) -> str:
@@ -297,6 +359,8 @@ def _sample_observations_from_buffer(
         (e["raw_long_term_context"], e["step"])
         for e in trajectory_buffer
         if e.get("raw_long_term_context", "").strip()
+        and not e.get("episode_boundary")
+        and e.get("action") is not None
     ]
     if not valid:
         return []
@@ -335,6 +399,8 @@ def _histories_for_samples(
     for e in trajectory_buffer:
         if e.get("episode_boundary"):
             ep_history = []
+            continue
+        if e.get("action") is None:
             continue
         raw = e.get("raw_long_term_context", "")
         if not raw or not raw.strip():
@@ -700,6 +766,7 @@ def run_stepwise_b_learn_episode(
                 old_experiments = list(experiments)
                 exp_steps_context = format_steps_context(
                     trajectory_buffer, perception, bl_config.max_steps_context_chars,
+                    include_trailing_state=False,
                 )
                 with improve_logging(step_dir):
                     forward_moments = [m for m in moments if m.raw_observation and m.raw_observation.strip()]
