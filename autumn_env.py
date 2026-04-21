@@ -39,10 +39,9 @@ Actions:
 - left / right / up / down — move (meaning depends on the game's dynamics, which you need to discover)
 - click ROW COL — click grid cell at (row, col), 0-indexed
 - noop — wait one step
-- go-to-test — end the interactive phase (only used when you are confident you understand the dynamics)
 - quit — give up
 
-Your goal is to interact with the environment to understand its underlying dynamics rules.
+Your goal is to interact with the environment to understand its underlying dynamics.
 """
 
 
