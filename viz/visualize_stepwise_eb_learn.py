@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import threading
 import traceback
@@ -15,6 +16,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 from stepwise_eb_viewer_data import (
     is_safe_step_image_path,
+    list_runs,
     load_combined_trajectory,
     load_experiment_timeline,
     load_log_dir,
@@ -22,6 +24,7 @@ from stepwise_eb_viewer_data import (
     load_step_detail,
     load_trajectory,
     resolve_log_dir,
+    resolve_run_dir,
 )
 
 
@@ -54,11 +57,21 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
-    def _get_log_dir(self, params):
+    def _get_run_dir(self, params):
         raw = params.get("log_dir", [None])[0]
         if not raw:
             raise ValueError("Missing log_dir parameter")
-        return resolve_log_dir(raw)
+        run_id = params.get("run", [None])[0] or None
+        return resolve_run_dir(raw, run_id)
+
+    def _get_log_dir_only(self, params):
+        raw = params.get("log_dir", [None])[0]
+        if not raw:
+            raise ValueError("Missing log_dir parameter")
+        abs_path = os.path.abspath(raw)
+        if not os.path.isdir(abs_path):
+            raise ValueError(f"Not a directory: {abs_path}")
+        return abs_path
 
     def do_GET(self):
         try:
@@ -70,29 +83,32 @@ class Handler(BaseHTTPRequestHandler):
                 self._html_response(render_index_html())
             elif path == "/app.js":
                 self._text_response(load_asset(APP_JS_PATH), "application/javascript; charset=utf-8")
+            elif path == "/api/runs":
+                log_dir = self._get_log_dir_only(params)
+                self._json_response({"log_dir": log_dir, "runs": list_runs(log_dir)})
             elif path == "/api/data":
-                log_dir = self._get_log_dir(params)
+                log_dir = self._get_run_dir(params)
                 self._json_response(load_log_dir(log_dir))
             elif path == "/api/step_detail":
-                log_dir = self._get_log_dir(params)
+                log_dir = self._get_run_dir(params)
                 episode = int(params.get("episode", [0])[0])
                 step = int(params.get("step", [0])[0])
                 self._json_response(load_step_detail(log_dir, episode, step))
             elif path == "/api/trajectory":
-                log_dir = self._get_log_dir(params)
+                log_dir = self._get_run_dir(params)
                 episode = int(params.get("episode", [0])[0])
                 self._json_response(load_trajectory(log_dir, episode))
             elif path == "/api/combined_trajectory":
-                log_dir = self._get_log_dir(params)
+                log_dir = self._get_run_dir(params)
                 self._json_response(load_combined_trajectory(log_dir))
             elif path == "/api/experiment_timeline":
-                log_dir = self._get_log_dir(params)
+                log_dir = self._get_run_dir(params)
                 self._json_response(load_experiment_timeline(log_dir))
             elif path == "/api/qa_timeline":
-                log_dir = self._get_log_dir(params)
+                log_dir = self._get_run_dir(params)
                 self._json_response(load_qa_timeline(log_dir))
             elif path == "/api/step_image":
-                log_dir = self._get_log_dir(params)
+                log_dir = self._get_run_dir(params)
                 episode = int(params.get("episode", [0])[0])
                 step = int(params.get("step", [0])[0])
                 name = params.get("name", ["obs_before.png"])[0]
@@ -170,14 +186,24 @@ def main():
 
     if args.log_dir:
         try:
-            resolved = resolve_log_dir(args.log_dir)
+            abs_path = os.path.abspath(args.log_dir)
+            if not os.path.isdir(abs_path):
+                raise ValueError(f"Not a directory: {abs_path}")
+            runs = list_runs(abs_path)
         except ValueError as exc:
             print(f"Error: {exc}", file=sys.stderr)
             sys.exit(1)
-        print(f"Log dir resolved to: {resolved}")
-        data = load_log_dir(resolved)
-        print(f"Found {len(data['episodes'])} episodes, {len(data['steps'])} steps")
-        url += f"?log_dir={quote(resolved, safe='')}"
+        if len(runs) == 1:
+            resolved = runs[0]["path"]
+            print(f"Log dir resolved to: {resolved}")
+            data = load_log_dir(resolved)
+            print(f"Found {len(data['episodes'])} episodes, {len(data['steps'])} steps")
+        elif len(runs) > 1:
+            print(f"Found {len(runs)} runs under {abs_path}; pick one in the browser")
+        else:
+            print(f"No runs found under {abs_path}", file=sys.stderr)
+            sys.exit(1)
+        url += f"?log_dir={quote(abs_path, safe='')}"
 
     print(f"Serving at {url}")
 

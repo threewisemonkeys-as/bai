@@ -142,6 +142,16 @@ window.STEPWISE_EB_VIEWER_CONFIG = (function() {
         <button onclick="loadDynamicFromLanding()">Load</button>
       </div>
     </div>
+    <div class="landing-panel hidden" id="dynamic-runs-panel">
+      <h2>Pick a Run</h2>
+      <p id="dynamic-runs-subtitle">Multiple runs were found under the selected log directory. Pick one to open.</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="landing-dynamic-run-select" class="landing-select"></select>
+        <button onclick="loadDynamicRunFromLanding()">Open</button>
+        <button class="topbar-btn" onclick="clearLogDirFromLanding()" style="padding:8px 14px">Change path</button>
+      </div>
+      <div class="landing-muted" id="landing-dynamic-run-meta" style="margin-top:10px"></div>
+    </div>
     <div class="landing-panel hidden" id="static-panel">
       <h2>Browse Curated Published Runs</h2>
       <p>Select a run exported into <code>data/stepwise_eb_runs</code>. This is the mode intended for GitHub Pages.</p>

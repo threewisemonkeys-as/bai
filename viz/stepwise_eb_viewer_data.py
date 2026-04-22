@@ -99,6 +99,112 @@ def resolve_log_dir(raw_path):
     return log_dir
 
 
+def is_run_dir(path):
+    """A run dir contains at least one episode_* subdirectory."""
+    if not os.path.isdir(path):
+        return False
+    try:
+        for name in os.listdir(path):
+            if name.startswith("episode_") and os.path.isdir(os.path.join(path, name)):
+                return True
+    except OSError:
+        return False
+    return False
+
+
+def list_runs(log_dir):
+    """List runs under log_dir.
+
+    If log_dir is itself a run, returns a single entry with id="".
+    Otherwise returns one entry per direct child subdirectory that looks like a
+    run, sorted by name descending (so timestamped runs appear newest-first).
+    If a direct child is not itself a run but contains one or more run dirs one
+    level deeper (matrix layouts like launch.py's cell_dir/<timestamp>/), those
+    grandchildren are surfaced with ids of the form "<cell>/<timestamp>".
+    """
+    log_dir = os.path.abspath(log_dir)
+    if not os.path.isdir(log_dir):
+        raise ValueError(f"Not a directory: {log_dir}")
+
+    if is_run_dir(log_dir):
+        return [_run_entry(log_dir, "", os.path.basename(log_dir.rstrip(os.sep)))]
+
+    runs = []
+    for name in sorted(os.listdir(log_dir), reverse=True):
+        child = os.path.join(log_dir, name)
+        if not os.path.isdir(child):
+            continue
+        if is_run_dir(child):
+            runs.append(_run_entry(child, name, name))
+            continue
+        try:
+            grand_names = sorted(os.listdir(child), reverse=True)
+        except OSError:
+            continue
+        for sub in grand_names:
+            grand = os.path.join(child, sub)
+            if is_run_dir(grand):
+                runs.append(_run_entry(grand, f"{name}/{sub}", name))
+    return runs
+
+
+def _run_entry(run_path, run_id, name):
+    episode_count = 0
+    step_count = 0
+    try:
+        for entry in os.listdir(run_path):
+            if entry.startswith("episode_") and os.path.isdir(os.path.join(run_path, entry)):
+                episode_count += 1
+                ep_path = os.path.join(run_path, entry)
+                try:
+                    for sub in os.listdir(ep_path):
+                        if sub.startswith("step_") and os.path.isdir(os.path.join(ep_path, sub)):
+                            step_count += 1
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return {
+        "id": run_id,
+        "name": name,
+        "path": run_path,
+        "episodes": episode_count,
+        "steps": step_count,
+    }
+
+
+def resolve_run_dir(raw_log_dir, run_id=None):
+    """Resolve a specific run directory inside log_dir.
+
+    - If run_id is provided, it must be a direct subdirectory name.
+    - Otherwise, log_dir must itself be a run.
+    Raises ValueError if the target is not a valid run dir.
+    """
+    log_dir = os.path.abspath(raw_log_dir)
+    if not os.path.isdir(log_dir):
+        raise ValueError(f"Not a directory: {log_dir}")
+
+    if run_id:
+        if "\\" in run_id:
+            raise ValueError(f"Invalid run id: {run_id}")
+        parts = [p for p in run_id.split("/") if p]
+        if not parts or any(p in (".", "..") for p in parts):
+            raise ValueError(f"Invalid run id: {run_id}")
+        candidate = os.path.abspath(os.path.join(log_dir, *parts))
+        if candidate == log_dir or os.path.commonpath([candidate, log_dir]) != log_dir:
+            raise ValueError(f"Run id must resolve inside log_dir: {run_id}")
+        if not is_run_dir(candidate):
+            raise ValueError(f"Not a run directory: {candidate}")
+        return candidate
+
+    if is_run_dir(log_dir):
+        return log_dir
+
+    raise ValueError(
+        f"{log_dir} contains multiple runs; specify one via the run parameter"
+    )
+
+
 def load_log_dir(log_dir):
     """Load the full step-centric log structure."""
     summary = read_json(os.path.join(log_dir, "summary.json"))

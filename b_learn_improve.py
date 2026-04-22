@@ -1146,6 +1146,25 @@ Please fix the error in your perception code.
     return new_beliefs, perception, total_cost, base_prompt, text
 
 
+def _prepend_rejection_notice(message: str, validation_error: str) -> str:
+    """Prepend a notice to the next outer-turn message when all validation retries failed.
+
+    Makes it explicit to the LLM that its previous perception code was rejected
+    and the working copy has been reverted, so it can reconcile this with the
+    conversation history (which otherwise looks like the code was accepted).
+    """
+    notice = (
+        "IMPORTANT: All validation retries of your previous perception module failed, "
+        "so the working copy has been reverted to the version before your last attempt. "
+        "The perception output shown below reflects the reverted (previous) module, "
+        "not your last submitted code. Final validation error was:\n"
+        f"{validation_error}\n\n"
+        "Please propose a fresh perception module that avoids this error.\n\n"
+        "---\n\n"
+    )
+    return notice + message
+
+
 async def _improve_with_perception_validation_conversational(
     config: DictConfig,
     beliefs: str,
@@ -1155,7 +1174,9 @@ async def _improve_with_perception_validation_conversational(
     sample_observations: list[tuple[str, int]] | None = None,
     max_retries: int = 3,
     images: list | None = None,
-) -> tuple[str, str, float, list[dict], str]:
+    sample_histories: list[list[str]] | None = None,
+    history_window: int | None = None,
+) -> tuple[str, str, float, list[dict], str, str | None]:
     """Run an improve prompt with perception validation using multi-turn conversation.
 
     Like _improve_with_perception_validation but maintains conversation history.
@@ -1165,8 +1186,17 @@ async def _improve_with_perception_validation_conversational(
     Retry turns (perception errors) are text-only; the images remain visible via
     the conversation history.
 
-    Returns: (new_beliefs, new_perception, total_cost, updated_history, llm_response)
+    Validation and the degradation check invoke perceive using the same inputs
+    shown in the prompt: when ``sample_histories`` and ``history_window`` are
+    provided, the windowed history is passed (matching `_run_perception_on_history`);
+    otherwise the single raw observation is passed.
+
+    Returns: (new_beliefs, new_perception, total_cost, updated_history, llm_response,
+             validation_error). validation_error is None on success, or the last
+             error message when all retries failed and perception was reverted.
     """
+    from mixed_improve import _run_perception_on_history
+
     perception_error = None
     new_beliefs = beliefs
     new_perception = perception
@@ -1175,6 +1205,13 @@ async def _improve_with_perception_validation_conversational(
     current_message = user_message
     text = ""
     initial_images = images
+
+    use_history = (
+        sample_observations is not None
+        and sample_histories is not None
+        and history_window is not None
+        and len(sample_histories) == len(sample_observations)
+    )
 
     for attempt in range(max_retries):
         if perception_error:
@@ -1213,19 +1250,31 @@ async def _improve_with_perception_validation_conversational(
         if candidate_perception.endswith("```"):
             candidate_perception = candidate_perception[:-len("```")].strip()
 
-        # Validate perception code
+        # Validate perception code using the same inputs shown in the prompt.
         test_obs = [raw for raw, _ in sample_observations[:3]] if sample_observations else None
-        is_valid, error_msg = validate_perception_code(candidate_perception, test_observations=test_obs)
+        test_hists = [sample_histories[i] for i in range(min(3, len(sample_histories)))] if use_history else None
+        is_valid, error_msg = validate_perception_code(
+            candidate_perception,
+            test_observations=test_obs,
+            test_histories=test_hists,
+            history_window=history_window if use_history else None,
+        )
         if not is_valid:
             perception_error = error_msg
             logging.warning(f"Perception code validation failed (attempt {attempt + 1}/{max_retries}): {error_msg}")
             continue
 
-        # Execution verification: check for output degradation
+        # Execution verification: check for output degradation using the same
+        # invocation path as the prompt (history-aware when available).
         if sample_observations:
             degraded_samples = []
-            for raw_obs, step_num in sample_observations[:3]:
-                new_out = _run_perception_on_observation(candidate_perception, raw_obs)
+            for idx, (raw_obs, step_num) in enumerate(sample_observations[:3]):
+                if use_history:
+                    new_out = _run_perception_on_history(
+                        candidate_perception, sample_histories[idx], history_window,
+                    )
+                else:
+                    new_out = _run_perception_on_observation(candidate_perception, raw_obs)
                 raw_has_map = "map:" in raw_obs and len(raw_obs) > 500
                 new_line_count = len(new_out.strip().splitlines()) if new_out else 0
                 if raw_has_map and new_line_count <= 3:
@@ -1248,10 +1297,10 @@ async def _improve_with_perception_validation_conversational(
 
         new_perception = candidate_perception
         logging.info(f"Perception code validated successfully on attempt {attempt + 1}")
-        return new_beliefs, new_perception, total_cost, current_history, text
+        return new_beliefs, new_perception, total_cost, current_history, text, None
 
     logging.error(f"All {max_retries} attempts to generate valid perception failed. Keeping previous perception.")
-    return new_beliefs, perception, total_cost, current_history, text
+    return new_beliefs, perception, total_cost, current_history, text, perception_error
 
 
 async def _improve_beliefs_only_conversational(

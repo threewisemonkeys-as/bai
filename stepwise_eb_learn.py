@@ -42,6 +42,7 @@ from b_learn_improve import (
     serialize_qa_feedback_results,
     _improve_with_perception_validation_conversational,
     _improve_beliefs_only_conversational,
+    _prepend_rejection_notice,
 )
 from stepwise_b_learn_improve import (
     parse_submit_signal,
@@ -719,6 +720,7 @@ Provide analysis highlighting:
 
             perception_conv_1b: list[dict] = []
             prev_obs_section_1b = obs_section_1b
+            prev_validation_error_1b: str | None = None
 
             for turn in range(max_perception_iters):
                 evolve_logger.info(f"{tag}     Track 1b (perception from analysis) turn {turn + 1}/{max_perception_iters}")
@@ -731,11 +733,13 @@ Provide analysis highlighting:
                     perception_instructions=perception_instructions,
                     response_format=EB_PERCEPTION_ONLY_RESPONSE_FORMAT,
                 )
+                if prev_validation_error_1b:
+                    message = _prepend_rejection_notice(message, prev_validation_error_1b)
 
                 # Attach sample images on the first turn only; subsequent turns rely on history.
                 turn_images = sample_obs_images if turn == 0 else None
 
-                _beliefs_unused, perception, turn_cost, perception_conv_1b, response_text = asyncio.run(
+                _beliefs_unused, perception, turn_cost, perception_conv_1b, response_text, prev_validation_error_1b = asyncio.run(
                     _improve_with_perception_validation_conversational(
                         config=config,
                         beliefs=beliefs,
@@ -744,6 +748,8 @@ Provide analysis highlighting:
                         user_message=message,
                         sample_observations=sample_obs,
                         images=turn_images,
+                        sample_histories=sample_obs_histories,
+                        history_window=hist_window,
                     )
                 )
                 total_cost += turn_cost
@@ -913,6 +919,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                 qa_conversation: list[dict] = []
                 prev_qa_correct = len(qa_correct)
                 prev_qa_incorrect = len(qa_incorrect)
+                prev_validation_error_2: str | None = None
 
                 for turn in range(max_qa_iters):
                     evolve_logger.info(f"{tag}     Track 2 turn {turn + 1}/{max_qa_iters}")
@@ -921,6 +928,8 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                         qa_fb_results, prev_qa_correct, prev_qa_incorrect,
                         response_format=eb_response_format,
                     )
+                    if prev_validation_error_2:
+                        message = _prepend_rejection_notice(message, prev_validation_error_2)
 
                     # Initial turn's prompt contains both steps_context and sample_obs
                     # raw states — attach their images. Followups re-reference via history.
@@ -928,7 +937,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                     if turn == 0:
                         turn_images = list(steps_context_images) + list(sample_obs_images)
 
-                    beliefs, perception, turn_cost, qa_conversation, response_text = asyncio.run(
+                    beliefs, perception, turn_cost, qa_conversation, response_text, prev_validation_error_2 = asyncio.run(
                         _improve_with_perception_validation_conversational(
                             config=config,
                             beliefs=beliefs,
@@ -937,6 +946,8 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                             user_message=message,
                             sample_observations=sample_obs if sample_obs else None,
                             images=turn_images,
+                            sample_histories=sample_obs_histories if sample_obs else None,
+                            history_window=hist_window,
                         )
                     )
                     total_cost += turn_cost
@@ -1297,6 +1308,7 @@ def run_stepwise_eb_learn_episode(
                         "experiment_image_paths": exp_image_paths,
                         "experiment_plan": experiment_plan,
                         "selected_question_index": q_idx,
+                        "qa_pairs_at_formulation": serialize_eb_qa_pairs(qa_pairs),
                     }
 
                 # Update current experiment and inject into agent

@@ -9,6 +9,8 @@ let qaTimelineCache = null;
 let staticIndex = null;
 let currentStaticRun = null;
 let currentStaticRunBase = null;
+let dynamicRuns = null;
+let currentDynamicRun = null;
 
 const VIEWER_CONFIG = window.STEPWISE_EB_VIEWER_CONFIG || {};
 if (VIEWER_CONFIG.dataIndexPath && !/^https?:\/\//.test(VIEWER_CONFIG.dataIndexPath)) {
@@ -26,6 +28,27 @@ const TABS = [
   ["experiment_timeline", "Experiment Timeline"],
   ["logs", "Improve Log"],
 ];
+
+// Tabs that only make sense for stepwise_eb_learn runs (they depend on
+// belief/perception/QA/experiment artifacts that the simple + openhands
+// baselines never produce). Hidden automatically when those artifacts are
+// absent; see isEBRun / visibleTabs below.
+const EB_ONLY_TABS = new Set([
+  "experiments", "artifacts", "feedback",
+  "qa_timeline", "experiment_timeline", "logs",
+]);
+
+function isEBRun() {
+  if (!DATA || !Array.isArray(DATA.steps)) return false;
+  return DATA.steps.some((s) =>
+    s.has_experiment_log || s.has_extraction_log ||
+    s.has_improve_log || s.has_beliefs || s.has_trim_log
+  );
+}
+
+function visibleTabs() {
+  return isEBRun() ? TABS : TABS.filter((t) => !EB_ONLY_TABS.has(t[0]));
+}
 
 function currentParams() {
   return new URLSearchParams(window.location.search);
@@ -120,11 +143,14 @@ function isDynamicMode() {
 }
 
 function isStaticMode() {
-  return !!currentRunId();
+  return !currentLogDir() && !!currentRunId();
 }
 
 function apiUrl(path, extraParams) {
-  const params = new URLSearchParams({ log_dir: currentLogDir(), ...extraParams });
+  const base = { log_dir: currentLogDir() };
+  const run = currentRunId();
+  if (run) base.run = run;
+  const params = new URLSearchParams({ ...base, ...extraParams });
   return path + "?" + params.toString();
 }
 
@@ -347,6 +373,64 @@ async function loadRunIndex() {
   staticIndex = await fetchJson(VIEWER_CONFIG.dataIndexPath);
 }
 
+async function loadDynamicRuns() {
+  const logDir = currentLogDir();
+  if (!logDir) return null;
+  const params = new URLSearchParams({ log_dir: logDir });
+  return await fetchJson("/api/runs?" + params.toString());
+}
+
+function dynamicRunLabel(run) {
+  if (!run) return "";
+  const summary = [];
+  if (run.episodes) summary.push(run.episodes + " ep");
+  if (run.steps) summary.push(run.steps + " steps");
+  const name = run.name || run.id || "(this directory)";
+  return summary.length ? name + " (" + summary.join(", ") + ")" : name;
+}
+
+function populateDynamicRunSelectors() {
+  if (!dynamicRuns || !Array.isArray(dynamicRuns.runs)) return;
+  const landingSelect = document.getElementById("landing-dynamic-run-select");
+  const topbarSelect = document.getElementById("topbar-run-select");
+  const current = currentRunId() || "";
+
+  const options = dynamicRuns.runs.length > 1
+    ? ['<option value="">Select a run</option>']
+    : [];
+  dynamicRuns.runs.forEach((run) => {
+    const value = run.id || "";
+    const selected = value === current ? " selected" : "";
+    options.push('<option value="' + esc(value) + '"' + selected + ">" + esc(dynamicRunLabel(run)) + "</option>");
+  });
+
+  if (landingSelect) {
+    landingSelect.innerHTML = options.join("");
+    landingSelect.value = current;
+    landingSelect.onchange = updateLandingDynamicRunMeta;
+    updateLandingDynamicRunMeta();
+  }
+  if (topbarSelect) {
+    topbarSelect.innerHTML = options.join("");
+    topbarSelect.value = current;
+    topbarSelect.onchange = function () {
+      navigateWith({ run: this.value || null });
+    };
+  }
+}
+
+function updateLandingDynamicRunMeta() {
+  const meta = document.getElementById("landing-dynamic-run-meta");
+  if (!meta || !dynamicRuns) return;
+  const subtitle = document.getElementById("dynamic-runs-subtitle");
+  if (subtitle) subtitle.textContent = "Found " + dynamicRuns.runs.length +
+    " run(s) under " + dynamicRuns.log_dir + ". Pick one to open.";
+  const selected = document.getElementById("landing-dynamic-run-select").value;
+  const run = dynamicRuns.runs.find((item) => (item.id || "") === selected);
+  if (!run) { meta.textContent = ""; return; }
+  meta.textContent = run.path;
+}
+
 function runLabel(run) {
   if (!run) return "";
   const title = run.title || run.log_dir_name || run.id;
@@ -402,11 +486,14 @@ function updateLandingRunMeta() {
 
 function configureLanding() {
   const dynamicPanel = document.getElementById("dynamic-panel");
+  const dynamicRunsPanel = document.getElementById("dynamic-runs-panel");
   const staticPanel = document.getElementById("static-panel");
   const allowDynamic = !!VIEWER_CONFIG.allowDynamicInput;
   const allowStatic = !!(staticIndex && Array.isArray(staticIndex.runs));
-  dynamicPanel.classList.toggle("hidden", !allowDynamic);
-  staticPanel.classList.toggle("hidden", !allowStatic);
+  const showDynamicRuns = !!(dynamicRuns && Array.isArray(dynamicRuns.runs) && dynamicRuns.runs.length);
+  dynamicPanel.classList.toggle("hidden", !allowDynamic || showDynamicRuns);
+  dynamicRunsPanel.classList.toggle("hidden", !showDynamicRuns);
+  staticPanel.classList.toggle("hidden", !allowStatic || showDynamicRuns);
 }
 
 function showLanding() {
@@ -423,20 +510,25 @@ function updateTopbar() {
   const topbarDir = document.getElementById("topbar-dir");
   const topbarCost = document.getElementById("topbar-cost");
   const runWrap = document.getElementById("topbar-run-wrap");
+  const topbarSelect = document.getElementById("topbar-run-select");
 
   if (isStaticMode() && currentStaticRun) {
     topbarDir.textContent = currentStaticRun.title || DATA.log_dir_name;
     runWrap.style.display = "inline-flex";
-    document.getElementById("topbar-run-select").value = currentStaticRun.id;
+    topbarSelect.value = currentStaticRun.id;
+  } else if (isDynamicMode() && dynamicRuns && dynamicRuns.runs.length > 1) {
+    topbarDir.textContent = dynamicRuns.log_dir;
+    runWrap.style.display = "inline-flex";
+    topbarSelect.value = currentRunId() || "";
   } else {
     topbarDir.textContent = DATA.log_dir_name;
     runWrap.style.display = "none";
   }
   topbarCost.textContent = "Total cost: $" + (DATA.total_cost || 0).toFixed(4);
 
-  const title = isStaticMode() && currentStaticRun
-    ? (currentStaticRun.title || DATA.log_dir_name)
-    : DATA.log_dir_name;
+  let title = DATA.log_dir_name;
+  if (isStaticMode() && currentStaticRun) title = currentStaticRun.title || title;
+  else if (isDynamicMode() && currentDynamicRun && currentDynamicRun.name) title = currentDynamicRun.name;
   document.title = title + " - Stepwise EB-Learn Viewer";
 }
 
@@ -448,6 +540,20 @@ function loadDynamicFromLanding() {
     return;
   }
   navigateWith({ log_dir: value, run: null });
+}
+
+function loadDynamicRunFromLanding() {
+  const select = document.getElementById("landing-dynamic-run-select");
+  const runId = select ? select.value : "";
+  if (!runId && dynamicRuns && dynamicRuns.runs.length > 1) {
+    setLandingError("Please choose a run.");
+    return;
+  }
+  navigateWith({ run: runId || null });
+}
+
+function clearLogDirFromLanding() {
+  navigateWith({ log_dir: null, run: null });
 }
 
 function loadStaticFromLanding() {
@@ -474,6 +580,46 @@ async function init() {
     }
   } catch (e) {
     setLandingError("Failed to load published run index: " + e.message);
+  }
+
+  dynamicRuns = null;
+  currentDynamicRun = null;
+  if (isDynamicMode()) {
+    try {
+      dynamicRuns = await loadDynamicRuns();
+    } catch (e) {
+      configureLanding();
+      showLanding();
+      setLandingError("Failed to list runs: " + e.message);
+      return;
+    }
+
+    const runs = (dynamicRuns && dynamicRuns.runs) || [];
+    if (runs.length === 0) {
+      configureLanding();
+      showLanding();
+      setLandingError("No runs found under " + (dynamicRuns ? dynamicRuns.log_dir : currentLogDir()));
+      return;
+    }
+
+    const requested = currentRunId() || "";
+    if (runs.length === 1) {
+      // Exactly one run: auto-select (log_dir may be the run itself, in which case id="").
+      currentDynamicRun = runs[0];
+      if ((runs[0].id || "") !== requested) {
+        navigateWith({ run: runs[0].id || null });
+        return;
+      }
+    } else {
+      currentDynamicRun = runs.find((r) => (r.id || "") === requested) || null;
+      if (!currentDynamicRun) {
+        populateDynamicRunSelectors();
+        configureLanding();
+        showLanding();
+        return;
+      }
+    }
+    populateDynamicRunSelectors();
   }
 
   configureLanding();
@@ -624,8 +770,12 @@ function renderStep(idx) {
     '<button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px" onclick="showStep(' + Math.min(total - 1, idx + 1) + ')" ' + (idx >= total - 1 ? "disabled" : "") + ">&#8594;</button>" +
     "</div>";
 
+  const tabsToShow = visibleTabs();
+  if (!tabsToShow.some((t) => t[0] === currentTab)) {
+    currentTab = "overview";
+  }
   html += '<div class="tabs">';
-  TABS.forEach((tab) => {
+  tabsToShow.forEach((tab) => {
     html += '<div class="tab ' + (currentTab === tab[0] ? "active" : "") + '" onclick="currentTab=\'' + tab[0] + "';renderStep(" + idx + ')">' + tab[1] + "</div>";
   });
   html += "</div>";
@@ -740,8 +890,11 @@ function renderOverview(data, step) {
       '<div class="card-body">' + expContent + "</div></div>";
   }
 
-  html += '<div style="margin-bottom:16px"><h3 style="font-size:12px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Beliefs</h3><pre>' + esc(data.beliefs || "(empty)") + "</pre></div>";
-  html += '<div style="margin-bottom:16px"><h3 style="font-size:12px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Perception</h3><pre>' + esc(data.perception || "(empty)") + "</pre></div>";
+  const ebRun = isEBRun();
+  if (ebRun) {
+    html += '<div style="margin-bottom:16px"><h3 style="font-size:12px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Beliefs</h3><pre>' + esc(data.beliefs || "(empty)") + "</pre></div>";
+    html += '<div style="margin-bottom:16px"><h3 style="font-size:12px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Perception</h3><pre>' + esc(data.perception || "(empty)") + "</pre></div>";
+  }
 
   // Cost section — below perception
   let costHtml = '<table class="data-table"><tr><th>Category</th><th>This Step</th><th>Cumulative</th></tr>';
@@ -754,10 +907,13 @@ function renderOverview(data, step) {
     cumExperiment += s.experiment_cost || 0;
     cumTotal += s.step_total_cost || 0;
   }
-  costHtml += '<tr><td>Agent</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.agent_step_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumAgent.toFixed(4) + "</td></tr>";
-  costHtml += '<tr><td>Extraction</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.extract_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumExtract.toFixed(4) + "</td></tr>";
-  costHtml += '<tr><td>Improve</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.improve_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumImprove.toFixed(4) + "</td></tr>";
-  costHtml += '<tr><td>Experiment</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.experiment_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumExperiment.toFixed(4) + "</td></tr>";
+  const agentLabel = ebRun ? "Agent" : "LLM Call";
+  costHtml += '<tr><td>' + agentLabel + '</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.agent_step_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumAgent.toFixed(4) + "</td></tr>";
+  if (ebRun) {
+    costHtml += '<tr><td>Extraction</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.extract_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumExtract.toFixed(4) + "</td></tr>";
+    costHtml += '<tr><td>Improve</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.improve_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumImprove.toFixed(4) + "</td></tr>";
+    costHtml += '<tr><td>Experiment</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.experiment_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumExperiment.toFixed(4) + "</td></tr>";
+  }
   costHtml += '<tr style="font-weight:600"><td>Total</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.step_total_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + cumTotal.toFixed(4) + "</td></tr>";
   costHtml += "</table>";
   html += collapsible("Cost Breakdown", costHtml, true);
@@ -899,7 +1055,10 @@ function renderExperiments(data) {
   }
 
   // Step 3: All Available Questions Now (question bank)
-  const qa = data.qa_pairs || [];
+  // Prefer the snapshot captured at experiment-formulation time so the bank
+  // shown here reflects the state that drove this step's experiment choice,
+  // not the post-extraction/trim/improve end-of-step state.
+  const qa = expLog.qa_pairs_at_formulation || data.qa_pairs || [];
   if (qa.length > 0) {
     const answered = qa.filter((item) => item.answer !== null);
     const unanswered = qa.filter((item) => item.answer === null);

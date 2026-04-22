@@ -483,19 +483,32 @@ async def get_episode_summary_async(
 def validate_perception_code(
     code: str,
     test_observations: list[str] | None = None,
+    test_histories: list[list[str]] | None = None,
+    history_window: int | None = None,
 ) -> tuple[bool, str | None]:
     """Validate perception code by attempting to compile, execute, and test it.
 
+    Invocation matches runtime: the perceive signature is auto-detected via
+    `_perceive_signature_mode`, and inputs are dispatched the same way
+    `_run_perception_on_history` / `_run_perception_on_observation` do.
+
     Args:
         code: Python code string containing the perceive function.
-        test_observations: Optional list of real raw observation strings to test
-            the perceive function on. When provided, the function is tested on
-            each observation. When not provided, a minimal synthetic input is used
-            to catch basic runtime errors.
+        test_histories: Optional list of per-sample observation histories
+            (chronological list of raw observations). When provided, each
+            history is passed to perceive using the same windowing rule as
+            runtime. Takes precedence over ``test_observations``.
+        history_window: Window size for history-mode invocation. Required
+            when ``test_histories`` is provided.
+        test_observations: Optional list of single raw observation strings.
+            Used when ``test_histories`` is not provided. If perceive expects
+            a list, each observation is wrapped as a single-frame history.
 
     Returns:
         Tuple of (is_valid, error_message). If valid, error_message is None.
     """
+    from stepwise_explore import _perceive_signature_mode
+
     if not code or not code.strip():
         return True, None  # Empty code is valid (no perception)
 
@@ -514,15 +527,34 @@ def validate_perception_code(
         if not callable(namespace["perceive"]):
             return False, "'perceive' is not a callable function"
 
-        # Test on real observations if available, otherwise use a minimal input
-        if test_observations:
-            test_inputs = test_observations
+        fn = namespace["perceive"]
+        mode = _perceive_signature_mode(fn)
+
+        # Build test inputs that mirror how the runtime will invoke perceive.
+        test_inputs: list = []
+        if test_histories:
+            for hist in test_histories:
+                if mode == "history":
+                    if history_window and history_window > 0:
+                        windowed = hist[-history_window:]
+                    else:
+                        windowed = list(hist)
+                    test_inputs.append(windowed)
+                else:
+                    test_inputs.append(hist[-1] if hist else "")
+        elif test_observations:
+            for obs in test_observations:
+                if mode == "history":
+                    test_inputs.append([obs])
+                else:
+                    test_inputs.append(obs)
         else:
-            test_inputs = ["message:\nTest message\n\nmap:\n...\n"]
+            synth = "message:\nTest message\n\nmap:\n...\n"
+            test_inputs.append([synth] if mode == "history" else synth)
 
         for i, test_input in enumerate(test_inputs):
             try:
-                result = namespace["perceive"](test_input)
+                result = fn(test_input)
                 if not isinstance(result, str):
                     return False, f"'perceive' function must return a string, got {type(result).__name__} (test input {i})"
             except Exception as e:

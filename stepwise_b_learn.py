@@ -65,6 +65,7 @@ from stepwise_b_learn_improve import (
 from b_learn_improve import (
     _improve_with_perception_validation_conversational,
     _improve_beliefs_only_conversational,
+    _prepend_rejection_notice,
 )
 from llm_utils import extract_xml_key
 from stepwise_explore import (
@@ -1560,6 +1561,7 @@ For beliefs:
 
             perception_conv_1c: list[dict] = []
             prev_obs_section_1c = obs_section_1c
+            prev_validation_error_1c: str | None = None
 
             for turn in range(bl_config.max_perception_iterations):
                 evolve_logger.info(f"{tag}     Track 1c (perception from analysis) turn {turn + 1}/{bl_config.max_perception_iterations}")
@@ -1568,8 +1570,10 @@ For beliefs:
                     perception, sample_obs, prev_obs_section_1c,
                     current_turn=turn + 1, max_turns=bl_config.max_perception_iterations,
                 )
+                if prev_validation_error_1c:
+                    message = _prepend_rejection_notice(message, prev_validation_error_1c)
 
-                _beliefs_unused, perception, turn_cost, perception_conv_1c, response_text = asyncio.run(
+                _beliefs_unused, perception, turn_cost, perception_conv_1c, response_text, prev_validation_error_1c = asyncio.run(
                     _improve_with_perception_validation_conversational(
                         config=config,
                         beliefs=beliefs,
@@ -1727,6 +1731,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                 qa_conversation: list[dict] = []
                 prev_qa_correct = len(qa_correct)
                 prev_qa_incorrect = len(qa_incorrect)
+                prev_validation_error_2b: str | None = None
 
                 for turn in range(bl_config.max_qa_iterations):
                     evolve_logger.info(f"{tag}     Track 2 turn {turn + 1}/{bl_config.max_qa_iterations}")
@@ -1734,8 +1739,10 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                     message = initial_qa_prompt if turn == 0 else build_qa_followup_message(
                         qa_fb_results, prev_qa_correct, prev_qa_incorrect,
                     )
+                    if prev_validation_error_2b:
+                        message = _prepend_rejection_notice(message, prev_validation_error_2b)
 
-                    beliefs, perception, turn_cost, qa_conversation, response_text = asyncio.run(
+                    beliefs, perception, turn_cost, qa_conversation, response_text, prev_validation_error_2b = asyncio.run(
                         _improve_with_perception_validation_conversational(
                             config=config,
                             beliefs=beliefs,
@@ -1923,6 +1930,7 @@ This is a multi-turn conversation. After each response, the critical moments wil
                 moment_conversation: list[dict] = []
                 prev_correct = len(correct)
                 prev_incorrect = len(incorrect)
+                prev_validation_error_3: str | None = None
 
                 for turn in range(bl_config.max_moments_iterations):
                     evolve_logger.info(f"{tag}     Track 3 turn {turn + 1}/{bl_config.max_moments_iterations}")
@@ -1930,8 +1938,10 @@ This is a multi-turn conversation. After each response, the critical moments wil
                     message = initial_moment_prompt if turn == 0 else build_moments_followup_message(
                         fb_results, prev_correct, prev_incorrect,
                     )
+                    if prev_validation_error_3:
+                        message = _prepend_rejection_notice(message, prev_validation_error_3)
 
-                    beliefs, perception, turn_cost, moment_conversation, response_text = asyncio.run(
+                    beliefs, perception, turn_cost, moment_conversation, response_text, prev_validation_error_3 = asyncio.run(
                         _improve_with_perception_validation_conversational(
                             config=config,
                             beliefs=beliefs,
