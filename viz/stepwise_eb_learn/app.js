@@ -42,7 +42,8 @@ function isEBRun() {
   if (!DATA || !Array.isArray(DATA.steps)) return false;
   return DATA.steps.some((s) =>
     s.has_experiment_log || s.has_extraction_log ||
-    s.has_improve_log || s.has_beliefs || s.has_trim_log
+    s.has_improve_log || s.has_beliefs || s.has_trim_log ||
+    s.has_question_selection_log
   );
 }
 
@@ -817,6 +818,527 @@ async function loadStepDetailForTab(epIdx, stepIdx, tab, stepOverview) {
   else if (tab === "logs") renderLogs(data);
 }
 
+function scoringArtifactSummaryRows(artifact) {
+  const rows = [];
+  const isProbeSelection = artifact.source === "online_probe_selection";
+  if (artifact.source) rows.push(["Source", artifact.source]);
+  if (artifact.method) rows.push(["Method", artifact.method]);
+  if (artifact.qa_source) rows.push(["QA Source", artifact.qa_source]);
+  if (artifact.num_qa != null) rows.push(["Questions", artifact.num_qa]);
+  if (artifact.num_qa_before_trim != null) rows.push([isProbeSelection ? "Questions Before Dedup" : "Questions Before Trim", artifact.num_qa_before_trim]);
+  if (artifact.num_qa_after_trim != null) rows.push([isProbeSelection ? "Questions After Dedup" : "Questions After Trim", artifact.num_qa_after_trim]);
+  if (artifact.num_unanswered_scored != null) rows.push(["Unanswered Scored", artifact.num_unanswered_scored]);
+  if (artifact.num_unanswered_projection != null) rows.push(["Projection Questions", artifact.num_unanswered_projection]);
+  if (artifact.num_unanswered_before_trim != null) rows.push([isProbeSelection ? "Unanswered Before Dedup" : "Unanswered Before Trim", artifact.num_unanswered_before_trim]);
+  if (artifact.num_unanswered_after_trim != null) rows.push([isProbeSelection ? "Unanswered After Dedup" : "Unanswered After Trim", artifact.num_unanswered_after_trim]);
+  if (artifact.cap_unanswered != null) rows.push(["Unanswered Cap", artifact.cap_unanswered]);
+  if (artifact.maintained_bank_preserved != null) rows.push(["Maintained Bank Preserved", artifact.maintained_bank_preserved ? "yes" : "no"]);
+  if (artifact.overlap_at_k != null) rows.push(["Overlap@k", Number(artifact.overlap_at_k).toFixed(3)]);
+  if (artifact.cost_usd != null) rows.push(["Cost", "$" + Number(artifact.cost_usd).toFixed(4)]);
+  if (artifact.did_trim != null) rows.push([isProbeSelection ? "Trimmed Maintained Bank" : "Did Trim", artifact.did_trim ? "yes" : "no"]);
+  return rows;
+}
+
+function renderScoringRankedTable(entries, keptQuestions, droppedQuestions) {
+  const kept = new Set(keptQuestions || []);
+  const dropped = new Set(droppedQuestions || []);
+  if (!Array.isArray(entries) || entries.length === 0) return '<div style="color:var(--text-muted)">No ranked unanswered questions recorded.</div>';
+  let html = '<table class="data-table"><tr><th>Rank</th><th>Question</th><th>Score</th><th>Src Step</th><th>Status</th></tr>';
+  entries.forEach((entry, idx) => {
+    let status = "scored";
+    if (kept.has(entry.question)) status = "kept";
+    else if (dropped.has(entry.question)) status = "dropped";
+    html += '<tr><td>' + (idx + 1) + '</td><td style="max-width:420px">' + esc(entry.question) + '</td><td style="font-family:var(--font-mono)">' +
+      Number(entry.score || 0).toFixed(4) + '</td><td>' + esc(entry.source_step) + '</td><td>' + esc(status) + '</td></tr>';
+  });
+  html += "</table>";
+  return html;
+}
+
+function renderTieBreakSection(tieBreak) {
+  if (!tieBreak || typeof tieBreak !== "object") return "";
+  if (!tieBreak.executed && !tieBreak.reason && !Array.isArray(tieBreak.candidate_questions)) return "";
+
+  let html = '<table class="data-table" style="margin-bottom:12px">';
+  html += '<tr><th style="width:180px">Executed</th><td>' + (tieBreak.executed ? "yes" : "no") + "</td></tr>";
+  if (tieBreak.reason) html += '<tr><th>Reason</th><td>' + esc(tieBreak.reason) + "</td></tr>";
+  if (tieBreak.top_score != null) html += '<tr><th>Top Score</th><td style="font-family:var(--font-mono)">' + Number(tieBreak.top_score).toFixed(6) + "</td></tr>";
+  if (tieBreak.selected_source_index != null) html += '<tr><th>Selected Bank #</th><td>Q' + (tieBreak.selected_source_index + 1) + "</td></tr>";
+  if (tieBreak.selected_question) html += '<tr><th>Selected Question</th><td>' + esc(tieBreak.selected_question) + "</td></tr>";
+  html += "</table>";
+
+  const candidates = Array.isArray(tieBreak.candidate_questions) ? tieBreak.candidate_questions : [];
+  if (candidates.length) {
+    html += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin:12px 0 6px">Tied Top Questions</div>';
+    html += '<table class="data-table" style="margin-bottom:12px"><tr><th>Bank #</th><th>Question</th><th>Score</th><th>Src Step</th></tr>';
+    candidates.forEach((item) => {
+      html += '<tr><td>' + (item.source_index != null ? "Q" + (item.source_index + 1) : "") +
+        '</td><td style="max-width:420px">' + esc(item.question || "") +
+        '</td><td style="font-family:var(--font-mono)">' + Number(item.score || 0).toFixed(6) +
+        '</td><td>' + esc(item.source_step) + "</td></tr>";
+    });
+    html += "</table>";
+  }
+
+  if (tieBreak.prompt || tieBreak.response) {
+    html += promptResponseBlock("Tie-break Selection", tieBreak.prompt, tieBreak.response);
+  }
+  return html;
+}
+
+function renderQuestionSnapshotTable(items, options) {
+  const opts = options || {};
+  const sourceIndices = Array.isArray(opts.sourceIndices) ? opts.sourceIndices : null;
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<div style="color:var(--text-muted)">No questions recorded.</div>';
+  }
+  let html = '<table class="data-table"><tr><th>#</th>';
+  if (sourceIndices) html += "<th>Bank #</th>";
+  html += "<th>Question</th><th>Answer</th><th>Evidence</th><th>Src Step</th></tr>";
+  items.forEach((item, i) => {
+    let answer;
+    let verdictClass;
+    if (item.answer === null || item.answer === undefined) {
+      answer = "UNANSWERED";
+      verdictClass = "verdict-unanswered";
+    } else if (item.answer === true) {
+      answer = "YES";
+      verdictClass = "verdict-correct";
+    } else {
+      answer = "NO";
+      verdictClass = "verdict-incorrect";
+    }
+    html += '<tr><td style="color:var(--text-muted)">Q' + (i + 1) + "</td>";
+    if (sourceIndices) {
+      const src = sourceIndices[i];
+      html += '<td style="color:var(--text-muted)">' + (src != null ? "Q" + (src + 1) : "") + "</td>";
+    }
+    html += '<td style="max-width:320px">' + esc(item.question || "") + "</td>" +
+      '<td><span class="verdict ' + verdictClass + '">' + answer + "</span></td>" +
+      '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(item.evidence || "") + '">' + esc(item.evidence || "") + "</td>" +
+      "<td>" + esc(item.source_step) + "</td></tr>";
+  });
+  html += "</table>";
+  return html;
+}
+
+function orderedQaForDisplay(data, qa) {
+  const items = Array.isArray(qa) ? qa : [];
+  const preordered = items === data.qa_pairs && Array.isArray(data.qa_pairs_ordered) && data.qa_pairs_ordered.length === items.length
+    ? data.qa_pairs_ordered
+    : null;
+  if (preordered) {
+    return {
+      items: preordered,
+      sourceIndices: Array.isArray(data.qa_pairs_ordered_source_indices) ? data.qa_pairs_ordered_source_indices : null,
+    };
+  }
+
+  const expLog = data.experiment_log || {};
+  const qSelectLog = data.question_selection_log || data.trim_log || {};
+  let order = Array.isArray(expLog.qa_pairs_for_experiment_source_indices)
+    ? expLog.qa_pairs_for_experiment_source_indices
+    : null;
+  if (!order || order.length === 0) {
+    order = Array.isArray(qSelectLog.experiment_source_indices) ? qSelectLog.experiment_source_indices : null;
+  }
+  if (!order || order.length === 0) return { items: items, sourceIndices: null };
+
+  const seen = new Set();
+  const orderedItems = [];
+  const sourceIndices = [];
+  order.forEach((idx) => {
+    if (!Number.isInteger(idx) || idx < 0 || idx >= items.length || seen.has(idx)) return;
+    seen.add(idx);
+    orderedItems.push(items[idx]);
+    sourceIndices.push(idx);
+  });
+  items.forEach((item, idx) => {
+    if (seen.has(idx)) return;
+    orderedItems.push(item);
+    sourceIndices.push(idx);
+  });
+  return { items: orderedItems, sourceIndices: sourceIndices };
+}
+
+function renderAnswerVectorTable(questionLog) {
+  const others = Array.isArray(questionLog.other_questions) ? questionLog.other_questions : [];
+  const aPos = Array.isArray(questionLog.a_pos) ? questionLog.a_pos : [];
+  const aNeg = Array.isArray(questionLog.a_neg) ? questionLog.a_neg : [];
+  if (!others.length) return '<div style="color:var(--text-muted)">No paired questions for answer-vector comparison.</div>';
+  let html = '<table class="data-table"><tr><th>#</th><th>Other Question</th><th>a_pos</th><th>a_neg</th><th>Diff</th></tr>';
+  others.forEach((question, idx) => {
+    const pos = aPos[idx];
+    const neg = aNeg[idx];
+    const diff = pos !== neg;
+    html += '<tr><td>' + (idx + 1) + '</td><td style="max-width:420px">' + esc(question) + '</td><td style="font-family:var(--font-mono)">' + esc(pos) +
+      '</td><td style="font-family:var(--font-mono)">' + esc(neg) + '</td><td>' + (diff ? '<span class="verdict verdict-incorrect">changed</span>' : '<span class="verdict verdict-correct">same</span>') + '</td></tr>';
+  });
+  html += "</table>";
+  return html;
+}
+
+function lcsDiffRows(aLines, bLines) {
+  const m = aLines.length;
+  const n = bLines.length;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      if (aLines[i] === bLines[j]) dp[i][j] = dp[i + 1][j + 1] + 1;
+      else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const rows = [];
+  let i = 0;
+  let j = 0;
+  while (i < m && j < n) {
+    if (aLines[i] === bLines[j]) {
+      rows.push({ type: "same", text: aLines[i] });
+      i++;
+      j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      rows.push({ type: "only_neg", text: aLines[i] });
+      i++;
+    } else {
+      rows.push({ type: "only_pos", text: bLines[j] });
+      j++;
+    }
+  }
+  while (i < m) {
+    rows.push({ type: "only_neg", text: aLines[i] });
+    i++;
+  }
+  while (j < n) {
+    rows.push({ type: "only_pos", text: bLines[j] });
+    j++;
+  }
+  return rows;
+}
+
+function renderBeliefDiff(questionLog) {
+  const bPos = String(questionLog.b_pos || "");
+  const bNeg = String(questionLog.b_neg || "");
+  if (!bPos && !bNeg) return '<div style="color:var(--text-muted)">No rewritten beliefs recorded.</div>';
+  if (bPos === bNeg) return '<div style="color:var(--text-muted)">No difference between b_pos and b_neg.</div>';
+
+  const rows = lcsDiffRows(bNeg.split("\n"), bPos.split("\n"));
+  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Lines only in <span style="color:var(--accent3)">b_pos</span> are marked with <strong>+</strong>; lines only in <span style="color:var(--accent2)">b_neg</span> are marked with <strong>-</strong>.</div>';
+  html += '<table class="data-table"><tr><th style="width:60px">Type</th><th>Line</th></tr>';
+  rows.forEach((row) => {
+    let label = "=";
+    let bg = "transparent";
+    let color = "var(--text)";
+    if (row.type === "only_pos") {
+      label = "+";
+      bg = "rgba(35, 180, 90, 0.12)";
+      color = "var(--accent3)";
+    } else if (row.type === "only_neg") {
+      label = "-";
+      bg = "rgba(220, 110, 110, 0.12)";
+      color = "#d87";
+    }
+    html += '<tr><td style="font-family:var(--font-mono);color:' + color + ';background:' + bg + '">' + label + '</td>' +
+      '<td style="white-space:pre-wrap;font-family:var(--font-mono);background:' + bg + '">' + esc(row.text) + '</td></tr>';
+  });
+  html += "</table>";
+  return html;
+}
+
+function renderScoringQuestionLog(questionLog, index) {
+  const summary = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">' +
+    'score <span style="font-family:var(--font-mono);color:var(--accent3)">' + Number(questionLog.score || 0).toFixed(4) + '</span>' +
+    ' | cost <span style="font-family:var(--font-mono);color:var(--text-muted)">$' + Number(questionLog.cost || 0).toFixed(4) + '</span>' +
+    ' | src step ' + esc(questionLog.source_step) + '</div>';
+  const beliefHtml =
+    '<div style="margin-bottom:12px"><div style="font-weight:600;font-size:12px;color:var(--accent3);margin-bottom:4px">b_pos</div><pre style="max-height:320px">' +
+    esc(questionLog.b_pos || "") + '</pre></div>' +
+    '<div style="margin-bottom:12px"><div style="font-weight:600;font-size:12px;color:var(--accent2);margin-bottom:4px">b_neg</div><pre style="max-height:320px">' +
+    esc(questionLog.b_neg || "") + '</pre></div>';
+  const beliefDiffHtml = renderBeliefDiff(questionLog);
+  const promptHtml =
+    promptResponseBlock("Rewrite b_pos", questionLog.rewrite_pos && questionLog.rewrite_pos.prompt, questionLog.rewrite_pos && questionLog.rewrite_pos.response) +
+    promptResponseBlock("Rewrite b_neg", questionLog.rewrite_neg && questionLog.rewrite_neg.prompt, questionLog.rewrite_neg && questionLog.rewrite_neg.response) +
+    promptResponseBlock("Predict a_pos", questionLog.predict_pos && questionLog.predict_pos.prompt, questionLog.predict_pos && questionLog.predict_pos.response) +
+    promptResponseBlock("Predict a_neg", questionLog.predict_neg && questionLog.predict_neg.prompt, questionLog.predict_neg && questionLog.predict_neg.response);
+  const vectorHtml = renderAnswerVectorTable(questionLog);
+  return collapsible(
+    'Q' + (index + 1) + ': ' + esc(questionLog.question),
+    summary + beliefHtml + collapsible("Belief Diff (b_pos vs b_neg)", beliefDiffHtml, true) + collapsible("Answer Vector Diff", vectorHtml, true) + collapsible("Prompt / Response Chain", promptHtml || '<div style="color:var(--text-muted)">No prompt artifacts recorded.</div>', false),
+    false,
+  );
+}
+
+function renderScoringArtifact(title, artifact) {
+  if (!artifact) return "";
+  let html = "";
+  const summaryRows = scoringArtifactSummaryRows(artifact);
+  if (summaryRows.length) {
+    html += '<table class="data-table" style="margin-bottom:12px">';
+    summaryRows.forEach((row) => {
+      html += '<tr><th style="width:220px">' + esc(row[0]) + '</th><td>' + esc(row[1]) + '</td></tr>';
+    });
+    html += "</table>";
+  }
+  if (Array.isArray(artifact.kept_unanswered_questions) && artifact.kept_unanswered_questions.length) {
+    const keptLabel = artifact.source === "online_probe_selection" ? "Selected Probe Questions" : "Kept Unanswered";
+    html += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--accent2);margin-bottom:4px">' + keptLabel + '</div><ol style="margin:0 0 0 20px">';
+    artifact.kept_unanswered_questions.forEach((q) => { html += '<li>' + esc(q) + '</li>'; });
+    html += "</ol></div>";
+  }
+  if (Array.isArray(artifact.dropped_unanswered_questions) && artifact.dropped_unanswered_questions.length) {
+    html += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:#d87; margin-bottom:4px">Dropped Unanswered</div><ol style="margin:0 0 0 20px">';
+    artifact.dropped_unanswered_questions.forEach((q) => { html += '<li>' + esc(q) + '</li>'; });
+    html += "</ol></div>";
+  }
+  if (Array.isArray(artifact.b_diff_top_k_questions) && artifact.b_diff_top_k_questions.length) {
+    html += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--accent3);margin-bottom:4px">B-diff Top-k</div><ol style="margin:0 0 0 20px">';
+    artifact.b_diff_top_k_questions.forEach((q) => { html += '<li>' + esc(q) + '</li>'; });
+    html += "</ol></div>";
+  }
+  if (Array.isArray(artifact.llm_trim_kept_unanswered) && artifact.llm_trim_kept_unanswered.length) {
+    html += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--purple);margin-bottom:4px">Live LLM-Kept Unanswered</div><ol style="margin:0 0 0 20px">';
+    artifact.llm_trim_kept_unanswered.forEach((q) => { html += '<li>' + esc(q) + '</li>'; });
+    html += "</ol></div>";
+  }
+
+  html += collapsible(
+    "Ranked Unanswered Questions",
+    renderScoringRankedTable(
+      artifact.ranked_unanswered || [],
+      artifact.kept_unanswered_questions,
+      artifact.dropped_unanswered_questions,
+    ),
+    true,
+  );
+
+  const tieBreakHtml = renderTieBreakSection(artifact.tie_break || (artifact.scoring_log && artifact.scoring_log.tie_break));
+  if (tieBreakHtml) {
+    html += collapsible("Top-Score Tie-break", tieBreakHtml, true);
+  }
+
+  if (Array.isArray(artifact.experiment_questions) && artifact.experiment_questions.length) {
+    let subsetHtml = '<table class="data-table"><tr><th>#</th><th>Bank #</th><th>Question</th><th>Answer</th><th>Src Step</th></tr>';
+    artifact.experiment_questions.forEach((item, idx) => {
+      const ans = item.answer === null || item.answer === undefined ? "UNANSWERED" : (item.answer ? "YES" : "NO");
+      subsetHtml += '<tr><td>Q' + (idx + 1) + '</td><td>' +
+        (item.source_index != null ? "Q" + (item.source_index + 1) : "") +
+        '</td><td style="max-width:420px">' + esc(item.question || "") +
+        '</td><td>' + esc(ans) + '</td><td>' + esc(item.source_step) + "</td></tr>";
+    });
+    subsetHtml += "</table>";
+    html += collapsible("Experiment Prompt Question Subset", subsetHtml, true);
+  }
+
+  const selectionLog = artifact.selection_log || {};
+  if (selectionLog.prompt || selectionLog.response || Array.isArray(selectionLog.selected_questions)) {
+    let selHtml = "";
+    if (Array.isArray(selectionLog.selected_questions) && selectionLog.selected_questions.length) {
+      selHtml += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Selected ' +
+        selectionLog.selected_questions.length + " questions for experiment formulation.</div>";
+      selHtml += '<table class="data-table" style="margin-bottom:12px"><tr><th>#</th><th>Bank #</th><th>Question</th><th>Answer</th><th>Src Step</th></tr>';
+      selectionLog.selected_questions.forEach((item, idx) => {
+        const ans = item.answer === null || item.answer === undefined ? "UNANSWERED" : (item.answer ? "YES" : "NO");
+        selHtml += '<tr><td>Q' + (idx + 1) + '</td><td>' +
+          (item.source_index != null ? "Q" + (item.source_index + 1) : "") +
+          '</td><td style="max-width:420px">' + esc(item.question || "") +
+          '</td><td>' + esc(ans) + '</td><td>' + esc(item.source_step) + "</td></tr>";
+      });
+      selHtml += "</table>";
+    }
+    if (selectionLog.prompt || selectionLog.response) {
+      selHtml += promptResponseBlock("Probe Selection", selectionLog.prompt, selectionLog.response);
+    }
+    html += collapsible("Probe Selection", selHtml, false);
+  }
+
+  const dedupLog = artifact.dedup_log || {};
+  if (dedupLog.prompt || dedupLog.response || Array.isArray(dedupLog.dropped_questions)) {
+    let dedupHtml = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Dropped duplicates: ' +
+      (dedupLog.dropped_count || 0) + "</div>";
+    if (Array.isArray(dedupLog.dropped_questions) && dedupLog.dropped_questions.length) {
+      dedupHtml += '<ol style="margin:0 0 12px 20px">';
+      dedupLog.dropped_questions.forEach((q) => { dedupHtml += '<li>' + esc(q) + "</li>"; });
+      dedupHtml += "</ol>";
+    }
+    if (dedupLog.prompt || dedupLog.response) {
+      dedupHtml += promptResponseBlock("De-duplication", dedupLog.prompt, dedupLog.response);
+    }
+    html += collapsible("Question Bank De-duplication", dedupHtml, false);
+  }
+
+  const scoreLog = artifact.scoring_log || {};
+  const perQuestion = Array.isArray(scoreLog.per_question) ? scoreLog.per_question : [];
+  let perQuestionHtml = "";
+  perQuestion.forEach((questionLog, index) => {
+    perQuestionHtml += renderScoringQuestionLog(questionLog, index);
+  });
+  html += collapsible(
+    "Per-Question Artifacts (" + perQuestion.length + ")",
+    perQuestionHtml || '<div style="color:var(--text-muted)">No per-question scoring artifacts recorded.</div>',
+    false,
+  );
+
+  return collapsible(title, html, true);
+}
+
+function renderExperimentSelectionScoring(data) {
+  const artifacts = data.question_scoring || {};
+  let html = "";
+  html += renderScoringArtifact("Online Scoring (full)", artifacts.online_full);
+  html += renderScoringArtifact("Online Scoring (light)", artifacts.online_light);
+  if (html) return html;
+
+  const qSelectLog = data.question_selection_log || {};
+  const trimLog = data.trim_log || {};
+  const selectionLog = qSelectLog.selection || trimLog.selection || {};
+  const dedupLog = qSelectLog.dedup || trimLog.dedup || {};
+  if (!(dedupLog.prompt || dedupLog.response || selectionLog.prompt || selectionLog.response)) {
+    return "";
+  }
+
+  let selectionHtml = "";
+  if (dedupLog.prompt || dedupLog.response) {
+    selectionHtml += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">De-dup dropped ' +
+      (dedupLog.dropped_count || 0) + " duplicate questions.</div>";
+    selectionHtml += promptResponseBlock("De-duplication", dedupLog.prompt, dedupLog.response);
+  }
+  if (selectionLog.prompt || selectionLog.response) {
+    selectionHtml += promptResponseBlock("Probe Selection", selectionLog.prompt, selectionLog.response);
+  }
+  return selectionHtml;
+}
+
+function parseQuestionBlockFromPrompt(prompt) {
+  if (!prompt) return [];
+  const match = String(prompt).match(/=== CURRENT QUESTIONS ===\n([\s\S]*?)\n=== END CURRENT QUESTIONS ===/);
+  if (!match) return [];
+  return match[1]
+    .trim()
+    .split(/\n(?=Q\d+:\s)/)
+    .map((chunk) => {
+      const parsed = chunk.match(/^Q(\d+):\s*([\s\S]*?)(?:\s*->\s*(YES|NO|UNANSWERED|UNKNOWN)(?:\s*\(evidence:\s*([\s\S]*)\))?)?$/);
+      if (!parsed) return null;
+      let evidence = parsed[4] || "";
+      if (evidence.endsWith(")")) evidence = evidence.slice(0, -1);
+      let answer = null;
+      if (parsed[3] === "YES") answer = true;
+      else if (parsed[3] === "NO") answer = false;
+      return {
+        original_index: Number(parsed[1]) - 1,
+        question: parsed[2].trim(),
+        answer: answer,
+        evidence: evidence,
+        source_step: "",
+      };
+    })
+    .filter(Boolean);
+}
+
+function filterDroppedQuestions(items, droppedIndices) {
+  if (!Array.isArray(items) || !items.length) return [];
+  const dropped = new Set(Array.isArray(droppedIndices) ? droppedIndices : []);
+  return items.filter((item, idx) => !dropped.has(item.original_index != null ? item.original_index : idx));
+}
+
+function questionItemsFromIndices(items, indices) {
+  if (!Array.isArray(items) || !items.length || !Array.isArray(indices)) return [];
+  return indices
+    .map((idx) => {
+      if (!Number.isInteger(idx) || idx < 0 || idx >= items.length) return null;
+      return items[idx];
+    })
+    .filter(Boolean);
+}
+
+function renderSimpleQuestionList(questions) {
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return '<div style="color:var(--text-muted)">No questions recorded.</div>';
+  }
+  let html = '<ol style="margin:0 0 0 20px">';
+  questions.forEach((question) => {
+    html += '<li style="margin-bottom:4px;font-size:13px">' + esc(question) + "</li>";
+  });
+  html += "</ol>";
+  return html;
+}
+
+function renderExperimentQuestionTable(items, options) {
+  const opts = options || {};
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<div style="color:var(--text-muted)">No questions recorded.</div>';
+  }
+  let html = '<table class="data-table"><tr><th>#</th>';
+  if (opts.showOriginalIndex) html += "<th>Original #</th>";
+  html += "<th>Question</th><th>Answer</th><th>Evidence</th><th>Src Step</th></tr>";
+  items.forEach((item, idx) => {
+    let answer = "UNANSWERED";
+    let verdictClass = "verdict-unanswered";
+    if (item.answer === true) {
+      answer = "YES";
+      verdictClass = "verdict-correct";
+    } else if (item.answer === false) {
+      answer = "NO";
+      verdictClass = "verdict-incorrect";
+    } else if (typeof item.answer === "string" && item.answer) {
+      answer = item.answer;
+    }
+    html += '<tr><td style="color:var(--text-muted)">Q' + (idx + 1) + "</td>";
+    if (opts.showOriginalIndex) {
+      html += '<td style="color:var(--text-muted)">' + (item.original_index != null ? "Q" + (item.original_index + 1) : "") + "</td>";
+    }
+    html += '<td style="max-width:420px">' + esc(item.question || "") + "</td>" +
+      '<td><span class="verdict ' + verdictClass + '">' + esc(answer) + "</span></td>" +
+      '<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(item.evidence || "") + '">' + esc(item.evidence || "") + "</td>" +
+      "<td>" + esc(item.source_step) + "</td></tr>";
+  });
+  html += "</table>";
+  return html;
+}
+
+function renderSelectionQuestionTable(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<div style="color:var(--text-muted)">No selected questions recorded.</div>';
+  }
+  let html = '<table class="data-table"><tr><th>#</th><th>Question</th><th>Src Step</th></tr>';
+  items.forEach((item, idx) => {
+    html += '<tr><td>Q' + (idx + 1) + '</td><td style="max-width:520px">' + esc(item.question || item) +
+      '</td><td>' + esc(item.source_step) + "</td></tr>";
+  });
+  html += "</table>";
+  return html;
+}
+
+function primaryOnlineScoringArtifact(data) {
+  const artifacts = data.question_scoring || {};
+  return artifacts.online_full || artifacts.online_light || null;
+}
+
+function renderScoringPipelineSection(artifact, scoringLog) {
+  const scoring = scoringLog || (artifact && artifact.scoring_log) || {};
+  let html = "";
+
+  const perQuestion = Array.isArray(scoring.per_question) ? scoring.per_question : [];
+  let perQuestionHtml = "";
+  perQuestion.forEach((questionLog, index) => {
+    perQuestionHtml += renderScoringQuestionLog(questionLog, index);
+  });
+  html += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin:14px 0 6px">Per-Question Artifacts (' + perQuestion.length + ")</div>";
+  html += perQuestionHtml || '<div style="color:var(--text-muted);margin-bottom:12px">No per-question scoring artifacts recorded.</div>';
+
+  html += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin:14px 0 6px">Ranked Questions with Scores</div>';
+  html += renderScoringRankedTable(
+    scoring.ranked_unanswered || (artifact && artifact.ranked_unanswered) || [],
+    scoring.selected_probe_questions || (artifact && artifact.kept_unanswered_questions),
+    artifact && artifact.dropped_unanswered_questions,
+  );
+  const tieBreakHtml = renderTieBreakSection(scoring.tie_break || (artifact && artifact.tie_break));
+  if (tieBreakHtml) {
+    html += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin:14px 0 6px">Top-Score Tie-break</div>';
+    html += tieBreakHtml;
+  }
+  return html;
+}
+
 function renderOverview(data, step) {
   const c = document.getElementById("overview-container");
   if (!c) return;
@@ -877,11 +1399,13 @@ function renderOverview(data, step) {
     const expLog = data.experiment_log || {};
     const selectedQIdx = expLog.selected_question_index;
     if (selectedQIdx != null) {
-      const qa = data.qa_pairs || [];
+      const qa = expLog.qa_pairs_for_experiment || expLog.qa_pairs_at_formulation || data.qa_pairs || [];
       const selectedQ = selectedQIdx < qa.length ? qa[selectedQIdx] : null;
+      const sourceIdx = expLog.selected_question_source_index;
+      const sourceLabel = sourceIdx != null ? ' <span style="color:var(--text-muted)">(bank Q' + (sourceIdx + 1) + ")</span>" : "";
       if (selectedQ) {
         expContent += '<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--accent3);border-radius:4px">' +
-          '<span style="color:var(--accent3);font-weight:600">Selected Question (Q' + (selectedQIdx + 1) + '):</span> ' + esc(selectedQ.question) + "</div>";
+          '<span style="color:var(--accent3);font-weight:600">Selected Question (prompt Q' + (selectedQIdx + 1) + '):</span>' + sourceLabel + " " + esc(selectedQ.question) + "</div>";
       }
     }
     expContent += '<pre style="max-height:none">' + esc(step.active_experiment) + "</pre>";
@@ -974,31 +1498,14 @@ function renderArtifacts(data) {
 
   const qa = data.qa_pairs || [];
   if (qa.length > 0) {
-    const answered = qa.filter((item) => item.answer !== null);
-    const unanswered = qa.filter((item) => item.answer === null);
+    const ordered = orderedQaForDisplay(data, qa);
+    const answered = ordered.items.filter((item) => item.answer !== null);
+    const unanswered = ordered.items.filter((item) => item.answer === null);
     let qaHtml = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' +
-      answered.length + " answered, " + unanswered.length + " unanswered</div>";
-    qaHtml += '<table class="data-table"><tr><th>#</th><th>Question</th><th>Answer</th><th>Evidence</th><th>Src Step</th></tr>';
-    qa.forEach((item, i) => {
-      let answer;
-      let verdictClass;
-      if (item.answer === null || item.answer === undefined) {
-        answer = "UNANSWERED";
-        verdictClass = "verdict-unanswered";
-      } else if (item.answer === true) {
-        answer = "YES";
-        verdictClass = "verdict-correct";
-      } else {
-        answer = "NO";
-        verdictClass = "verdict-incorrect";
-      }
-      qaHtml += '<tr><td style="color:var(--text-muted)">Q' + (i + 1) + "</td>" +
-        '<td style="max-width:280px">' + esc(item.question) + "</td>" +
-        '<td><span class="verdict ' + verdictClass + '">' + answer + "</span></td>" +
-        '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(item.evidence) + '">' + esc(item.evidence || "") + "</td>" +
-        "<td>" + esc(item.source_step) + "</td></tr>";
-    });
-    qaHtml += "</table>";
+      answered.length + " answered, " + unanswered.length + " unanswered";
+    if (ordered.sourceIndices) qaHtml += " | ordered by experiment selection";
+    qaHtml += "</div>";
+    qaHtml += renderQuestionSnapshotTable(ordered.items, { sourceIndices: ordered.sourceIndices });
     html += collapsible("Questions (" + qa.length + ": " + answered.length + " answered, " + unanswered.length + " unanswered)", qaHtml, true);
   }
 
@@ -1011,9 +1518,24 @@ function renderExperiments(data) {
   if (!c) return;
   let html = "";
   const expLog = data.experiment_log || {};
+  const qSelectLog = data.question_selection_log || data.trim_log || {};
+  const dedupLog = qSelectLog.dedup || {};
+  const selectionLog = qSelectLog.selection || {};
+  const scoringArtifact = primaryOnlineScoringArtifact(data);
+  const scoringLog = qSelectLog.scoring || (scoringArtifact && scoringArtifact.scoring_log) || {};
   const stepMeta = DATA.steps[selectedStepIdx] || {};
   const didGenQ = stepMeta.did_gen_questions;
   const didFormulate = stepMeta.did_formulate_experiment;
+  const beforeDedupQuestions = parseQuestionBlockFromPrompt(dedupLog.prompt);
+  const afterDedupQuestions = filterDroppedQuestions(beforeDedupQuestions, dedupLog.dropped_indices);
+  const scoringCandidateIndices = scoringLog.candidate_indices || scoringLog.projection_unanswered_indices;
+  let selectedForScoring = questionItemsFromIndices(afterDedupQuestions, scoringCandidateIndices);
+  if (!selectedForScoring.length && Array.isArray(scoringLog.per_question)) {
+    selectedForScoring = scoringLog.per_question.map((item) => ({
+      question: item.question,
+      source_step: item.source_step,
+    }));
+  }
 
   html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px">' +
     (didGenQ
@@ -1024,105 +1546,93 @@ function renderExperiments(data) {
       : "No question generation this step — the agent used the experiment carried over from the previous cycle.") +
     "</div>";
 
-  // Step 1: Question Generation — Prompt & Response
-  if (expLog.question_gen_prompt || expLog.question_gen_response) {
+  if (expLog.question_gen_prompt || expLog.question_gen_response || (expLog.new_questions && expLog.new_questions.length)) {
     let qGenHtml = "";
-    if (expLog.question_gen_prompt) {
-      qGenHtml += promptImagesHtml(expLog.question_gen_prompt, {
-        currentStep: stepMeta,
-        stepMeta: stepMeta,
-        imagePaths: expLog.question_gen_image_paths,
-        accentCurrent: true,
-      });
-      qGenHtml += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:4px">Prompt</div>' +
-        '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.question_gen_prompt) + "</pre></div>";
-    }
-    if (expLog.question_gen_response) {
-      qGenHtml += '<div><div style="font-weight:600;font-size:12px;color:var(--accent3);margin-bottom:4px">Response</div>' +
-        '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.question_gen_response) + "</pre></div>";
-    }
-    html += collapsible("Step 1: Question Generation — Prompt & Response", qGenHtml, false);
-  }
-
-  // Step 2: New Questions Generated
-  if (expLog.new_questions && expLog.new_questions.length > 0) {
-    let qHtml = '<ul style="margin:0;padding-left:20px">';
-    expLog.new_questions.forEach((question) => {
-      qHtml += '<li style="margin-bottom:4px;font-size:13px;color:var(--accent3)">' + esc(question) + "</li>";
+    qGenHtml += promptResponseBlock("Question Generation", expLog.question_gen_prompt, expLog.question_gen_response, {
+      currentStep: stepMeta,
+      stepMeta: stepMeta,
+      imagePaths: expLog.question_gen_image_paths,
+      accentCurrent: true,
     });
-    qHtml += "</ul>";
-    html += collapsible("Step 2: New Questions Generated (" + expLog.new_questions.length + ")", qHtml, true);
+    qGenHtml += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin:12px 0 6px">New Questions Generated (' +
+      ((expLog.new_questions && expLog.new_questions.length) || 0) + ")</div>";
+    qGenHtml += renderSimpleQuestionList(expLog.new_questions || []);
+    html += collapsible("1. Question Generation", qGenHtml, true);
   }
 
-  // Step 3: All Available Questions Now (question bank)
-  // Prefer the snapshot captured at experiment-formulation time so the bank
-  // shown here reflects the state that drove this step's experiment choice,
-  // not the post-extraction/trim/improve end-of-step state.
-  const qa = expLog.qa_pairs_at_formulation || data.qa_pairs || [];
-  if (qa.length > 0) {
-    const answered = qa.filter((item) => item.answer !== null);
-    const unanswered = qa.filter((item) => item.answer === null);
-    let qaHtml = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' +
-      answered.length + " answered, " + unanswered.length + " unanswered</div>";
-    qaHtml += '<table class="data-table"><tr><th>#</th><th>Question</th><th>Answer</th><th>Evidence</th><th>Src Step</th></tr>';
-    qa.forEach((item, i) => {
-      let answer;
-      let verdictClass;
-      if (item.answer === null || item.answer === undefined) {
-        answer = "UNANSWERED";
-        verdictClass = "verdict-unanswered";
-      } else if (item.answer === true) {
-        answer = "YES";
-        verdictClass = "verdict-correct";
-      } else {
-        answer = "NO";
-        verdictClass = "verdict-incorrect";
-      }
-      qaHtml += '<tr><td style="color:var(--text-muted)">Q' + (i + 1) + "</td>" +
-        '<td style="max-width:280px">' + esc(item.question) + "</td>" +
-        '<td><span class="verdict ' + verdictClass + '">' + answer + "</span></td>" +
-        '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(item.evidence) + '">' + esc(item.evidence || "") + "</td>" +
-        "<td>" + esc(item.source_step) + "</td></tr>";
-    });
-    qaHtml += "</table>";
-    html += collapsible("Step 3: All Available Questions (" + qa.length + ": " + answered.length + " answered, " + unanswered.length + " unanswered)", qaHtml, false);
+  if (beforeDedupQuestions.length || dedupLog.prompt || dedupLog.response || afterDedupQuestions.length) {
+    let dedupHtml = "";
+    dedupHtml += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:6px">All Questions Before Dedup (' +
+      (dedupLog.pre_dedup_count != null ? dedupLog.pre_dedup_count : beforeDedupQuestions.length) + ")</div>";
+    dedupHtml += renderExperimentQuestionTable(beforeDedupQuestions, { showOriginalIndex: false });
+    dedupHtml += '<div style="font-size:12px;color:var(--text-muted);margin:10px 0">Dropped duplicates: ' + (dedupLog.dropped_count || 0) + "</div>";
+    dedupHtml += promptResponseBlock("Dedup", dedupLog.prompt, dedupLog.response);
+    dedupHtml += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin:14px 0 6px">Questions After Dedup (' +
+      (dedupLog.post_dedup_count != null ? dedupLog.post_dedup_count : afterDedupQuestions.length) + ")</div>";
+    dedupHtml += renderExperimentQuestionTable(afterDedupQuestions, { showOriginalIndex: true });
+    html += collapsible("2. Deduplication", dedupHtml, true);
   }
 
-  // Step 4: Experiment Formulation — Prompt & Response
-  if (expLog.experiment_prompt || expLog.experiment_response) {
-    let expHtml = "";
-    if (expLog.experiment_prompt) {
-      expHtml += promptImagesHtml(expLog.experiment_prompt, {
-        currentStep: stepMeta,
-        stepMeta: stepMeta,
-        imagePaths: expLog.experiment_image_paths,
-        accentCurrent: true,
-      });
-      expHtml += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:4px">Prompt</div>' +
-        '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.experiment_prompt) + "</pre></div>";
+  if (selectionLog.prompt || selectionLog.response || selectedForScoring.length) {
+    let topKHtml = "";
+    topKHtml += promptResponseBlock("Top-k Selection", selectionLog.prompt, selectionLog.response);
+    if (selectionLog.note) {
+      topKHtml += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' + esc(selectionLog.note) + "</div>";
     }
-    if (expLog.experiment_response) {
-      expHtml += '<div><div style="font-weight:600;font-size:12px;color:var(--accent2);margin-bottom:4px">Response</div>' +
-        '<pre style="max-height:400px;overflow:auto;font-size:11px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(expLog.experiment_response) + "</pre></div>";
-    }
-    html += collapsible("Step 4: Experiment Formulation — Prompt & Response", expHtml, false);
+    topKHtml += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin:12px 0 6px">Selected Questions for Scoring (' +
+      selectedForScoring.length + ")</div>";
+    topKHtml += renderSelectionQuestionTable(selectedForScoring);
+    html += collapsible("3. Top-k Selection", topKHtml, true);
   }
 
-  // Step 5: Selected Question & Formulated Experiment
-  if (expLog.experiment_plan || expLog.selected_question_index != null) {
-    let resultHtml = "";
+  if (scoringArtifact || scoringLog.method || Array.isArray(scoringLog.per_question)) {
+    html += collapsible("4. Question Scoring", renderScoringPipelineSection(scoringArtifact, scoringLog), true);
+  }
+
+  const tieBreakHtml = renderTieBreakSection(scoringLog.tie_break || (scoringArtifact && scoringArtifact.tie_break));
+  if (tieBreakHtml) {
+    html += collapsible("5. Top-Score Tie-break", tieBreakHtml, true);
+  }
+
+  const qaBank = expLog.qa_pairs_at_formulation || data.qa_pairs || [];
+  const qaForExperiment = expLog.qa_pairs_for_experiment || qSelectLog.experiment_questions || qaBank;
+
+  if (expLog.target_question || expLog.selected_question_index != null || expLog.selected_question_source_index != null) {
+    let selectedHtml = "";
     const qIdx = expLog.selected_question_index;
-    if (qIdx != null && qIdx < qa.length) {
-      resultHtml += '<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--accent3);border-radius:4px">' +
-        '<span style="color:var(--accent3);font-weight:600">Selected Question (Q' + (qIdx + 1) + '):</span> ' + esc(qa[qIdx].question) + "</div>";
+    let selectedQ = null;
+    if (qIdx != null && qIdx < qaForExperiment.length) selectedQ = qaForExperiment[qIdx];
+    if (!selectedQ && expLog.target_question) selectedQ = { question: expLog.target_question };
+    if (selectedQ) {
+      const sourceIdx = expLog.selected_question_source_index != null ? expLog.selected_question_source_index : expLog.target_question_source_index;
+      const sourceLabel = sourceIdx != null ? ' <span style="color:var(--text-muted)">(bank Q' + (sourceIdx + 1) + ")</span>" : "";
+      const promptLabel = qIdx != null ? "prompt Q" + (qIdx + 1) : "target";
+      selectedHtml += '<div style="font-size:13px;padding:10px 12px;background:var(--bg);border:1px solid var(--accent3);border-radius:4px">' +
+        '<span style="color:var(--accent3);font-weight:600">Selected Question (' + promptLabel + '):</span>' +
+        sourceLabel + " " + esc(selectedQ.question || "") + "</div>";
     }
+    html += collapsible("6. Selected Question", selectedHtml || '<div style="color:var(--text-muted)">No selected question recorded.</div>', true);
+  }
+
+  if (expLog.experiment_prompt || expLog.experiment_response) {
+    const expHtml = promptResponseBlock("Experiment Formulation", expLog.experiment_prompt, expLog.experiment_response, {
+      currentStep: stepMeta,
+      stepMeta: stepMeta,
+      imagePaths: expLog.experiment_image_paths,
+      accentCurrent: true,
+    });
+    html += collapsible("7. Experiment Formulation", expHtml, true);
+  }
+
+  if (expLog.experiment_plan || expLog.experiment_response) {
+    let resultHtml = "";
     if (expLog.experiment_plan) {
       resultHtml += '<div style="font-size:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--accent2);border-radius:6px">' +
         '<strong style="color:var(--accent2)">Formulated Experiment:</strong> ' + esc(expLog.experiment_plan) + "</div>";
     } else {
       resultHtml += '<div style="color:var(--text-muted);font-size:12px;padding:8px 12px;background:var(--surface);border-radius:4px">LLM chose to keep the current experiment (returned null).</div>';
     }
-    html += collapsible("Step 5: Selected Question & Formulated Experiment", resultHtml, true);
+    html += collapsible("8. Formulated Experiment", resultHtml, true);
   }
 
   if (!html) html = '<div style="color:var(--text-muted);padding:20px">No experiment data for this step.</div>';
@@ -1445,8 +1955,8 @@ async function loadQATimeline(highlightGlobalStep) {
     if (newQ.length > 0) {
       stepHtml += '<div class="extraction-section" style="margin-bottom:4px"><div class="extraction-header" onclick="toggleBody(this)" style="padding:6px 10px">' +
         '<span style="font-size:11px;color:var(--accent3);font-weight:600">New Questions (+' + newQ.length + ')</span>' +
-        '<span style="margin-left:auto;font-size:11px">&#9654;</span></div>' +
-        '<div class="extraction-body"><ul style="margin:0;padding-left:18px;font-size:12px">';
+        '<span style="margin-left:auto;font-size:11px">&#9660;</span></div>' +
+        '<div class="extraction-body open"><ul style="margin:0;padding-left:18px;font-size:12px">';
       newQ.forEach((q) => {
         stepHtml += '<li style="margin-bottom:2px;color:var(--accent3)">' + esc(q) + "</li>";
       });
@@ -1455,17 +1965,21 @@ async function loadQATimeline(highlightGlobalStep) {
 
     const allQ = item.all_questions || [];
     if (allQ.length > 0) {
+      const hasSourceIndex = allQ.some((q) => q.source_index != null);
       stepHtml += '<div class="extraction-section"><div class="extraction-header" onclick="toggleBody(this)" style="padding:6px 10px">' +
         '<span style="font-size:11px;color:var(--text-muted);font-weight:600">All Questions (' + allQ.length + ')</span>' +
-        '<span style="margin-left:auto;font-size:11px">&#9654;</span></div>' +
-        '<div class="extraction-body"><table class="data-table" style="font-size:11px"><tr><th>#</th><th>Question</th><th>Status</th></tr>';
+        '<span style="margin-left:auto;font-size:11px">&#9660;</span></div>' +
+        '<div class="extraction-body open"><table class="data-table" style="font-size:11px"><tr><th>#</th>' +
+        (hasSourceIndex ? "<th>Bank #</th>" : "") + '<th>Question</th><th>Status</th></tr>';
       allQ.forEach((q, qi) => {
         const status = q.answer === null || q.answer === undefined
           ? '<span class="verdict verdict-unanswered">UNANSWERED</span>'
           : q.answer === true
             ? '<span class="verdict verdict-correct">YES</span>'
             : '<span class="verdict verdict-incorrect">NO</span>';
-        stepHtml += "<tr><td>Q" + (qi + 1) + "</td><td>" + esc(q.question) + "</td><td>" + status + "</td></tr>";
+        stepHtml += "<tr><td>Q" + (qi + 1) + "</td>" +
+          (hasSourceIndex ? "<td>" + (q.source_index != null ? "Q" + (q.source_index + 1) : "") + "</td>" : "") +
+          "<td>" + esc(q.question) + "</td><td>" + status + "</td></tr>";
       });
       stepHtml += "</table></div></div>";
     }
@@ -1531,7 +2045,10 @@ async function loadExperimentTimeline(highlightGlobalStep) {
     // Show selected question
     if (item.selected_question_index != null) {
       const qText = item.selected_question_text || ("Q" + (item.selected_question_index + 1));
-      eventHtml += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">SELECTED QUESTION (Q' + (item.selected_question_index + 1) + "):</div>";
+      const sourceLabel = item.selected_question_source_index != null
+        ? " / bank Q" + (item.selected_question_source_index + 1)
+        : "";
+      eventHtml += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">SELECTED QUESTION (prompt Q' + (item.selected_question_index + 1) + sourceLabel + "):</div>";
       eventHtml += '<div style="font-size:12px;padding:6px 10px;margin-bottom:8px;background:var(--bg);border:1px solid var(--accent3);border-radius:4px;color:var(--accent3)">' + esc(qText) + "</div>";
     }
 

@@ -124,6 +124,73 @@ def _format_qa_list(qa_pairs: list[EBQAPair]) -> str:
     return "\n".join(lines)
 
 
+def _parse_1_based_indices(text: str, max_index: int) -> list[int]:
+    """Parse unique 1-based Q indices from an LLM response fragment."""
+    indices: list[int] = []
+    seen: set[int] = set()
+    for match in re.finditer(r"\d+", text or ""):
+        idx = int(match.group(0)) - 1
+        if 0 <= idx < max_index and idx not in seen:
+            seen.add(idx)
+            indices.append(idx)
+    return indices
+
+
+def _extract_attr(attrs: str, name: str) -> str | None:
+    match = re.search(
+        rf"""\b{name}\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))""",
+        attrs,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return next(group for group in match.groups() if group is not None)
+
+
+def _normalize_question_index(raw: str | None, max_index: int) -> int | None:
+    """Parse a 1-based question reference like Q3 or 3 into a 0-based index."""
+    if raw is None:
+        return None
+    match = re.search(r"(?:\bQ\s*)?(\d+)", raw, re.IGNORECASE)
+    if not match:
+        return None
+    idx = int(match.group(1)) - 1
+    if 0 <= idx < max_index:
+        return idx
+    return None
+
+
+def _iter_q_blocks(text: str, max_index: int) -> list[tuple[int | None, str]]:
+    """Return <q n="Q1">...</q> blocks, accepting n="1" as well."""
+    blocks: list[tuple[int | None, str]] = []
+    for match in re.finditer(
+        r"<q\b(?P<attrs>[^>]*)>(?P<body>.*?)</q>",
+        text or "",
+        re.DOTALL | re.IGNORECASE,
+    ):
+        attrs = match.group("attrs")
+        idx = _normalize_question_index(_extract_attr(attrs, "n"), max_index)
+        blocks.append((idx, match.group("body")))
+    return blocks
+
+
+def _parse_q_tag_indices(text: str, max_index: int) -> list[int]:
+    """Parse indices from <q n="Q1" /> or legacy <q source_index="1" /> tags."""
+    indices: list[int] = []
+    seen: set[int] = set()
+    for match in re.finditer(r"<q\b(?P<attrs>[^>]*)/?>", text or "", re.IGNORECASE):
+        attrs = match.group("attrs")
+        idx = _normalize_question_index(_extract_attr(attrs, "n"), max_index)
+        if idx is None:
+            idx = _normalize_question_index(
+                _extract_attr(attrs, "source_index"), max_index,
+            )
+        if idx is not None and idx not in seen:
+            seen.add(idx)
+            indices.append(idx)
+    return indices
+
+
 # ---------------------------------------------------------------------------
 # Question generation
 # ---------------------------------------------------------------------------
@@ -211,7 +278,12 @@ Format your response as:
 What aspects of the environment are we most uncertain about? What questions would help us learn the most?
 </think>
 <questions>
-QUESTION 1: [A specific yes/no question about how the environment works]
+<q n="Q1">
+<question>[A specific yes/no question about how the environment works]</question>
+</q>
+<q n="Q2">
+<question>[Another specific yes/no question about how the environment works]</question>
+</q>
 ...
 (Generate questions)
 </questions>"""
@@ -229,12 +301,21 @@ QUESTION 1: [A specific yes/no question about how the environment works]
     # Build set of existing question texts for deduplication
     existing_questions = {q.question.strip().lower() for q in current_qa}
     if questions_text:
-        for match in re.finditer(
-            r"QUESTION\s+\d+:\s*(.+?)(?=QUESTION\s+\d+:|$)",
-            questions_text,
-            re.DOTALL,
-        ):
-            q = match.group(1).strip()
+        parsed_question_texts = [
+            extract_xml_key(q_body, "question")
+            for _, q_body in _iter_q_blocks(questions_text, num_questions)
+        ]
+        if not any(parsed_question_texts):
+            parsed_question_texts = [
+                match.group(1).strip()
+                for match in re.finditer(
+                    r"Q\s*\d+:\s*(.+?)(?=Q\s*\d+:|$)",
+                    questions_text,
+                    re.DOTALL | re.IGNORECASE,
+                )
+            ]
+        for raw_q in parsed_question_texts:
+            q = (raw_q or "").strip()
             if q:
                 if len(q) > 300:
                     q = q[:300].rsplit(" ", 1)[0] + "..."
@@ -272,6 +353,7 @@ async def formulate_experiment_from_question(
     current_image=None,
     steps_context_images: list | None = None,
     hide_raw_obs: bool = False,
+    target_question_index: int | None = None,
 ) -> tuple[str | None, int | None, float, str, str]:
     """Select an unanswered question from Q and formulate an experiment to answer it.
 
@@ -295,8 +377,59 @@ async def formulate_experiment_from_question(
         section_title="CURRENT STATE (agent has not yet acted)",
     )
 
-    qa_list_text = _format_qa_list(current_qa)
     current_exp_text = current_experiment if current_experiment else "(no experiment set yet)"
+    target_question_section = ""
+    available_questions_section = ""
+    task_instruction = (
+        "Your task: Decide whether to keep the current experiment or formulate a new one for one unanswered question."
+    )
+    target_question_instruction = (
+        "Otherwise, select one UNANSWERED question from AVAILABLE QUESTIONS and formulate a specific, actionable experiment (1-3 sentences) that the agent can carry out to answer it."
+    )
+    think_instruction = (
+        "Has the current experiment been sufficiently tested? If not, which unanswered question should be answered next?"
+    )
+    question_index_format = (
+        '<q n="Q1">\n'
+        "<experiment_plan>[1-3 sentence actionable experiment to answer the selected question]</experiment_plan>"
+        "\n</q>"
+    )
+    unanswered_question_lines = [
+        f"Q{i + 1}: {qa.question}"
+        for i, qa in enumerate(current_qa)
+        if qa.answer is None
+    ]
+    if unanswered_question_lines:
+        available_questions_section = f"""
+=== AVAILABLE QUESTIONS ===
+{chr(10).join(unanswered_question_lines)}
+=== END AVAILABLE QUESTIONS ===
+"""
+    if (
+        target_question_index is not None
+        and 0 <= target_question_index < len(current_qa)
+        and current_qa[target_question_index].answer is None
+    ):
+        target_question_section = f"""
+=== TARGET QUESTION ===
+Q{target_question_index + 1}: {current_qa[target_question_index].question}
+=== END TARGET QUESTION ===
+"""
+        task_instruction = (
+            "Your task: Decide whether to keep the current experiment or formulate a new one for the TARGET QUESTION."
+        )
+        target_question_instruction = (
+            "Otherwise, formulate a specific, actionable experiment (1-3 sentences) to answer the TARGET QUESTION above.\n"
+            f'Use <q n="Q{target_question_index + 1}"> to identify the fixed target question.'
+        )
+        think_instruction = (
+            "Has the current experiment been sufficiently tested? If not, what experiment would answer the TARGET QUESTION?"
+        )
+        question_index_format = (
+            f'<q n="Q{target_question_index + 1}">\n'
+            "<experiment_plan>[1-3 sentence actionable experiment to answer the TARGET QUESTION]</experiment_plan>"
+            "\n</q>"
+        )
 
     prompt = f"""You are designing the next experiment for an agent interacting with an environment.
 
@@ -313,30 +446,28 @@ Each ``<pre_state>`` (and ``<post_state>``, when present) below is annotated wit
 === RECENT HISTORY OF STATES AND ACTIONS ===
 {step_history}
 === END RECENT HISTORY ==={current_obs_section}
-=== CURRENT QUESTIONS ===
-{qa_list_text}
-=== END CURRENT QUESTIONS ===
+{target_question_section}
+{available_questions_section if not target_question_section else ""}
 
 === CURRENT EXPERIMENT ===
 {current_exp_text}
 === END CURRENT EXPERIMENT ===
 
-Your task: Decide whether to keep the current experiment or formulate a new one based on an unanswered question.
+{task_instruction}
 
 If the current experiment is still being tested (the agent hasn't had enough steps to gather evidence), return null.
-Otherwise, select an UNANSWERED question from the list above and design a specific, actionable experiment (1-3 sentences) that the agent can carry out to answer that question.
+{target_question_instruction}
 
 Format your response as:
 <think>
-Has the current experiment been sufficiently tested? If so, which unanswered question should we focus on next?
+{think_instruction}
 </think>
 <experiment>
 If keeping the current experiment:
 null
 
 If formulating a new experiment:
-<question_index>[The Q number of the selected unanswered question]</question_index>
-<experiment_plan>[1-3 sentence actionable experiment to answer the selected question]</experiment_plan>
+{question_index_format}
 </experiment>"""
 
     images: list = []
@@ -351,30 +482,43 @@ If formulating a new experiment:
     if not experiment_text_raw or experiment_text_raw.strip().lower() == "null":
         return None, None, cost, prompt, text
 
-    question_index_str = extract_xml_key(experiment_text_raw, "question_index")
-    experiment_plan = extract_xml_key(experiment_text_raw, "experiment_plan")
-
     question_index = None
-    if question_index_str:
-        # Parse "Q3" or "3" style references
-        idx_match = re.search(r"\d+", question_index_str)
-        if idx_match:
-            raw_idx = int(idx_match.group()) - 1  # Convert to 0-indexed
-            # Validate: must be in range and point to an unanswered question
-            if 0 <= raw_idx < len(current_qa) and current_qa[raw_idx].answer is None:
-                question_index = raw_idx
-            else:
-                logging.warning(
-                    f"Experiment question_index {raw_idx + 1} is out of range or not unanswered "
-                    f"(total={len(current_qa)}), ignoring index"
-                )
+    experiment_plan = None
+    q_blocks = _iter_q_blocks(experiment_text_raw, len(current_qa))
+    if q_blocks:
+        question_index, q_body = q_blocks[0]
+        experiment_plan = extract_xml_key(q_body, "experiment_plan")
 
+    question_index_str = extract_xml_key(experiment_text_raw, "question_index")
+    if question_index_str:
+        question_index = _normalize_question_index(question_index_str, len(current_qa))
+
+    if question_index is not None and current_qa[question_index].answer is not None:
+        logging.warning(
+            f"Experiment question_index {question_index + 1} is not unanswered, ignoring index"
+        )
+        question_index = None
+    elif question_index is None and question_index_str:
+        logging.warning(
+            f"Experiment question_index {question_index_str!r} is out of range "
+            f"(total={len(current_qa)}), ignoring index"
+        )
+
+    if experiment_plan is None:
+        experiment_plan = extract_xml_key(experiment_text_raw, "experiment_plan")
     if not experiment_plan:
         # Fallback: treat the whole experiment block as the plan
         experiment_plan = experiment_text_raw.strip()
 
     if len(experiment_plan) > 300:
         experiment_plan = experiment_plan[:300].rsplit(" ", 1)[0] + "..."
+
+    if (
+        target_question_index is not None
+        and 0 <= target_question_index < len(current_qa)
+        and current_qa[target_question_index].answer is None
+    ):
+        question_index = target_question_index
 
     logging.info(f"Formulated experiment from question Q{(question_index or 0) + 1}: {experiment_plan[:80]}...")
     return experiment_plan, question_index, cost, prompt, text
@@ -399,6 +543,8 @@ async def update_qa_from_trajectory(
     1. Answers unanswered questions if the trajectory provides evidence
     2. Corrects existing answers if trajectory contradicts them
     3. Adds new questions discovered from the trajectory
+    Existing questions are preserved even if the model omits them from its
+    response; pruning is handled by the separate trim phase.
 
     Returns: (updated_qa_pairs, cost, extraction_log)
     """
@@ -428,7 +574,6 @@ Your task: Update the questions list based on evidence from the trajectory.
 1. For each UNANSWERED question: If the trajectory provides clear, unambiguous evidence, answer it (YES or NO) with supporting evidence quoted from the trajectory.
 2. For each ANSWERED question: If the trajectory provides evidence that contradicts the current answer, update the answer and evidence. Otherwise keep it unchanged.
 3. If the trajectory reveals important aspects of how the environment works that aren't covered by existing questions, add NEW questions (with answers if evidence is available, otherwise as UNANSWERED).
-4. If any existing questions are redundant, no longer useful, or superseded by better questions, you may DROP them.
 
 Only answer questions when the trajectory provides clear evidence. Do not guess or infer beyond what is directly observed.
 
@@ -437,16 +582,16 @@ Format your response as:
 Review the trajectory and each question. What can we learn?
 </think>
 <updated_questions>
-<q n="1">
+<q n="Q1">
 <question>[question text]</question>
 <evidence>[evidence from trajectory, or empty if unanswered]</evidence>
 <answer>YES or NO or UNANSWERED</answer>
 </q>
-<q n="2">
+<q n="Q2">
 ...
 </q>
 ...
-(Include all existing questions plus any new ones)
+(Use existing Q numbers for existing questions. Number new questions as Q{len(current_qa) + 1}, Q{len(current_qa) + 2}, etc. Include all existing questions plus any new ones.)
 </updated_questions>"""
 
     text, cost = await _llm_call(
@@ -463,14 +608,10 @@ Review the trajectory and each question. What can we learn?
         extraction_log["parse_error"] = "No <updated_questions> block found"
         return current_qa, cost, extraction_log
 
-    # Parse each <q> entry
-    updated_qa: list[EBQAPair] = []
-    for q_match in re.finditer(
-        r'<q\s+n="(\d+)">(.*?)</q>',
-        updated_questions_text,
-        re.DOTALL,
-    ):
-        q_content = q_match.group(2)
+    parsed_by_index: dict[int, EBQAPair] = {}
+    parsed_by_question: dict[str, EBQAPair] = {}
+    parsed_new_questions: list[EBQAPair] = []
+    for parsed_idx, q_content in _iter_q_blocks(updated_questions_text, 10**9):
         question = extract_xml_key(q_content, "question")
         answer_str = extract_xml_key(q_content, "answer")
         evidence = extract_xml_key(q_content, "evidence") or ""
@@ -487,31 +628,87 @@ Review the trajectory and each question. What can we learn?
                 answer = False
             # else UNANSWERED -> None
 
-        # Try to find matching source_step from existing Q; use current_step for new questions
-        source_step = current_step
-        for existing in current_qa:
-            if existing.question.strip().lower() == question.strip().lower():
-                source_step = existing.source_step
-                break
+        existing_by_index = (
+            current_qa[parsed_idx]
+            if parsed_idx is not None and 0 <= parsed_idx < len(current_qa)
+            else None
+        )
+        existing_by_text = None
+        if existing_by_index is None:
+            for existing in current_qa:
+                if existing.question.strip().lower() == question.strip().lower():
+                    existing_by_text = existing
+                    break
 
-        updated_qa.append(EBQAPair(
-            question=question.strip(),
+        source_question = (
+            existing_by_index.question
+            if existing_by_index is not None
+            else question.strip()
+        )
+        source_step = (
+            existing_by_index.source_step
+            if existing_by_index is not None
+            else existing_by_text.source_step
+            if existing_by_text is not None
+            else current_step
+        )
+
+        parsed = EBQAPair(
+            question=source_question,
             answer=answer,
             evidence=evidence.strip(),
             source_step=source_step,
-        ))
+        )
 
-    if not updated_qa:
+        if existing_by_index is not None:
+            parsed_by_index[parsed_idx] = parsed
+        elif existing_by_text is not None:
+            parsed_by_question[existing_by_text.question.strip().lower()] = parsed
+        else:
+            parsed_new_questions.append(parsed)
+
+    if not parsed_by_index and not parsed_by_question and not parsed_new_questions:
         extraction_log["parse_error"] = "No valid <q> entries parsed"
         return current_qa, cost, extraction_log
 
+    updated_qa: list[EBQAPair] = []
+    existing_keys: set[str] = set()
+    for idx, existing in enumerate(current_qa):
+        key = existing.question.strip().lower()
+        existing_keys.add(key)
+        parsed = parsed_by_index.get(idx) or parsed_by_question.get(key)
+        if parsed is None:
+            updated_qa.append(existing)
+        elif existing.answer is not None and parsed.answer is None:
+            # Do not let an update pass accidentally erase an established answer.
+            updated_qa.append(existing)
+        else:
+            updated_qa.append(parsed)
+
+    for qa in parsed_new_questions:
+        key = qa.question.strip().lower()
+        if key not in existing_keys:
+            updated_qa.append(qa)
+            existing_keys.add(key)
+
     prev_unanswered = sum(1 for q in current_qa if q.answer is None)
     new_unanswered = sum(1 for q in updated_qa if q.answer is None)
+    prev_by_question = {q.question.strip().lower(): q for q in current_qa}
+    newly_answered = sum(
+        1
+        for q in updated_qa
+        if q.answer is not None
+        and (prev := prev_by_question.get(q.question.strip().lower())) is not None
+        and prev.answer is None
+    )
     extraction_log["prev_count"] = len(current_qa)
     extraction_log["new_count"] = len(updated_qa)
     extraction_log["prev_unanswered"] = prev_unanswered
     extraction_log["new_unanswered"] = new_unanswered
-    extraction_log["newly_answered"] = prev_unanswered - new_unanswered
+    extraction_log["newly_answered"] = newly_answered
+    extraction_log["new_questions"] = sum(
+        1 for q in updated_qa if q.question.strip().lower() not in prev_by_question
+    )
 
     logging.info(
         f"Q&A update: {len(current_qa)} -> {len(updated_qa)} questions "
@@ -573,16 +770,16 @@ Format your response as:
 Which questions are most valuable? Which can be dropped?
 </think>
 <trimmed_questions>
-<q n="1">
+<q n="Q1">
 <question>[question text]</question>
 <answer>YES or NO or UNANSWERED</answer>
 <evidence>[evidence, or empty if unanswered]</evidence>
 </q>
-<q n="2">
+<q n="Q2">
 ...
 </q>
 ...
-(Include at most {max_answered_qa_pairs} ANSWERED questions and at most {max_unanswered_qa_pairs} UNANSWERED questions)
+(Use the original Q numbers from CURRENT QUESTIONS. Include at most {max_answered_qa_pairs} ANSWERED questions and at most {max_unanswered_qa_pairs} UNANSWERED questions)
 </trimmed_questions>"""
 
     text, cost = await _llm_call(config, prompt)
@@ -603,17 +800,16 @@ Which questions are most valuable? Which can be dropped?
         return current_qa, cost, trim_log
 
     trimmed_qa: list[EBQAPair] = []
-    for q_match in re.finditer(
-        r'<q\s+n="(\d+)">(.*?)</q>',
-        trimmed_text,
-        re.DOTALL,
-    ):
-        q_content = q_match.group(2)
+    for parsed_idx, q_content in _iter_q_blocks(trimmed_text, len(current_qa)):
         question = extract_xml_key(q_content, "question")
         answer_str = extract_xml_key(q_content, "answer")
         evidence = extract_xml_key(q_content, "evidence") or ""
 
         if not question:
+            continue
+
+        if parsed_idx is not None and 0 <= parsed_idx < len(current_qa):
+            trimmed_qa.append(current_qa[parsed_idx])
             continue
 
         answer: bool | None = None
@@ -655,3 +851,374 @@ Which questions are most valuable? Which can be dropped?
     )
 
     return trimmed_qa, cost, trim_log
+
+
+# ---------------------------------------------------------------------------
+# Probe-based Q&A maintenance and selection
+# ---------------------------------------------------------------------------
+
+
+async def deduplicate_qa_pairs(
+    config: DictConfig,
+    current_qa: list[EBQAPair],
+) -> tuple[list[EBQAPair], float, dict]:
+    """Drop duplicate questions while preserving the full non-duplicate bank.
+
+    This intentionally does not trim for usefulness. It only asks which
+    questions are semantic duplicates of another currently accumulated
+    question.
+    """
+    qa_list_text = _format_qa_list(current_qa)
+    prompt = f"""You are maintaining a knowledge base of binary questions about an environment.
+
+=== CURRENT QUESTIONS ===
+{qa_list_text}
+=== END CURRENT QUESTIONS ===
+
+Your task: identify only duplicate or near-duplicate questions that should be dropped. Do not drop a question because it is low priority, narrow, old, or currently unanswered.
+
+When two questions are duplicates, prefer to keep:
+- An answered question with clear evidence over an unanswered question
+- The clearer or more general wording
+- The earlier question if both are otherwise equivalent
+
+Format your response as:
+<think>
+Which questions are duplicates of another question in the list?
+</think>
+<duplicate_drop_indices>
+<q n="Q2" />
+<q n="Q5" />
+(Use the original Q numbers from CURRENT QUESTIONS. Write NONE if no questions should be dropped.)
+</duplicate_drop_indices>"""
+
+    text, cost = await _llm_call(config, prompt)
+    drop_text = extract_xml_key(text, "duplicate_drop_indices")
+    dedup_log: dict = {
+        "method": "deduplicate_only",
+        "prompt": prompt,
+        "response": text,
+        "pre_dedup_count": len(current_qa),
+        "pre_dedup_answered": sum(1 for q in current_qa if q.answer is not None),
+        "pre_dedup_unanswered": sum(1 for q in current_qa if q.answer is None),
+    }
+
+    if drop_text is None:
+        dedup_log["parse_error"] = "No <duplicate_drop_indices> block found"
+        dedup_log["post_dedup_count"] = len(current_qa)
+        dedup_log["dropped_indices"] = []
+        dedup_log["dropped_questions"] = []
+        return current_qa, cost, dedup_log
+
+    drop_indices = _parse_q_tag_indices(drop_text, len(current_qa))
+    if not drop_indices:
+        drop_indices = _parse_1_based_indices(drop_text, len(current_qa))
+    drop_set = set(drop_indices)
+    deduped = [q for i, q in enumerate(current_qa) if i not in drop_set]
+
+    dedup_log["post_dedup_count"] = len(deduped)
+    dedup_log["post_dedup_answered"] = sum(1 for q in deduped if q.answer is not None)
+    dedup_log["post_dedup_unanswered"] = sum(1 for q in deduped if q.answer is None)
+    dedup_log["dropped_count"] = len(current_qa) - len(deduped)
+    dedup_log["dropped_indices"] = drop_indices
+    dedup_log["dropped_questions"] = [current_qa[i].question for i in drop_indices]
+
+    logging.info(
+        f"Q&A dedup: {len(current_qa)} -> {len(deduped)} questions "
+        f"(dropped {len(current_qa) - len(deduped)} duplicates)"
+    )
+    return deduped, cost, dedup_log
+
+
+async def select_qa_pairs_for_experiment(
+    config: DictConfig,
+    current_qa: list[EBQAPair],
+    max_answered_qa_pairs: int,
+    max_unanswered_qa_pairs: int,
+    default_knowledge: str = "",
+    beliefs: str = "",
+) -> tuple[list[EBQAPair], list[int], float, dict]:
+    """Select a capped question subset for experiment formulation.
+
+    The returned subset is a view over current_qa, represented both as copied
+    EBQAPair objects and as source indices into current_qa. It should be used
+    for experiment selection only, not persisted as the maintained question
+    bank.
+    """
+    num_answered = sum(1 for q in current_qa if q.answer is not None)
+    num_unanswered = sum(1 for q in current_qa if q.answer is None)
+    unanswered_source_indices = [
+        i for i, qa in enumerate(current_qa) if qa.answer is None
+    ]
+    selection_log: dict = {
+        "method": "llm_top_k_probe_selection",
+        "pre_selection_count": len(current_qa),
+        "pre_selection_answered": num_answered,
+        "pre_selection_unanswered": num_unanswered,
+        "max_answered_qa_pairs": max_answered_qa_pairs,
+        "max_unanswered_qa_pairs": max_unanswered_qa_pairs,
+        "default_knowledge_length": len(default_knowledge),
+        "beliefs_length": len(beliefs),
+        "candidate_source_indices": unanswered_source_indices,
+    }
+
+    if not unanswered_source_indices:
+        selection_log.update({
+            "note": "no unanswered questions available for experiment selection",
+            "selected_source_indices": [],
+            "post_selection_count": 0,
+            "post_selection_answered": 0,
+            "post_selection_unanswered": 0,
+        })
+        return [], [], 0.0, selection_log
+
+    if num_unanswered <= max_unanswered_qa_pairs:
+        indices = unanswered_source_indices
+        selection_log.update({
+            "note": "unanswered question bank within selection cap; selected all unanswered questions",
+            "selected_source_indices": indices,
+            "post_selection_count": len(indices),
+            "post_selection_answered": 0,
+            "post_selection_unanswered": len(indices),
+        })
+        return [current_qa[i] for i in indices], indices, 0.0, selection_log
+
+    qa_list_text = "\n".join(
+        f"Q{source_idx + 1}: {current_qa[source_idx].question} -> UNANSWERED"
+        for source_idx in unanswered_source_indices
+    )
+    default_knowledge_section = ""
+    if default_knowledge:
+        default_knowledge_section = f"""
+=== DEFAULT KNOWLEDGE ===
+{default_knowledge}
+=== END DEFAULT KNOWLEDGE ===
+"""
+    beliefs_section = ""
+    if beliefs:
+        beliefs_section = f"""
+=== CURRENT BELIEFS ===
+{beliefs}
+=== END CURRENT BELIEFS ===
+"""
+    prompt = f"""You are selecting the next experiment target for an agent learning an environment.
+
+{default_knowledge_section}
+
+{beliefs_section}
+
+=== AVAILABLE QUESTIONS ===
+{qa_list_text}
+=== END AVAILABLE QUESTIONS ===
+
+Select up to {max_unanswered_qa_pairs} questions that will -
+1. be most valuable to answer next
+2. cover distinct aspects of the environment
+
+Use each question's Q number in the <q n="..."> attribute. Format your response as:
+<think>
+Which questions should be selected?
+</think>
+<selected_questions>
+<q n="Q1" />
+...
+</selected_questions>"""
+
+    text, cost = await _llm_call(config, prompt)
+    selection_log["prompt"] = prompt
+    selection_log["response"] = text
+
+    selected_text = extract_xml_key(text, "selected_questions")
+    selected_indices: list[int] = []
+    unanswered_source_set = set(unanswered_source_indices)
+    if selected_text:
+        selected_indices = [
+            idx for idx in _parse_q_tag_indices(selected_text, len(current_qa))
+            if idx in unanswered_source_set
+        ]
+        if not selected_indices:
+            selected_indices = [
+                i for i in _parse_1_based_indices(selected_text, len(current_qa))
+                if i in unanswered_source_set
+            ]
+
+    if not selected_indices:
+        selection_log["parse_error"] = "No valid selected source indices parsed"
+        selected_indices = unanswered_source_indices
+
+    selected_indices = selected_indices[:max_unanswered_qa_pairs]
+    selected_qa = [current_qa[i] for i in selected_indices]
+
+    selection_log["selected_source_indices"] = selected_indices
+    selection_log["selected_questions"] = [
+        {
+            "source_index": i,
+            "question": current_qa[i].question,
+            "answer": current_qa[i].answer,
+            "source_step": current_qa[i].source_step,
+        }
+        for i in selected_indices
+    ]
+    selection_log["post_selection_count"] = len(selected_qa)
+    selection_log["post_selection_answered"] = sum(
+        1 for q in selected_qa if q.answer is not None
+    )
+    selection_log["post_selection_unanswered"] = sum(
+        1 for q in selected_qa if q.answer is None
+    )
+
+    logging.info(
+        f"Q&A probe selection: {len(current_qa)} -> {len(selected_qa)} prompt questions "
+        f"(answered {selection_log['post_selection_answered']}, "
+        f"unanswered {selection_log['post_selection_unanswered']})"
+    )
+    return selected_qa, selected_indices, cost, selection_log
+
+
+# ---------------------------------------------------------------------------
+# Scored Q&A trimming (B-difference based)
+# ---------------------------------------------------------------------------
+
+
+async def trim_qa_pairs_scored(
+    config: DictConfig,
+    current_qa: list[EBQAPair],
+    max_answered_qa_pairs: int,
+    max_unanswered_qa_pairs: int,
+    beliefs: str,
+    *,
+    method: str,
+    max_concurrent: int = 8,
+    include_policy: bool = True,
+    current_step: int = 0,
+) -> tuple[list[EBQAPair], float, dict]:
+    """Trim Q&A by B-difference scoring on unanswered questions.
+
+    Delegates to ``trim_qa_pairs`` for the answered-cap case (when the
+    answered count exceeds its cap) so we don't reinvent an answered-question
+    selector. For the unanswered pool, computes B-difference scores and
+    keeps the top ``max_unanswered_qa_pairs`` entries.
+
+    Returns: (trimmed_qa, total_cost, trim_log)
+    """
+    # Lazy import to avoid a top-level cycle with question_scoring.
+    from question_scoring import score_questions_b_diff
+
+    total_cost = 0.0
+    trim_log: dict = {
+        "method": f"b_diff_{method}",
+        "pre_trim_count": len(current_qa),
+        "pre_trim_answered": sum(1 for q in current_qa if q.answer is not None),
+        "pre_trim_unanswered": sum(1 for q in current_qa if q.answer is None),
+        "max_answered_qa_pairs": max_answered_qa_pairs,
+        "max_unanswered_qa_pairs": max_unanswered_qa_pairs,
+    }
+
+    # Step A: if answered cap exceeded, reuse the existing LLM trim for the
+    # answered side. We call it with the original (answered_cap, inf-ish)
+    # pair and then separately handle unanswered below. The prompt already
+    # handles both caps, but we only want to shrink answered here.
+    working_qa = list(current_qa)
+    if trim_log["pre_trim_answered"] > max_answered_qa_pairs:
+        answered_only = [q for q in working_qa if q.answer is not None]
+        trimmed_answered, ans_cost, ans_log = await trim_qa_pairs(
+            config=config,
+            current_qa=answered_only,
+            max_answered_qa_pairs=max_answered_qa_pairs,
+            max_unanswered_qa_pairs=0,
+            current_step=current_step,
+        )
+        total_cost += ans_cost
+        trim_log["answered_trim"] = ans_log
+        # Reassemble with existing unanswered in place
+        unanswered_in_order = [q for q in working_qa if q.answer is None]
+        working_qa = trimmed_answered + unanswered_in_order
+
+    # Step B: score + drop unanswered if over cap
+    unanswered = [q for q in working_qa if q.answer is None]
+    if len(unanswered) > max_unanswered_qa_pairs:
+        scores, score_cost, score_log = await score_questions_b_diff(
+            config=config,
+            beliefs=beliefs,
+            qa_pairs=working_qa,
+            method=method,
+            include_policy=include_policy,
+            max_concurrent=max_concurrent,
+        )
+        total_cost += score_cost
+
+        # Rank unanswered by score desc, break ties by source_step desc (prefer newer)
+        ranked = sorted(
+            [i for i, q in enumerate(working_qa) if q.answer is None],
+            key=lambda i: (scores.get(i, 0.0), working_qa[i].source_step),
+            reverse=True,
+        )
+        keep_indices = set(ranked[:max_unanswered_qa_pairs])
+        ranked_entries = [
+            {
+                "idx": i,
+                "question": working_qa[i].question,
+                "source_step": working_qa[i].source_step,
+                "score": scores.get(i, 0.0),
+            }
+            for i in ranked
+        ]
+        kept_unanswered_indices = ranked[:max_unanswered_qa_pairs]
+        dropped_unanswered_indices = ranked[max_unanswered_qa_pairs:]
+        trim_log["scoring"] = {
+            **score_log,
+            "ranked_unanswered": ranked_entries,
+            "kept_unanswered_indices": kept_unanswered_indices,
+            "kept_unanswered_questions": [
+                working_qa[i].question for i in kept_unanswered_indices
+            ],
+            "dropped_unanswered_indices": dropped_unanswered_indices,
+            "dropped_unanswered_questions": [
+                working_qa[i].question for i in dropped_unanswered_indices
+            ],
+            "answered_context": [
+                {
+                    "idx": i,
+                    "question": q.question,
+                    "answer": q.answer,
+                    "evidence": q.evidence,
+                    "source_step": q.source_step,
+                }
+                for i, q in enumerate(working_qa)
+                if q.answer is not None
+            ],
+            "unanswered_pool": [
+                {
+                    "idx": i,
+                    "question": q.question,
+                    "source_step": q.source_step,
+                }
+                for i, q in enumerate(working_qa)
+                if q.answer is None
+            ],
+        }
+
+        working_qa = [
+            q for i, q in enumerate(working_qa)
+            if q.answer is not None or i in keep_indices
+        ]
+    else:
+        trim_log["scoring"] = {
+            "note": "unanswered within cap — no scoring performed",
+            "num_unanswered": len(unanswered),
+        }
+
+    trim_log["post_trim_count"] = len(working_qa)
+    trim_log["post_trim_answered"] = sum(1 for q in working_qa if q.answer is not None)
+    trim_log["post_trim_unanswered"] = sum(1 for q in working_qa if q.answer is None)
+    trim_log["dropped_count"] = len(current_qa) - len(working_qa)
+    trim_log["total_cost"] = total_cost
+
+    logging.info(
+        f"Q&A trim (scored/{method}): {len(current_qa)} -> {len(working_qa)} questions "
+        f"(answered: {trim_log['pre_trim_answered']} -> {trim_log['post_trim_answered']}, "
+        f"unanswered: {trim_log['pre_trim_unanswered']} -> {trim_log['post_trim_unanswered']}, "
+        f"dropped {trim_log['dropped_count']}, cost ${total_cost:.6f})"
+    )
+
+    return working_qa, total_cost, trim_log

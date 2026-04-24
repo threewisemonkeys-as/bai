@@ -718,6 +718,46 @@ class QAFeedbackResult:
     verdict: str            # "CORRECT" | "INCORRECT" | "INCONCLUSIVE"
 
 
+def _extract_tag_attr(attrs: str, name: str) -> str | None:
+    match = re.search(
+        rf"""\b{name}\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))""",
+        attrs,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return next(group for group in match.groups() if group is not None)
+
+
+def _normalize_q_index(raw: str | None, max_index: int) -> int | None:
+    """Parse a 1-based question reference like Q3 or 3 into a 0-based index."""
+    if raw is None:
+        return None
+    match = re.search(r"(?:\bQ\s*)?(\d+)", raw, re.IGNORECASE)
+    if not match:
+        return None
+    idx = int(match.group(1)) - 1
+    if 0 <= idx < max_index:
+        return idx
+    return None
+
+
+def _iter_indexed_blocks(
+    text: str, tag: str, max_index: int
+) -> list[tuple[int | None, str]]:
+    """Return ``<tag n="Q1">...</tag>`` blocks, tolerant of n="1" and Q-prefixes."""
+    blocks: list[tuple[int | None, str]] = []
+    pattern = re.compile(
+        rf"<{tag}\b(?P<attrs>[^>]*)>(?P<body>.*?)</{tag}\s*(?:\b[^>]*)?>",
+        re.DOTALL | re.IGNORECASE,
+    )
+    for match in pattern.finditer(text or ""):
+        attrs = match.group("attrs")
+        idx = _normalize_q_index(_extract_tag_attr(attrs, "n"), max_index)
+        blocks.append((idx, match.group("body")))
+    return blocks
+
+
 async def qa_forward_pass(
     config: DictConfig,
     beliefs: str,
@@ -777,19 +817,39 @@ For each question, reason step-by-step about what your belief says (or doesn't s
 
 {questions_text}
 
-For each question, respond in this format:
-<Q n=<question number>>
+For each question Qn (e.g. Q1, Q2, ...), respond in this format:
+<q n="Q1">
 <reasoning>Your step-by-step reasoning based on your knowledge</reasoning>
 <answer>YES or NO</answer>
-</Q n=<question number>>
+</q>
+<q n="Q2">
+<reasoning>...</reasoning>
+<answer>YES or NO</answer>
+</q>
+...
 """
 
     text, cost = await _llm_call(config, prompt)
 
+    # Parse all <q n="..."> blocks, tolerating n="Q1", n="1", and the legacy
+    # <Q n=1>...</Q n=1> shape from earlier prompts.
+    parsed_by_index: dict[int, str] = {}
+    for idx, body in _iter_indexed_blocks(text, "q", len(qa_pairs)):
+        if idx is not None and idx not in parsed_by_index:
+            parsed_by_index[idx] = body
+    if not parsed_by_index:
+        for i in range(len(qa_pairs)):
+            legacy = re.search(
+                rf"<Q\s+n=\"?'?{i + 1}\"?'?\s*>\s*(.*?)\s*</Q\s+n=\"?'?{i + 1}\"?'?\s*>",
+                text,
+                re.DOTALL,
+            )
+            if legacy:
+                parsed_by_index[i] = legacy.group(1)
+
     results = []
-    for i, qa in enumerate(qa_pairs, 1):
-        m = re.search(rf"<Q\s+n={i}>\s*(.*?)\s*</Q\s+n={i}>", text, re.DOTALL)
-        q_block = m.group(1) if m else None
+    for i, qa in enumerate(qa_pairs):
+        q_block = parsed_by_index.get(i)
         if q_block:
             reasoning = extract_xml_key(q_block, "reasoning") or ""
             answer = extract_xml_key(q_block, "answer") or "MISSING"
@@ -860,7 +920,7 @@ async def _qa_feedback_batch(
     for i, fr in enumerate(qa_forward_results, 1):
         actual = "YES" if fr.qa_pair.answer else "NO"
         item_blocks.append(
-            f"--- Question {i} ---\n"
+            f"--- Q{i} ---\n"
             f"Question: {fr.qa_pair.question}\n"
             f"Agent's reasoning: {fr.reasoning}\n"
             f"Agent's predicted answer: {fr.predicted_answer}\n"
@@ -886,21 +946,42 @@ For INCORRECT predictions, explain what knowledge the agent was missing or had w
 
 {items_text}
 
-For each question Qn, respond with feedback Fn in this format:
-<F n=<question number>>
+For each question Qn (e.g. Q1, Q2, ...), respond in this format:
+<q n="Q1">
 <verdict>CORRECT or INCORRECT or INCONCLUSIVE</verdict>
 <feedback>Explanation of what the agent's knowledge got right or wrong</feedback>
-</F n=<question number>>"""
+</q>
+<q n="Q2">
+<verdict>...</verdict>
+<feedback>...</feedback>
+</q>
+..."""
 
     text, cost = await _llm_call(config, prompt)
 
+    # Parse <q n="..."> blocks, tolerating n="Q1", n="1", and legacy
+    # <F n=1>...</F n=1> feedback tags from earlier prompts.
+    parsed_by_index: dict[int, str] = {}
+    for idx, body in _iter_indexed_blocks(text, "q", len(qa_forward_results)):
+        if idx is not None and idx not in parsed_by_index:
+            parsed_by_index[idx] = body
+    if not parsed_by_index:
+        for idx, body in _iter_indexed_blocks(text, "f", len(qa_forward_results)):
+            if idx is not None and idx not in parsed_by_index:
+                parsed_by_index[idx] = body
+    if not parsed_by_index:
+        for i in range(len(qa_forward_results)):
+            legacy = re.search(
+                rf"<F\s+n=\"?'?{i + 1}\"?'?\s*>\s*(.*?)\s*</F\s+n=\"?'?{i + 1}\"?'?\s*>",
+                text,
+                re.DOTALL,
+            )
+            if legacy:
+                parsed_by_index[i] = legacy.group(1)
+
     results = []
-    for i, fr in enumerate(qa_forward_results, 1):
-        # The prompt requests tags like `<F n=1>...</F n=1>`, not `<F1>...</F1>`.
-        # Parse that exact shape so feedback verdicts don't all fall back to
-        # INCONCLUSIVE when the model follows instructions correctly.
-        m = re.search(rf"<F\s+n={i}>\s*(.*?)\s*</F\s+n={i}>", text, re.DOTALL)
-        f_block = m.group(1) if m else None
+    for i, fr in enumerate(qa_forward_results):
+        f_block = parsed_by_index.get(i)
         if f_block:
             verdict_str = extract_xml_key(f_block, "verdict") or "INCONCLUSIVE"
             feedback_str = extract_xml_key(f_block, "feedback") or ""
@@ -946,7 +1027,7 @@ async def improve_from_qa_feedback(
     for i, fr in enumerate(qa_feedback_results, 1):
         actual = "YES" if fr.forward.qa_pair.answer else "NO"
         qa_blocks.append(
-            f"--- QA Feedback {i} ---\n"
+            f"--- Q{i} ---\n"
             f"Question: {fr.forward.qa_pair.question}\n"
             f"Correct answer: {actual}\n"
             f"Evidence: {fr.forward.qa_pair.evidence}\n"

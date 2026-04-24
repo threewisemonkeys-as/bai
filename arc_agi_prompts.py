@@ -51,7 +51,7 @@ def get_arc_instruction_prompt(available_actions: list[str] | None = None) -> st
         else ""
     )
 
-    return f"""You are playing a game. You need to determine how the game works by experimenting with actions and observing the results.
+    return f"""You are playing a game. Your goal is to get as far as possible in the game.
 
 The game is played on a 64x64 grid of integer values (0-15), each representing a color:
 {color_desc}
@@ -61,5 +61,4 @@ Available actions:
 {actions_block}
 </actions>
 
-Call exactly one action per turn.
 {complex_note}"""

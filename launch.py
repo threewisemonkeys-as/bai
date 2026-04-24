@@ -47,8 +47,8 @@ ENVS = [
 # "mock" uses a placeholder id — it's never called since mock_mode shorts
 # out all LLM requests.
 MODEL_IDS = {
-    # "gemini-2.5-flash": "google/gemini-2.5-flash",
-    "sonnet-4.6":       "anthropic/claude-sonnet-4.6",
+    "gemini-2.5-flash": "google/gemini-2.5-flash",
+    # "sonnet-4.6":       "anthropic/claude-sonnet-4.6",
     # "mock":             "google/gemini-2.5-flash",
 }
 MODELS = list(MODEL_IDS)
@@ -80,12 +80,16 @@ def model_overrides(model: str, script: str) -> dict:
         ov[f"{ns}.n_environment_steps"] = 5
     return ov
 
-# eb_learn-only per-cell tuning: (env, model) -> overrides. Missing entries
-# fall back to EB_LEARN_DEFAULT (which matches config.yaml today).
+# eb_learn-only defaults and per-cell tuning. Per-cell overrides are layered
+# on top of EB_LEARN_DEFAULT so shared behavior, including question scoring,
+# is not lost when an env/model only customizes step counts or image settings.
 EB_LEARN_DEFAULT = {
     "eval.evolve.n_environment_steps": 10,
     "eval.evolve.hide_obs_when_image": False,
     "agent.max_image_history":         0,
+    "eval.evolve.question_scoring_method": "b_diff_full",
+    "eval.evolve.question_scoring_max_concurrent": 8,
+    "eval.evolve.max_unanswered_qa_pairs": 20,
 }
 EB_LEARN_OVERRIDES: dict[tuple[str, str], dict] = {
     ("minihack", "gemini-2.5-flash"): {
@@ -165,7 +169,10 @@ def build_cells() -> list[Cell]:
     for script, env, model in itertools.product(SCRIPT_FILES, ENVS, MODELS):
         ov: dict = {"envs.names": env, **model_overrides(model, script)}
         if script == "eb_learn":
-            ov.update(EB_LEARN_OVERRIDES.get((env, model), EB_LEARN_DEFAULT))
+            ov.update({
+                **EB_LEARN_DEFAULT,
+                **EB_LEARN_OVERRIDES.get((env, model), {}),
+            })
         cells.append(Cell(script=script, env=env, model=model, overrides=ov))
     return cells
 

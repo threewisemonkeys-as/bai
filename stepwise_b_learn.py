@@ -1187,7 +1187,7 @@ def _inject_beliefs(
             instructions = getattr(env, "mission", None)
         base_instruction = env.get_instruction_prompt(instructions=instructions)
         if beliefs:
-            base_instruction += f"\n\nTips -\n{beliefs}"
+            base_instruction += f"\n\n{beliefs}"
         agent.prompt_builder.update_instruction_prompt(base_instruction)
 
 

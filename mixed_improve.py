@@ -43,10 +43,39 @@ def _mock_llm_response(prompt: str) -> str:
     # --- Question generation (stepwise_eb_learn_improve.generate_questions_from_steps) ---
     if "generating questions to guide an agent" in p or "Generate new binary" in p:
         n = random.randint(2, 4)
-        lines = [f"QUESTION {i + 1}: [mock] Generated question {i + 1} at random?" for i in range(n)]
+        blocks = [
+            f'<q n="Q{i + 1}">\n'
+            f"<question>[mock] Generated question {random.randint(100000, 999999)} at random?</question>\n"
+            "</q>"
+            for i in range(n)
+        ]
         return (
             "<think>[mock] reasoning about what to ask next</think>\n"
-            "<questions>\n" + "\n".join(lines) + "\n</questions>"
+            "<questions>\n" + "\n".join(blocks) + "\n</questions>"
+        )
+
+    # --- Probe-bank de-duplication (deduplicate_qa_pairs) ---
+    if "<duplicate_drop_indices>" in p:
+        return (
+            "<think>[mock] no semantic duplicates detected</think>\n"
+            "<duplicate_drop_indices>NONE</duplicate_drop_indices>"
+        )
+
+    # --- Probe subset selection (select_qa_pairs_for_experiment) ---
+    if "<selected_questions>" in p:
+        qs = re.findall(r"^Q(\d+):", p, re.MULTILINE)
+        cap_section = p.split("Select at most:", 1)[-1]
+        cap_section = cap_section.split("This selection is only", 1)[0]
+        answered_cap_match = re.search(r"-\s*(\d+)\s+ANSWERED questions", cap_section)
+        unanswered_cap_match = re.search(r"-\s*(\d+)\s+UNANSWERED questions", cap_section)
+        answered_cap = int(answered_cap_match.group(1)) if answered_cap_match else len(qs)
+        unanswered_cap = int(unanswered_cap_match.group(1)) if unanswered_cap_match else len(qs)
+        limit = max(1, answered_cap + unanswered_cap)
+        kept = qs[:limit]
+        lines = [f'<q source_index="{idx}" />' for idx in kept]
+        return (
+            "<think>[mock] selecting prompt probes</think>\n"
+            "<selected_questions>\n" + "\n".join(lines) + "\n</selected_questions>"
         )
 
     # --- Experiment formulation (formulate_experiment_from_question) ---
@@ -96,14 +125,28 @@ def _mock_llm_response(prompt: str) -> str:
 
     # --- Trim QA (trim_qa_pairs) ---
     if "<trimmed_questions>" in p:
-        qs = re.findall(r"^Q(\d+):\s*(.+?)(?:\s*->|\s*$)", p, re.MULTILINE)
-        max_match = re.search(r"trim it to at most (\d+)", p)
-        max_total = int(max_match.group(1)) if max_match else len(qs)
-        kept = random.sample(qs, min(max_total, len(qs))) if qs else []
+        qs = re.findall(
+            r"^Q(\d+):\s*(.+?)(?:\s*->\s*(YES|NO|UNANSWERED))?(?:\s*\(evidence:.*?\))?$",
+            p,
+            re.MULTILINE,
+        )
+        cap_section = p.split("We need to trim it so that it has at most:", 1)[-1]
+        cap_section = cap_section.split("=== CURRENT QUESTIONS ===", 1)[0]
+        answered_cap_match = re.search(r"-\s*(\d+)\s+ANSWERED questions", cap_section)
+        unanswered_cap_match = re.search(r"-\s*(\d+)\s+UNANSWERED questions", cap_section)
+        answered_cap = int(answered_cap_match.group(1)) if answered_cap_match else len(qs)
+        unanswered_cap = int(unanswered_cap_match.group(1)) if unanswered_cap_match else len(qs)
+        answered_qs = [q for q in qs if q[2] in ("YES", "NO")]
+        unanswered_qs = [q for q in qs if q[2] == "UNANSWERED" or not q[2]]
+        kept = []
+        if answered_qs:
+            kept.extend(random.sample(answered_qs, min(answered_cap, len(answered_qs))))
+        if unanswered_qs:
+            kept.extend(random.sample(unanswered_qs, min(unanswered_cap, len(unanswered_qs))))
         inner_blocks = []
-        for idx_str, q_text in kept:
+        for idx_str, q_text, existing_status in kept:
             q_text = re.split(r"\s*->\s*", q_text, maxsplit=1)[0].strip()
-            status = random.choice(["YES", "NO", "UNANSWERED"])
+            status = existing_status or "UNANSWERED"
             ev = "[mock] kept evidence" if status != "UNANSWERED" else ""
             inner_blocks.append(
                 f'<q n="{idx_str}">\n'
@@ -121,6 +164,16 @@ def _mock_llm_response(prompt: str) -> str:
             "<think>[mock] trimming</think>\n"
             "<trimmed_questions>\n" + "\n".join(inner_blocks) + "\n</trimmed_questions>"
         )
+
+    # --- B-difference answer-vector prediction (question_scoring) ---
+    if "answer each question with YES, NO, or UNKNOWN" in p:
+        q_numbers = re.findall(r"^Q(\d+):", p, re.MULTILINE)
+        choices = ["YES", "NO", "UNKNOWN"]
+        blocks = [
+            f'<Q n="{n}">\n<answer>{random.choice(choices)}</answer>\n</Q>'
+            for n in q_numbers
+        ]
+        return "\n".join(blocks) if blocks else '<Q n="1">\n<answer>UNKNOWN</answer>\n</Q>'
 
     # --- QA forward pass (_qa_forward_batch) ---
     if "answer each question below with YES or NO" in p:

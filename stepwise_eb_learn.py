@@ -33,6 +33,7 @@ from balrog.utils import get_unique_seed
 from explore import get_default_knowledge, override_temperature, evolve_logger
 from mixed_improve import (
     QAPair,
+    _llm_call,
     _run_perception_on_observation,
     set_mock_mode,
 )
@@ -60,7 +61,10 @@ from stepwise_eb_learn_improve import (
     generate_questions_from_steps,
     formulate_experiment_from_question,
     update_qa_from_trajectory,
+    deduplicate_qa_pairs,
+    select_qa_pairs_for_experiment,
     trim_qa_pairs,
+    trim_qa_pairs_scored,
 )
 from llm_utils import extract_xml_key
 from stepwise_b_learn import (
@@ -78,6 +82,43 @@ from stepwise_explore import (
     apply_perception_with_history,
 )
 from run_utils import setup_run, improve_logging, _update_summary_json
+
+
+def _extract_xml_attr(attrs: str, name: str) -> str | None:
+    match = re.search(
+        rf"""\b{name}\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))""",
+        attrs,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return next(group for group in match.groups() if group is not None)
+
+
+def _normalize_q_ref(raw: str | None, max_index: int) -> int | None:
+    if raw is None:
+        return None
+    match = re.search(r"(?:\bQ\s*)?(\d+)", raw, re.IGNORECASE)
+    if not match:
+        return None
+    idx = int(match.group(1)) - 1
+    if 0 <= idx < max_index:
+        return idx
+    return None
+
+
+def _parse_q_tag_indices(text: str, max_index: int) -> list[int]:
+    indices: list[int] = []
+    seen: set[int] = set()
+    for match in re.finditer(r"<q\b(?P<attrs>[^>]*)/?>", text or "", re.IGNORECASE):
+        attrs = match.group("attrs")
+        idx = _normalize_q_ref(_extract_xml_attr(attrs, "n"), max_index)
+        if idx is None:
+            idx = _normalize_q_ref(_extract_xml_attr(attrs, "source_index"), max_index)
+        if idx is not None and idx not in seen:
+            seen.add(idx)
+            indices.append(idx)
+    return indices
 
 
 # ---------------------------------------------------------------------------
@@ -214,11 +255,14 @@ class StepwiseEBLearnConfig:
     improve_interval: int
     experiment_interval: int
     max_steps_context_chars: int
+    max_images_context: int = 10
     perception_history_window: int = 10
     perception_input_tail: int = 2
     hide_obs_when_image: bool = False
     question_gen_current_state_only: bool = False
     include_policy: bool = True
+    question_scoring_method: str = "b_diff_light"
+    question_scoring_max_concurrent: int = 8
     mock_mode: bool = False
 
 
@@ -343,6 +387,7 @@ def _images_for_sample_obs(
 def _images_for_steps_context(
     trajectory_buffer: list[dict],
     steps_context_text: str,
+    max_images: int | None = None,
 ) -> tuple[str, list]:
     """Return ``(annotated_text, images)`` for the step blocks in ``steps_context_text``.
 
@@ -357,6 +402,37 @@ def _images_for_steps_context(
         return steps_context_text, []
     images: list = []
     seen: set[int] = set()
+    entries_by_step = {
+        e.get("step"): e
+        for e in trajectory_buffer
+        if not e.get("episode_boundary") and e.get("action") is not None
+    }
+    image_slots: list[tuple[int, str]] = []
+
+    for m in re.finditer(r'<step n="(\d+)">(.*?)</step>', steps_context_text, re.DOTALL):
+        n = int(m.group(1))
+        if n in seen:
+            continue
+        seen.add(n)
+
+        entry = entries_by_step.get(n)
+        if entry is None:
+            continue
+
+        block_inner = m.group(2)
+        if entry.get("image") is not None:
+            image_slots.append((n, "pre"))
+        if "<post_state>" in block_inner and entry.get("result_image") is not None:
+            image_slots.append((n, "post"))
+
+    if max_images is None:
+        keep_slots = set(image_slots)
+    elif max_images <= 0:
+        keep_slots = set()
+    else:
+        keep_slots = set(image_slots[-max_images:])
+
+    seen.clear()
 
     def annotate_block(m: re.Match) -> str:
         n = int(m.group(1))
@@ -365,21 +441,13 @@ def _images_for_steps_context(
             return m.group(0)
         seen.add(n)
 
-        entry = None
-        for e in trajectory_buffer:
-            if e.get("episode_boundary"):
-                continue
-            if e.get("action") is None:
-                continue
-            if e.get("step") == n:
-                entry = e
-                break
+        entry = entries_by_step.get(n)
         if entry is None:
             return m.group(0)
 
         new_inner = block_inner
         img = entry.get("image")
-        if img is not None:
+        if img is not None and (n, "pre") in keep_slots:
             images.append(img)
             idx = len(images)
             new_inner = new_inner.replace(
@@ -388,7 +456,7 @@ def _images_for_steps_context(
 
         if "<post_state>" in block_inner:
             result_img = entry.get("result_image")
-            if result_img is not None:
+            if result_img is not None and (n, "post") in keep_slots:
                 images.append(result_img)
                 idx = len(images)
                 new_inner = new_inner.replace(
@@ -619,6 +687,21 @@ def _run_improve_loop_eb(
         trajectory_buffer, steps_context,
     )
     sample_obs_images = _images_for_sample_obs(trajectory_buffer, sample_obs)
+    track1b_sample_obs = (
+        sample_obs[-eb_config.max_images_context:]
+        if eb_config.max_images_context > 0
+        else []
+    )
+    track1b_sample_obs_histories = (
+        sample_obs_histories[-len(track1b_sample_obs):]
+        if track1b_sample_obs
+        else []
+    )
+    track1b_sample_obs_images = (
+        sample_obs_images[-len(track1b_sample_obs):]
+        if track1b_sample_obs
+        else []
+    )
 
     num_answered = sum(1 for q in qa_pairs if q.answer is not None)
     evolve_logger.info(
@@ -698,12 +781,12 @@ Provide analysis highlighting:
         # ========================================
         # Track 1b: Perception improvement guided by beliefs analysis
         # ========================================
-        if sample_obs:
+        if track1b_sample_obs:
             track1b_record = {"track": "perception_from_analysis", "step": step, "global_step": global_step, "turns": []}
             pre_perception_track1b = perception
             obs_section_1b = _build_obs_section(
-                perception, sample_obs,
-                sample_histories=sample_obs_histories, history_window=hist_window,
+                perception, track1b_sample_obs,
+                sample_histories=track1b_sample_obs_histories, history_window=hist_window,
                 display_tail=display_tail,
             )
 
@@ -726,9 +809,9 @@ Provide analysis highlighting:
                 evolve_logger.info(f"{tag}     Track 1b (perception from analysis) turn {turn + 1}/{max_perception_iters}")
 
                 message = perception_from_analysis_prompt if turn == 0 else build_perception_followup_message(
-                    perception, sample_obs, prev_obs_section_1b,
+                    perception, track1b_sample_obs, prev_obs_section_1b,
                     current_turn=turn + 1, max_turns=max_perception_iters,
-                    sample_histories=sample_obs_histories, history_window=hist_window,
+                    sample_histories=track1b_sample_obs_histories, history_window=hist_window,
                     display_tail=display_tail,
                     perception_instructions=perception_instructions,
                     response_format=EB_PERCEPTION_ONLY_RESPONSE_FORMAT,
@@ -737,7 +820,7 @@ Provide analysis highlighting:
                     message = _prepend_rejection_notice(message, prev_validation_error_1b)
 
                 # Attach sample images on the first turn only; subsequent turns rely on history.
-                turn_images = sample_obs_images if turn == 0 else None
+                turn_images = track1b_sample_obs_images if turn == 0 else None
 
                 _beliefs_unused, perception, turn_cost, perception_conv_1b, response_text, prev_validation_error_1b = asyncio.run(
                     _improve_with_perception_validation_conversational(
@@ -746,9 +829,9 @@ Provide analysis highlighting:
                         perception=perception,
                         conversation_history=perception_conv_1b,
                         user_message=message,
-                        sample_observations=sample_obs,
+                        sample_observations=track1b_sample_obs,
                         images=turn_images,
-                        sample_histories=sample_obs_histories,
+                        sample_histories=track1b_sample_obs_histories,
                         history_window=hist_window,
                     )
                 )
@@ -768,8 +851,8 @@ Provide analysis highlighting:
                     break
 
                 prev_obs_section_1b = _build_obs_section(
-                    perception, sample_obs,
-                    sample_histories=sample_obs_histories, history_window=hist_window,
+                    perception, track1b_sample_obs,
+                    sample_histories=track1b_sample_obs_histories, history_window=hist_window,
                     display_tail=display_tail,
                 )
 
@@ -1030,6 +1113,109 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
 # ---------------------------------------------------------------------------
 
 
+async def select_tied_b_diff_question(
+    config: DictConfig,
+    *,
+    qa_pairs: list[EBQAPair],
+    tied_source_indices: list[int],
+    top_score: float,
+    beliefs: str,
+    default_knowledge: str,
+) -> tuple[int | None, float, dict]:
+    """Use an LLM to choose one target question from tied top b-diff scores."""
+    if len(tied_source_indices) <= 1:
+        return (
+            tied_source_indices[0] if tied_source_indices else None,
+            0.0,
+            {
+                "executed": False,
+                "reason": "no_top_score_tie",
+                "top_score": top_score,
+                "candidate_source_indices": tied_source_indices,
+            },
+        )
+
+    tied_questions_text = "\n".join(
+        f'Q{i + 1} (score={top_score:.6f}, source_step={qa_pairs[i].source_step}): '
+        f"{qa_pairs[i].question}"
+        for i in tied_source_indices
+    )
+    default_knowledge_section = ""
+    if default_knowledge:
+        default_knowledge_section = f"""
+=== DEFAULT KNOWLEDGE ===
+{default_knowledge}
+=== END DEFAULT KNOWLEDGE ===
+"""
+    prompt = f"""You are selecting the next experiment target for an agent learning an environment.
+
+{default_knowledge_section}
+
+=== CURRENT BELIEFS ===
+{beliefs}
+=== END CURRENT BELIEFS ===
+
+=== AVAILABLE QUESTIONS ===
+{tied_questions_text}
+=== AVAILABLE QUESTIONS ===
+
+Select questions that will -
+1. be most valuable to answer next
+2. cover distinct aspects of the environment
+
+
+Use each question's Q number in the <q n="..."> attribute. Format your response as:
+<think>
+Which questions should be selected?
+</think>
+<selected_question>
+<q n="Q1" />
+</selected_question>"""
+
+    text, cost = await _llm_call(config, prompt)
+    selected_text = extract_xml_key(text, "selected_question") or ""
+    tied_set = set(tied_source_indices)
+    selected_source_index: int | None = None
+    for idx in _parse_q_tag_indices(selected_text, len(qa_pairs)):
+        if idx in tied_set:
+            selected_source_index = idx
+            break
+    if selected_source_index is None:
+        for match in re.finditer(r"\d+", selected_text):
+            idx = int(match.group(0)) - 1
+            if idx in tied_set:
+                selected_source_index = idx
+                break
+
+    parse_error = None
+    if selected_source_index is None:
+        selected_source_index = tied_source_indices[0]
+        parse_error = "No valid tied source_index parsed; fell back to first ranked tied question"
+
+    tie_break_log = {
+        "executed": True,
+        "reason": "multiple_top_score_tie",
+        "top_score": top_score,
+        "candidate_source_indices": tied_source_indices,
+        "candidate_questions": [
+            {
+                "source_index": i,
+                "question": qa_pairs[i].question,
+                "source_step": qa_pairs[i].source_step,
+                "score": top_score,
+            }
+            for i in tied_source_indices
+        ],
+        "selected_source_index": selected_source_index,
+        "selected_question": qa_pairs[selected_source_index].question,
+        "prompt": prompt,
+        "response": text,
+    }
+    if parse_error:
+        tie_break_log["parse_error"] = parse_error
+    return selected_source_index, cost, tie_break_log
+
+
 def run_stepwise_eb_learn_episode(
     config: DictConfig,
     eb_config: StepwiseEBLearnConfig,
@@ -1212,14 +1398,19 @@ def run_stepwise_eb_learn_episode(
                     hide_raw_obs_when_image=eb_config.hide_obs_when_image,
                     include_trailing_state=False,
                 )
-                exp_steps_context, exp_steps_context_images = _images_for_steps_context(
+                q_steps_context, q_steps_context_images = _images_for_steps_context(
                     trajectory_buffer, exp_steps_context,
                 )
+                exp_steps_context, exp_steps_context_images = _images_for_steps_context(
+                    trajectory_buffer,
+                    exp_steps_context,
+                    max_images=eb_config.max_images_context,
+                )
                 q_steps_context = (
-                    "" if eb_config.question_gen_current_state_only else exp_steps_context
+                    "" if eb_config.question_gen_current_state_only else q_steps_context
                 )
                 q_steps_context_images = (
-                    [] if eb_config.question_gen_current_state_only else exp_steps_context_images
+                    [] if eb_config.question_gen_current_state_only else q_steps_context_images
                 )
                 with improve_logging(step_dir):
                     # Step 1: Generate questions
@@ -1250,7 +1441,251 @@ def run_stepwise_eb_learn_episode(
                         f"[g{global_step}] Generated {len(new_questions)} questions — cost: ${q_cost:.6f}"
                     )
 
-                    # Step 2: Formulate experiment from question
+                    # Step 2: De-duplicate the maintained bank, then select a
+                    # capped probe subset for this experiment prompt. Unlike
+                    # the old trim path, low-scoring questions remain in the
+                    # maintained bank for future scoring/projection coverage.
+                    selection_cost_total = 0.0
+                    qa_pairs_for_experiment = list(qa_pairs)
+                    selected_source_indices = list(range(len(qa_pairs)))
+                    scoring_method = eb_config.question_scoring_method
+
+                    qa_pairs, dedup_cost, dedup_log = asyncio.run(
+                        deduplicate_qa_pairs(
+                            config=config,
+                            current_qa=qa_pairs,
+                        )
+                    )
+                    selection_cost_total += dedup_cost
+
+                    (
+                        qa_pairs_for_experiment,
+                        selected_source_indices,
+                        select_cost,
+                        selection_log,
+                    ) = asyncio.run(
+                        select_qa_pairs_for_experiment(
+                            config=config,
+                            current_qa=qa_pairs,
+                            max_answered_qa_pairs=eb_config.max_answered_qa_pairs,
+                            max_unanswered_qa_pairs=eb_config.max_unanswered_qa_pairs,
+                            default_knowledge=default_knowledge,
+                            beliefs=beliefs,
+                        )
+                    )
+                    selection_cost_total += select_cost
+
+                    scoring_log: dict | None = None
+                    ranked_unanswered_indices: list[int] = []
+                    target_experiment_question_index: int | None = None
+                    target_experiment_question_source_index: int | None = None
+                    if scoring_method in ("b_diff_full", "b_diff_light"):
+                        from question_scoring import score_questions_b_diff
+
+                        candidate_indices = [
+                            i for i in selected_source_indices
+                            if qa_pairs[i].answer is None
+                        ]
+                        method_suffix = (
+                            "full" if scoring_method == "b_diff_full" else "light"
+                        )
+                        scores, score_cost, scoring_log = asyncio.run(
+                            score_questions_b_diff(
+                                config=config,
+                                beliefs=beliefs,
+                                qa_pairs=qa_pairs,
+                                method=method_suffix,
+                                include_policy=eb_config.include_policy,
+                                max_concurrent=eb_config.question_scoring_max_concurrent,
+                                candidate_indices=candidate_indices,
+                                default_knowledge=default_knowledge,
+                            )
+                        )
+                        selection_cost_total += score_cost
+
+                        ranked_unanswered_indices = sorted(
+                            candidate_indices,
+                            key=lambda i: (scores.get(i, 0.0), qa_pairs[i].source_step),
+                            reverse=True,
+                        )
+                        tied_top_indices: list[int] = []
+                        tie_break_log: dict = {
+                            "executed": False,
+                            "reason": "no_unanswered_candidates",
+                            "candidate_source_indices": [],
+                        }
+                        selected_tied_source_index: int | None = None
+                        if ranked_unanswered_indices:
+                            top_score = scores.get(ranked_unanswered_indices[0], 0.0)
+                            tied_top_indices = [
+                                i
+                                for i in ranked_unanswered_indices
+                                if scores.get(i, 0.0) == top_score
+                            ]
+                            if len(tied_top_indices) > 1:
+                                (
+                                    selected_tied_source_index,
+                                    tie_break_cost,
+                                    tie_break_log,
+                                ) = asyncio.run(
+                                    select_tied_b_diff_question(
+                                        config=config,
+                                        qa_pairs=qa_pairs,
+                                        tied_source_indices=tied_top_indices,
+                                        top_score=top_score,
+                                        beliefs=beliefs,
+                                        default_knowledge=default_knowledge,
+                                    )
+                                )
+                                selection_cost_total += tie_break_cost
+                            else:
+                                selected_tied_source_index = ranked_unanswered_indices[0]
+                                tie_break_log = {
+                                    "executed": False,
+                                    "reason": "no_top_score_tie",
+                                    "top_score": top_score,
+                                    "candidate_source_indices": tied_top_indices,
+                                    "selected_source_index": selected_tied_source_index,
+                                    "selected_question": qa_pairs[selected_tied_source_index].question,
+                                }
+                        selected_answered_indices = [
+                            i for i in selected_source_indices
+                            if qa_pairs[i].answer is not None
+                        ]
+                        ranked_source_indices = (
+                            ranked_unanswered_indices + selected_answered_indices
+                        )
+                        qa_pairs_for_experiment = [
+                            qa_pairs[i] for i in ranked_source_indices
+                        ]
+                        selected_source_indices = ranked_source_indices
+                        if selected_tied_source_index is not None:
+                            target_experiment_question_source_index = selected_tied_source_index
+                            target_experiment_question_index = selected_source_indices.index(
+                                selected_tied_source_index
+                            )
+
+                        scoring_log["ranked_unanswered"] = [
+                            {
+                                "idx": i,
+                                "question": qa_pairs[i].question,
+                                "source_step": qa_pairs[i].source_step,
+                                "score": scores.get(i, 0.0),
+                            }
+                            for i in ranked_unanswered_indices
+                        ]
+                        scoring_log["selected_probe_indices"] = candidate_indices
+                        scoring_log["selected_probe_questions"] = [
+                            qa_pairs[i].question for i in candidate_indices
+                        ]
+                        scoring_log["tie_break"] = tie_break_log
+                        scoring_log["projection_question_count"] = sum(
+                            1 for q in qa_pairs if q.answer is None
+                        )
+                        scoring_log["target_experiment_question_source_index"] = (
+                            target_experiment_question_source_index
+                        )
+                        scoring_log["target_experiment_question"] = (
+                            qa_pairs[target_experiment_question_source_index].question
+                            if target_experiment_question_source_index is not None
+                            else None
+                        )
+                    elif scoring_method != "llm_trim":
+                        raise ValueError(
+                            f"Unknown question_scoring_method: {scoring_method!r}"
+                        )
+
+                    step_trim_log = {
+                        "method": f"probe_selection_{scoring_method}",
+                        "pre_trim_count": dedup_log.get("pre_dedup_count"),
+                        "post_trim_count": len(qa_pairs),
+                        "pre_trim_answered": dedup_log.get("pre_dedup_answered"),
+                        "post_trim_answered": sum(
+                            1 for q in qa_pairs if q.answer is not None
+                        ),
+                        "pre_trim_unanswered": dedup_log.get("pre_dedup_unanswered"),
+                        "post_trim_unanswered": sum(
+                            1 for q in qa_pairs if q.answer is None
+                        ),
+                        "max_answered_qa_pairs": eb_config.max_answered_qa_pairs,
+                        "max_unanswered_qa_pairs": eb_config.max_unanswered_qa_pairs,
+                        "dropped_count": dedup_log.get("dropped_count", 0),
+                        "total_cost": selection_cost_total,
+                        "dedup": dedup_log,
+                        "selection": selection_log,
+                        "scoring": scoring_log,
+                        "maintained_bank_preserved": True,
+                        "experiment_source_indices": selected_source_indices,
+                        "target_experiment_prompt_index": target_experiment_question_index,
+                        "target_experiment_source_index": target_experiment_question_source_index,
+                        "target_experiment_question": (
+                            qa_pairs[target_experiment_question_source_index].question
+                            if target_experiment_question_source_index is not None
+                            else None
+                        ),
+                        "experiment_questions": [
+                            {
+                                "source_index": i,
+                                "question": qa_pairs[i].question,
+                                "answer": qa_pairs[i].answer,
+                                "source_step": qa_pairs[i].source_step,
+                            }
+                            for i in selected_source_indices
+                        ],
+                    }
+                    step_trim_cost = selection_cost_total
+                    total_learn_cost += selection_cost_total
+                    did_trim_step = bool(dedup_log.get("dropped_count", 0))
+
+                    with open(step_dir / "trim_log.json", "w") as f:
+                        json.dump(step_trim_log, f, indent=4, default=str)
+                    with open(step_dir / "question_selection_log.json", "w") as f:
+                        json.dump(step_trim_log, f, indent=4, default=str)
+                    if scoring_log is not None:
+                        method_suffix = (
+                            "full" if scoring_method == "b_diff_full" else "light"
+                        )
+                        scoring_artifact = {
+                            "step": global_step,
+                            "method": method_suffix,
+                            "source": "online_probe_selection",
+                            "did_trim": False,
+                            "num_qa_before_trim": step_trim_log.get("pre_trim_count"),
+                            "num_qa_after_trim": step_trim_log.get("post_trim_count"),
+                            "num_answered_before_trim": step_trim_log.get("pre_trim_answered"),
+                            "num_answered_after_trim": step_trim_log.get("post_trim_answered"),
+                            "num_unanswered_before_trim": step_trim_log.get("pre_trim_unanswered"),
+                            "num_unanswered_after_trim": step_trim_log.get("post_trim_unanswered"),
+                            "cap_answered": step_trim_log.get("max_answered_qa_pairs"),
+                            "cap_unanswered": step_trim_log.get("max_unanswered_qa_pairs"),
+                            "dropped_count": step_trim_log.get("dropped_count"),
+                            "cost_usd": selection_cost_total,
+                            "ranked_unanswered": scoring_log.get("ranked_unanswered", []),
+                            "kept_unanswered_questions": [
+                                qa_pairs[i].question for i in ranked_unanswered_indices
+                            ],
+                            "dropped_unanswered_questions": [],
+                            "tie_break": scoring_log.get("tie_break"),
+                            "scoring_log": scoring_log,
+                            "selection_log": selection_log,
+                            "dedup_log": dedup_log,
+                        }
+                        with open(
+                            step_dir / f"scoring_online_{method_suffix}.json", "w"
+                        ) as f:
+                            json.dump(scoring_artifact, f, indent=4, default=str)
+                    with open(step_dir / "qa_pairs.json", "w") as f:
+                        json.dump(serialize_eb_qa_pairs(qa_pairs), f, indent=4)
+
+                    num_unanswered = sum(1 for q in qa_pairs if q.answer is None)
+                    evolve_logger.info(
+                        f"[g{global_step}] Question selection done — "
+                        f"bank QA: {len(qa_pairs)} ({num_unanswered} unanswered), "
+                        f"experiment prompt QA: {len(qa_pairs_for_experiment)}, "
+                        f"cost: ${selection_cost_total:.6f}"
+                    )
+
+                    # Step 3: Formulate experiment from question
                     evolve_logger.info(f"[g{global_step}] Formulating experiment from questions...")
                     experiment_plan, q_idx, e_cost, e_prompt, e_response = asyncio.run(
                         formulate_experiment_from_question(
@@ -1258,7 +1693,7 @@ def run_stepwise_eb_learn_episode(
                             beliefs=beliefs,
                             perception_code=perception,
                             steps_context=exp_steps_context,
-                            current_qa=qa_pairs,
+                            current_qa=qa_pairs_for_experiment,
                             current_experiment=current_experiment,
                             current_observation=_pre_action_raw_long,
                             current_aux_observation=_pre_action_raw_short,
@@ -1266,6 +1701,7 @@ def run_stepwise_eb_learn_episode(
                             current_image=_pre_action_image,
                             steps_context_images=exp_steps_context_images,
                             hide_raw_obs=eb_config.hide_obs_when_image,
+                            target_question_index=target_experiment_question_index,
                         )
                     )
                     step_experiment_cost += e_cost
@@ -1278,16 +1714,15 @@ def run_stepwise_eb_learn_episode(
                         current_experiment = experiment_plan
                         did_formulate_experiment = True
 
-                    # Experiment prompts always use trajectory images plus the
-                    # current pre-action image. Question prompts normally share
-                    # that sequence, but current-state-only question prompts
-                    # renumber the current image to image 1, so save a separate
-                    # one-image sequence for viewer alignment.
-                    shared_prompt_images = list(exp_steps_context_images or [])
+                    # Experiment prompts use the capped trajectory-image
+                    # sequence plus the current pre-action image. Question
+                    # prompts keep their own sequence so the saved prompt
+                    # images match the exact attachments used for each call.
+                    exp_prompt_images = list(exp_steps_context_images or [])
                     if _pre_action_image is not None:
-                        shared_prompt_images.append(_pre_action_image)
+                        exp_prompt_images.append(_pre_action_image)
                     exp_image_paths = _save_prompt_images(
-                        shared_prompt_images, step_dir, "experiment_log_images",
+                        exp_prompt_images, step_dir, "experiment_log_images",
                     )
                     if eb_config.question_gen_current_state_only:
                         q_image_paths = _save_prompt_images(
@@ -1296,7 +1731,17 @@ def run_stepwise_eb_learn_episode(
                             "question_gen_log_images",
                         )
                     else:
-                        q_image_paths = exp_image_paths
+                        q_prompt_images = list(q_steps_context_images or [])
+                        if _pre_action_image is not None:
+                            q_prompt_images.append(_pre_action_image)
+                        if q_prompt_images == exp_prompt_images:
+                            q_image_paths = exp_image_paths
+                        else:
+                            q_image_paths = _save_prompt_images(
+                                q_prompt_images,
+                                step_dir,
+                                "question_gen_log_images",
+                            )
 
                     step_experiment_log = {
                         "question_gen_prompt": q_prompt,
@@ -1308,6 +1753,24 @@ def run_stepwise_eb_learn_episode(
                         "experiment_image_paths": exp_image_paths,
                         "experiment_plan": experiment_plan,
                         "selected_question_index": q_idx,
+                        "selected_question_source_index": (
+                            selected_source_indices[q_idx]
+                            if q_idx is not None
+                            and 0 <= q_idx < len(selected_source_indices)
+                            else None
+                        ),
+                        "target_question_index": target_experiment_question_index,
+                        "target_question_source_index": target_experiment_question_source_index,
+                        "target_question": (
+                            qa_pairs[target_experiment_question_source_index].question
+                            if target_experiment_question_source_index is not None
+                            else None
+                        ),
+                        "question_selection_method": scoring_method,
+                        "qa_pairs_for_experiment": serialize_eb_qa_pairs(
+                            qa_pairs_for_experiment
+                        ),
+                        "qa_pairs_for_experiment_source_indices": selected_source_indices,
                         "qa_pairs_at_formulation": serialize_eb_qa_pairs(qa_pairs),
                     }
 
@@ -1332,9 +1795,10 @@ def run_stepwise_eb_learn_episode(
                 step_dir=step_dir, step=step, global_step=global_step,
                 action=None, reward=0.0, done=False, episode_return=episode_return,
                 agent_cost=0.0, extract_cost=0.0, improve_cost=0.0, experiment_cost=step_experiment_cost,
-                trim_cost=0.0,
+                trim_cost=step_trim_cost,
                 num_qa=len(qa_pairs), num_unanswered=num_unanswered,
                 did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                did_trim=did_trim_step,
                 active_experiment=current_experiment, phase="acting",
             )
 
@@ -1429,9 +1893,10 @@ def run_stepwise_eb_learn_episode(
                 step_dir=step_dir, step=step, global_step=global_step,
                 action=action, reward=reward, done=done, episode_return=episode_return,
                 agent_cost=agent_step_cost, extract_cost=0.0, improve_cost=0.0, experiment_cost=step_experiment_cost,
-                trim_cost=0.0,
+                trim_cost=step_trim_cost,
                 num_qa=len(qa_pairs), num_unanswered=num_unanswered,
                 did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                did_trim=did_trim_step,
                 active_experiment=current_experiment, phase="extracting",
                 env_info=info if isinstance(info, dict) else None,
             )
@@ -1494,7 +1959,9 @@ def run_stepwise_eb_learn_episode(
                     hide_raw_obs_when_image=eb_config.hide_obs_when_image,
                 )
                 steps_context, steps_context_images_update = _images_for_steps_context(
-                    trajectory_buffer, steps_context,
+                    trajectory_buffer,
+                    steps_context,
+                    max_images=eb_config.max_images_context,
                 )
                 with improve_logging(step_dir):
                     qa_pairs, extract_cost, step_extraction_log = asyncio.run(
@@ -1527,43 +1994,6 @@ def run_stepwise_eb_learn_episode(
                     f"[g{global_step}] Q update done — "
                     f"QA: {len(qa_pairs)} ({num_unanswered} unanswered), cost: ${extract_cost:.6f}"
                 )
-
-                # --- Trim Q if over either status-specific limit ---
-                num_answered = sum(1 for q in qa_pairs if q.answer is not None)
-                num_unanswered = sum(1 for q in qa_pairs if q.answer is None)
-                if (
-                    num_answered > eb_config.max_answered_qa_pairs
-                    or num_unanswered > eb_config.max_unanswered_qa_pairs
-                ):
-                    evolve_logger.info(
-                        f"[g{global_step}] Trimming Q: answered "
-                        f"{num_answered}/{eb_config.max_answered_qa_pairs}, "
-                        f"unanswered {num_unanswered}/{eb_config.max_unanswered_qa_pairs}..."
-                    )
-                    with improve_logging(step_dir):
-                        qa_pairs, trim_cost_val, step_trim_log = asyncio.run(
-                            trim_qa_pairs(
-                                config=config,
-                                current_qa=qa_pairs,
-                                max_answered_qa_pairs=eb_config.max_answered_qa_pairs,
-                                max_unanswered_qa_pairs=eb_config.max_unanswered_qa_pairs,
-                                current_step=global_step,
-                            )
-                        )
-                        step_trim_cost = trim_cost_val
-                        total_learn_cost += trim_cost_val
-                        did_trim_step = True
-
-                    with open(step_dir / "trim_log.json", "w") as f:
-                        json.dump(step_trim_log, f, indent=4, default=str)
-                    with open(step_dir / "qa_pairs.json", "w") as f:
-                        json.dump(serialize_eb_qa_pairs(qa_pairs), f, indent=4)
-
-                    num_unanswered = sum(1 for q in qa_pairs if q.answer is None)
-                    evolve_logger.info(
-                        f"[g{global_step}] Trim done — "
-                        f"QA: {len(qa_pairs)} ({num_unanswered} unanswered), cost: ${trim_cost_val:.6f}"
-                    )
 
                 # Update step_log: extraction done, improve starting
                 _save_step_log_eb(
@@ -1839,7 +2269,10 @@ def stepwise_eb_learn(
     evolve_logger.info(f"  Num questions per gen: {eb_config.num_questions}")
     evolve_logger.info(f"  Max answered QA pairs: {eb_config.max_answered_qa_pairs}")
     evolve_logger.info(f"  Max unanswered QA pairs: {eb_config.max_unanswered_qa_pairs}")
+    evolve_logger.info(f"  Question scoring method: {eb_config.question_scoring_method}")
+    evolve_logger.info(f"  Question scoring max concurrent: {eb_config.question_scoring_max_concurrent}")
     evolve_logger.info(f"  Max steps context chars: {eb_config.max_steps_context_chars}")
+    evolve_logger.info(f"  Max images context: {eb_config.max_images_context}")
     evolve_logger.info(f"  Explore temp: {eb_config.explore_temp}")
     evolve_logger.info(f"  Question gen current-state only: {eb_config.question_gen_current_state_only}")
     evolve_logger.info(f"  Include policy: {eb_config.include_policy}")
@@ -1952,11 +2385,14 @@ def main(config: DictConfig):
         improve_interval=evolve_cfg.get("improve_interval", 5),
         experiment_interval=evolve_cfg.get("experiment_interval", 10),
         max_steps_context_chars=evolve_cfg.get("max_steps_context_chars", 50000),
+        max_images_context=evolve_cfg.get("max_images_context", 10),
         perception_history_window=evolve_cfg.get("perception_history_window", 10),
         perception_input_tail=evolve_cfg.get("perception_input_tail", 2),
         hide_obs_when_image=evolve_cfg.get("hide_obs_when_image", False),
         question_gen_current_state_only=evolve_cfg.get("question_gen_current_state_only", False),
         include_policy=evolve_cfg.get("include_policy", True),
+        question_scoring_method=evolve_cfg.get("question_scoring_method", "b_diff_light"),
+        question_scoring_max_concurrent=evolve_cfg.get("question_scoring_max_concurrent", 8),
         mock_mode=evolve_cfg.get("mock_mode", False),
     )
 

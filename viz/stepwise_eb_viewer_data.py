@@ -43,6 +43,34 @@ def write_json(path, obj):
         f.write("\n")
 
 
+def ordered_qa_pairs_for_display(qa_pairs, question_selection_log=None, experiment_log=None):
+    """Return QA pairs in experiment-selection order, plus source indices."""
+    if not isinstance(qa_pairs, list):
+        return [], []
+    question_selection_log = question_selection_log or {}
+    experiment_log = experiment_log or {}
+
+    order = experiment_log.get("qa_pairs_for_experiment_source_indices")
+    if not isinstance(order, list) or not order:
+        order = question_selection_log.get("experiment_source_indices")
+    if not isinstance(order, list) or not order:
+        return list(qa_pairs), None
+
+    ordered_indices = []
+    seen = set()
+    for raw_idx in order:
+        if not isinstance(raw_idx, int):
+            continue
+        if 0 <= raw_idx < len(qa_pairs) and raw_idx not in seen:
+            ordered_indices.append(raw_idx)
+            seen.add(raw_idx)
+    for idx in range(len(qa_pairs)):
+        if idx not in seen:
+            ordered_indices.append(idx)
+
+    return [qa_pairs[idx] for idx in ordered_indices], ordered_indices
+
+
 def is_safe_step_image_path(path):
     """Return True for step-local PNG paths that are safe to serve/copy."""
     if not isinstance(path, str) or not path:
@@ -276,6 +304,7 @@ def load_log_dir(log_dir):
                 "has_improve_log": os.path.exists(os.path.join(s_path, "improve.log")),
                 "has_extraction_log": os.path.exists(os.path.join(s_path, "extraction_log.json")),
                 "has_trim_log": os.path.exists(os.path.join(s_path, "trim_log.json")),
+                "has_question_selection_log": os.path.exists(os.path.join(s_path, "question_selection_log.json")),
                 "has_experiment_log": os.path.exists(os.path.join(s_path, "experiment_log.json")),
                 "has_agent_messages": os.path.exists(os.path.join(s_path, "agent_messages.json")),
                 "has_obs_before": os.path.exists(os.path.join(s_path, "obs_before.png")),
@@ -315,17 +344,169 @@ def load_step_detail(log_dir, episode_idx, step_idx):
     step_path = os.path.join(log_dir, f"episode_{episode_idx}", f"step_{step_idx:03d}")
     if not os.path.isdir(step_path):
         return {"error": f"Step dir not found: {step_path}"}
+    trim_log = read_json(os.path.join(step_path, "trim_log.json")) or {}
+    question_selection_log = read_json(os.path.join(step_path, "question_selection_log.json")) or {}
+    selection_source_log = question_selection_log or trim_log
+    question_scoring = {
+        "online_full": read_json(os.path.join(step_path, "scoring_online_full.json")),
+        "online_light": read_json(os.path.join(step_path, "scoring_online_light.json")),
+        "offline_full": read_json(os.path.join(step_path, "scoring_offline_full.json")),
+        "offline_light": read_json(os.path.join(step_path, "scoring_offline_light.json")),
+    }
+    if (
+        question_scoring["online_full"] is None
+        and trim_log.get("method") == "b_diff_full"
+        and isinstance(trim_log.get("scoring"), dict)
+    ):
+        question_scoring["online_full"] = {
+            "step": step_idx,
+            "method": "full",
+            "source": "online_trim",
+            "num_qa_before_trim": trim_log.get("pre_trim_count"),
+            "num_qa_after_trim": trim_log.get("post_trim_count"),
+            "num_answered_before_trim": trim_log.get("pre_trim_answered"),
+            "num_answered_after_trim": trim_log.get("post_trim_answered"),
+            "num_unanswered_before_trim": trim_log.get("pre_trim_unanswered"),
+            "num_unanswered_after_trim": trim_log.get("post_trim_unanswered"),
+            "cap_answered": trim_log.get("max_answered_qa_pairs"),
+            "cap_unanswered": trim_log.get("max_unanswered_qa_pairs"),
+            "dropped_count": trim_log.get("dropped_count"),
+            "cost_usd": trim_log.get("total_cost"),
+            "ranked_unanswered": trim_log["scoring"].get("ranked_unanswered", []),
+            "kept_unanswered_questions": trim_log["scoring"].get("kept_unanswered_questions", []),
+            "dropped_unanswered_questions": trim_log["scoring"].get("dropped_unanswered_questions", []),
+            "tie_break": trim_log["scoring"].get("tie_break"),
+            "scoring_log": trim_log.get("scoring"),
+        }
+    if (
+        question_scoring["online_full"] is None
+        and selection_source_log.get("method") == "probe_selection_b_diff_full"
+        and isinstance(selection_source_log.get("scoring"), dict)
+    ):
+        scoring = selection_source_log["scoring"]
+        question_scoring["online_full"] = {
+            "step": step_idx,
+            "method": "full",
+            "source": "online_probe_selection",
+            "did_trim": False,
+            "num_qa_before_trim": selection_source_log.get("pre_trim_count"),
+            "num_qa_after_trim": selection_source_log.get("post_trim_count"),
+            "num_answered_before_trim": selection_source_log.get("pre_trim_answered"),
+            "num_answered_after_trim": selection_source_log.get("post_trim_answered"),
+            "num_unanswered_before_trim": selection_source_log.get("pre_trim_unanswered"),
+            "num_unanswered_after_trim": selection_source_log.get("post_trim_unanswered"),
+            "num_unanswered_scored": scoring.get("num_unanswered_scored"),
+            "num_unanswered_projection": scoring.get("num_unanswered_projection"),
+            "cap_answered": selection_source_log.get("max_answered_qa_pairs"),
+            "cap_unanswered": selection_source_log.get("max_unanswered_qa_pairs"),
+            "dropped_count": selection_source_log.get("dropped_count"),
+            "cost_usd": selection_source_log.get("total_cost"),
+            "ranked_unanswered": scoring.get("ranked_unanswered", []),
+            "kept_unanswered_questions": scoring.get("selected_probe_questions", []),
+            "dropped_unanswered_questions": [],
+            "tie_break": scoring.get("tie_break"),
+            "scoring_log": scoring,
+            "selection_log": selection_source_log.get("selection"),
+            "dedup_log": selection_source_log.get("dedup"),
+            "experiment_questions": selection_source_log.get("experiment_questions", []),
+            "maintained_bank_preserved": selection_source_log.get("maintained_bank_preserved"),
+        }
+    if (
+        question_scoring["online_light"] is None
+        and trim_log.get("method") == "b_diff_light"
+        and isinstance(trim_log.get("scoring"), dict)
+    ):
+        question_scoring["online_light"] = {
+            "step": step_idx,
+            "method": "light",
+            "source": "online_trim",
+            "num_qa_before_trim": trim_log.get("pre_trim_count"),
+            "num_qa_after_trim": trim_log.get("post_trim_count"),
+            "num_answered_before_trim": trim_log.get("pre_trim_answered"),
+            "num_answered_after_trim": trim_log.get("post_trim_answered"),
+            "num_unanswered_before_trim": trim_log.get("pre_trim_unanswered"),
+            "num_unanswered_after_trim": trim_log.get("post_trim_unanswered"),
+            "cap_answered": trim_log.get("max_answered_qa_pairs"),
+            "cap_unanswered": trim_log.get("max_unanswered_qa_pairs"),
+            "dropped_count": trim_log.get("dropped_count"),
+            "cost_usd": trim_log.get("total_cost"),
+            "ranked_unanswered": trim_log["scoring"].get("ranked_unanswered", []),
+            "kept_unanswered_questions": trim_log["scoring"].get("kept_unanswered_questions", []),
+            "dropped_unanswered_questions": trim_log["scoring"].get("dropped_unanswered_questions", []),
+            "tie_break": trim_log["scoring"].get("tie_break"),
+            "scoring_log": trim_log.get("scoring"),
+        }
+    if (
+        question_scoring["online_light"] is None
+        and selection_source_log.get("method") == "probe_selection_b_diff_light"
+        and isinstance(selection_source_log.get("scoring"), dict)
+    ):
+        scoring = selection_source_log["scoring"]
+        question_scoring["online_light"] = {
+            "step": step_idx,
+            "method": "light",
+            "source": "online_probe_selection",
+            "did_trim": False,
+            "num_qa_before_trim": selection_source_log.get("pre_trim_count"),
+            "num_qa_after_trim": selection_source_log.get("post_trim_count"),
+            "num_answered_before_trim": selection_source_log.get("pre_trim_answered"),
+            "num_answered_after_trim": selection_source_log.get("post_trim_answered"),
+            "num_unanswered_before_trim": selection_source_log.get("pre_trim_unanswered"),
+            "num_unanswered_after_trim": selection_source_log.get("post_trim_unanswered"),
+            "num_unanswered_scored": scoring.get("num_unanswered_scored"),
+            "num_unanswered_projection": scoring.get("num_unanswered_projection"),
+            "cap_answered": selection_source_log.get("max_answered_qa_pairs"),
+            "cap_unanswered": selection_source_log.get("max_unanswered_qa_pairs"),
+            "dropped_count": selection_source_log.get("dropped_count"),
+            "cost_usd": selection_source_log.get("total_cost"),
+            "ranked_unanswered": scoring.get("ranked_unanswered", []),
+            "kept_unanswered_questions": scoring.get("selected_probe_questions", []),
+            "dropped_unanswered_questions": [],
+            "tie_break": scoring.get("tie_break"),
+            "scoring_log": scoring,
+            "selection_log": selection_source_log.get("selection"),
+            "dedup_log": selection_source_log.get("dedup"),
+            "experiment_questions": selection_source_log.get("experiment_questions", []),
+            "maintained_bank_preserved": selection_source_log.get("maintained_bank_preserved"),
+        }
+    for key in ("online_full", "online_light"):
+        artifact = question_scoring.get(key)
+        if not isinstance(artifact, dict):
+            continue
+        scoring = artifact.get("scoring_log") or {}
+        if "num_unanswered_projection" not in artifact and isinstance(scoring, dict):
+            artifact["num_unanswered_projection"] = scoring.get("num_unanswered_projection")
+        if selection_source_log.get("method", "").startswith("probe_selection_"):
+            artifact.setdefault("selection_log", selection_source_log.get("selection"))
+            artifact.setdefault("dedup_log", selection_source_log.get("dedup"))
+            artifact.setdefault("experiment_questions", selection_source_log.get("experiment_questions", []))
+            artifact.setdefault("maintained_bank_preserved", selection_source_log.get("maintained_bank_preserved"))
+        if "tie_break" not in artifact and isinstance(scoring, dict):
+            artifact["tie_break"] = scoring.get("tie_break")
+    qa_pairs = read_json(os.path.join(step_path, "qa_pairs.json")) or []
+    experiment_log = read_json(os.path.join(step_path, "experiment_log.json")) or {}
+    ordered_qa_pairs, ordered_qa_source_indices = ordered_qa_pairs_for_display(
+        qa_pairs,
+        question_selection_log=selection_source_log,
+        experiment_log=experiment_log,
+    )
     detail = {
         "beliefs": read_file(os.path.join(step_path, "beliefs.txt")),
         "perception": read_file(os.path.join(step_path, "perception.py")),
-        "qa_pairs": read_json(os.path.join(step_path, "qa_pairs.json")) or [],
+        "qa_pairs": qa_pairs,
+        "qa_pairs_ordered": ordered_qa_pairs,
+        "qa_pairs_ordered_source_indices": ordered_qa_source_indices,
         "feedback_history": read_json(os.path.join(step_path, "feedback_history.json")) or [],
         "extraction_log": read_json(os.path.join(step_path, "extraction_log.json")) or {},
-        "trim_log": read_json(os.path.join(step_path, "trim_log.json")) or {},
-        "experiment_log": read_json(os.path.join(step_path, "experiment_log.json")) or {},
+        "trim_log": trim_log,
+        "question_selection_log": question_selection_log,
+        "experiment_log": experiment_log,
         "agent_messages": read_json(os.path.join(step_path, "agent_messages.json")) or [],
         "improve_log": read_file(os.path.join(step_path, "improve.log")),
         "step_log": read_json(os.path.join(step_path, "step_log.json")) or {},
+        "question_scoring": {
+            key: value for key, value in question_scoring.items() if value is not None
+        },
     }
     # Include image availability flags
     detail["has_obs_before"] = os.path.exists(os.path.join(step_path, "obs_before.png"))
@@ -486,13 +667,23 @@ def load_experiment_timeline(log_dir):
             new_questions = exp_log.get("new_questions", [])
             experiment_plan = exp_log.get("experiment_plan")
             selected_q_idx = exp_log.get("selected_question_index")
+            selected_q_source_idx = exp_log.get("selected_question_source_index")
 
             # Try to resolve the selected question text from qa_pairs
             selected_question_text = None
             if selected_q_idx is not None:
-                qa_pairs = read_json(os.path.join(s_path, "qa_pairs.json")) or []
-                if 0 <= selected_q_idx < len(qa_pairs):
-                    selected_question_text = qa_pairs[selected_q_idx].get("question", "")
+                qa_pairs_for_experiment = exp_log.get("qa_pairs_for_experiment") or []
+                if 0 <= selected_q_idx < len(qa_pairs_for_experiment):
+                    selected_question_text = qa_pairs_for_experiment[selected_q_idx].get("question", "")
+                else:
+                    qa_pairs = exp_log.get("qa_pairs_at_formulation") or read_json(os.path.join(s_path, "qa_pairs.json")) or []
+                    fallback_idx = (
+                        selected_q_source_idx
+                        if selected_q_source_idx is not None
+                        else selected_q_idx
+                    )
+                    if 0 <= fallback_idx < len(qa_pairs):
+                        selected_question_text = qa_pairs[fallback_idx].get("question", "")
 
             total_questions_generated += len(new_questions)
             if experiment_plan:
@@ -505,6 +696,7 @@ def load_experiment_timeline(log_dir):
                 "new_questions": new_questions,
                 "experiment_plan": experiment_plan,
                 "selected_question_index": selected_q_idx,
+                "selected_question_source_index": selected_q_source_idx,
                 "selected_question_text": selected_question_text,
                 "cumulative_questions": total_questions_generated,
                 "cumulative_experiments": total_experiments_formulated,
@@ -550,14 +742,28 @@ def load_qa_timeline(log_dir):
             # Include new questions from experiment_log if available
             exp_log = read_json(os.path.join(s_path, "experiment_log.json"))
             new_questions = exp_log.get("new_questions", []) if exp_log else []
+            question_selection_log = read_json(os.path.join(s_path, "question_selection_log.json")) or {}
+            ordered_qa_pairs, ordered_source_indices = ordered_qa_pairs_for_display(
+                qa_pairs,
+                question_selection_log=question_selection_log,
+                experiment_log=exp_log or {},
+            )
 
             # Include all questions with their status
             all_questions = []
-            for qa in qa_pairs:
+            for display_idx, qa in enumerate(ordered_qa_pairs):
+                source_idx = None
+                if isinstance(ordered_source_indices, list):
+                    source_idx = (
+                        ordered_source_indices[display_idx]
+                        if display_idx < len(ordered_source_indices)
+                        else None
+                    )
                 all_questions.append({
                     "question": qa.get("question", ""),
                     "answer": qa.get("answer"),
                     "source_step": qa.get("source_step"),
+                    "source_index": source_idx,
                 })
 
             timeline.append({
