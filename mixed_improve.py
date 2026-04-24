@@ -61,6 +61,17 @@ def _mock_llm_response(prompt: str) -> str:
             "<duplicate_drop_indices>NONE</duplicate_drop_indices>"
         )
 
+    # --- Single-question tie break (_break_bdiff_tie) ---
+    if "<selected_question>" in p:
+        qs = re.findall(r"^Q(\d+)\b", p, re.MULTILINE)
+        selected = qs[0] if qs else "1"
+        return (
+            "<think>[mock] selecting tied question</think>\n"
+            "<selected_question>\n"
+            f'<q n="Q{selected}" />\n'
+            "</selected_question>"
+        )
+
     # --- Probe subset selection (select_qa_pairs_for_experiment) ---
     if "<selected_questions>" in p:
         qs = re.findall(r"^Q(\d+):", p, re.MULTILINE)
@@ -188,16 +199,24 @@ def _mock_llm_response(prompt: str) -> str:
 
     # --- QA feedback (_qa_feedback_batch) ---
     if "evaluating whether an agent's predicted answers" in p:
-        nums = re.findall(r"--- Question (\d+) ---", p)
+        nums = re.findall(r"---\s*(?:Question\s+|Q)(\d+)\s*---", p)
         blocks = []
         for n in nums:
             v = random.choices(
                 ["CORRECT", "INCORRECT", "INCONCLUSIVE"], weights=[5, 4, 1]
             )[0]
             blocks.append(
-                f"<F n={n}>\n<verdict>{v}</verdict>\n<feedback>[mock] feedback for Q{n}</feedback>\n</F n={n}>"
+                f'<q n="Q{n}">\n'
+                f"<verdict>{v}</verdict>\n"
+                f"<feedback>[mock] feedback for Q{n}</feedback>\n"
+                "</q>"
             )
-        return "\n".join(blocks) if blocks else "<F n=1>\n<verdict>INCONCLUSIVE</verdict>\n<feedback>[mock]</feedback>\n</F n=1>"
+        return "\n".join(blocks) if blocks else (
+            '<q n="Q1">\n'
+            "<verdict>INCONCLUSIVE</verdict>\n"
+            "<feedback>[mock]</feedback>\n"
+            "</q>"
+        )
 
     # --- Perception error / retry message ---
     if "previous perception code had an error" in p:

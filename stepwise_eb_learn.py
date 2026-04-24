@@ -264,6 +264,10 @@ class StepwiseEBLearnConfig:
     question_scoring_method: str = "b_diff_light"
     question_scoring_max_concurrent: int = 8
     mock_mode: bool = False
+    autumn_eval_after_learn: bool = False
+    autumn_eval_task_types: list[str] | None = None
+    autumn_eval_max_steps: int = 501
+    autumn_eval_render_mode: str = "text"
 
 
 def _resolve_schedule(value: "int | list[list[int]]", global_step: int) -> int:
@@ -2178,6 +2182,193 @@ def run_stepwise_eb_learn_episode(
     return beliefs, perception, qa_pairs, current_experiment, episode_log, step + 1, trajectory_buffer, past_experiments
 
 
+def _run_frozen_autumn_task_eval(
+    *,
+    config: DictConfig,
+    eb_config: StepwiseEBLearnConfig,
+    beliefs: str,
+    perception: str,
+    program: str,
+    task_type: str,
+    output_dir: Path,
+) -> dict:
+    """Score learned EB artifacts on one AutumnBench evaluation task."""
+    from autumn_env import AutumnBenchEnvWrapper
+
+    autumn_kwargs = getattr(getattr(config, "envs", None), "autumn_kwargs", None)
+
+    def _cfg(name: str, default):
+        if autumn_kwargs is None:
+            return default
+        value = getattr(autumn_kwargs, name, None)
+        return default if value is None else value
+
+    seed = getattr(config.envs.env_kwargs, "seed", None)
+    if seed is None:
+        seed = get_unique_seed(process_num=0, episode_idx=0)
+    env_kwargs = {
+        "env_name": program,
+        "task_type": task_type,
+        "max_episode_steps": eb_config.autumn_eval_max_steps,
+        "max_interaction_steps": int(
+            _cfg("max_interaction_steps", _cfg("max_episode_steps", 300))
+        ),
+        "seed": seed,
+        "stack_frames": bool(_cfg("stack_frames", False)),
+        "skip_frames": bool(_cfg("skip_frames", False)),
+        "render_mode": eb_config.autumn_eval_render_mode,
+        "logging_path": str(output_dir / "autumn_env_logs"),
+    }
+    data_dir = _cfg("data_dir", None)
+    if data_dir is not None:
+        env_kwargs["data_dir"] = str(data_dir)
+    env = AutumnBenchEnvWrapper(**env_kwargs)
+
+    agent = AgentFactory(config).create_agent()
+    agent.reset()
+
+    random.seed(seed)
+    np.random.seed(seed)
+    obs, info = env.reset(seed=seed)
+
+    _inject_beliefs(config, agent, env, "autumn", program, beliefs)
+
+    perception_fn = load_perception_fn(perception)
+    raw_obs_history = [obs["text"]["long_term_context"]]
+    if perception_fn is not None:
+        apply_perception_with_history(
+            obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+        )
+
+    if eb_config.mock_mode:
+        set_mock_action_provider(lambda: random.choice(_mock_available_actions(env)))
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    trajectory: list[dict] = []
+    episode_return = 0.0
+    total_cost = 0.0
+    input_tokens = 0
+    output_tokens = 0
+    action = None
+    done = False
+    step = 0
+
+    for step in range(eb_config.autumn_eval_max_steps):
+        response = agent.act(obs, prev_action=action)
+        action = response.completion
+        reasoning = getattr(response, "reasoning", "")
+        total_cost += getattr(response, "cost", 0.0)
+        input_tokens += getattr(response, "input_tokens", 0)
+        output_tokens += getattr(response, "output_tokens", 0)
+
+        raw_before = obs["text"]["long_term_context"]
+        aux_before = obs["text"].get("short_term_context", "")
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
+        episode_return += reward
+
+        raw_after = obs["text"]["long_term_context"]
+        raw_obs_history.append(raw_after)
+        if perception_fn is not None:
+            apply_perception_with_history(
+                obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+            )
+
+        trajectory.append(
+            {
+                "step": step,
+                "action": action,
+                "reasoning": reasoning,
+                "reward": reward,
+                "done": done,
+                "info": info,
+                "phase": env.get_stats().get("phase"),
+                "pre_observation": raw_before,
+                "pre_auxiliary_observation": aux_before,
+                "post_observation": raw_after,
+                "post_auxiliary_observation": obs["text"].get("short_term_context", ""),
+            }
+        )
+
+        if done:
+            break
+
+    result = {
+        "program": program,
+        "task_type": task_type,
+        "episode_return": episode_return,
+        "num_steps": step + 1,
+        "done": done,
+        "failed_candidates": env.failed_candidates,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_cost": total_cost,
+        "env_stats": env.get_stats(),
+    }
+    with open(output_dir / "episode_log.json", "w") as f:
+        json.dump(result, f, indent=4, default=str)
+    with open(output_dir / "trajectory.json", "w") as f:
+        json.dump(trajectory, f, indent=2, default=str)
+    env.close()
+    return result
+
+
+def run_frozen_autumn_evaluation(
+    *,
+    config: DictConfig,
+    eb_config: StepwiseEBLearnConfig,
+    beliefs: str,
+    perception: str,
+    output_dir: str,
+) -> dict:
+    """Run AutumnBench test phases with learned artifacts frozen."""
+    task_types = eb_config.autumn_eval_task_types or ["mfp", "cd", "planning"]
+    programs = list(config.tasks.autumn_tasks)
+    eval_root = Path(output_dir) / "autumn_frozen_eval"
+    eval_root.mkdir(parents=True, exist_ok=True)
+
+    results: dict[str, dict] = {}
+    aggregate_reward = 0.0
+    for program in programs:
+        for task_type in task_types:
+            run_key = f"{program}_{task_type}"
+            run_dir = eval_root / run_key
+            evolve_logger.info(f"Running frozen Autumn eval: {run_key}")
+            try:
+                result = _run_frozen_autumn_task_eval(
+                    config=config,
+                    eb_config=eb_config,
+                    beliefs=beliefs,
+                    perception=perception,
+                    program=program,
+                    task_type=task_type,
+                    output_dir=run_dir,
+                )
+            except Exception as e:
+                logging.exception("Frozen Autumn eval failed")
+                result = {
+                    "program": program,
+                    "task_type": task_type,
+                    "error": str(e),
+                    "episode_return": 0.0,
+                }
+            results[run_key] = result
+            aggregate_reward += float(result.get("episode_return", 0.0))
+
+    summary = {
+        "aggregate_reward": aggregate_reward,
+        "num_tasks": len(results),
+        "results": results,
+    }
+    with open(eval_root / "summary.json", "w") as f:
+        json.dump(summary, f, indent=4, default=str)
+    evolve_logger.info(
+        f"Frozen Autumn eval complete: aggregate_reward={aggregate_reward:.3f}, "
+        f"num_tasks={len(results)}"
+    )
+    return summary
+
+
 # ---------------------------------------------------------------------------
 # Outer orchestrator
 # ---------------------------------------------------------------------------
@@ -2340,6 +2531,18 @@ def stepwise_eb_learn(
 
         episode_idx += 1
 
+    if (
+        eb_config.autumn_eval_after_learn
+        and config.envs.names.split("-")[0] == "autumn"
+    ):
+        run_frozen_autumn_evaluation(
+            config=config,
+            eb_config=eb_config,
+            beliefs=beliefs,
+            perception=perception,
+            output_dir=output_dir,
+        )
+
 
 # ---------------------------------------------------------------------------
 # Entry point
@@ -2394,6 +2597,12 @@ def main(config: DictConfig):
         question_scoring_method=evolve_cfg.get("question_scoring_method", "b_diff_light"),
         question_scoring_max_concurrent=evolve_cfg.get("question_scoring_max_concurrent", 8),
         mock_mode=evolve_cfg.get("mock_mode", False),
+        autumn_eval_after_learn=evolve_cfg.get("autumn_eval_after_learn", False),
+        autumn_eval_task_types=list(
+            evolve_cfg.get("autumn_eval_task_types", ["mfp", "cd", "planning"])
+        ),
+        autumn_eval_max_steps=evolve_cfg.get("autumn_eval_max_steps", 501),
+        autumn_eval_render_mode=evolve_cfg.get("autumn_eval_render_mode", "text"),
     )
 
     stepwise_eb_learn(

@@ -116,6 +116,8 @@ EB_LEARN_OVERRIDES: dict[tuple[str, str], dict] = {
         "eval.evolve.n_environment_steps": 100,
         "eval.evolve.hide_obs_when_image": True,
         "agent.max_image_history":         4,
+        "eval.evolve.autumn_eval_after_learn": True,
+        "eval.evolve.autumn_eval_max_steps": 501,
     },
     ("autumn", "sonnet-4.6"): {
         "eval.evolve.n_environment_steps": 5,
