@@ -49,7 +49,7 @@ ENVS = [
 MODEL_IDS = {
     "gemini-2.5-flash": "google/gemini-2.5-flash",
     # "sonnet-4.6":       "anthropic/claude-sonnet-4.6",
-    # "mock":             "google/gemini-2.5-flash",
+    "mock":             "google/gemini-2.5-flash",
 }
 MODELS = list(MODEL_IDS)
 
@@ -86,7 +86,9 @@ def model_overrides(model: str, script: str) -> dict:
 EB_LEARN_DEFAULT = {
     "eval.evolve.n_environment_steps": 10,
     "eval.evolve.hide_obs_when_image": False,
+    "agent.max_text_history":          4,
     "agent.max_image_history":         0,
+    "agent.max_cot_history":           4,
     "eval.evolve.question_scoring_method": "b_diff_full",
     "eval.evolve.question_scoring_max_concurrent": 8,
     "eval.evolve.max_unanswered_qa_pairs": 20,
@@ -95,26 +97,31 @@ EB_LEARN_OVERRIDES: dict[tuple[str, str], dict] = {
     ("minihack", "gemini-2.5-flash"): {
         "eval.evolve.n_environment_steps": 50,
         "eval.evolve.hide_obs_when_image": False,
+        "agent.max_text_history":          4,
         "agent.max_image_history":         0,
     },
     ("minihack", "sonnet-4.6"): {
         "eval.evolve.n_environment_steps": 5,
         "eval.evolve.hide_obs_when_image": False,
+        "agent.max_text_history":          4,
         "agent.max_image_history":         0,
     },
     ("arc_agi", "gemini-2.5-flash"): {
         "eval.evolve.n_environment_steps": 50,
         "eval.evolve.hide_obs_when_image": True,
+        "agent.max_text_history":          4,
         "agent.max_image_history":         4,
     },
     ("arc_agi", "sonnet-4.6"): {
         "eval.evolve.n_environment_steps": 5,
         "eval.evolve.hide_obs_when_image": True,
+        "agent.max_text_history":          4,
         "agent.max_image_history":         4,
     },
     ("autumn", "gemini-2.5-flash"): {
         "eval.evolve.n_environment_steps": 100,
         "eval.evolve.hide_obs_when_image": True,
+        "agent.max_text_history":          4,
         "agent.max_image_history":         4,
         "eval.evolve.autumn_eval_after_learn": True,
         "eval.evolve.autumn_eval_max_steps": 501,
@@ -122,21 +129,25 @@ EB_LEARN_OVERRIDES: dict[tuple[str, str], dict] = {
     ("autumn", "sonnet-4.6"): {
         "eval.evolve.n_environment_steps": 5,
         "eval.evolve.hide_obs_when_image": True,
+        "agent.max_text_history":          4,
         "agent.max_image_history":         4,
     },
     ("minihack", "mock"): {
         "eval.evolve.n_environment_steps": 5,
         "eval.evolve.hide_obs_when_image": False,
+        "agent.max_text_history":          4,
         "agent.max_image_history":         0,
     },
     ("arc_agi", "mock"): {
         "eval.evolve.n_environment_steps": 5,
         "eval.evolve.hide_obs_when_image": True,
+        "agent.max_text_history":          4,
         "agent.max_image_history":         4,
     },
     ("autumn", "mock"): {
         "eval.evolve.n_environment_steps": 5,
         "eval.evolve.hide_obs_when_image": True,
+        "agent.max_text_history":          4,
         "agent.max_image_history":         4,
     },
 }
@@ -166,6 +177,23 @@ NUM_STEPS_KEYS = {
 }
 
 
+def _simple_env_overrides(env: str, model: str) -> dict:
+    merged = {
+        **EB_LEARN_DEFAULT,
+        **EB_LEARN_OVERRIDES.get((env, model), {}),
+    }
+    return {
+        "eval.simple.n_environment_steps": merged["eval.evolve.n_environment_steps"],
+        "eval.evolve.hide_obs_when_image": merged["eval.evolve.hide_obs_when_image"],
+        "agent.max_text_history": merged["agent.max_text_history"],
+        "agent.max_image_history": merged["agent.max_image_history"],
+        "agent.max_cot_history": merged["agent.max_cot_history"],
+        "eval.simple.hide_obs_when_image": merged["eval.evolve.hide_obs_when_image"],
+        "eval.simple.history_window": merged["agent.max_text_history"],
+        "eval.simple.max_image_history": merged["agent.max_image_history"],
+    }
+
+
 def build_cells() -> list[Cell]:
     cells: list[Cell] = []
     for script, env, model in itertools.product(SCRIPT_FILES, ENVS, MODELS):
@@ -175,6 +203,8 @@ def build_cells() -> list[Cell]:
                 **EB_LEARN_DEFAULT,
                 **EB_LEARN_OVERRIDES.get((env, model), {}),
             })
+        elif script == "simple":
+            ov.update(_simple_env_overrides(env, model))
         cells.append(Cell(script=script, env=env, model=model, overrides=ov))
     return cells
 

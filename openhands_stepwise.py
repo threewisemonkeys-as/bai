@@ -9,11 +9,10 @@ orchestrator can forward the action to env.step(...).
 
 Workspace layout (orchestrator-owned only):
     <workspace>/
-      last_n_steps.json        — rolling buffer of the last N committed steps
+      observations.json        — trailing obs/action history, ending with current obs
       obs_images/step_NNN.png  — pre-action image per step, if env emits one
 
-Everything else in the workspace is agent-managed. We do not tell the agent
-the files exist; it can discover and use them however it wants.
+Everything else in the workspace is agent-managed.
 """
 
 import base64
@@ -23,6 +22,7 @@ import json
 import logging
 import os
 import random
+import shutil
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -59,6 +59,7 @@ from balrog.environments import make_env
 from balrog.utils import get_unique_seed
 
 from explore import evolve_logger, get_default_knowledge
+from goal_prompts import append_agent_goal, resolve_agent_goal
 from run_utils import setup_run, _update_summary_json
 
 
@@ -159,7 +160,7 @@ class SubmitActionTool(ToolDefinition[SubmitAction, SubmitActionObservation]):
 @dataclass
 class OpenHandsStepwiseConfig:
     n_environment_steps: int
-    history_window: int                  # N entries retained in last_n_steps.json
+    history_window: int                  # N entries retained in observations.json history
     max_iteration_per_step: int          # cap on OpenHands inner iterations per env step
     openhands_model: str                 # e.g. "anthropic/claude-sonnet-4-5-20250929"
     openhands_api_key_env: str           # env var name holding the key, e.g. "ANTHROPIC_API_KEY"
@@ -168,6 +169,10 @@ class OpenHandsStepwiseConfig:
     openhands_max_output_tokens: int | None = None
     enable_browser_tools: bool = False
     mock_mode: bool = False
+    log_llm_payloads: bool = False
+    workspace_seed_dir: str | None = None
+    workspace_checkpoint_interval: int = 0
+    workspace_checkpoint_exclude_images: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -215,15 +220,86 @@ def _save_step_dir_image(img, step_dir: Path, filename: str) -> None:
         evolve_logger.warning(f"Failed to save {filename} in {step_dir}: {e}")
 
 
-# ---------------------------------------------------------------------------
-# Rolling step buffer
-# ---------------------------------------------------------------------------
+def _snapshot_workspace(workspace: Path, dest: Path, exclude_images: bool) -> None:
+    """Copy the live workspace dir into ``dest`` for phase-2 artifact eval."""
+    if dest.exists():
+        return
+    ignore = shutil.ignore_patterns("obs_images") if exclude_images else None
+    try:
+        shutil.copytree(workspace, dest, dirs_exist_ok=True, ignore=ignore)
+    except Exception as e:  # noqa: BLE001
+        evolve_logger.warning(f"Failed to snapshot workspace to {dest}: {e}")
 
 
-def _write_last_n_steps(workspace: Path, entries: list[dict]) -> None:
-    path = workspace / "last_n_steps.json"
-    with open(path, "w") as f:
-        json.dump(entries, f, indent=2, default=str)
+def _write_observations_json(
+    workspace: Path,
+    *,
+    env_name: str,
+    task: str,
+    episode_idx: int,
+    step_idx: int,
+    global_step: int,
+    raw_long: str,
+    raw_short: str,
+    completed_entries: list[dict],
+    history_window: int,
+    valid_actions: list[str],
+    pre_action_image_path: str | None,
+    respawn_notice: bool,
+    invalid_action_feedback: str | None,
+) -> None:
+    """Write trailing history ending in the current pre-action observation.
+
+    stepwise_eb_learn.py passes the most recent raw text observations from the
+    current episode into history-aware perceive(observation_history). This file
+    gives the coding baseline a single workspace artifact with prior completed
+    step outcomes plus the current pending observation as the final entry.
+    """
+    current_entry = {
+        "status": "current",
+        "step": global_step,
+        "episode_idx": episode_idx,
+        "episode_step": step_idx,
+        "pre_action_obs_long": raw_long,
+        "pre_action_obs_short": raw_short,
+        "pre_action_image_path": pre_action_image_path,
+        "valid_actions": valid_actions,
+        "respawn_notice": respawn_notice,
+        "invalid_action_feedback": invalid_action_feedback,
+        "action": None,
+        "reasoning": None,
+        "reward": None,
+        "done": None,
+        "info": None,
+    }
+    if history_window and history_window > 0:
+        history = completed_entries[-max(0, history_window - 1):] + [current_entry]
+    else:
+        history = list(completed_entries) + [current_entry]
+    payload = {
+        "schema_version": 1,
+        "description": (
+            "Trailing environment history in chronological order. Completed "
+            "entries include action/reward outcomes; the final entry has "
+            "status='current' and is the pre-action observation for the action "
+            "to choose now."
+        ),
+        "env_name": env_name,
+        "task": task,
+        "episode_idx": episode_idx,
+        "step_idx": step_idx,
+        "global_step": global_step,
+        "history_window": history_window,
+        "current_history_index": len(history) - 1,
+        "history": history,
+        "observation_history": [
+            entry.get("pre_action_obs_long", "")
+            for entry in history
+            if entry.get("episode_idx") == episode_idx
+        ],
+    }
+    with open(workspace / "observations.json", "w") as f:
+        json.dump(payload, f, indent=2, default=str)
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +351,10 @@ def _build_user_message(
             "you will receive the current raw observation. "
             "You must commit exactly one action per turn by calling the `submit_action` "
             "tool. Between commits you are free to use the workspace (bash, file edits, "
-            "etc.)."
+            "etc.). The workspace contains `observations.json` with trailing "
+            "observation/action history ending in the current pre-action "
+            "observation, and `obs_images/` with pre-action screenshots when "
+            "the environment provides images."
         )
         if instruction_prompt:
             lines.append("\n=== ENVIRONMENT INSTRUCTIONS ===")
@@ -346,6 +425,85 @@ def _build_openhands_llm(oh_config: OpenHandsStepwiseConfig) -> LLM:
     if oh_config.openhands_max_output_tokens is not None:
         kwargs["max_output_tokens"] = oh_config.openhands_max_output_tokens
     return LLM(**kwargs)
+
+
+_LLM_PAYLOAD_LOG_COUNTER = 0
+
+
+def _sanitize_llm_payload(obj: Any) -> Any:
+    """Best-effort JSON-safe copy of final provider payloads.
+
+    Large inline screenshots are shortened, but tool schemas and message text are
+    kept intact so the actual available-tool contract can be inspected.
+    """
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            if str(k).lower() in {"api_key", "authorization"}:
+                out[k] = "<redacted>"
+            else:
+                out[k] = _sanitize_llm_payload(v)
+        return out
+    if isinstance(obj, list):
+        return [_sanitize_llm_payload(v) for v in obj]
+    if isinstance(obj, tuple):
+        return [_sanitize_llm_payload(v) for v in obj]
+    if isinstance(obj, str):
+        if obj.startswith("data:image/") and len(obj) > 160:
+            return obj[:120] + "...<truncated inline image>"
+        return obj
+    if hasattr(obj, "model_dump"):
+        try:
+            return _sanitize_llm_payload(obj.model_dump(mode="json", exclude_none=True))
+        except Exception:  # noqa: BLE001
+            return str(obj)
+    return obj
+
+
+def _write_llm_payload_log(log_dir: Path, api_name: str, payload: dict[str, Any]) -> None:
+    global _LLM_PAYLOAD_LOG_COUNTER
+    _LLM_PAYLOAD_LOG_COUNTER += 1
+    log_dir.mkdir(parents=True, exist_ok=True)
+    out = {
+        "api": api_name,
+        "sequence": _LLM_PAYLOAD_LOG_COUNTER,
+        "timestamp": time.time(),
+        "payload": _sanitize_llm_payload(payload),
+    }
+    path = log_dir / f"{_LLM_PAYLOAD_LOG_COUNTER:04d}_{api_name}.json"
+    with open(path, "w") as f:
+        json.dump(out, f, indent=2, default=str)
+
+
+def _install_litellm_payload_logger(log_dir: Path) -> None:
+    """Wrap OpenHands' LiteLLM bindings and dump the final LLM request payload."""
+    import openhands.sdk.llm.llm as _llm_module
+
+    if not getattr(_llm_module.litellm_completion, "_oh_stepwise_payload_logger", False):
+        original_completion = _llm_module.litellm_completion
+
+        def _logged_completion(*args, **kwargs):
+            payload = dict(kwargs)
+            if args:
+                payload["_args"] = list(args)
+            _write_llm_payload_log(log_dir, "chat_completion", payload)
+            return original_completion(*args, **kwargs)
+
+        _logged_completion._oh_stepwise_payload_logger = True  # type: ignore[attr-defined]
+        _llm_module.litellm_completion = _logged_completion
+
+    if not getattr(_llm_module.litellm_responses, "_oh_stepwise_payload_logger", False):
+        original_responses = _llm_module.litellm_responses
+
+        def _logged_responses(*args, **kwargs):
+            payload = dict(kwargs)
+            if args:
+                payload["_args"] = list(args)
+            _write_llm_payload_log(log_dir, "responses", payload)
+            return original_responses(*args, **kwargs)
+
+        _logged_responses._oh_stepwise_payload_logger = True  # type: ignore[attr-defined]
+        _llm_module.litellm_responses = _logged_responses
 
 
 # ---------------------------------------------------------------------------
@@ -671,7 +829,7 @@ def _run_episode(
     episode_idx: int,
     episode_dir: Path,
     default_knowledge: str,
-    rolling_buffer: list[dict],
+    history_buffer: list[dict],
     global_step_start: int,
     max_episode_steps: int | None,
     is_first_step_in_run: bool,
@@ -696,15 +854,20 @@ def _run_episode(
         max_steps = min(max_steps, max_episode_steps)
 
     try:
-        instruction_prompt = env.get_instruction_prompt()
+        env_instruction_prompt = env.get_instruction_prompt()
     except Exception:
-        instruction_prompt = default_knowledge
+        env_instruction_prompt = default_knowledge
+    agent_goal = resolve_agent_goal(config)
+    instruction_prompt = append_agent_goal(env_instruction_prompt, agent_goal)
+    if default_knowledge.strip() == (env_instruction_prompt or "").strip():
+        default_knowledge = ""
 
     episode_log: dict = {
         "task": task,
         "env_name": env_name,
         "episode_idx": episode_idx,
         "seed": seed,
+        "agent_goal": agent_goal,
         "action_frequency": defaultdict(int),
         "num_submit_action_calls": 0,
         "num_default_action_fallbacks": 0,
@@ -741,6 +904,22 @@ def _run_episode(
             _save_step_dir_image(obs.get("image"), step_dir, "obs_before.png")
 
             valid_actions = _valid_actions(env)
+            _write_observations_json(
+                workspace,
+                env_name=env_name,
+                task=task,
+                episode_idx=episode_idx,
+                step_idx=step,
+                global_step=global_step,
+                raw_long=raw_long,
+                raw_short=raw_short,
+                completed_entries=history_buffer,
+                history_window=oh_config.history_window,
+                valid_actions=valid_actions,
+                pre_action_image_path=image_rel,
+                respawn_notice=respawn_notice and step == 0,
+                invalid_action_feedback=pending_invalid_feedback,
+            )
 
             # Full pipeline (real or mocked LLM): build user message, run the
             # conversation until submit_action fires and pauses it, then read
@@ -829,8 +1008,10 @@ def _run_episode(
 
             # Rolling buffer update (last N).
             entry = {
+                "status": "completed",
                 "step": global_step,
                 "episode_idx": episode_idx,
+                "episode_step": step,
                 "pre_action_obs_long": raw_long,
                 "pre_action_obs_short": raw_short,
                 "pre_action_image_path": image_rel,
@@ -840,10 +1021,9 @@ def _run_episode(
                 "done": done,
                 "info": info if isinstance(info, dict) else None,
             }
-            rolling_buffer.append(entry)
-            if len(rolling_buffer) > oh_config.history_window:
-                del rolling_buffer[: len(rolling_buffer) - oh_config.history_window]
-            _write_last_n_steps(workspace, rolling_buffer)
+            history_buffer.append(entry)
+            if len(history_buffer) > oh_config.history_window:
+                del history_buffer[: len(history_buffer) - oh_config.history_window]
 
             # Per-step log.
             step_log = {
@@ -889,6 +1069,17 @@ def _run_episode(
             agent_messages = _flatten_conversation_events(conversation, action)
             with open(step_dir / "agent_messages.json", "w") as amf:
                 json.dump(agent_messages, amf, indent=2, default=str)
+
+            if (
+                oh_config.workspace_checkpoint_interval > 0
+                and global_step > 0
+                and global_step % oh_config.workspace_checkpoint_interval == 0
+            ):
+                _snapshot_workspace(
+                    workspace,
+                    step_dir / "openhands_ws",
+                    exclude_images=oh_config.workspace_checkpoint_exclude_images,
+                )
 
             csv_writer.writerow([
                 step, action, reasoning,
@@ -975,7 +1166,20 @@ def stepwise_openhands(
     workspace = Path(output_dir) / "openhands_ws"
     workspace.mkdir(parents=True, exist_ok=True)
     (workspace / "obs_images").mkdir(parents=True, exist_ok=True)
-    _write_last_n_steps(workspace, [])
+
+    if oh_config.workspace_seed_dir:
+        seed_path = Path(oh_config.workspace_seed_dir)
+        if not seed_path.is_absolute():
+            seed_path = Path(original_cwd) / seed_path
+        if seed_path.is_dir():
+            shutil.copytree(seed_path, workspace, dirs_exist_ok=True)
+            evolve_logger.info(
+                f"Seeded workspace from {seed_path}"
+            )
+        else:
+            evolve_logger.warning(
+                f"workspace_seed_dir={seed_path} is not a directory; skipping copy."
+            )
 
     default_knowledge = get_default_knowledge(config)
     evolve_logger.info(f"Default knowledge: {len(default_knowledge)} chars")
@@ -988,6 +1192,11 @@ def stepwise_openhands(
             "the LiteLLM transport call is stubbed to synthesize a submit_action "
             "tool call with a random valid env action each step."
         )
+
+    if oh_config.log_llm_payloads:
+        payload_log_dir = Path(output_dir) / "openhands_llm_payloads"
+        _install_litellm_payload_logger(payload_log_dir)
+        evolve_logger.info(f"OpenHands LLM payload logging enabled: {payload_log_dir}")
 
     llm = _build_openhands_llm(oh_config)
     tools = get_default_tools(enable_browser=oh_config.enable_browser_tools)
@@ -1011,7 +1220,7 @@ def stepwise_openhands(
         f"mock_mode={oh_config.mock_mode})"
     )
 
-    rolling_buffer: list[dict] = []
+    history_buffer: list[dict] = []
     episode_idx = 0
     global_steps_used = 0
     cumulative_cost = 0.0
@@ -1038,7 +1247,7 @@ def stepwise_openhands(
                 episode_idx=episode_idx,
                 episode_dir=episode_dir,
                 default_knowledge=default_knowledge,
-                rolling_buffer=rolling_buffer,
+                history_buffer=history_buffer,
                 global_step_start=global_steps_used,
                 max_episode_steps=remaining,
                 is_first_step_in_run=is_first_step_in_run,
@@ -1077,6 +1286,7 @@ def main(config: DictConfig):
     )
 
     ohcfg = config.eval.get("openhands", {}) or {}
+    evolve_logger.info(f"Agent goal: {resolve_agent_goal(config)}")
     oh_config = OpenHandsStepwiseConfig(
         n_environment_steps=int(ohcfg.get("n_environment_steps", config.eval.evolve.get("n_environment_steps", 20))),
         history_window=int(ohcfg.get("history_window", 20)),
@@ -1088,6 +1298,12 @@ def main(config: DictConfig):
         openhands_max_output_tokens=ohcfg.get("max_output_tokens", None),
         enable_browser_tools=bool(ohcfg.get("enable_browser_tools", False)),
         mock_mode=bool(ohcfg.get("mock_mode", False)),
+        log_llm_payloads=bool(ohcfg.get("log_llm_payloads", False)),
+        workspace_seed_dir=ohcfg.get("workspace_seed_dir", None),
+        workspace_checkpoint_interval=int(ohcfg.get("workspace_checkpoint_interval", 0)),
+        workspace_checkpoint_exclude_images=bool(
+            ohcfg.get("workspace_checkpoint_exclude_images", False)
+        ),
     )
 
     stepwise_openhands(

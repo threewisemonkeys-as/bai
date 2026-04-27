@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import base64
 from typing import Any, Optional
 
 from PIL import Image
@@ -41,23 +42,85 @@ _DEFAULT_DATA_DIR = os.path.join(
 )
 
 
-INSTRUCTION_PROMPT = """You are interacting with a new environment.
-Each observation is a 2D grid of color-name strings (rows x cols). At each step you choose one of the currently available actions listed in the auxiliary observation.
+INSTRUCTION_PROMPT = """You are interacting with an environment.
+Each observation is a 2D grid of color-name strings (rows x cols). 
+At each step you choose one of the currently available actions listed in the auxiliary observation.
 
-Interactive actions:
-- left / right / up / down — move (meaning depends on the game's dynamics, which you need to discover)
+- left / right / up / down — move (meaning depends on the game's dynamics)
 - click ROW COL — click grid cell at (row, col), 0-indexed
 - noop — wait one step
 - reset — reset the interactive phase to the initial state when available
 - quit — give up
-
-Evaluation actions depend on the task:
-- mfp — use step/rewind to inspect the trajectory, then choose_option_N to fill the masked final state.
-- cd — interact with the changed environment, use I found the change! when behavior diverges from learned normal dynamics, then choose_frame_N and Submit choice.
-- planning — use movement/click/noop actions to reach the provided goal state in the highlighted mask. Exploration-only actions are not available.
-
-During exploration, your goal is to understand the underlying dynamics. During evaluation, use what you learned during exploration to maximize task reward.
 """
+
+
+def _combine_images(images: list[Image.Image]) -> Optional[Image.Image]:
+    if not images:
+        return None
+    if len(images) == 1:
+        return images[0]
+    sep_width = 8
+    total_w = sum(img.width for img in images) + sep_width * (len(images) - 1)
+    max_h = max(img.height for img in images)
+    canvas = Image.new("RGB", (total_w, max_h), "white")
+    x = 0
+    for img in images:
+        canvas.paste(img, (x, 0))
+        x += img.width + sep_width
+    return canvas
+
+
+def _decode_image_value(value: Any) -> list[Image.Image]:
+    if isinstance(value, list):
+        images: list[Image.Image] = []
+        for item in value:
+            images.extend(_decode_image_value(item))
+        return images
+    if not isinstance(value, str):
+        return []
+
+    try:
+        if os.path.isfile(value):
+            return [Image.open(value).convert("RGB")]
+    except (OSError, ValueError):
+        pass
+
+    try:
+        raw = base64.b64decode(value)
+        return [Image.open(io.BytesIO(raw)).convert("RGB")]
+    except Exception:
+        return []
+
+
+def _decode_observation_images(image_data: bytes) -> list[dict[str, Any]]:
+    try:
+        return [{"label": "Observation", "image": Image.open(io.BytesIO(image_data)).convert("RGB")}]
+    except Exception:
+        pass
+
+    try:
+        payload = json.loads(image_data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return []
+
+    images: list[dict[str, Any]] = []
+    if isinstance(payload, dict):
+        labels = {
+            "grid": "Current state",
+            "goal_state": "Goal state",
+            "choices": "Choices",
+        }
+        for key in ("grid", "goal_state", "choices"):
+            for image in _decode_image_value(payload.get(key)):
+                images.append({"label": labels.get(key, key), "image": image})
+    else:
+        for image in _decode_image_value(payload):
+            images.append({"label": "Observation", "image": image})
+    return images
+
+
+def _decode_observation_image(image_data: bytes) -> Optional[Image.Image]:
+    return _combine_images([item["image"] for item in _decode_observation_images(image_data)])
 
 
 def _obs_to_balrog(
@@ -77,6 +140,12 @@ def _obs_to_balrog(
     pre-rendered ``text_grid`` so both modalities reach the prompt.
     """
     header = obs_pb.text_data or ""
+    # Planning-phase text_data only carries task prose (now owned by the
+    # injected eval_goal in the system prompt) plus a highlight_mask JSON
+    # blob (now exposed as planning_eval.highlight_mask_text for perception).
+    # Drop it so it doesn't reach the agent's prompt.
+    if task_type == "planning" and phase == "Planning":
+        header = ""
     if text_grid is not None:
         long_term = header + text_grid if header else text_grid
     else:
@@ -90,11 +159,10 @@ def _obs_to_balrog(
     short_term = "\n".join(short_term_lines)
 
     image = None
+    images: list[dict[str, Any]] = []
     if obs_pb.image_data:
-        try:
-            image = Image.open(io.BytesIO(obs_pb.image_data)).convert("RGB")
-        except Exception:
-            image = None
+        images = _decode_observation_images(obs_pb.image_data)
+        image = _combine_images([item["image"] for item in images])
 
     return {
         "text": {
@@ -102,6 +170,7 @@ def _obs_to_balrog(
             "short_term_context": short_term,
         },
         "image": image,
+        "images": images,
     }
 
 
@@ -112,15 +181,16 @@ def _build_action_strings(action_space: list, grid_size: int) -> list[str]:
     the LLM can emit, and keeps the directional / noop / reset / quit
     entries as-is.
     """
+    seen: set[str] = set()
     out = []
     for act in action_space:
         t = act.text_data
         if t == "go-to-test":
             continue
-        if t.startswith("click ["):
-            out.append(f"click ROW COL  (ROW, COL in 0..{grid_size - 1})")
-        else:
-            out.append(t)
+        s = f"click ROW COL  (ROW, COL in 0..{grid_size - 1})" if t.startswith("click [") else t
+        if s not in seen:
+            seen.add(s)
+            out.append(s)
     return out
 
 
@@ -229,6 +299,44 @@ class AutumnBenchEnvWrapper:
             logger.warning(f"Failed to synthesize text grid: {e}")
             return None
 
+    def _planning_state_payload(self) -> dict[str, Any]:
+        if self.task_type != "planning" or self._phase_name() != "Planning":
+            return {}
+        try:
+            planning_servicer = getattr(self._env, "planning_environment", None)
+            planning_env = getattr(planning_servicer, "environment", None)
+            if planning_env is None:
+                current_environment = getattr(self._env, "current_environment", None)
+                planning_env = getattr(current_environment, "environment", None)
+            if planning_env is None:
+                return {}
+
+            render_dict = json.loads(planning_env.interpreter.render_all())
+            self._grid_size = render_dict.get("GRID_SIZE", self._grid_size)
+            current_grid = render_grid(
+                render_dict,
+                background_color=planning_env.interpreter.get_background(),
+                color_dict=planning_env.color_dict_str_to_int,
+            )
+            goal_grid = getattr(planning_env, "goal_state", None)
+            highlight_mask = getattr(planning_env, "inv_mask", None)
+            payload = {
+                "current_state_text": json.dumps(current_grid),
+                "goal_state_text": json.dumps(goal_grid),
+            }
+            if highlight_mask is not None:
+                payload["highlight_mask_text"] = json.dumps(highlight_mask)
+            return payload
+        except Exception as e:
+            logger.warning(f"Failed to synthesize planning state payload: {e}")
+            return {}
+
+    def _attach_planning_state_payload(self, obs: dict) -> dict:
+        planning_state = self._planning_state_payload()
+        if planning_state:
+            obs["planning_eval"] = planning_state
+        return obs
+
     @property
     def language_action_space(self) -> list[str]:
         try:
@@ -319,6 +427,7 @@ class AutumnBenchEnvWrapper:
             phase=self._phase_name(),
             action_strings=self.language_action_space,
         )
+        self._attach_planning_state_payload(obs)
         info = {"env_name": self.env_name, "task_type": self.task_type}
         return obs, info
 
@@ -347,6 +456,8 @@ class AutumnBenchEnvWrapper:
         }:
             return head
         if head == "go-to-test":
+            if self._is_composite:
+                return "go-to-test"
             self.failed_candidates.append(action)
             return self.default_action
         if head.startswith("click"):
@@ -402,6 +513,7 @@ class AutumnBenchEnvWrapper:
             phase=self._phase_name(),
             action_strings=self.language_action_space,
         )
+        self._attach_planning_state_payload(obs)
         return obs, self._last_reward, bool(terminated), truncated, self._last_info
 
     def check_action_validity(self, candidate_action: str) -> str:

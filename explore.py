@@ -133,7 +133,8 @@ def get_default_knowledge(config: DictConfig) -> str:
         config: BALROG configuration
 
     Returns:
-        String containing default instructions (actions, goal, etc.)
+        String containing default environment instructions/actions. The run-level
+        agent goal is injected separately by the stepwise runners.
     """
     env_name = config.envs.names.split("-")[0]
 

@@ -75,6 +75,7 @@ from stepwise_explore import (
     find_last_completed_episode,
     _save_episode_artifacts,
 )
+from goal_prompts import append_agent_goal, resolve_agent_goal
 from run_utils import setup_run, improve_logging, _update_summary_json
 
 
@@ -1166,29 +1167,21 @@ def _inject_beliefs(
     env_name: str,
     task: str,
     beliefs: str,
+    goal_override: str | None = None,
+    agent_goal: str | None = None,
 ):
     """Inject beliefs into the agent's instruction prompt."""
-    if config.eval.get("beliefs_in_system_prompt", False):
-        if env_name == "minihack":
-            from balrog.environments.minihack import get_loaded_instruction_prompt
-            instruction_prompt = get_loaded_instruction_prompt(
-                env=env, load=beliefs, task=task,
-            )
-        else:
-            from balrog.environments.nle import get_loaded_instruction_prompt
-            instruction_prompt = get_loaded_instruction_prompt(
-                env=env, load=beliefs, task=task,
-            )
-        agent.prompt_builder.update_instruction_prompt(instruction_prompt)
-    else:
-        instructions = None
-        if env_name == "babyai":
-            from balrog.environments import make_env as _  # noqa: F401
-            instructions = getattr(env, "mission", None)
-        base_instruction = env.get_instruction_prompt(instructions=instructions)
-        if beliefs:
-            base_instruction += f"\n\n{beliefs}"
-        agent.prompt_builder.update_instruction_prompt(base_instruction)
+    instructions = None
+    if env_name == "babyai":
+        from balrog.environments import make_env as _  # noqa: F401
+        instructions = getattr(env, "mission", None)
+
+    goal_text = goal_override or agent_goal or resolve_agent_goal(config)
+    instruction_prompt = env.get_instruction_prompt(instructions=instructions)
+    instruction_prompt = append_agent_goal(instruction_prompt, goal_text)
+    if beliefs:
+        instruction_prompt += f"\n\n{beliefs}"
+    agent.prompt_builder.update_instruction_prompt(instruction_prompt)
 
 
 # ---------------------------------------------------------------------------

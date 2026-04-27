@@ -339,6 +339,40 @@ function promptImagesHtml(promptText, opts) {
   return html;
 }
 
+function messageAttachmentPaths(msg) {
+  if (!msg) return [];
+  const paths = [];
+  const seen = new Set();
+  function addPath(path) {
+    if (!path || seen.has(path)) return;
+    seen.add(path);
+    paths.push(path);
+  }
+  addPath(msg.attachment_path);
+  if (Array.isArray(msg.attachment_paths)) {
+    msg.attachment_paths.forEach((path) => {
+      addPath(path);
+    });
+  }
+  if (paths.length === 0 && typeof msg.content === "string" && msg.content.includes("[image attached]")) {
+    addPath("obs_before.png");
+  }
+  return paths;
+}
+
+function messageAttachmentsHtml(msg, stepMeta) {
+  const paths = messageAttachmentPaths(msg);
+  if (paths.length === 0 || !stepMeta) return "";
+  let html = '<div style="margin:8px 0 10px"><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;font-weight:600">Message images (' +
+    paths.length + ')</div><div style="display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:4px">';
+  paths.forEach((path, i) => {
+    html += '<div style="text-align:center"><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Attachment ' + (i + 1) + '</div>' +
+      '<img src="' + stepLocalImageUrl(stepMeta.episode_idx, stepMeta.step, path) + '" style="max-width:160px;image-rendering:pixelated;border:1px solid var(--border);border-radius:3px" /></div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
 async function fetchReport() {
   if (isDynamicMode()) return await fetchJson(apiUrl("/api/data"));
   return await fetchJson(staticUrl("report.json"));
@@ -1374,6 +1408,7 @@ function renderOverview(data, step) {
           observationContent = obsText.substring(0, endIdx).trim();
         }
         agentHtml += '<div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;color:var(--text-muted);margin-bottom:4px">Current Observation</div>' +
+          messageAttachmentsHtml(lastUser, step) +
           '<pre style="max-height:none;font-size:11px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;word-break:break-word">' + esc(observationContent) + "</pre></div>";
       }
       if (lastAssistant) {
@@ -1788,6 +1823,7 @@ function renderAgentMessages(data) {
   }
 
   let html = '<div style="display:flex;flex-direction:column;gap:8px">';
+  const stepMeta = DATA && DATA.steps ? DATA.steps[selectedStepIdx] : null;
   msgs.forEach((msg, i) => {
     const isAssistant = msg.role === "assistant";
     const bubbleClass = isAssistant ? "msg-assistant" : "msg-user";
@@ -1800,6 +1836,7 @@ function renderAgentMessages(data) {
     html += '<div class="msg-bubble ' + bubbleClass + '">' +
       '<div class="msg-role">' + esc(isResponse ? "assistant (response)" : msg.role || "unknown") +
       " (message " + (i + 1) + "/" + msgs.length + ", " + content.length + " chars)</div>" +
+      messageAttachmentsHtml(msg, stepMeta) +
       '<pre style="max-height:none;margin:0;border:none;padding:0;background:transparent">' + esc(content) + "</pre>" +
       extra + "</div>";
   });

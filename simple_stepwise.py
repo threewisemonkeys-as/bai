@@ -4,8 +4,9 @@ Mirrors the outer shape of openhands_stepwise.py — single orchestrator owns
 a rolling message history across the whole run; episodes are only visible to
 the agent via a 'respawned' prepend on the user message. Each env-step posts
 one user message (raw obs + image + valid actions) into the history and the
-agent responds with its chosen action wrapped in ``<action>...</action>`` XML
-tags, which the orchestrator parses and forwards to env.step(...).
+agent responds with the same brief plan plus ``<|ACTION|>...<|END|>``-style
+action marker used by the robust CoT agent in stepwise_eb_learn.py. The
+orchestrator parses the final action marker and forwards it to env.step(...).
 
 No workspace, no tools — just LLM <-> env.
 """
@@ -34,6 +35,7 @@ from balrog.environments import make_env
 from balrog.utils import get_unique_seed
 
 from explore import evolve_logger, get_default_knowledge
+from goal_prompts import append_agent_goal, resolve_agent_goal
 from run_utils import setup_run, _update_summary_json
 
 
@@ -46,12 +48,16 @@ from run_utils import setup_run, _update_summary_json
 class SimpleStepwiseConfig:
     n_environment_steps: int
     history_window: int                  # Max user/assistant turn pairs retained in the running message list
+    max_image_history: int               # Max recent user turns whose images stay attached
     model: str                           # e.g. "anthropic/claude-sonnet-4-5-20250929"
     api_key_env: str                     # env var name holding the key, e.g. "ANTHROPIC_API_KEY"
     base_url: str | None = None
     temperature: float | None = None
     max_output_tokens: int | None = None
+    hide_obs_when_image: bool = False
     mock_mode: bool = False
+    dynamics_history_path: str | None = None
+    history_checkpoint_interval: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -147,20 +153,23 @@ def _user_content_text(user_content: list[dict]) -> str:
 
 
 def _flatten_history_for_log(
-    history: list[dict], final_action: str | None
+    history: list[dict], final_action: str | None, step_dir: Path | None = None
 ) -> list[dict]:
     """Serialize the rolling message history into a JSON-safe shape for the viz
     agent-messages panel. Text content passes through; multi-modal parts are
     flattened (text preserved, images replaced with an ``[image attached]``
     marker). ``final_action`` is attached to the last assistant entry."""
     out: list[dict] = []
-    for msg in history:
+    image_dir = step_dir / "agent_message_images" if step_dir is not None else None
+    for i, msg in enumerate(history, 1):
         role = msg.get("role", "user")
         content = msg.get("content", "")
+        record: dict = {"role": role}
         if isinstance(content, str):
             text = content
         elif isinstance(content, list):
             parts: list[str] = []
+            attachment_paths: list[str] = []
             for part in content:
                 if isinstance(part, dict):
                     if part.get("type") == "text":
@@ -169,10 +178,30 @@ def _flatten_history_for_log(
                             parts.append(t)
                     elif part.get("type") == "image_url":
                         parts.append("[image attached]")
+                        data_url = (part.get("image_url") or {}).get("url", "")
+                        if image_dir is not None and data_url.startswith("data:image/"):
+                            try:
+                                _, encoded = data_url.split(",", 1)
+                                rel_path = (
+                                    f"agent_message_images/"
+                                    f"message_{i:03d}_attachment_{len(attachment_paths) + 1:02d}.png"
+                                )
+                                image_dir.mkdir(parents=True, exist_ok=True)
+                                (step_dir / rel_path).write_bytes(
+                                    base64.b64decode(encoded)
+                                )
+                                attachment_paths.append(rel_path)
+                            except Exception as e:  # noqa: BLE001
+                                record.setdefault("attachment_errors", []).append(str(e))
             text = "\n".join(parts)
+            if attachment_paths:
+                record["attachment_paths"] = attachment_paths
+                if len(attachment_paths) == 1:
+                    record["attachment_path"] = attachment_paths[0]
         else:
             text = str(content)
-        out.append({"role": role, "content": text})
+        record["content"] = text
+        out.append(record)
     if out and final_action is not None and out[-1].get("role") == "assistant":
         out[-1]["action"] = final_action
     return out
@@ -181,6 +210,31 @@ def _flatten_history_for_log(
 # ---------------------------------------------------------------------------
 # Message construction
 # ---------------------------------------------------------------------------
+
+_ACTION_INSTRUCTIONS = """
+First create (if not present) or update your plan from the previous steps and presented the updated plan in -
+<plan>
+<reasoning>
+thinking about what to do next and how to do it.
+</reasoning>
+<goal>
+high level subtask you are trying to achieve currently. update this as you complete subtasks, achieve goals or are given new goals.
+</goal>
+<history>
+updated history with what happened. keep this numbered and summarise the past as you go along to keep the list short.
+</history>
+<steps>
+updated next steps to achieve subtask and eventually the main task.
+</steps>
+</plan>
+
+
+Finally you must choose exactly one of the listed actions and output it strictly in the following format -
+<|ACTION|>YOUR_CHOSEN_ACTION<|END|>
+
+Replace YOUR_CHOSEN_ACTION with the chosen action.
+Keep the plan very brief.
+""".strip()
 
 
 def _build_user_content(
@@ -225,9 +279,7 @@ def _build_user_content(
         lines.append(short_ctx)
     lines.append(long_ctx)
 
-    lines.append(
-        "\nRespond with your chosen action wrapped in <action>...</action> tags."
-    )
+    lines.append("\n" + _ACTION_INSTRUCTIONS)
 
     text = "\n".join(lines)
     content: list[dict] = [{"type": "text", "text": text}]
@@ -239,12 +291,28 @@ def _build_user_content(
     return content
 
 
+def _build_persistent_env_message(
+    instruction_prompt: str,
+    default_knowledge: str,
+) -> dict:
+    lines: list[str] = []
+    if instruction_prompt:
+        lines.append("=== ENVIRONMENT INSTRUCTIONS ===")
+        lines.append(instruction_prompt.strip())
+        lines.append("=== END ENVIRONMENT INSTRUCTIONS ===")
+    if default_knowledge and default_knowledge.strip() != instruction_prompt.strip():
+        lines.append("\n=== DEFAULT KNOWLEDGE ===")
+        lines.append(default_knowledge.strip())
+        lines.append("=== END DEFAULT KNOWLEDGE ===")
+    return {"role": "system", "content": "\n".join(lines)}
+
+
 # ---------------------------------------------------------------------------
 # Response parsing
 # ---------------------------------------------------------------------------
 
 
-_ACTION_RE = re.compile(r"<action>\s*(.+?)\s*</action>", re.DOTALL | re.IGNORECASE)
+_ACTION_RE = re.compile(r"<\|ACTION\|>(.*?)<\|END\|>", re.DOTALL)
 
 
 def _parse_action(text: str) -> str | None:
@@ -292,8 +360,13 @@ def _install_litellm_mock() -> None:
             _MOCK_ACTION_PROVIDER() if _MOCK_ACTION_PROVIDER is not None else "wait"
         )
         content = (
-            "(mock llm: random valid action)\n"
-            f"<action>{action}</action>"
+            "<plan>\n"
+            "<reasoning>[mock] selecting a random valid action.</reasoning>\n"
+            "<goal>[mock] explore the current environment.</goal>\n"
+            "<history>[mock] smoke-test rollout.</history>\n"
+            "<steps>[mock] continue with one valid action.</steps>\n"
+            "</plan>\n\n"
+            f"<|ACTION|>{action}<|END|>"
         )
         msg = LLMMsg(role="assistant", content=content)
         return ModelResponse(
@@ -396,6 +469,34 @@ def _trim_history(history: list[dict], max_user_turns: int) -> None:
     history[:] = system_msgs + tail
 
 
+def _trim_image_history(history: list[dict], max_image_turns: int) -> None:
+    """Keep image attachments only on the most recent user turns."""
+    user_positions_with_images: list[int] = []
+    for i, msg in enumerate(history):
+        if msg.get("role") != "user" or not isinstance(msg.get("content"), list):
+            continue
+        if any(
+            isinstance(part, dict) and part.get("type") == "image_url"
+            for part in msg["content"]
+        ):
+            user_positions_with_images.append(i)
+
+    keep = (
+        set(user_positions_with_images[-max_image_turns:])
+        if max_image_turns > 0
+        else set()
+    )
+    for i in user_positions_with_images:
+        if i in keep:
+            continue
+        msg = history[i]
+        msg["content"] = [
+            part
+            for part in msg["content"]
+            if not (isinstance(part, dict) and part.get("type") == "image_url")
+        ]
+
+
 # ---------------------------------------------------------------------------
 # Episode loop
 # ---------------------------------------------------------------------------
@@ -435,15 +536,29 @@ def _run_episode(
         max_steps = min(max_steps, max_episode_steps)
 
     try:
-        instruction_prompt = env.get_instruction_prompt()
+        env_instruction_prompt = env.get_instruction_prompt()
     except Exception:  # noqa: BLE001
-        instruction_prompt = default_knowledge
+        env_instruction_prompt = default_knowledge
+    agent_goal = resolve_agent_goal(config)
+    instruction_prompt = append_agent_goal(env_instruction_prompt, agent_goal)
+    if default_knowledge.strip() == (env_instruction_prompt or "").strip():
+        default_knowledge = ""
+
+    if is_first_step_in_run and episode_idx == 0:
+        history.insert(
+            0,
+            _build_persistent_env_message(
+                instruction_prompt=instruction_prompt or "",
+                default_knowledge=default_knowledge or "",
+            ),
+        )
 
     episode_log: dict = {
         "task": task,
         "env_name": env_name,
         "episode_idx": episode_idx,
         "seed": seed,
+        "agent_goal": agent_goal,
         "action_frequency": defaultdict(int),
         "num_action_parse_failures": 0,
         "num_default_action_fallbacks": 0,
@@ -476,17 +591,24 @@ def _run_episode(
 
             raw_long = obs.get("text", {}).get("long_term_context", "") or ""
             raw_short = obs.get("text", {}).get("short_term_context", "") or ""
+            prompt_obs = obs
+            if sc.hide_obs_when_image and obs.get("image") is not None:
+                prompt_obs = {
+                    **obs,
+                    "text": {
+                        **(obs.get("text") or {}),
+                        "long_term_context": "",
+                    },
+                }
             _save_step_dir_image(obs.get("image"), step_dir, "obs_before.png")
 
             valid_actions = _valid_actions(env)
 
             user_content = _build_user_content(
-                obs=obs,
-                is_first_step=(
-                    is_first_step_in_run and step == 0 and episode_idx == 0
-                ),
-                instruction_prompt=instruction_prompt or "",
-                default_knowledge=default_knowledge or "",
+                obs=prompt_obs,
+                is_first_step=False,
+                instruction_prompt="",
+                default_knowledge="",
                 respawn_notice=respawn_notice and step == 0,
                 episode_idx=episode_idx,
                 step_idx=step,
@@ -495,6 +617,7 @@ def _run_episode(
             )
             pending_invalid_feedback = None
             history.append({"role": "user", "content": user_content})
+            _trim_image_history(history, sc.max_image_history)
 
             _t0 = time.time()
             parse_failed = False
@@ -518,10 +641,10 @@ def _run_episode(
                 parse_failed = True
                 episode_log["num_action_parse_failures"] += 1
                 action = _fallback_action(env, valid_actions)
-                reasoning = "(no <action> tag found in response; fell back to default action)"
+                reasoning = "(no <|ACTION|>...<|END|> marker found in response; fell back to default action)"
                 episode_log["num_default_action_fallbacks"] += 1
                 evolve_logger.warning(
-                    f"[g{global_step}] no <action> tag in LLM response "
+                    f"[g{global_step}] no <|ACTION|>...<|END|> marker in LLM response "
                     f"(run took {dt:.1f}s); using default action {action!r}."
                 )
             else:
@@ -529,6 +652,7 @@ def _run_episode(
                 reasoning = assistant_text
 
             _trim_history(history, sc.history_window)
+            _trim_image_history(history, sc.max_image_history)
 
             invalid_action_this_step = False
             try:
@@ -596,9 +720,17 @@ def _run_episode(
             # (post-trim). Text content is preserved; image parts are replaced
             # with an ``[image attached]`` marker. The last assistant entry
             # carries the parsed action for the viz trajectory panel.
-            agent_messages = _flatten_history_for_log(history, action)
+            agent_messages = _flatten_history_for_log(history, action, step_dir=step_dir)
             with open(step_dir / "agent_messages.json", "w") as amf:
                 json.dump(agent_messages, amf, indent=2, default=str)
+
+            if (
+                sc.history_checkpoint_interval > 0
+                and global_step > 0
+                and global_step % sc.history_checkpoint_interval == 0
+            ):
+                with open(step_dir / "dynamics_history.json", "w") as dhf:
+                    json.dump(history, dhf, indent=2, default=str)
 
             csv_writer.writerow([
                 step, action, reasoning,
@@ -690,8 +822,9 @@ def stepwise_simple(
         _install_litellm_mock()
         evolve_logger.info(
             "Mock mode: prompts/logs are constructed normally; "
-            "litellm.completion is stubbed to synthesize an <action>...</action> "
-            "response with a random valid env action each step."
+            "litellm.completion is stubbed to synthesize a brief plan plus "
+            "a <|ACTION|>...<|END|> response with a random valid env action "
+            "each step."
         )
 
     api_key = os.getenv(sc.api_key_env)
@@ -705,6 +838,28 @@ def stepwise_simple(
             )
 
     history: list[dict] = []
+    if sc.dynamics_history_path:
+        seed_path = Path(sc.dynamics_history_path)
+        if not seed_path.is_absolute():
+            seed_path = Path(original_cwd) / seed_path
+        try:
+            with open(seed_path) as f:
+                seed_history = json.load(f)
+            if isinstance(seed_history, list):
+                history.extend(seed_history)
+                evolve_logger.info(
+                    f"Loaded {len(seed_history)} seed history messages from "
+                    f"{seed_path}"
+                )
+            else:
+                evolve_logger.warning(
+                    f"Seed history at {seed_path} is not a list; ignoring."
+                )
+        except (OSError, json.JSONDecodeError) as e:
+            evolve_logger.warning(
+                f"Failed to load dynamics_history_path={seed_path}: {e}"
+            )
+
     episode_idx = 0
     global_steps_used = 0
     cumulative_cost = 0.0
@@ -712,7 +867,8 @@ def stepwise_simple(
 
     evolve_logger.info(
         f"Simple agent ready (model={sc.model}, history_window={sc.history_window}, "
-        f"mock_mode={sc.mock_mode})"
+        f"max_image_history={sc.max_image_history}, "
+        f"hide_obs_when_image={sc.hide_obs_when_image}, mock_mode={sc.mock_mode})"
     )
 
     while global_steps_used < sc.n_environment_steps:
@@ -741,6 +897,10 @@ def stepwise_simple(
         )
         is_first_step_in_run = False
         global_steps_used += steps_taken
+
+        with open(episode_dir / "dynamics_history.json", "w") as f:
+            json.dump(history, f, indent=2, default=str)
+
         episode_idx += 1
 
         evolve_logger.info(
@@ -748,6 +908,9 @@ def stepwise_simple(
             f"return={episode_log.get('episode_return', 0.0):.2f}, "
             f"steps={steps_taken}"
         )
+
+    with open(Path(output_dir) / "dynamics_history.json", "w") as f:
+        json.dump(history, f, indent=2, default=str)
 
 
 # ---------------------------------------------------------------------------
@@ -767,17 +930,37 @@ def main(config: DictConfig):
     )
 
     scfg = config.eval.get("simple", {}) or {}
+    simple_history_window = scfg.get("history_window", None)
+    simple_max_image_history = scfg.get("max_image_history", None)
+    evolve_logger.info(f"Agent goal: {resolve_agent_goal(config)}")
     sc = SimpleStepwiseConfig(
         n_environment_steps=int(
             scfg.get("n_environment_steps", config.eval.evolve.get("n_environment_steps", 20))
         ),
-        history_window=int(scfg.get("history_window", 20)),
+        history_window=int(
+            config.agent.get("max_text_history", 20)
+            if simple_history_window is None
+            else simple_history_window
+        ),
+        max_image_history=int(
+            config.agent.get("max_image_history", 1)
+            if simple_max_image_history is None
+            else simple_max_image_history
+        ),
         model=str(scfg.get("model", "anthropic/claude-sonnet-4-5-20250929")),
         api_key_env=str(scfg.get("api_key_env", "ANTHROPIC_API_KEY")),
         base_url=scfg.get("base_url", None),
         temperature=scfg.get("temperature", None),
         max_output_tokens=scfg.get("max_output_tokens", None),
+        hide_obs_when_image=bool(
+            scfg.get(
+                "hide_obs_when_image",
+                config.eval.evolve.get("hide_obs_when_image", False),
+            )
+        ),
         mock_mode=bool(scfg.get("mock_mode", False)),
+        dynamics_history_path=scfg.get("dynamics_history_path", None),
+        history_checkpoint_interval=int(scfg.get("history_checkpoint_interval", 0)),
     )
 
     stepwise_simple(

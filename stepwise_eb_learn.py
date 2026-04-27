@@ -80,7 +80,9 @@ from stepwise_explore import (
     load_perception_fn,
     apply_perception,
     apply_perception_with_history,
+    _perceive_signature_mode,
 )
+from goal_prompts import append_agent_goal, resolve_agent_goal
 from run_utils import setup_run, improve_logging, _update_summary_json
 
 
@@ -183,6 +185,27 @@ def perceive(observation_history: list[str]) -> str:
 Set status to SUBMIT if you believe your current beliefs and perception are sufficient given the available evidence. Set status to CONTINUE if you want to receive re-evaluation results and iterate further. When in doubt, prefer CONTINUE."""
 
 
+def _build_eb_qa_response_format(include_policy: bool = True) -> str:
+    beliefs_block = _eb_beliefs_block_template(include_policy)
+    return f"""Format your response as:
+<think>
+Analyze the feedback and determine what needs to change.
+</think>
+
+{beliefs_block}
+
+Respond with a updated perception code inside <updated_perception> only when perception needs to change.
+Otherwise set it exactly to KEEP_UNCHANGED.
+
+<updated_perception>
+KEEP_UNCHANGED
+</updated_perception>
+
+<status>CONTINUE or SUBMIT</status>
+
+Set status to SUBMIT if you believe your current beliefs and perception are sufficient given the available evidence. Set status to CONTINUE if you want to receive re-evaluation results and iterate further. When in doubt, prefer CONTINUE."""
+
+
 def _build_eb_beliefs_only_response_format(include_policy: bool = True) -> str:
     beliefs_block = _eb_beliefs_block_template(include_policy)
     think_line = (
@@ -264,10 +287,16 @@ class StepwiseEBLearnConfig:
     question_scoring_method: str = "b_diff_light"
     question_scoring_max_concurrent: int = 8
     mock_mode: bool = False
+    frozen_eval_after_learn: bool = False
+    frozen_eval_envs: list[str] | None = None
+    frozen_eval_max_steps: int = 501
+    frozen_eval_minihack_goal: str | None = None
+    frozen_eval_arc_agi_goal: str | None = None
     autumn_eval_after_learn: bool = False
     autumn_eval_task_types: list[str] | None = None
     autumn_eval_max_steps: int = 501
     autumn_eval_render_mode: str = "text"
+    frozen_eval_autumn_planning_goal: str | None = None
 
 
 def _resolve_schedule(value: "int | list[list[int]]", global_step: int) -> int:
@@ -363,6 +392,143 @@ def _save_prompt_images(images: list, step_dir: Path, subdir: str) -> list[str]:
             continue
         rel_paths.append(rel)
     return rel_paths
+
+
+def _save_eval_agent_messages(step_dir: Path, agent, reasoning: str, action: str) -> list[dict]:
+    """Persist the exact agent messages sent to the LLM for frozen eval steps."""
+    try:
+        runtime_messages = list(getattr(agent, "last_messages", []) or [])
+    except Exception:
+        runtime_messages = []
+
+    image_dir = step_dir / "agent_message_images"
+    agent_messages: list[dict] = []
+    for i, message in enumerate(runtime_messages, 1):
+        record = {
+            "role": getattr(message, "role", "unknown"),
+            "content": getattr(message, "content", ""),
+        }
+        attachment = getattr(message, "attachment", None)
+        if attachment is not None:
+            attachments = attachment if isinstance(attachment, (list, tuple)) else [attachment]
+            attachment_paths = []
+            for j, img in enumerate(attachments, 1):
+                rel_path = f"agent_message_images/message_{i:03d}_attachment_{j:02d}.png"
+                try:
+                    image_dir.mkdir(parents=True, exist_ok=True)
+                    img.save(step_dir / rel_path)
+                    attachment_paths.append(rel_path)
+                except Exception as exc:
+                    record.setdefault("attachment_errors", []).append(str(exc))
+            if attachment_paths:
+                record["attachment_paths"] = attachment_paths
+                if len(attachment_paths) == 1:
+                    record["attachment_path"] = attachment_paths[0]
+        agent_messages.append(record)
+
+    agent_messages.append({
+        "role": "assistant",
+        "content": reasoning,
+        "action": action,
+    })
+
+    with open(step_dir / "agent_messages.json", "w") as amf:
+        json.dump(agent_messages, amf, indent=2, default=str)
+    return agent_messages
+
+
+def _safe_image_label(label: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", label).strip("_").lower() or "image"
+
+
+def _save_eval_labeled_images(step_dir: Path, prefix: str, images: list[dict] | None) -> list[str]:
+    rel_paths = []
+    for i, item in enumerate(images or [], 1):
+        image = item.get("image") if isinstance(item, dict) else None
+        if image is None:
+            continue
+        label = _safe_image_label(str(item.get("label", f"image_{i}")))
+        rel_path = f"{prefix}_{i:02d}_{label}.png"
+        try:
+            image.save(step_dir / rel_path)
+            rel_paths.append(rel_path)
+        except Exception:
+            pass
+    return rel_paths
+
+
+def _save_eval_step_images(
+    step_dir: Path,
+    before_image,
+    after_image,
+    before_images: list[dict] | None = None,
+    after_images: list[dict] | None = None,
+) -> dict[str, bool | list[str]]:
+    """Save pre/post observation images for frozen eval viewer inspection."""
+    flags: dict[str, bool | list[str]] = {"has_obs_before": False, "has_obs_after": False}
+    if before_image is not None:
+        try:
+            before_image.save(step_dir / "obs_before.png")
+            flags["has_obs_before"] = True
+        except Exception:
+            pass
+    if after_image is not None:
+        try:
+            after_image.save(step_dir / "obs_after.png")
+            flags["has_obs_after"] = True
+        except Exception:
+            pass
+    before_paths = _save_eval_labeled_images(step_dir, "obs_before", before_images)
+    after_paths = _save_eval_labeled_images(step_dir, "obs_after", after_images)
+    if before_paths:
+        flags["has_obs_before"] = True
+        flags["obs_before_image_paths"] = before_paths
+    if after_paths:
+        flags["has_obs_after"] = True
+        flags["obs_after_image_paths"] = after_paths
+    return flags
+
+
+def _run_perception_on_planning_state(perception_fn, state_text: str) -> str:
+    try:
+        if _perceive_signature_mode(perception_fn) == "history":
+            return str(perception_fn([state_text]))
+        return str(perception_fn(state_text))
+    except Exception as e:
+        logging.warning(f"Planning state perception module failed: {e}")
+        return f"Perception code failed with error -\n{e}"
+
+
+def _apply_autumn_planning_perception(obs: dict, perception_fn) -> dict | None:
+    planning_eval = obs.get("planning_eval") or {}
+    current_state = planning_eval.get("current_state_text")
+    goal_state = planning_eval.get("goal_state_text")
+    if perception_fn is None or not current_state or not goal_state:
+        return None
+
+    current_output = _run_perception_on_planning_state(perception_fn, current_state)
+    goal_output = _run_perception_on_planning_state(perception_fn, goal_state)
+    section = (
+        f"\n{'='*10} Start of current-state features from Perception Module {'='*10}\n"
+        f"{current_output}\n\n"
+        f"{'='*10} End of current-state features from Perception Module {'='*10}\n\n"
+        f"{'='*10} Start of goal-state features from Perception Module {'='*10}\n"
+        f"{goal_output}\n\n"
+        f"{'='*10} End of goal-state features from Perception Module {'='*10}\n"
+    )
+    obs["text"]["short_term_context"] = (
+        section
+        + "\n"
+        + f"{'='*10} Start of Auxilliary Observation {'='*10}\n"
+        + obs["text"].get("short_term_context", "")
+        + f"\n\n{'='*10} End of Auxilliary Observation {'='*10}"
+    )
+    return {
+        "current_state_input": current_state,
+        "goal_state_input": goal_state,
+        "current_state_perception": current_output,
+        "goal_state_perception": goal_output,
+    }
 
 
 def _images_for_sample_obs(
@@ -668,6 +834,7 @@ def _run_improve_loop_eb(
     include_policy = eb_config.include_policy
     perception_instructions = _eb_perception_instructions(include_policy)
     eb_response_format = _build_eb_response_format(include_policy)
+    qa_response_format = _build_eb_qa_response_format(include_policy)
     beliefs_only_response_format = _build_eb_beliefs_only_response_format(include_policy)
     beliefs_section_guidance = _build_beliefs_section_guidance(include_policy)
     policy_task_phrase = (
@@ -1001,7 +1168,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
 
 {perception_instructions}
 
-{eb_response_format}"""
+{qa_response_format}"""
 
                 qa_conversation: list[dict] = []
                 prev_qa_correct = len(qa_correct)
@@ -1013,7 +1180,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
 
                     message = initial_qa_prompt if turn == 0 else build_qa_followup_message(
                         qa_fb_results, prev_qa_correct, prev_qa_incorrect,
-                        response_format=eb_response_format,
+                        response_format=qa_response_format,
                     )
                     if prev_validation_error_2:
                         message = _prepend_rejection_notice(message, prev_validation_error_2)
@@ -1035,6 +1202,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                             images=turn_images,
                             sample_histories=sample_obs_histories if sample_obs else None,
                             history_window=hist_window,
+                            allow_keep_perception=True,
                         )
                     )
                     total_cost += turn_cost
@@ -1283,7 +1451,8 @@ def run_stepwise_eb_learn_episode(
         )
 
     # Setup instruction prompt with beliefs
-    _inject_beliefs(config, agent, env, env_name, task, beliefs)
+    agent_goal = resolve_agent_goal(config)
+    _inject_beliefs(config, agent, env, env_name, task, beliefs, agent_goal=agent_goal)
     agent.experiment_goal = current_experiment
 
     # Save raw initial obs before apply_perception modifies long_term_context in-place
@@ -1313,6 +1482,7 @@ def run_stepwise_eb_learn_episode(
         max_steps = min(max_steps, max_episode_steps)
     episode_log: dict = {
         "task": task,
+        "agent_goal": agent_goal,
         "action_frequency": defaultdict(int),
         "input_tokens": 0,
         "output_tokens": 0,
@@ -2062,7 +2232,10 @@ def run_stepwise_eb_learn_episode(
 
                 # Inject updated beliefs for next step
                 if not done:
-                    _inject_beliefs(config, agent, env, env_name, task, beliefs)
+                    _inject_beliefs(
+                        config, agent, env, env_name, task, beliefs,
+                        agent_goal=agent_goal,
+                    )
 
                 evolve_logger.info(
                     f"[g{global_step}] Improve done — cost: ${improve_cost:.6f}"
@@ -2229,21 +2402,55 @@ def _run_frozen_autumn_task_eval(
 
     random.seed(seed)
     np.random.seed(seed)
+    output_dir.mkdir(parents=True, exist_ok=True)
     obs, info = env.reset(seed=seed)
 
-    _inject_beliefs(config, agent, env, "autumn", program, beliefs)
+    artifact_eval_cfg = getattr(config, "artifact_eval", None)
+    start_in_test_phase = bool(
+        getattr(artifact_eval_cfg, "autumn_eval_start_in_test_phase", False)
+    )
+    transition_info = None
+    if start_in_test_phase and task_type in {"mfp", "cd", "planning"}:
+        obs, reward, terminated, truncated, info = env.step("go-to-test")
+        transition_info = {
+            "action": "go-to-test",
+            "reward": reward,
+            "terminated": terminated,
+            "truncated": truncated,
+            "info": info,
+            "env_stats": env.get_stats(),
+        }
+        with open(output_dir / "autumn_eval_transition.json", "w") as f:
+            json.dump(transition_info, f, indent=4, default=str)
+
+    eval_goal = _frozen_autumn_eval_goal(task_type, config, eb_config)
+    _inject_beliefs(
+        config,
+        agent,
+        env,
+        "autumn",
+        program,
+        beliefs,
+        goal_override=eval_goal,
+    )
 
     perception_fn = load_perception_fn(perception)
-    raw_obs_history = [obs["text"]["long_term_context"]]
-    if perception_fn is not None:
-        apply_perception_with_history(
-            obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+    raw_obs_history = [
+        (obs.get("planning_eval") or {}).get(
+            "current_state_text", obs["text"]["long_term_context"]
         )
+    ]
+    planning_perception = None
+    if perception_fn is not None:
+        planning_perception = _apply_autumn_planning_perception(obs, perception_fn)
+        if planning_perception is None:
+            apply_perception_with_history(
+                obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+            )
 
     if eb_config.mock_mode:
         set_mock_action_provider(lambda: random.choice(_mock_available_actions(env)))
 
-    output_dir.mkdir(parents=True, exist_ok=True)
     trajectory: list[dict] = []
     episode_return = 0.0
     total_cost = 0.0
@@ -2254,25 +2461,47 @@ def _run_frozen_autumn_task_eval(
     step = 0
 
     for step in range(eb_config.autumn_eval_max_steps):
+        step_dir = output_dir / f"step_{step:03d}"
+        step_dir.mkdir(parents=True, exist_ok=True)
+        raw_before = obs["text"]["long_term_context"]
+        aux_before = obs["text"].get("short_term_context", "")
+        before_image = obs.get("image")
+        before_images = obs.get("images", [])
+        planning_perception_before = planning_perception
+
         response = agent.act(obs, prev_action=action)
         action = response.completion
         reasoning = getattr(response, "reasoning", "")
         total_cost += getattr(response, "cost", 0.0)
         input_tokens += getattr(response, "input_tokens", 0)
         output_tokens += getattr(response, "output_tokens", 0)
+        _save_eval_agent_messages(step_dir, agent, reasoning, action)
 
-        raw_before = obs["text"]["long_term_context"]
-        aux_before = obs["text"].get("short_term_context", "")
         obs, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
         episode_return += reward
 
         raw_after = obs["text"]["long_term_context"]
-        raw_obs_history.append(raw_after)
+        aux_after = obs["text"].get("short_term_context", "")
+        after_image = obs.get("image")
+        after_images = obs.get("images", [])
+        image_flags = _save_eval_step_images(
+            step_dir,
+            before_image,
+            after_image,
+            before_images=before_images,
+            after_images=after_images,
+        )
+        raw_obs_history.append(
+            (obs.get("planning_eval") or {}).get("current_state_text", raw_after)
+        )
+        planning_perception = None
         if perception_fn is not None:
-            apply_perception_with_history(
-                obs, perception_fn, raw_obs_history, eb_config.perception_history_window
-            )
+            planning_perception = _apply_autumn_planning_perception(obs, perception_fn)
+            if planning_perception is None:
+                apply_perception_with_history(
+                    obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+                )
 
         trajectory.append(
             {
@@ -2286,7 +2515,9 @@ def _run_frozen_autumn_task_eval(
                 "pre_observation": raw_before,
                 "pre_auxiliary_observation": aux_before,
                 "post_observation": raw_after,
-                "post_auxiliary_observation": obs["text"].get("short_term_context", ""),
+                "post_auxiliary_observation": aux_after,
+                "planning_perception": planning_perception_before,
+                **image_flags,
             }
         )
 
@@ -2296,6 +2527,7 @@ def _run_frozen_autumn_task_eval(
     result = {
         "program": program,
         "task_type": task_type,
+        "eval_goal": eval_goal,
         "episode_return": episode_return,
         "num_steps": step + 1,
         "done": done,
@@ -2305,6 +2537,8 @@ def _run_frozen_autumn_task_eval(
         "total_cost": total_cost,
         "env_stats": env.get_stats(),
     }
+    if transition_info is not None:
+        result["pre_eval_transition"] = transition_info
     with open(output_dir / "episode_log.json", "w") as f:
         json.dump(result, f, indent=4, default=str)
     with open(output_dir / "trajectory.json", "w") as f:
@@ -2329,6 +2563,7 @@ def run_frozen_autumn_evaluation(
 
     results: dict[str, dict] = {}
     aggregate_reward = 0.0
+    total_cost = 0.0
     for program in programs:
         for task_type in task_types:
             run_key = f"{program}_{task_type}"
@@ -2354,17 +2589,267 @@ def run_frozen_autumn_evaluation(
                 }
             results[run_key] = result
             aggregate_reward += float(result.get("episode_return", 0.0))
+            total_cost += float(result.get("total_cost", 0.0))
 
     summary = {
         "aggregate_reward": aggregate_reward,
         "num_tasks": len(results),
+        "total_cost": total_cost,
         "results": results,
     }
     with open(eval_root / "summary.json", "w") as f:
         json.dump(summary, f, indent=4, default=str)
     evolve_logger.info(
         f"Frozen Autumn eval complete: aggregate_reward={aggregate_reward:.3f}, "
-        f"num_tasks={len(results)}"
+        f"num_tasks={len(results)}, cost=${total_cost:.4f}"
+    )
+    return summary
+
+
+def _frozen_eval_goal(
+    env_name: str, config: DictConfig, eb_config: StepwiseEBLearnConfig
+) -> str:
+    if env_name == "minihack":
+        return eb_config.frozen_eval_minihack_goal or resolve_agent_goal(config)
+    if env_name == "arc_agi":
+        return eb_config.frozen_eval_arc_agi_goal or resolve_agent_goal(config)
+    return resolve_agent_goal(config)
+
+
+def _frozen_autumn_eval_goal(
+    task_type: str, config: DictConfig, eb_config: StepwiseEBLearnConfig
+) -> str:
+    if task_type == "planning" and eb_config.frozen_eval_autumn_planning_goal:
+        return eb_config.frozen_eval_autumn_planning_goal
+    return resolve_agent_goal(config)
+
+
+def _make_frozen_eval_env(env_name: str, task: str, config: DictConfig):
+    if env_name == "arc_agi":
+        from arc_agi_env import make_arc_env
+
+        return make_arc_env(task, config)
+    return make_env(env_name, task, config)
+
+
+def _run_frozen_task_eval(
+    *,
+    config: DictConfig,
+    eb_config: StepwiseEBLearnConfig,
+    env_name: str,
+    task: str,
+    beliefs: str,
+    perception: str,
+    output_dir: Path,
+    eval_goal: str,
+    seed_index: int = 0,
+) -> dict:
+    """Run one non-learning evaluation episode with learned artifacts frozen."""
+    env = _make_frozen_eval_env(env_name, task, config)
+    agent = AgentFactory(config).create_agent()
+    agent.reset()
+
+    seed = getattr(config.envs.env_kwargs, "seed", None)
+    if seed is None:
+        seed = get_unique_seed(process_num=0, episode_idx=seed_index)
+    random.seed(seed)
+    np.random.seed(seed)
+    obs, info = env.reset(seed=seed)
+
+    _inject_beliefs(
+        config,
+        agent,
+        env,
+        env_name,
+        task,
+        beliefs,
+        goal_override=eval_goal,
+    )
+
+    perception_fn = load_perception_fn(perception)
+    raw_obs_history = [obs["text"]["long_term_context"]]
+    if perception_fn is not None:
+        apply_perception_with_history(
+            obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+        )
+
+    if eb_config.mock_mode:
+        set_mock_action_provider(lambda: random.choice(_mock_available_actions(env)))
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    trajectory: list[dict] = []
+    episode_return = 0.0
+    total_cost = 0.0
+    input_tokens = 0
+    output_tokens = 0
+    action_frequency: dict[str, int] = defaultdict(int)
+    failed_actions: list[str] = []
+    action = None
+    done = False
+    step = 0
+    final_info = info
+
+    for step in range(eb_config.frozen_eval_max_steps):
+        step_dir = output_dir / f"step_{step:03d}"
+        step_dir.mkdir(parents=True, exist_ok=True)
+        raw_before = raw_obs_history[-1]
+        aux_before = obs["text"].get("short_term_context", "")
+        before_image = obs.get("image")
+
+        response = agent.act(obs, prev_action=action)
+        action = response.completion
+        reasoning = getattr(response, "reasoning", "")
+        total_cost += getattr(response, "cost", 0.0)
+        input_tokens += getattr(response, "input_tokens", 0)
+        output_tokens += getattr(response, "output_tokens", 0)
+        action_frequency[action] += 1
+        _save_eval_agent_messages(step_dir, agent, reasoning, action)
+
+        try:
+            obs, reward, terminated, truncated, final_info = env.step(action)
+        except ValueError as e:
+            logging.warning(f"Frozen eval invalid action: {action} — {e}")
+            failed_actions.append(action)
+            if config.eval.feedback_on_invalid_action:
+                obs["text"]["long_term_context"] = (
+                    "\n\nYour previous output did not contain a valid action. Retry\n\n"
+                    f"Observation:\n{obs['text']['long_term_context']}"
+                )
+            reward = 0.0
+            terminated = False
+            truncated = False
+            final_info = {"invalid_action_error": str(e)}
+
+        done = terminated or truncated
+        episode_return += reward
+
+        raw_after = obs["text"]["long_term_context"]
+        aux_after = obs["text"].get("short_term_context", "")
+        after_image = obs.get("image")
+        image_flags = _save_eval_step_images(step_dir, before_image, after_image)
+        raw_obs_history.append(raw_after)
+        if perception_fn is not None:
+            apply_perception_with_history(
+                obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+            )
+
+        trajectory.append(
+            {
+                "step": step,
+                "action": action,
+                "reasoning": reasoning,
+                "reward": reward,
+                "done": done,
+                "info": final_info,
+                "pre_observation": raw_before,
+                "pre_auxiliary_observation": aux_before,
+                "post_observation": raw_after,
+                "post_auxiliary_observation": aux_after,
+                **image_flags,
+            }
+        )
+
+        if done:
+            break
+
+    env_stats = {}
+    if hasattr(env, "get_stats"):
+        try:
+            env_stats = env.get_stats()
+        except Exception:
+            logging.exception("Failed to collect frozen eval env stats")
+
+    result = {
+        "env_name": env_name,
+        "task": task,
+        "eval_goal": eval_goal,
+        "episode_return": episode_return,
+        "num_steps": len(trajectory),
+        "done": done,
+        "final_info": final_info,
+        "failed_actions": failed_actions,
+        "failed_candidates": getattr(env, "failed_candidates", []),
+        "action_frequency": dict(action_frequency),
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_cost": total_cost,
+        "env_stats": env_stats,
+    }
+    with open(output_dir / "episode_log.json", "w") as f:
+        json.dump(result, f, indent=4, default=str)
+    with open(output_dir / "trajectory.json", "w") as f:
+        json.dump(trajectory, f, indent=2, default=str)
+    if hasattr(env, "close"):
+        env.close()
+    return result
+
+
+def run_frozen_environment_evaluation(
+    *,
+    config: DictConfig,
+    eb_config: StepwiseEBLearnConfig,
+    beliefs: str,
+    perception: str,
+    output_dir: str,
+) -> dict:
+    """Run frozen post-learning evaluation for MiniHack and ARC-AGI-3."""
+    active_env = config.envs.names.split("-")[0]
+    env_names = eb_config.frozen_eval_envs or [active_env]
+    eval_root = Path(output_dir) / "frozen_eval"
+    eval_root.mkdir(parents=True, exist_ok=True)
+
+    results: dict[str, dict] = {}
+    aggregate_reward = 0.0
+    total_cost = 0.0
+    seed_index = 0
+    for env_name in env_names:
+        if env_name not in ("minihack", "arc_agi"):
+            evolve_logger.info(f"Skipping generic frozen eval for unsupported env: {env_name}")
+            continue
+
+        tasks = list(config.tasks[f"{env_name}_tasks"])
+        eval_goal = _frozen_eval_goal(env_name, config, eb_config)
+        for task in tasks:
+            run_key = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{env_name}_{task}")
+            run_dir = eval_root / run_key
+            evolve_logger.info(f"Running frozen eval: {run_key}")
+            try:
+                result = _run_frozen_task_eval(
+                    config=config,
+                    eb_config=eb_config,
+                    env_name=env_name,
+                    task=task,
+                    beliefs=beliefs,
+                    perception=perception,
+                    output_dir=run_dir,
+                    eval_goal=eval_goal,
+                    seed_index=seed_index,
+                )
+            except Exception as e:
+                logging.exception("Frozen eval failed")
+                result = {
+                    "env_name": env_name,
+                    "task": task,
+                    "eval_goal": eval_goal,
+                    "error": str(e),
+                    "episode_return": 0.0,
+                }
+            results[run_key] = result
+            aggregate_reward += float(result.get("episode_return", 0.0))
+            total_cost += float(result.get("total_cost", 0.0))
+            seed_index += 1
+
+    summary = {
+        "aggregate_reward": aggregate_reward,
+        "num_tasks": len(results),
+        "total_cost": total_cost,
+        "results": results,
+    }
+    with open(eval_root / "summary.json", "w") as f:
+        json.dump(summary, f, indent=4, default=str)
+    evolve_logger.info(
+        f"Frozen eval complete: aggregate_reward={aggregate_reward:.3f}, "
+        f"num_tasks={len(results)}, cost=${total_cost:.4f}"
     )
     return summary
 
@@ -2448,8 +2933,10 @@ def stepwise_eb_learn(
             perception = ""
         qa_pairs = []
 
-    default_knowledge = get_default_knowledge(config)
+    agent_goal = resolve_agent_goal(config)
+    default_knowledge = append_agent_goal(get_default_knowledge(config), agent_goal)
     evolve_logger.info(f"Default knowledge: {len(default_knowledge)} chars")
+    evolve_logger.info(f"Agent goal: {agent_goal}")
 
     evolve_logger.info(f"Stepwise EB-learn config:")
     evolve_logger.info(f"  Total env steps: {eb_config.n_environment_steps}")
@@ -2542,6 +3029,18 @@ def stepwise_eb_learn(
             perception=perception,
             output_dir=output_dir,
         )
+    frozen_eval_envs = eb_config.frozen_eval_envs or [config.envs.names.split("-")[0]]
+    if (
+        eb_config.frozen_eval_after_learn
+        and any(env_name in ("minihack", "arc_agi") for env_name in frozen_eval_envs)
+    ):
+        run_frozen_environment_evaluation(
+            config=config,
+            eb_config=eb_config,
+            beliefs=beliefs,
+            perception=perception,
+            output_dir=output_dir,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -2549,22 +3048,13 @@ def stepwise_eb_learn(
 # ---------------------------------------------------------------------------
 
 
-@hydra.main(config_path="BALROG/balrog/config", config_name="config", version_base="1.1")
-def main(config: DictConfig):
-    run_name_suffix = f"{config.agent.type}_{config.client.model_id.replace('/', '_')}_stepwise_eb_learn"
-
-    original_cwd, output_dir = setup_run(
-        config,
-        run_name_suffix=run_name_suffix,
-        resume_from=config.eval.resume_from,
-        output_dir_base=config.eval.output_dir,
-        logger_name="evolve",
-    )
-
+def build_stepwise_eb_config(config: DictConfig) -> StepwiseEBLearnConfig:
+    """Build the EB config from Hydra config using the main script defaults."""
     evolve_cfg = config.eval.evolve
 
     legacy_max_total_qa_pairs = evolve_cfg.get("max_total_qa_pairs", 50)
-    eb_config = StepwiseEBLearnConfig(
+    frozen_eval_envs = evolve_cfg.get("frozen_eval_envs", None)
+    return StepwiseEBLearnConfig(
         n_environment_steps=evolve_cfg.get("n_environment_steps", 100),
         max_perception_iterations=evolve_cfg.get(
             "max_perception_iterations",
@@ -2597,13 +3087,45 @@ def main(config: DictConfig):
         question_scoring_method=evolve_cfg.get("question_scoring_method", "b_diff_light"),
         question_scoring_max_concurrent=evolve_cfg.get("question_scoring_max_concurrent", 8),
         mock_mode=evolve_cfg.get("mock_mode", False),
+        frozen_eval_after_learn=evolve_cfg.get("frozen_eval_after_learn", False),
+        frozen_eval_envs=(
+            list(frozen_eval_envs) if frozen_eval_envs is not None else None
+        ),
+        frozen_eval_max_steps=evolve_cfg.get("frozen_eval_max_steps", 501),
+        frozen_eval_minihack_goal=evolve_cfg.get(
+            "frozen_eval_minihack_goal",
+            StepwiseEBLearnConfig.frozen_eval_minihack_goal,
+        ),
+        frozen_eval_arc_agi_goal=evolve_cfg.get(
+            "frozen_eval_arc_agi_goal",
+            StepwiseEBLearnConfig.frozen_eval_arc_agi_goal,
+        ),
         autumn_eval_after_learn=evolve_cfg.get("autumn_eval_after_learn", False),
         autumn_eval_task_types=list(
             evolve_cfg.get("autumn_eval_task_types", ["mfp", "cd", "planning"])
         ),
         autumn_eval_max_steps=evolve_cfg.get("autumn_eval_max_steps", 501),
         autumn_eval_render_mode=evolve_cfg.get("autumn_eval_render_mode", "text"),
+        frozen_eval_autumn_planning_goal=evolve_cfg.get(
+            "frozen_eval_autumn_planning_goal",
+            StepwiseEBLearnConfig.frozen_eval_autumn_planning_goal,
+        ),
     )
+
+
+@hydra.main(config_path="BALROG/balrog/config", config_name="config", version_base="1.1")
+def main(config: DictConfig):
+    run_name_suffix = f"{config.agent.type}_{config.client.model_id.replace('/', '_')}_stepwise_eb_learn"
+
+    original_cwd, output_dir = setup_run(
+        config,
+        run_name_suffix=run_name_suffix,
+        resume_from=config.eval.resume_from,
+        output_dir_base=config.eval.output_dir,
+        logger_name="evolve",
+    )
+
+    eb_config = build_stepwise_eb_config(config)
 
     stepwise_eb_learn(
         eb_config=eb_config,

@@ -51,7 +51,7 @@ def get_arc_instruction_prompt(available_actions: list[str] | None = None) -> st
         else ""
     )
 
-    return f"""You are playing a game. Your goal is to get as far as possible in the game.
+    return f"""You are playing a game.
 
 The game is played on a 64x64 grid of integer values (0-15), each representing a color:
 {color_desc}

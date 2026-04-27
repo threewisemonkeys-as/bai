@@ -1257,6 +1257,7 @@ async def _improve_with_perception_validation_conversational(
     images: list | None = None,
     sample_histories: list[list[str]] | None = None,
     history_window: int | None = None,
+    allow_keep_perception: bool = False,
 ) -> tuple[str, str, float, list[dict], str, str | None]:
     """Run an improve prompt with perception validation using multi-turn conversation.
 
@@ -1271,6 +1272,10 @@ async def _improve_with_perception_validation_conversational(
     shown in the prompt: when ``sample_histories`` and ``history_window`` are
     provided, the windowed history is passed (matching `_run_perception_on_history`);
     otherwise the single raw observation is passed.
+
+    If ``allow_keep_perception`` is true, the response may omit
+    ``<updated_perception>`` or set it to ``KEEP_UNCHANGED``. In that case the
+    current perception module is preserved without a retry.
 
     Returns: (new_beliefs, new_perception, total_cost, updated_history, llm_response,
              validation_error). validation_error is None on success, or the last
@@ -1296,11 +1301,18 @@ async def _improve_with_perception_validation_conversational(
 
     for attempt in range(max_retries):
         if perception_error:
+            perception_fix_instruction = (
+                "Please fix the error in your perception code, or set "
+                "<updated_perception>KEEP_UNCHANGED</updated_perception> if no "
+                "perception change is needed."
+                if allow_keep_perception
+                else "Please fix the error in your perception code and provide "
+                "updated beliefs and perception in the same format as before."
+            )
             current_message = (
                 f"Your previous perception code had an error:\n"
                 f"{perception_error}\n\n"
-                f"Please fix the error in your perception code and provide "
-                f"updated beliefs and perception in the same format as before."
+                f"{perception_fix_instruction}"
             )
 
         # Only attach images on the first attempt; retries are text-only.
@@ -1319,17 +1331,35 @@ async def _improve_with_perception_validation_conversational(
         # Extract perception code
         candidate_perception = extract_xml_key(text, "updated_perception")
         if not candidate_perception:
+            if allow_keep_perception:
+                logging.info("No updated_perception provided; keeping existing perception module")
+                return new_beliefs, perception, total_cost, current_history, text, None
             logging.warning(f"Failed to extract updated_perception (attempt {attempt + 1})")
             perception_error = "No <updated_perception> block found in response."
             continue
 
         candidate_perception = candidate_perception.strip()
+        if allow_keep_perception and candidate_perception.strip().upper() in {
+            "KEEP_UNCHANGED",
+            "UNCHANGED",
+            "NO_CHANGE",
+        }:
+            logging.info("LLM requested KEEP_UNCHANGED; keeping existing perception module")
+            return new_beliefs, perception, total_cost, current_history, text, None
+
         if candidate_perception.startswith("```python"):
             candidate_perception = candidate_perception[len("```python"):].strip()
         elif candidate_perception.startswith("```"):
             candidate_perception = candidate_perception[len("```"):].strip()
         if candidate_perception.endswith("```"):
             candidate_perception = candidate_perception[:-len("```")].strip()
+        if allow_keep_perception and candidate_perception.strip().upper() in {
+            "KEEP_UNCHANGED",
+            "UNCHANGED",
+            "NO_CHANGE",
+        }:
+            logging.info("LLM requested KEEP_UNCHANGED; keeping existing perception module")
+            return new_beliefs, perception, total_cost, current_history, text, None
 
         # Validate perception code using the same inputs shown in the prompt.
         test_obs = [raw for raw, _ in sample_observations[:3]] if sample_observations else None
