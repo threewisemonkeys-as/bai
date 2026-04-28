@@ -228,6 +228,17 @@ def _mock_llm_response(prompt: str) -> str:
     if has_beliefs_fmt or has_perc_fmt:
         return _mock_improve_response(p, include_beliefs=has_beliefs_fmt, include_perception=has_perc_fmt)
 
+    # --- Critical transition identification (identify_critical_transition) ---
+    if "<critical>yes</critical>" in p or "Critical-transition identification" in p or (
+        "decide whether the most recent transition" in p and "<critical>" in p
+    ):
+        decision = random.choice(["yes", "no"])
+        return (
+            "<analysis>[mock] comparing predicted vs observed post-state.</analysis>\n"
+            f"<critical>{decision}</critical>\n"
+            "<reason>[mock] random gate decision for smoke testing.</reason>"
+        )
+
     # --- Fallback ---
     return "<think>[mock] response for unrecognized prompt</think>"
 

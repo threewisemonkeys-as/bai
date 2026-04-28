@@ -61,7 +61,7 @@ def perceive(observation_text: str) -> str:
 
 <status>CONTINUE or SUBMIT</status>
 
-Set status to SUBMIT if you believe your current beliefs and perception are sufficient given the available evidence. Set status to CONTINUE if you want to receive re-evaluation results and iterate further. When in doubt, prefer CONTINUE."""
+Set status to SUBMIT if you believe your current beliefs and perception are sufficient given the available evidence otherwise set status to CONTINUE."""
 
 
 PERCEPTION_ONLY_RESPONSE_FORMAT = """Format your response as:
@@ -79,7 +79,7 @@ def perceive(observation_text: str) -> str:
 
 <status>CONTINUE or SUBMIT</status>
 
-Set status to SUBMIT if you believe your current perception module is extracting information well. Set status to CONTINUE if you want to see updated examples and iterate further. When in doubt, prefer CONTINUE."""
+Set status to SUBMIT if you believe your current perception module is extracting information well otherwise set status to CONTINUE."""
 
 
 BELIEFS_ONLY_RESPONSE_FORMAT = """Format your response as:
@@ -322,24 +322,57 @@ def _build_execution_report_section(
     sample_observations: list[tuple[str, int]] | None,
     sample_histories: list[list[str]] | None = None,
     history_window: int | None = None,
+    display_tail: int | None = None,
 ) -> str:
     """Build execution report section for prompts.
 
-    History-aware variant currently renders the same legacy execution report
-    (raw_obs → single-obs perception output). The history-aware perception
-    output already appears in `_build_obs_section`, which is where the LLM
-    reviews the current module's behavior.
+    When sample_histories and history_window are provided, perception is invoked
+    with the windowed history (matching rollout behavior). display_tail controls
+    how many frames are shown in <input> for display purposes.
     """
     if not sample_observations:
         return ""
-    exec_report = _build_execution_report(perception, sample_observations)
+    from mixed_improve import _run_perception_on_history, _run_perception_on_observation
+    use_history = (
+        sample_histories is not None
+        and history_window is not None
+        and len(sample_histories) == len(sample_observations)
+    )
+    max_samples = 3
+    samples = sample_observations[:max_samples]
+    tail_note = ""
+    if use_history and display_tail is not None:
+        tail_note = (
+            f"Note: Each <input> below shows only the last {display_tail} frame(s) "
+            f"of the observation history for display purposes. The actual perceive() "
+            f"call receives the full history (up to {history_window} frames).\n\n"
+        )
+    blocks = []
+    for idx, (raw_obs, step_num) in enumerate(samples):
+        if use_history:
+            history = sample_histories[idx]
+            output = _run_perception_on_history(perception, history, history_window)
+            if display_tail is not None:
+                input_block = _render_history_input(history, display_tail)
+            else:
+                input_block = raw_obs
+        else:
+            output = _run_perception_on_observation(perception, raw_obs)
+            input_block = raw_obs
+        blocks.append(
+            f"<execution_sample step=\"{step_num}\">\n"
+            f"<input>\n{input_block}\n</input>\n"
+            f"<output>\n{output if output else '(empty — perception produced no output)'}\n</output>\n"
+            f"</execution_sample>"
+        )
+    exec_report = "\n".join(blocks)
     if not exec_report:
         return ""
     return f"""
 === CURRENT PERCEPTION EXECUTION OUTPUT ===
 Below is the actual output of the current perception module on real observations:
 
-{exec_report}
+{tail_note}{exec_report}
 === END CURRENT PERCEPTION EXECUTION OUTPUT ===
 """
 

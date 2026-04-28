@@ -284,6 +284,7 @@ def load_log_dir(log_dir):
         for s_idx, s_name in step_dirs:
             s_path = os.path.join(ep_path, s_name)
             step_log = read_json(os.path.join(s_path, "step_log.json")) or {}
+            critical_id_log = read_json(os.path.join(s_path, "critical_id_log.json")) or {}
             all_steps.append({
                 "episode_idx": ep_idx,
                 "step": s_idx,
@@ -296,6 +297,7 @@ def load_log_dir(log_dir):
                 "extract_cost": step_log.get("extract_cost", 0),
                 "improve_cost": step_log.get("improve_cost", 0),
                 "experiment_cost": step_log.get("experiment_cost", 0),
+                "critical_cost": step_log.get("critical_cost", 0),
                 "step_total_cost": step_log.get("step_total_cost", 0),
                 "num_qa_pairs": step_log.get("num_qa_pairs", 0),
                 "num_unanswered_questions": step_log.get("num_unanswered_questions", 0),
@@ -306,6 +308,7 @@ def load_log_dir(log_dir):
                 "has_trim_log": os.path.exists(os.path.join(s_path, "trim_log.json")),
                 "has_question_selection_log": os.path.exists(os.path.join(s_path, "question_selection_log.json")),
                 "has_experiment_log": os.path.exists(os.path.join(s_path, "experiment_log.json")),
+                "has_critical_id_log": os.path.exists(os.path.join(s_path, "critical_id_log.json")),
                 "has_agent_messages": os.path.exists(os.path.join(s_path, "agent_messages.json")),
                 "has_obs_before": os.path.exists(os.path.join(s_path, "obs_before.png")),
                 "has_obs_after": os.path.exists(os.path.join(s_path, "obs_after.png")),
@@ -314,6 +317,9 @@ def load_log_dir(log_dir):
                 "did_gen_questions": step_log.get("did_gen_questions", False),
                 "did_formulate_experiment": step_log.get("did_formulate_experiment", False),
                 "did_trim": step_log.get("did_trim", False),
+                "did_critical_id": step_log.get("did_critical_id", False),
+                "critical": step_log.get("critical"),
+                "critical_reason": critical_id_log.get("reason"),
                 "active_experiment": step_log.get("active_experiment"),
                 "selected_question": step_log.get("selected_question"),
                 "phase": step_log.get("phase", "complete"),
@@ -497,6 +503,7 @@ def load_step_detail(log_dir, episode_idx, step_idx):
         "qa_pairs_ordered": ordered_qa_pairs,
         "qa_pairs_ordered_source_indices": ordered_qa_source_indices,
         "feedback_history": read_json(os.path.join(step_path, "feedback_history.json")) or [],
+        "critical_id_log": read_json(os.path.join(step_path, "critical_id_log.json")) or {},
         "extraction_log": read_json(os.path.join(step_path, "extraction_log.json")) or {},
         "trim_log": trim_log,
         "question_selection_log": question_selection_log,

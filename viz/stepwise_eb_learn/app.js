@@ -43,7 +43,8 @@ function isEBRun() {
   return DATA.steps.some((s) =>
     s.has_experiment_log || s.has_extraction_log ||
     s.has_improve_log || s.has_beliefs || s.has_trim_log ||
-    s.has_question_selection_log
+    s.has_question_selection_log || s.has_critical_id_log ||
+    s.did_critical_id
   );
 }
 
@@ -559,7 +560,10 @@ function updateTopbar() {
     topbarDir.textContent = DATA.log_dir_name;
     runWrap.style.display = "none";
   }
-  topbarCost.textContent = "Total cost: $" + (DATA.total_cost || 0).toFixed(4);
+  const criticalSteps = DATA.steps.filter((s) => s.did_critical_id && s.critical === true).length;
+  const classifiedSteps = DATA.steps.filter((s) => s.did_critical_id).length;
+  topbarCost.textContent = "Total cost: $" + (DATA.total_cost || 0).toFixed(4) +
+    (classifiedSteps ? " | critical " + criticalSteps + "/" + classifiedSteps : "");
 
   let title = DATA.log_dir_name;
   if (isStaticMode() && currentStaticRun) title = currentStaticRun.title || title;
@@ -743,6 +747,9 @@ function buildSidebar() {
     }
 
     const statusDot = dotColor ? '<span class="status-dot" style="background:' + dotColor + '" title="' + dotTitle + '"></span>' : "";
+    const criticalBadge = step.did_critical_id
+      ? '<span class="critical-badge ' + (step.critical ? "yes" : "no") + '" title="' + esc(step.critical_reason || (step.critical ? "critical transition" : "non-critical transition")) + '">' + (step.critical ? "C" : "skip") + "</span>"
+      : "";
     const doneMark = step.done ? '<span class="done-marker">END</span>' : "";
     const isInProgress = step.phase && step.phase !== "complete";
     const phaseLabels = { started: "starting", acting: "acting", extracting: "extracting", improving: "improving" };
@@ -757,7 +764,7 @@ function buildSidebar() {
 
     el.innerHTML = '<span class="gs">g' + step.global_step + "</span>" +
       '<span class="act" title="' + esc(actionText) + '">' + esc(actionText) + "</span>" +
-      statusDot + doneMark + phaseBadge + lvlBadge +
+      statusDot + criticalBadge + doneMark + phaseBadge + lvlBadge +
       '<span class="rw ' + rewardClass + '">' + (isInProgress && !step.action ? "" : rewardVal.toFixed(2)) + "</span>";
     el.onclick = () => {
       currentTab = "overview";
@@ -785,6 +792,9 @@ function renderStep(idx) {
   const phasePill = stepIsInProgress
     ? ' <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(210,153,34,0.15);color:' + phaseColor + ';font-weight:600;vertical-align:middle">' + (step.phase || "") + "</span>"
     : "";
+  const criticalPill = step.did_critical_id
+    ? ' <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + (step.critical ? "rgba(63,185,80,0.15)" : "rgba(139,148,158,0.14)") + ';color:' + (step.critical ? "var(--accent2)" : "var(--text-muted)") + ';font-weight:700;vertical-align:middle">' + (step.critical ? "critical" : "non-critical") + "</span>"
+    : "";
 
   // Build env info badge (ARC-AGI: game_id, levels, state)
   const ei = step.env_info || {};
@@ -800,7 +810,7 @@ function renderStep(idx) {
 
   let html = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">' +
     '<button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px" onclick="showStep(' + Math.max(0, idx - 1) + ')" ' + (idx === 0 ? "disabled" : "") + ">&#8592;</button>" +
-    '<h1 style="margin:0;font-size:18px">Step ' + step.step + phasePill + ' <span style="color:var(--text-muted);font-size:14px;font-weight:400">ep' + step.episode_idx + " | global " + step.global_step + envBadge + "</span></h1>" +
+    '<h1 style="margin:0;font-size:18px">Step ' + step.step + phasePill + criticalPill + ' <span style="color:var(--text-muted);font-size:14px;font-weight:400">ep' + step.episode_idx + " | global " + step.global_step + envBadge + "</span></h1>" +
     '<span style="font-size:12px;color:var(--text-muted);margin-left:auto">action: <b>' + esc(step.action || "...") + "</b> | reward: " + (step.action ? Number(step.reward).toFixed(2) : "—") + " | cost: $" + Number(step.step_total_cost).toFixed(4) + "</span>" +
     '<button style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px" onclick="showStep(' + Math.min(total - 1, idx + 1) + ')" ' + (idx >= total - 1 ? "disabled" : "") + ">&#8594;</button>" +
     "</div>";
@@ -1373,6 +1383,37 @@ function renderScoringPipelineSection(artifact, scoringLog) {
   return html;
 }
 
+function renderCriticalDecision(data, step) {
+  const log = data.critical_id_log || {};
+  const hasLog = !!(step && step.did_critical_id) || !!(log.prompt || log.response);
+  if (!hasLog) return "";
+  const isCritical = step && step.critical === true;
+  const statusColor = isCritical ? "var(--accent2)" : "var(--text-muted)";
+  const statusBg = isCritical ? "rgba(63,185,80,0.12)" : "rgba(139,148,158,0.12)";
+  const reason = log.reason || (step && step.critical_reason) || "";
+  const cost = step && step.critical_cost != null ? step.critical_cost : log.cost_usd;
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px">';
+  html += '<div class="stat-card"><div class="stat-label">Decision</div><div class="stat-value" style="font-size:18px;color:' + statusColor + '">' + (isCritical ? "Critical" : "Non-critical") + "</div></div>";
+  html += '<div class="stat-card"><div class="stat-label">Gate</div><div class="stat-value" style="font-size:18px;color:' + statusColor + '">' + (isCritical ? "Learn" : "Skip learn") + "</div></div>";
+  if (cost != null) {
+    html += '<div class="stat-card"><div class="stat-label">Critical ID Cost</div><div class="stat-value yellow" style="font-size:18px">$' + Number(cost || 0).toFixed(4) + "</div></div>";
+  }
+  html += "</div>";
+  if (reason) {
+    html += '<div style="font-size:12px;padding:8px 10px;background:' + statusBg + ';border:1px solid var(--border);border-radius:4px;margin-bottom:10px">' +
+      '<strong style="color:' + statusColor + '">Reason:</strong> ' + esc(reason) + "</div>";
+  }
+  html += promptResponseBlock("Critical Identification", log.prompt, log.response, {
+    imagePaths: log.prompt_image_paths,
+    labelPrefix: "Image",
+    accentCurrent: true,
+    currentStep: step,
+  });
+  return '<div class="card" style="margin-bottom:16px;border-left:3px solid ' + statusColor + '">' +
+    '<div class="card-header" onclick="toggleCard(this)">Critical Transition Gate <span style="font-size:11px;color:' + statusColor + ';font-weight:700">' + (isCritical ? "critical" : "non-critical") + '</span> <span class="toggle">&#9660;</span></div>' +
+    '<div class="card-body">' + html + "</div></div>";
+}
+
 function renderOverview(data, step) {
   const c = document.getElementById("overview-container");
   if (!c) return;
@@ -1426,6 +1467,8 @@ function renderOverview(data, step) {
     html += collapsible("Observation Images", imgHtml, true);
   }
 
+  html += renderCriticalDecision(data, step);
+
   // Active Experiment with selected questions
   if (step.active_experiment) {
     const genLabel = step.did_formulate_experiment ? "formulated at start of this step" : "carried over from previous step";
@@ -1457,18 +1500,22 @@ function renderOverview(data, step) {
 
   // Cost section — below perception
   let costHtml = '<table class="data-table"><tr><th>Category</th><th>This Step</th><th>Cumulative</th></tr>';
-  let cumAgent = 0, cumExtract = 0, cumImprove = 0, cumExperiment = 0, cumTotal = 0;
+  let cumAgent = 0, cumExtract = 0, cumImprove = 0, cumExperiment = 0, cumCritical = 0, cumTotal = 0;
   for (let i = 0; i <= selectedStepIdx; i++) {
     const s = DATA.steps[i];
     cumAgent += s.agent_step_cost || 0;
     cumExtract += s.extract_cost || 0;
     cumImprove += s.improve_cost || 0;
     cumExperiment += s.experiment_cost || 0;
+    cumCritical += s.critical_cost || 0;
     cumTotal += s.step_total_cost || 0;
   }
   const agentLabel = ebRun ? "Agent" : "LLM Call";
   costHtml += '<tr><td>' + agentLabel + '</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.agent_step_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumAgent.toFixed(4) + "</td></tr>";
   if (ebRun) {
+    if (step.did_critical_id || cumCritical > 0) {
+      costHtml += '<tr><td>Critical ID</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.critical_cost || 0).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumCritical.toFixed(4) + "</td></tr>";
+    }
     costHtml += '<tr><td>Extraction</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.extract_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumExtract.toFixed(4) + "</td></tr>";
     costHtml += '<tr><td>Improve</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.improve_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumImprove.toFixed(4) + "</td></tr>";
     costHtml += '<tr><td>Experiment</td><td style="font-family:var(--font-mono);color:var(--accent3)">$' + Number(step.experiment_cost).toFixed(4) + '</td><td style="font-family:var(--font-mono);color:var(--text-muted)">$' + cumExperiment.toFixed(4) + "</td></tr>";
@@ -1489,8 +1536,10 @@ function renderCostChart() {
   DATA.steps.forEach((step, i) => {
     const height = Math.max((step.step_total_cost / maxCost) * 100, 1);
     const isSelected = i === selectedStepIdx;
-    const color = isSelected ? "var(--accent)" : (step.improve_cost > 0 ? "var(--purple)" : "var(--surface2)");
-    html += '<div style="flex:1;height:' + height + '%;background:' + color + ';border-radius:2px 2px 0 0;cursor:pointer;min-width:2px" title="g' + step.global_step + ": $" + step.step_total_cost.toFixed(4) + '" onclick="showStep(' + i + ')"></div>';
+    const color = isSelected ? "var(--accent)" : (step.improve_cost > 0 ? "var(--purple)" : (step.critical === false ? "var(--border)" : (step.did_critical_id ? "var(--accent2)" : "var(--surface2)")));
+    const title = "g" + step.global_step + ": $" + step.step_total_cost.toFixed(4) +
+      (step.did_critical_id ? " | " + (step.critical ? "critical" : "non-critical") : "");
+    html += '<div style="flex:1;height:' + height + '%;background:' + color + ';border-radius:2px 2px 0 0;cursor:pointer;min-width:2px" title="' + esc(title) + '" onclick="showStep(' + i + ')"></div>';
   });
   html += "</div>";
   html += '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:4px"><span>g0</span><span>g' + DATA.steps[DATA.steps.length - 1].global_step + "</span></div>";

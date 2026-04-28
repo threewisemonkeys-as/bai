@@ -37,6 +37,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ar
 .step-item .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .step-item .done-marker { color: var(--danger); font-weight: 700; font-size: 11px; }
 .step-item .phase-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: rgba(210,153,34,0.2); color: var(--accent3); font-weight: 600; white-space: nowrap; }
+.step-item .critical-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; border: 1px solid var(--border); font-weight: 700; white-space: nowrap; }
+.step-item .critical-badge.yes { color: var(--accent2); background: rgba(63,185,80,0.14); border-color: rgba(63,185,80,0.4); }
+.step-item .critical-badge.no { color: var(--text-muted); background: rgba(139,148,158,0.12); }
 .ep-header { padding: 8px 16px; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--border); }
 .main { flex: 1; overflow-y: auto; padding: 24px; }
 pre { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 12px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; max-height: 500px; overflow-y: auto; }

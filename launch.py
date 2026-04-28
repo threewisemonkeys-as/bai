@@ -92,6 +92,7 @@ EB_LEARN_DEFAULT = {
     "eval.evolve.question_scoring_method": "b_diff_full",
     "eval.evolve.question_scoring_max_concurrent": 8,
     "eval.evolve.max_unanswered_qa_pairs": 20,
+    "eval.evolve.critical_transitions_enabled": True,
 }
 EB_LEARN_OVERRIDES: dict[tuple[str, str], dict] = {
     ("minihack", "gemini-2.5-flash"): {

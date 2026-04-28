@@ -70,6 +70,9 @@ def _cell_overrides(script: str, env: str, model: str) -> dict:
             **_eb_launch.EB_LEARN_DEFAULT,
             **_eb_launch.EB_LEARN_OVERRIDES.get((env, model), {}),
         }
+        # Greedy runs should rely on the LLM probe selector for experiment
+        # generation rather than the B-diff question scoring path.
+        ov["eval.evolve.question_scoring_method"] = "llm_trim"
     else:
         ov = {
             "envs.names": env,
@@ -125,6 +128,19 @@ def build_cmd(cell: Cell, output_dir: Path) -> list[str]:
     return ["uv", "run", SCRIPT_FILES[cell.script], *args]
 
 
+def apply_extra_overrides(cells: list[Cell], extra_overrides: list[str] | None) -> None:
+    if not extra_overrides:
+        return
+    for raw in extra_overrides:
+        if "=" not in raw:
+            sys.exit(f"Invalid override {raw!r}; expected key=value.")
+        key, value = raw.split("=", 1)
+        if not key:
+            sys.exit(f"Invalid override {raw!r}; override key is empty.")
+        for cell in cells:
+            cell.overrides[key] = value
+
+
 def run_cell(cell: Cell, root: Path) -> tuple[Cell, int]:
     out_dir = root / cell.name
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -149,6 +165,8 @@ def main():
     p.add_argument("--parallel", type=int, default=1,
                    help="Max concurrent cells (default: 1)")
     p.add_argument("--tag", default=time.strftime("%Y%m%d-%H%M%S"))
+    p.add_argument("--override", action="append", default=None,
+                   help="Extra Hydra override key=value. May be repeated.")
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
 
@@ -163,6 +181,7 @@ def main():
     if args.num_steps is not None:
         for c in cells:
             c.overrides[NUM_STEPS_KEYS[c.script]] = args.num_steps
+    apply_extra_overrides(cells, args.override)
 
     root = args.log_dir / args.tag
     print(f"Greedy matrix root: {root}")
