@@ -85,6 +85,8 @@ from stepwise_explore import (
 from goal_prompts import append_agent_goal, resolve_agent_goal
 from run_utils import setup_run, improve_logging, _update_summary_json
 
+INVALID_ACTION_RETRY_MESSAGE = "Your previous action was not formatted correctly. Retry"
+
 
 def _extract_xml_attr(attrs: str, name: str) -> str | None:
     match = re.search(
@@ -271,6 +273,7 @@ class StepwiseEBLearnConfig:
     max_qa_per_forward: int
     max_answered_qa_pairs: int
     max_unanswered_qa_pairs: int
+    trim_unanswered_at_selection: bool
     num_questions: int                 # Questions per generation step
     num_sample_obs: int
     explore_temp: float
@@ -524,7 +527,6 @@ def _save_eval_labeled_images(step_dir: Path, prefix: str, images: list[dict] | 
             pass
     return rel_paths
 
-
 def _save_eval_step_images(
     step_dir: Path,
     before_image,
@@ -766,6 +768,7 @@ def _save_step_log_eb(
     did_formulate_experiment: bool = False,
     did_trim: bool = False,
     active_experiment: str | None = None,
+    active_experiment_question: str | None = None,
     phase: str = "complete",
     env_info: dict | None = None,
     critical_cost: float = 0.0,
@@ -800,6 +803,7 @@ def _save_step_log_eb(
         "did_critical_id": did_critical_id,
         "critical": critical,
         "active_experiment": active_experiment,
+        "active_experiment_question": active_experiment_question,
     }
     # Persist environment-specific info (e.g. ARC-AGI game_id, levels, state)
     if env_info:
@@ -1568,6 +1572,7 @@ def run_stepwise_eb_learn_episode(
     perception: str,
     qa_pairs: list[EBQAPair],
     current_experiment: str | None,
+    current_experiment_question: str | None,
     default_knowledge: str,
     output_dir: str,
     episode_idx: int = 0,
@@ -1577,12 +1582,24 @@ def run_stepwise_eb_learn_episode(
     past_experiments: list[str] | None = None,
     agent_history_events: list[dict] | None = None,
     cumulative_cost_offset: float = 0.0,
-) -> tuple[str, str, list[EBQAPair], str | None, dict, int, list[dict], list[str], list[dict]]:
+) -> tuple[
+    str,
+    str,
+    list[EBQAPair],
+    str | None,
+    str | None,
+    dict,
+    int,
+    list[dict],
+    list[str],
+    list[dict],
+]:
     """Run a single episode with per-step EB-learning.
 
     Returns:
-        (beliefs, perception, qa_pairs, current_experiment, episode_stats, steps_taken,
-         trajectory_buffer, past_experiments, agent_history_events)
+        (beliefs, perception, qa_pairs, current_experiment,
+         current_experiment_question, episode_stats, steps_taken, trajectory_buffer,
+         past_experiments, agent_history_events)
     """
     # --- Setup environment and agent ---
     env_name = config.envs.names.split("-")[0]
@@ -1741,6 +1758,7 @@ def run_stepwise_eb_learn_episode(
                 num_qa=len(qa_pairs), num_unanswered=num_unanswered,
                 did_gen_questions=False, did_formulate_experiment=False,
                 active_experiment=current_experiment, phase="started",
+                active_experiment_question=current_experiment_question,
             )
 
             # --- Question generation + experiment formulation ---
@@ -1810,6 +1828,8 @@ def run_stepwise_eb_learn_episode(
                     qa_pairs_for_experiment = list(qa_pairs)
                     selected_source_indices = list(range(len(qa_pairs)))
                     scoring_method = eb_config.question_scoring_method
+                    destructive_unanswered_dropped_count = 0
+                    destructive_unanswered_dropped_questions: list[str] = []
 
                     qa_pairs, dedup_cost, dedup_log = asyncio.run(
                         deduplicate_qa_pairs(
@@ -1835,6 +1855,56 @@ def run_stepwise_eb_learn_episode(
                         )
                     )
                     selection_cost_total += select_cost
+
+                    if eb_config.trim_unanswered_at_selection:
+                        selected_unanswered_indices = set(selected_source_indices)
+                        kept_source_indices = [
+                            i
+                            for i, qa in enumerate(qa_pairs)
+                            if qa.answer is not None or i in selected_unanswered_indices
+                        ]
+                        dropped_unanswered_indices = [
+                            i
+                            for i, qa in enumerate(qa_pairs)
+                            if qa.answer is None and i not in selected_unanswered_indices
+                        ]
+                        destructive_unanswered_dropped_count = len(
+                            dropped_unanswered_indices
+                        )
+                        destructive_unanswered_dropped_questions = [
+                            qa_pairs[i].question for i in dropped_unanswered_indices
+                        ]
+
+                        source_to_filtered_index = {
+                            source_idx: filtered_idx
+                            for filtered_idx, source_idx in enumerate(kept_source_indices)
+                        }
+                        selected_source_indices = [
+                            source_to_filtered_index[i]
+                            for i in selected_source_indices
+                            if i in source_to_filtered_index
+                        ]
+                        qa_pairs = [qa_pairs[i] for i in kept_source_indices]
+                        qa_pairs_for_experiment = [
+                            qa_pairs[i] for i in selected_source_indices
+                        ]
+                        selection_log["destructive_unanswered_filter"] = {
+                            "enabled": True,
+                            "kept_source_indices_before_filter": kept_source_indices,
+                            "dropped_unanswered_source_indices_before_filter": (
+                                dropped_unanswered_indices
+                            ),
+                            "dropped_unanswered_questions": (
+                                destructive_unanswered_dropped_questions
+                            ),
+                            "dropped_unanswered_count": (
+                                destructive_unanswered_dropped_count
+                            ),
+                            "post_filter_count": len(qa_pairs),
+                            "post_filter_unanswered": sum(
+                                1 for q in qa_pairs if q.answer is None
+                            ),
+                        }
 
                     scoring_log: dict | None = None
                     ranked_unanswered_indices: list[int] = []
@@ -1970,12 +2040,26 @@ def run_stepwise_eb_learn_episode(
                         ),
                         "max_answered_qa_pairs": eb_config.max_answered_qa_pairs,
                         "max_unanswered_qa_pairs": eb_config.max_unanswered_qa_pairs,
-                        "dropped_count": dedup_log.get("dropped_count", 0),
+                        "dropped_count": (
+                            dedup_log.get("dropped_count", 0)
+                            + destructive_unanswered_dropped_count
+                        ),
+                        "selection_dropped_unanswered_count": (
+                            destructive_unanswered_dropped_count
+                        ),
+                        "selection_dropped_unanswered_questions": (
+                            destructive_unanswered_dropped_questions
+                        ),
                         "total_cost": selection_cost_total,
                         "dedup": dedup_log,
                         "selection": selection_log,
                         "scoring": scoring_log,
-                        "maintained_bank_preserved": True,
+                        "maintained_bank_preserved": (
+                            not eb_config.trim_unanswered_at_selection
+                        ),
+                        "trim_unanswered_at_selection": (
+                            eb_config.trim_unanswered_at_selection
+                        ),
                         "experiment_source_indices": selected_source_indices,
                         "target_experiment_prompt_index": target_experiment_question_index,
                         "target_experiment_source_index": target_experiment_question_source_index,
@@ -1996,7 +2080,7 @@ def run_stepwise_eb_learn_episode(
                     }
                     step_trim_cost = selection_cost_total
                     total_learn_cost += selection_cost_total
-                    did_trim_step = bool(dedup_log.get("dropped_count", 0))
+                    did_trim_step = bool(step_trim_log.get("dropped_count", 0))
 
                     with open(step_dir / "trim_log.json", "w") as f:
                         json.dump(step_trim_log, f, indent=4, default=str)
@@ -2025,7 +2109,9 @@ def run_stepwise_eb_learn_episode(
                             "kept_unanswered_questions": [
                                 qa_pairs[i].question for i in ranked_unanswered_indices
                             ],
-                            "dropped_unanswered_questions": [],
+                            "dropped_unanswered_questions": (
+                                destructive_unanswered_dropped_questions
+                            ),
                             "tie_break": scoring_log.get("tie_break"),
                             "scoring_log": scoring_log,
                             "selection_log": selection_log,
@@ -2056,6 +2142,7 @@ def run_stepwise_eb_learn_episode(
                             steps_context=exp_steps_context,
                             current_qa=qa_pairs_for_experiment,
                             current_experiment=current_experiment,
+                            current_experiment_question=current_experiment_question,
                             current_observation=_pre_action_raw_long,
                             current_aux_observation=_pre_action_raw_short,
                             default_knowledge=default_knowledge,
@@ -2069,11 +2156,20 @@ def run_stepwise_eb_learn_episode(
                     total_learn_cost += e_cost
 
                     if experiment_plan is not None:
+                        selected_question_text = (
+                            qa_pairs_for_experiment[q_idx].question
+                            if q_idx is not None
+                            and 0 <= q_idx < len(qa_pairs_for_experiment)
+                            else None
+                        )
                         # Move old active experiment to past if it exists
                         if current_experiment and current_experiment not in past_experiments:
                             past_experiments.append(current_experiment)
                         current_experiment = experiment_plan
+                        current_experiment_question = selected_question_text
                         did_formulate_experiment = True
+                    else:
+                        selected_question_text = None
 
                     # Experiment prompts use the capped trajectory-image
                     # sequence plus the current pre-action image. Question
@@ -2114,6 +2210,7 @@ def run_stepwise_eb_learn_episode(
                         "experiment_image_paths": exp_image_paths,
                         "experiment_plan": experiment_plan,
                         "selected_question_index": q_idx,
+                        "selected_question": selected_question_text,
                         "selected_question_source_index": (
                             selected_source_indices[q_idx]
                             if q_idx is not None
@@ -2127,6 +2224,8 @@ def run_stepwise_eb_learn_episode(
                             if target_experiment_question_source_index is not None
                             else None
                         ),
+                        "active_experiment": current_experiment,
+                        "active_experiment_question": current_experiment_question,
                         "question_selection_method": scoring_method,
                         "qa_pairs_for_experiment": serialize_eb_qa_pairs(
                             qa_pairs_for_experiment
@@ -2161,6 +2260,7 @@ def run_stepwise_eb_learn_episode(
                 did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
                 did_trim=did_trim_step,
                 active_experiment=current_experiment, phase="acting",
+                active_experiment_question=current_experiment_question,
             )
 
             # --- Agent acts ---
@@ -2189,7 +2289,7 @@ def run_stepwise_eb_learn_episode(
                 invalid_action = True
                 if config.eval.feedback_on_invalid_action:
                     obs["text"]["long_term_context"] = (
-                        f"\n\nYour previous output did not contain a valid action. Retry\n\n"
+                        f"\n\n{INVALID_ACTION_RETRY_MESSAGE}\n\n"
                         f"Observation:\n{obs['text']['long_term_context']}"
                     )
                 terminated = False
@@ -2262,6 +2362,7 @@ def run_stepwise_eb_learn_episode(
                 did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
                 did_trim=did_trim_step,
                 active_experiment=current_experiment, phase="extracting",
+                active_experiment_question=current_experiment_question,
                 env_info=info if isinstance(info, dict) else None,
             )
 
@@ -2441,6 +2542,7 @@ def run_stepwise_eb_learn_episode(
                     did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
                     did_trim=did_trim_step,
                     active_experiment=current_experiment, phase="improving",
+                    active_experiment_question=current_experiment_question,
                     env_info=info if isinstance(info, dict) else None,
                     critical_cost=step_critical_cost,
                     did_critical_id=did_critical_id_this_step,
@@ -2479,11 +2581,14 @@ def run_stepwise_eb_learn_episode(
                 # Reload perception after improvement
                 perception_fn = load_perception_fn(perception)
 
-                # Re-apply updated perception to current obs for the agent's next step
+                # Re-apply updated perception to current obs for the agent's next step.
+                # Invalid-action feedback keeps the observation unchanged, so the
+                # short-term context is already perception-wrapped from the prior
+                # prompt; wrapping it again nests the auxiliary observation block.
                 if not done:
                     obs["text"]["long_term_context"] = new_raw_long
                     obs["text"]["short_term_context"] = new_raw_short
-                    if perception_fn is not None:
+                    if perception_fn is not None and not invalid_action:
                         apply_perception_with_history(
                             obs, perception_fn, raw_obs_history, eb_config.perception_history_window
                         )
@@ -2553,6 +2658,7 @@ def run_stepwise_eb_learn_episode(
                 did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
                 did_trim=did_trim_step,
                 active_experiment=current_experiment, phase="complete",
+                active_experiment_question=current_experiment_question,
                 env_info=info if isinstance(info, dict) else None,
                 critical_cost=step_critical_cost,
                 did_critical_id=did_critical_id_this_step,
@@ -2638,6 +2744,7 @@ def run_stepwise_eb_learn_episode(
         perception,
         qa_pairs,
         current_experiment,
+        current_experiment_question,
         episode_log,
         step + 1,
         trajectory_buffer,
@@ -3005,7 +3112,7 @@ def _run_frozen_task_eval(
             failed_actions.append(action)
             if config.eval.feedback_on_invalid_action:
                 obs["text"]["long_term_context"] = (
-                    "\n\nYour previous output did not contain a valid action. Retry\n\n"
+                    f"\n\n{INVALID_ACTION_RETRY_MESSAGE}\n\n"
                     f"Observation:\n{obs['text']['long_term_context']}"
                 )
             reward = 0.0
@@ -3173,6 +3280,7 @@ def stepwise_eb_learn(
     start_episode = last_ep + 1
 
     current_experiment: str | None = None
+    current_experiment_question: str | None = None
     trajectory_buffer: list[dict] = []
     past_experiments: list[str] = []
     agent_history_events: list[dict] = []
@@ -3188,9 +3296,26 @@ def stepwise_eb_learn(
                 try:
                     sl = json.loads(sl_file.read_text())
                     current_experiment = sl.get("active_experiment")
+                    current_experiment_question = sl.get("active_experiment_question")
                     break
                 except (json.JSONDecodeError, TypeError):
                     pass
+        if current_experiment and not current_experiment_question:
+            for step_dir in sorted(last_ep_dir.glob("step_*"), reverse=True):
+                exp_file = step_dir / "experiment_log.json"
+                if exp_file.exists():
+                    try:
+                        exp_log = json.loads(exp_file.read_text())
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                    if exp_log.get("active_experiment") == current_experiment:
+                        current_experiment_question = exp_log.get(
+                            "active_experiment_question"
+                        ) or exp_log.get("selected_question")
+                        break
+                    if exp_log.get("experiment_plan") == current_experiment:
+                        current_experiment_question = exp_log.get("selected_question")
+                        break
         # Recover global step count from episode logs
         for ep_idx in range(start_episode):
             ep_log_file = Path(output_dir) / f"episode_{ep_idx}" / "episode_log.json"
@@ -3241,6 +3366,7 @@ def stepwise_eb_learn(
     evolve_logger.info(f"  Num questions per gen: {eb_config.num_questions}")
     evolve_logger.info(f"  Max answered QA pairs: {eb_config.max_answered_qa_pairs}")
     evolve_logger.info(f"  Max unanswered QA pairs: {eb_config.max_unanswered_qa_pairs}")
+    evolve_logger.info(f"  Trim unanswered at selection: {eb_config.trim_unanswered_at_selection}")
     evolve_logger.info(f"  Question scoring method: {eb_config.question_scoring_method}")
     evolve_logger.info(f"  Question scoring max concurrent: {eb_config.question_scoring_max_concurrent}")
     evolve_logger.info(f"  Max steps context chars: {eb_config.max_steps_context_chars}")
@@ -3279,6 +3405,7 @@ def stepwise_eb_learn(
                 perception,
                 qa_pairs,
                 current_experiment,
+                current_experiment_question,
                 episode_log,
                 steps_taken,
                 trajectory_buffer,
@@ -3292,6 +3419,7 @@ def stepwise_eb_learn(
                     perception=perception,
                     qa_pairs=qa_pairs,
                     current_experiment=current_experiment,
+                    current_experiment_question=current_experiment_question,
                     default_knowledge=default_knowledge,
                     output_dir=str(episode_dir),
                     episode_idx=episode_idx,
@@ -3375,6 +3503,9 @@ def build_stepwise_eb_config(config: DictConfig) -> StepwiseEBLearnConfig:
         ),
         max_unanswered_qa_pairs=evolve_cfg.get(
             "max_unanswered_qa_pairs", legacy_max_total_qa_pairs
+        ),
+        trim_unanswered_at_selection=evolve_cfg.get(
+            "trim_unanswered_at_selection", False
         ),
         num_questions=evolve_cfg.get("num_questions", 5),
         num_sample_obs=evolve_cfg.get("num_sample_obs", 3),

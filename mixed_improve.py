@@ -90,7 +90,10 @@ def _mock_llm_response(prompt: str) -> str:
         )
 
     # --- Experiment formulation (formulate_experiment_from_question) ---
-    if "designing the next experiment" in p:
+    if (
+        "designing the next experiment" in p
+        or "designing the associated experiment" in p
+    ):
         if random.random() < 0.3:
             return "<think>[mock] keep current experiment</think>\n<experiment>null</experiment>"
         # Pick an existing question number from the prompt if possible

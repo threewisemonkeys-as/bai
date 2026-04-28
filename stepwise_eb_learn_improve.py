@@ -347,6 +347,7 @@ async def formulate_experiment_from_question(
     steps_context: str,
     current_qa: list[EBQAPair],
     current_experiment: str | None,
+    current_experiment_question: str | None,
     current_observation: str | None,
     current_aux_observation: str | None,
     default_knowledge: str,
@@ -377,61 +378,83 @@ async def formulate_experiment_from_question(
         section_title="CURRENT STATE (agent has not yet acted)",
     )
 
-    current_exp_text = current_experiment if current_experiment else "(no experiment set yet)"
-    target_question_section = ""
-    available_questions_section = ""
-    task_instruction = (
-        "Your task: Decide whether to keep the current experiment or formulate a new one for one unanswered question."
-    )
-    target_question_instruction = (
-        "Otherwise, select one UNANSWERED question from AVAILABLE QUESTIONS and formulate a specific, actionable experiment (1-3 sentences) that the agent can carry out to answer it."
-    )
-    think_instruction = (
-        "Has the current experiment been sufficiently tested? If not, which unanswered question should be answered next?"
-    )
-    question_index_format = (
-        '<q n="Q1">\n'
-        "<experiment_plan>[1-3 sentence actionable experiment to answer the selected question]</experiment_plan>"
-        "\n</q>"
+    active_question_status_text = "(no active question)"
+    active_question_index: int | None = None
+    if current_experiment_question:
+        active_question_status_text = "not found in current questions"
+        active_question_key = current_experiment_question.strip().lower()
+        for i, qa in enumerate(current_qa):
+            if qa.question.strip().lower() != active_question_key:
+                continue
+            active_question_index = i
+            if qa.answer is None:
+                active_question_status_text = "UNANSWERED"
+            else:
+                answer_text = "YES" if qa.answer else "NO"
+                evidence = _strip_raw_grid_text(qa.evidence) if qa.evidence else ""
+                active_question_status_text = (
+                    f"{answer_text}"
+                    + (f" (evidence: {evidence})" if evidence else "")
+                )
+            break
+
+    if current_experiment:
+        current_exp_question_text = (
+            f"Q{active_question_index + 1}: {current_experiment_question}"
+            if active_question_index is not None and current_experiment_question
+            else current_experiment_question
+            if current_experiment_question
+            else "(question not recorded)"
+        )
+        current_exp_text = f"""Active question:
+{current_exp_question_text}
+
+Active question status in current Q&A:
+{active_question_status_text}
+
+Active experiment plan:
+{current_experiment}"""
+    else:
+        current_exp_text = "(no active question or experiment)"
+
+    valid_target_question_index = (
+        target_question_index is not None
+        and 0 <= target_question_index < len(current_qa)
+        and current_qa[target_question_index].answer is None
     )
     unanswered_question_lines = [
         f"Q{i + 1}: {qa.question}"
         for i, qa in enumerate(current_qa)
         if qa.answer is None
     ]
-    if unanswered_question_lines:
-        available_questions_section = f"""
-=== AVAILABLE QUESTIONS ===
-{chr(10).join(unanswered_question_lines)}
-=== END AVAILABLE QUESTIONS ===
-"""
-    if (
-        target_question_index is not None
-        and 0 <= target_question_index < len(current_qa)
-        and current_qa[target_question_index].answer is None
-    ):
-        target_question_section = f"""
-=== TARGET QUESTION ===
-Q{target_question_index + 1}: {current_qa[target_question_index].question}
-=== END TARGET QUESTION ===
-"""
-        task_instruction = (
-            "Your task: Decide whether to keep the current experiment or formulate a new one for the TARGET QUESTION."
-        )
-        target_question_instruction = (
-            "Otherwise, formulate a specific, actionable experiment (1-3 sentences) to answer the TARGET QUESTION above.\n"
-            f'Use <q n="Q{target_question_index + 1}"> to identify the fixed target question.'
-        )
-        think_instruction = (
-            "Has the current experiment been sufficiently tested? If not, what experiment would answer the TARGET QUESTION?"
-        )
-        question_index_format = (
-            f'<q n="Q{target_question_index + 1}">\n'
-            "<experiment_plan>[1-3 sentence actionable experiment to answer the TARGET QUESTION]</experiment_plan>"
-            "\n</q>"
-        )
+    available_questions_text = (
+        "\n".join(unanswered_question_lines)
+        if unanswered_question_lines
+        else "(none)"
+    )
 
-    prompt = f"""You are designing the next experiment for an agent interacting with an environment.
+    if valid_target_question_index:
+        target_question_text = (
+            f"Q{target_question_index + 1}: "
+            f"{current_qa[target_question_index].question}"
+        )
+        target_non_null_format = ""
+        if (
+            active_question_index is not None
+            and current_qa[active_question_index].answer is None
+            and active_question_index != target_question_index
+        ):
+            target_non_null_format += f"""If revising the active question's experiment:
+<q n="Q{active_question_index + 1}">
+<experiment_plan>[1-3 sentence revised experiment to answer the active question]</experiment_plan>
+</q>
+
+"""
+        target_non_null_format += f"""If formulating a target-question experiment:
+<q n="Q{target_question_index + 1}">
+<experiment_plan>[1-3 sentence actionable experiment to answer the TARGET QUESTION]</experiment_plan>
+</q>"""
+        prompt = f"""You are designing the next experiment for an agent interacting with an environment. The experiment must answer either the ongoing active question or the fixed target question.
 
 === DEFAULT KNOWLEDGE ===
 {default_knowledge}
@@ -446,28 +469,78 @@ Each ``<pre_state>`` (and ``<post_state>``, when present) below is annotated wit
 === RECENT HISTORY OF STATES AND ACTIONS ===
 {step_history}
 === END RECENT HISTORY ==={current_obs_section}
-{target_question_section}
-{available_questions_section if not target_question_section else ""}
 
-=== CURRENT EXPERIMENT ===
+=== ACTIVE QUESTION AND EXPERIMENT ===
 {current_exp_text}
-=== END CURRENT EXPERIMENT ===
+=== END ACTIVE QUESTION AND EXPERIMENT ===
 
-{task_instruction}
+=== TARGET QUESTION ===
+{target_question_text}
+=== END TARGET QUESTION ===
 
-If the current experiment is still being tested (the agent hasn't had enough steps to gather evidence), return null.
-{target_question_instruction}
+Your task:
+1. Decide whether the active question is already answered.
+2. If there is an active experiment and the active question is not answered yet:
+   - Return null if the current experiment plan is still the right next experiment.
+   - Formulate a revised experiment for the active question if the same question should keep being investigated but the current plan should change.
+3. If the active question is answered, or there is no active question, formulate a new experiment for the TARGET QUESTION.
+4. Any experiment plan must be specific, actionable, 1-3 sentences, and directly aimed at collecting evidence for the question named in the <q> tag.
 
 Format your response as:
 <think>
-{think_instruction}
+Is the active question answered? Should the current experiment be kept, revised for the same active question, or replaced with an experiment for the target question?
 </think>
 <experiment>
-If keeping the current experiment:
+If keeping the current experiment unchanged:
 null
 
-If formulating a new experiment:
-{question_index_format}
+{target_non_null_format}
+</experiment>"""
+    else:
+        prompt = f"""You are selecting the next question and designing the associated experiment for an agent interacting with an environment.
+
+=== DEFAULT KNOWLEDGE ===
+{default_knowledge}
+=== END DEFAULT KNOWLEDGE ===
+
+=== CURRENT BELIEFS ===
+{beliefs if beliefs else "(empty - no beliefs yet)"}
+=== END CURRENT BELIEFS ===
+
+Each ``<pre_state>`` (and ``<post_state>``, when present) below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state. ``<pre_state>`` is the observation before the step's action; ``<post_state>`` is the final observation of a past episode segment.
+
+=== RECENT HISTORY OF STATES AND ACTIONS ===
+{step_history}
+=== END RECENT HISTORY ==={current_obs_section}
+
+=== ACTIVE QUESTION AND EXPERIMENT ===
+{current_exp_text}
+=== END ACTIVE QUESTION AND EXPERIMENT ===
+
+=== AVAILABLE UNANSWERED QUESTIONS ===
+{available_questions_text}
+=== END AVAILABLE UNANSWERED QUESTIONS ===
+
+Your task:
+1. Decide whether the active question is already answered.
+2. If there is an active experiment and the active question is not answered yet:
+   - Return null if the current experiment plan is still the right next experiment.
+   - Formulate a revised experiment for the active question if the same question should keep being investigated but the current plan should change.
+3. If the active question is answered, or there is no active question, select one question from AVAILABLE UNANSWERED QUESTIONS to investigate next.
+4. Any experiment plan must be specific, actionable, 1-3 sentences, and directly aimed at collecting evidence for the question named in the <q> tag.
+
+Format your response as:
+<think>
+Is the active question answered? Should the current experiment be kept, revised for the same active question, or replaced with an experiment for a newly selected question?
+</think>
+<experiment>
+If keeping the current experiment unchanged:
+null
+
+If revising the active question's experiment or formulating a new selected-question experiment:
+<q n="Q#">
+<experiment_plan>[1-3 sentence actionable experiment to answer the question named in the q tag]</experiment_plan>
+</q>
 </experiment>"""
 
     images: list = []
@@ -504,6 +577,16 @@ If formulating a new experiment:
             f"(total={len(current_qa)}), ignoring index"
         )
 
+    if question_index is None and valid_target_question_index:
+        question_index = target_question_index
+
+    if question_index is None:
+        logging.warning(
+            "Experiment response did not identify a valid unanswered selected question; "
+            "keeping current experiment"
+        )
+        return None, None, cost, prompt, text
+
     if experiment_plan is None:
         experiment_plan = extract_xml_key(experiment_text_raw, "experiment_plan")
     if not experiment_plan:
@@ -512,13 +595,6 @@ If formulating a new experiment:
 
     if len(experiment_plan) > 300:
         experiment_plan = experiment_plan[:300].rsplit(" ", 1)[0] + "..."
-
-    if (
-        target_question_index is not None
-        and 0 <= target_question_index < len(current_qa)
-        and current_qa[target_question_index].answer is None
-    ):
-        question_index = target_question_index
 
     logging.info(f"Formulated experiment from question Q{(question_index or 0) + 1}: {experiment_plan[:80]}...")
     return experiment_plan, question_index, cost, prompt, text
@@ -1011,9 +1087,7 @@ async def select_qa_pairs_for_experiment(
 {qa_list_text}
 === END AVAILABLE QUESTIONS ===
 
-Select up to {max_unanswered_qa_pairs} questions that will -
-1. be most valuable to answer next
-2. cover distinct aspects of the environment
+Select up to {max_unanswered_qa_pairs} questions that will be most useful at achieving the environment objective while covering distinct aspects of the environment.
 
 Use each question's Q number in the <q n="..."> attribute. Format your response as:
 <think>
