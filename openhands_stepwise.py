@@ -348,14 +348,8 @@ def _build_user_message(
 
     if is_first_step:
         lines.append(
-            "You are an agent interacting with an environment. On each of your turns "
-            "you will receive the current raw observation. "
-            "You must commit exactly one action per turn by calling the `submit_action` "
-            "tool. Between commits you are free to use the workspace (bash, file edits, "
-            "etc.). The workspace contains `observations.json` with trailing "
-            "observation/action history ending in the current pre-action "
-            "observation, and `obs_images/` with pre-action screenshots when "
-            "the environment provides images."
+            "You are an agent interacting with an environment."
+            "You have access to a workspace you can use to do this"
         )
         if instruction_prompt:
             lines.append("\n=== ENVIRONMENT INSTRUCTIONS ===")
@@ -408,9 +402,9 @@ def _build_user_message(
         lines.append(short_ctx)
     lines.append(long_ctx)
 
-    lines.append(
-        "\nCommit your chosen action by calling `submit_action(action=..., reasoning=...)`."
-    )
+    # lines.append(
+    #     "\nCommit your chosen action by calling `submit_action(action=..., reasoning=...)`."
+    # )
 
     text = "\n".join(lines)
     content: list[Any] = [TextContent(text=text)]
