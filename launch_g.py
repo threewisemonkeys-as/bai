@@ -11,6 +11,8 @@ stderr.log, and cmd.txt — same shape as ``launch.py`` /
 Usage:
     uv run launch_g.py --log-dir logs/greedy --dry-run
     uv run launch_g.py --log-dir logs/greedy --scripts simple --envs minihack
+    uv run launch_g.py --log-dir logs/greedy --scripts openhands,simple \
+        --envs minihack --repeats 5 --seed-base 1700 --parallel 10
 """
 
 from __future__ import annotations
@@ -56,9 +58,17 @@ class Cell:
     env: str
     model: str
     overrides: dict = field(default_factory=dict)
+    repeat_idx: int | None = None
 
     @property
     def name(self) -> str:
+        base = f"{self.script}__{self.env}__{self.model}".replace(".", "p")
+        if self.repeat_idx is None:
+            return base
+        return f"{base}__repeat_{self.repeat_idx:03d}"
+
+    @property
+    def config_name(self) -> str:
         return f"{self.script}__{self.env}__{self.model}".replace(".", "p")
 
 
@@ -141,6 +151,34 @@ def apply_extra_overrides(cells: list[Cell], extra_overrides: list[str] | None) 
             cell.overrides[key] = value
 
 
+def _has_override(extra_overrides: list[str] | None, key: str) -> bool:
+    if not extra_overrides:
+        return False
+    return any(raw.split("=", 1)[0] == key for raw in extra_overrides if "=" in raw)
+
+
+def expand_repeats(cells: list[Cell], repeats: int, seed_base: int | None) -> list[Cell]:
+    if repeats < 1:
+        sys.exit("--repeats must be >= 1.")
+    if repeats == 1 and seed_base is None:
+        return cells
+
+    expanded: list[Cell] = []
+    for cell in cells:
+        for repeat_idx in range(repeats):
+            overrides = dict(cell.overrides)
+            if seed_base is not None:
+                overrides["envs.env_kwargs.seed"] = seed_base + repeat_idx
+            expanded.append(Cell(
+                script=cell.script,
+                env=cell.env,
+                model=cell.model,
+                overrides=overrides,
+                repeat_idx=repeat_idx,
+            ))
+    return expanded
+
+
 def run_cell(cell: Cell, root: Path) -> tuple[Cell, int]:
     out_dir = root / cell.name
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -164,6 +202,10 @@ def main():
                    help="Global override for n_environment_steps across all cells")
     p.add_argument("--parallel", type=int, default=1,
                    help="Max concurrent cells (default: 1)")
+    p.add_argument("--repeats", type=int, default=1,
+                   help="Number of repeated runs per selected config (default: 1)")
+    p.add_argument("--seed-base", type=int, default=None,
+                   help="If set, use envs.env_kwargs.seed=seed_base+repeat_idx")
     p.add_argument("--tag", default=time.strftime("%Y%m%d-%H%M%S"))
     p.add_argument("--override", action="append", default=None,
                    help="Extra Hydra override key=value. May be repeated.")
@@ -182,12 +224,18 @@ def main():
         for c in cells:
             c.overrides[NUM_STEPS_KEYS[c.script]] = args.num_steps
     apply_extra_overrides(cells, args.override)
+    if args.seed_base is not None and _has_override(args.override, "envs.env_kwargs.seed"):
+        sys.exit("Use either --seed-base or --override envs.env_kwargs.seed=..., not both.")
+    cells = expand_repeats(cells, args.repeats, args.seed_base)
 
     root = args.log_dir / args.tag
     print(f"Greedy matrix root: {root}")
-    print(f"Cells ({len(cells)}):")
+    print(f"Runs ({len(cells)}), repeats={args.repeats}, parallel={max(1, args.parallel)}:")
     for c in cells:
         print(f"  - {c.name}")
+        if c.repeat_idx is not None:
+            print(f"      config={c.config_name}")
+            print(f"      repeat_idx={c.repeat_idx}")
         for k, v in c.overrides.items():
             print(f"      {k}={_fmt(v)}")
 

@@ -193,12 +193,12 @@ def _pil_to_data_url(img) -> str | None:
     return f"data:image/png;base64,{data}"
 
 
-def _save_obs_image(img, workspace: Path, step_num: int) -> str | None:
+def _save_obs_image(img, workspace: Path, step_num: int, suffix: str = "") -> str | None:
     if img is None:
         return None
     out_dir = workspace / "obs_images"
     out_dir.mkdir(parents=True, exist_ok=True)
-    rel = f"obs_images/step_{step_num:04d}.png"
+    rel = f"obs_images/step_{step_num:04d}{suffix}.png"
     try:
         img.save(workspace / rel)
     except Exception as e:  # noqa: BLE001
@@ -334,6 +334,7 @@ def _build_user_message(
     instruction_prompt: str,
     default_knowledge: str,
     respawn_notice: bool,
+    previous_terminal_obs: dict | None,
     episode_idx: int,
     step_idx: int,
     global_step: int,
@@ -375,6 +376,29 @@ def _build_user_message(
     if header_prefix:
         lines.append(header_prefix.rstrip())
 
+    previous_terminal_image = None
+    if respawn_notice and previous_terminal_obs is not None:
+        terminal_long = (
+            previous_terminal_obs.get("text", {}).get("long_term_context", "") or ""
+        )
+        terminal_short = (
+            previous_terminal_obs.get("text", {}).get("short_term_context", "") or ""
+        )
+        previous_terminal_image = previous_terminal_obs.get("image")
+        lines.append(
+            "\nPrevious Terminal Observation "
+            "(after the action that ended the previous episode):"
+        )
+        if terminal_short:
+            lines.append(terminal_short)
+        if terminal_long:
+            lines.append(terminal_long)
+        if previous_terminal_image is not None:
+            lines.append(
+                "\nThe previous terminal observation image is attached before "
+                "the current observation image."
+            )
+
     if invalid_action_feedback:
         lines.append("\n[invalid_previous_action]")
         lines.append(invalid_action_feedback)
@@ -390,6 +414,10 @@ def _build_user_message(
 
     text = "\n".join(lines)
     content: list[Any] = [TextContent(text=text)]
+
+    previous_terminal_data_url = _pil_to_data_url(previous_terminal_image)
+    if previous_terminal_data_url is not None:
+        content.append(ImageContent(image_urls=[previous_terminal_data_url]))
 
     data_url = _pil_to_data_url(image)
     if data_url is not None:
@@ -589,7 +617,9 @@ def _message_text(user_msg: Message) -> str:
     return "\n".join(out)
 
 
-def _flatten_conversation_events(conversation, final_action: str | None) -> list[dict]:
+def _flatten_conversation_events(
+    conversation, final_action: str | None, step_dir: Path | None = None
+) -> list[dict]:
     """Walk ``conversation._state.events`` and serialize each LLM-convertible
     event into a ``{role, content, ...}`` dict for the viz agent-messages
     panel. ``final_action`` is attached to the most recent ActionEvent entry.
@@ -612,8 +642,9 @@ def _flatten_conversation_events(conversation, final_action: str | None) -> list
         return []
 
     out: list[dict] = []
+    image_dir = step_dir / "agent_message_images" if step_dir is not None else None
     last_action_idx: int | None = None
-    for ev in events:
+    for event_idx, ev in enumerate(events, 1):
         if not isinstance(ev, LLMConvertibleEvent):
             # Skip non-LLM events like PauseEvent — they're internal control
             # flow, not part of the conversation the model sees.
@@ -624,18 +655,40 @@ def _flatten_conversation_events(conversation, final_action: str | None) -> list
         elif isinstance(ev, MessageEvent):
             llm_msg = ev.llm_message
             parts: list[str] = []
+            attachment_paths: list[str] = []
+            record: dict = {"role": getattr(llm_msg, "role", ev.source)}
             for p in getattr(llm_msg, "content", []) or []:
                 t = getattr(p, "text", None)
                 if t:
                     parts.append(t)
                 elif hasattr(p, "image_urls"):
-                    parts.append("[image attached]")
-            out.append(
-                {
-                    "role": getattr(llm_msg, "role", ev.source),
-                    "content": "\n".join(parts),
-                }
-            )
+                    for data_url in getattr(p, "image_urls", []) or []:
+                        parts.append("[image attached]")
+                        if (
+                            image_dir is not None
+                            and isinstance(data_url, str)
+                            and data_url.startswith("data:image/")
+                        ):
+                            try:
+                                _, encoded = data_url.split(",", 1)
+                                rel_path = (
+                                    "agent_message_images/"
+                                    f"message_{event_idx:03d}_attachment_"
+                                    f"{len(attachment_paths) + 1:02d}.png"
+                                )
+                                image_dir.mkdir(parents=True, exist_ok=True)
+                                (step_dir / rel_path).write_bytes(
+                                    base64.b64decode(encoded)
+                                )
+                                attachment_paths.append(rel_path)
+                            except Exception as e:  # noqa: BLE001
+                                record.setdefault("attachment_errors", []).append(str(e))
+            record["content"] = "\n".join(parts)
+            if attachment_paths:
+                record["attachment_paths"] = attachment_paths
+                if len(attachment_paths) == 1:
+                    record["attachment_path"] = attachment_paths[0]
+            out.append(record)
         elif isinstance(ev, ActionEvent):
             thought_parts: list[str] = []
             reasoning = getattr(ev, "reasoning_content", "") or ""
@@ -833,8 +886,9 @@ def _run_episode(
     global_step_start: int,
     max_episode_steps: int | None,
     is_first_step_in_run: bool,
-) -> tuple[dict, int, bool]:
-    """Run one episode; returns (episode_log, steps_taken, first_step_flag_after)."""
+    previous_terminal_observation: dict | None = None,
+) -> tuple[dict, int, bool, dict | None]:
+    """Run one episode; returns episode log, steps, run-start flag, terminal obs."""
     env_name, task, env = _make_env_for_config(config)
 
     # In mock mode, register a closure that hands the patched
@@ -883,6 +937,7 @@ def _run_episode(
     first_step_flag_after = False  # becomes True if run ends without sending any step
     feedback_on_invalid = bool(config.eval.get("feedback_on_invalid_action", False))
     pending_invalid_feedback: str | None = None
+    terminal_observation: dict | None = None
 
     csv_path = episode_dir / "trajectory.csv"
     csv_file = open(csv_path, "w", newline="", encoding="utf-8")
@@ -936,6 +991,9 @@ def _run_episode(
                 instruction_prompt=instruction_prompt or "",
                 default_knowledge=default_knowledge or "",
                 respawn_notice=respawn_notice and step == 0,
+                previous_terminal_obs=(
+                    previous_terminal_observation if step == 0 else None
+                ),
                 episode_idx=episode_idx,
                 step_idx=step,
                 global_step=global_step,
@@ -1000,11 +1058,26 @@ def _run_episode(
                 obs_next = obs
 
             done = bool(terminated or truncated)
+            terminal_observation = (
+                obs_next if done and isinstance(obs_next, dict) else None
+            )
             episode_return += float(reward)
             episode_log["action_frequency"][action] += 1
 
+            post_action_image_rel = None
+            post_action_obs_long = ""
+            post_action_obs_short = ""
             if isinstance(obs_next, dict):
                 _save_step_dir_image(obs_next.get("image"), step_dir, "obs_after.png")
+                post_action_image_rel = _save_obs_image(
+                    obs_next.get("image"), workspace, global_step, suffix="_after"
+                )
+                post_action_obs_long = (
+                    obs_next.get("text", {}).get("long_term_context", "") or ""
+                )
+                post_action_obs_short = (
+                    obs_next.get("text", {}).get("short_term_context", "") or ""
+                )
 
             # Rolling buffer update (last N).
             entry = {
@@ -1015,6 +1088,9 @@ def _run_episode(
                 "pre_action_obs_long": raw_long,
                 "pre_action_obs_short": raw_short,
                 "pre_action_image_path": image_rel,
+                "post_action_obs_long": post_action_obs_long,
+                "post_action_obs_short": post_action_obs_short,
+                "post_action_image_path": post_action_image_rel,
                 "action": action,
                 "reasoning": reasoning,
                 "reward": float(reward),
@@ -1066,7 +1142,9 @@ def _run_episode(
             # observations, agent thought/tool_calls, tool results, and errors.
             # The last ActionEvent carries the parsed action for the viz
             # trajectory panel.
-            agent_messages = _flatten_conversation_events(conversation, action)
+            agent_messages = _flatten_conversation_events(
+                conversation, action, step_dir=step_dir
+            )
             with open(step_dir / "agent_messages.json", "w") as amf:
                 json.dump(agent_messages, amf, indent=2, default=str)
 
@@ -1147,7 +1225,7 @@ def _run_episode(
     with open(episode_dir / "episode_log.json", "w") as f:
         json.dump(episode_log, f, indent=4, default=str)
 
-    return episode_log, step + 1, first_step_flag_after
+    return episode_log, step + 1, first_step_flag_after, terminal_observation
 
 
 # ---------------------------------------------------------------------------
@@ -1206,7 +1284,7 @@ def stepwise_openhands(
     agent = Agent(
         llm=llm,
         tools=tools,
-        system_prompt_filename=str(Path(__file__).parent / "openhands_empty_system_prompt.j2"),
+        system_prompt_filename=str(Path(__file__).parent / "openhands_system_prompt.j2"),
     )
     conversation = Conversation(
         agent=agent,
@@ -1225,6 +1303,7 @@ def stepwise_openhands(
     global_steps_used = 0
     cumulative_cost = 0.0
     is_first_step_in_run = True
+    previous_terminal_observation: dict | None = None
 
     try:
         while global_steps_used < oh_config.n_environment_steps:
@@ -1238,7 +1317,12 @@ def stepwise_openhands(
                 f"remaining: {remaining})\n{'=' * 80}"
             )
 
-            episode_log, steps_taken, _ = _run_episode(
+            (
+                episode_log,
+                steps_taken,
+                _,
+                previous_terminal_observation,
+            ) = _run_episode(
                 config=config,
                 oh_config=oh_config,
                 conversation=conversation,
@@ -1251,6 +1335,7 @@ def stepwise_openhands(
                 global_step_start=global_steps_used,
                 max_episode_steps=remaining,
                 is_first_step_in_run=is_first_step_in_run,
+                previous_terminal_observation=previous_terminal_observation,
             )
             is_first_step_in_run = False
             global_steps_used += steps_taken

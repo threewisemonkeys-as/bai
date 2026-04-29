@@ -243,6 +243,7 @@ def _build_user_content(
     instruction_prompt: str,
     default_knowledge: str,
     respawn_notice: bool,
+    previous_terminal_obs: dict | None,
     episode_idx: int,
     step_idx: int,
     global_step: int,
@@ -270,6 +271,29 @@ def _build_user_content(
     if respawn_notice:
         lines.append("The previous episode was terminated and you have respawned.")
 
+    previous_terminal_image = None
+    if respawn_notice and previous_terminal_obs is not None:
+        terminal_long = (
+            previous_terminal_obs.get("text", {}).get("long_term_context", "") or ""
+        )
+        terminal_short = (
+            previous_terminal_obs.get("text", {}).get("short_term_context", "") or ""
+        )
+        previous_terminal_image = previous_terminal_obs.get("image")
+        lines.append(
+            "\nPrevious Terminal Observation "
+            "(after the action that ended the previous episode):"
+        )
+        if terminal_short:
+            lines.append(terminal_short)
+        if terminal_long:
+            lines.append(terminal_long)
+        if previous_terminal_image is not None:
+            lines.append(
+                "\nThe previous terminal observation image is attached before "
+                "the current observation image."
+            )
+
     if invalid_action_feedback:
         lines.append("\n[invalid_previous_action]")
         lines.append(invalid_action_feedback)
@@ -283,6 +307,12 @@ def _build_user_content(
 
     text = "\n".join(lines)
     content: list[dict] = [{"type": "text", "text": text}]
+
+    previous_terminal_data_url = _pil_to_data_url(previous_terminal_image)
+    if previous_terminal_data_url is not None:
+        content.append(
+            {"type": "image_url", "image_url": {"url": previous_terminal_data_url}}
+        )
 
     data_url = _pil_to_data_url(image)
     if data_url is not None:
@@ -514,7 +544,8 @@ def _run_episode(
     max_episode_steps: int | None,
     is_first_step_in_run: bool,
     cumulative_cost_start: float,
-) -> tuple[dict, int, float]:
+    previous_terminal_observation: dict | None = None,
+) -> tuple[dict, int, float, dict | None]:
     env_name, task, env = _make_env_for_config(config)
 
     if sc.mock_mode:
@@ -574,6 +605,7 @@ def _run_episode(
     cumulative_cost = cumulative_cost_start
     feedback_on_invalid = bool(config.eval.get("feedback_on_invalid_action", False))
     pending_invalid_feedback: str | None = None
+    terminal_observation: dict | None = None
 
     csv_path = episode_dir / "trajectory.csv"
     csv_file = open(csv_path, "w", newline="", encoding="utf-8")
@@ -610,6 +642,9 @@ def _run_episode(
                 instruction_prompt="",
                 default_knowledge="",
                 respawn_notice=respawn_notice and step == 0,
+                previous_terminal_obs=(
+                    previous_terminal_observation if step == 0 else None
+                ),
                 episode_idx=episode_idx,
                 step_idx=step,
                 global_step=global_step,
@@ -673,6 +708,9 @@ def _run_episode(
                 obs_next = obs
 
             done = bool(terminated or truncated)
+            terminal_observation = (
+                obs_next if done and isinstance(obs_next, dict) else None
+            )
             episode_return += float(reward)
             cumulative_cost += step_cost
             episode_log["action_frequency"][action] += 1
@@ -799,7 +837,7 @@ def _run_episode(
     with open(episode_dir / "episode_log.json", "w") as f:
         json.dump(episode_log, f, indent=4, default=str)
 
-    return episode_log, step + 1, cumulative_cost
+    return episode_log, step + 1, cumulative_cost, terminal_observation
 
 
 # ---------------------------------------------------------------------------
@@ -864,6 +902,7 @@ def stepwise_simple(
     global_steps_used = 0
     cumulative_cost = 0.0
     is_first_step_in_run = True
+    previous_terminal_observation: dict | None = None
 
     evolve_logger.info(
         f"Simple agent ready (model={sc.model}, history_window={sc.history_window}, "
@@ -882,7 +921,12 @@ def stepwise_simple(
             f"remaining: {remaining})\n{'=' * 80}"
         )
 
-        episode_log, steps_taken, cumulative_cost = _run_episode(
+        (
+            episode_log,
+            steps_taken,
+            cumulative_cost,
+            previous_terminal_observation,
+        ) = _run_episode(
             config=config,
             sc=sc,
             api_key=api_key,
@@ -894,6 +938,7 @@ def stepwise_simple(
             max_episode_steps=remaining,
             is_first_step_in_run=is_first_step_in_run,
             cumulative_cost_start=cumulative_cost,
+            previous_terminal_observation=previous_terminal_observation,
         )
         is_first_step_in_run = False
         global_steps_used += steps_taken
