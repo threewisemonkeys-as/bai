@@ -45,7 +45,7 @@ ENVS = [
 # launch.py. Add "mock" here if you want fast smoke tests without LLM calls.
 MODEL_IDS = {
     "gemini-2.5-flash": "google/gemini-2.5-flash",
-    # "sonnet-4.6": "anthropic/claude-sonnet-4.6",
+    "sonnet-4.6": "anthropic/claude-sonnet-4.6",
     "mock": "google/gemini-2.5-flash",
 }
 MODELS = list(MODEL_IDS)

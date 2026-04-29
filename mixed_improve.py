@@ -32,6 +32,20 @@ def is_mock_mode() -> bool:
     return _MOCK_MODE
 
 
+_META_TEMPERATURE: float | None = None
+
+
+def set_meta_temperature(temperature: float | None) -> None:
+    """Set sampling temperature used by _llm_call / _llm_call_conversational.
+
+    None = let the provider pick its default. Mirrors set_mock_mode pattern so
+    callers can route all meta/learning prompts through a single temperature
+    independent of the BALROG agent's client.generate_kwargs.temperature.
+    """
+    global _META_TEMPERATURE
+    _META_TEMPERATURE = temperature
+
+
 def _mock_llm_response(prompt: str) -> str:
     """Return a plausible LLM response for the given prompt by sniffing format hints.
 
@@ -366,12 +380,14 @@ async def _llm_call(
     input_data = build_llm_input(prompt, images=images)
     model_name = _get_model_name(config)
     logging.info(f"LLM prompt (images={num_imgs}):\n{prompt}")
-    response = await asyncio.to_thread(
-        litellm.responses,
-        model=model_name,
-        input=input_data,
-        num_retries=5,
-    )
+    api_kwargs = {
+        "model": model_name,
+        "input": input_data,
+        "num_retries": 5,
+    }
+    if _META_TEMPERATURE is not None:
+        api_kwargs["temperature"] = _META_TEMPERATURE
+    response = await asyncio.to_thread(litellm.responses, **api_kwargs)
     text = extract_llm_response_text(response)
     logging.info(f"LLM response:\n{text}")
     cost = _get_response_cost(response, config.client.model_id)
@@ -408,12 +424,14 @@ async def _llm_call_conversational(
     input_data = build_llm_input_multiturn(conversation_history, user_message, images=images)
     model_name = _get_model_name(config)
     logging.info(f"LLM conversational prompt (turn {len(input_data)}, images={num_imgs}):\n{user_message}")
-    response = await asyncio.to_thread(
-        litellm.responses,
-        model=model_name,
-        input=input_data,
-        num_retries=5,
-    )
+    api_kwargs = {
+        "model": model_name,
+        "input": input_data,
+        "num_retries": 5,
+    }
+    if _META_TEMPERATURE is not None:
+        api_kwargs["temperature"] = _META_TEMPERATURE
+    response = await asyncio.to_thread(litellm.responses, **api_kwargs)
     text = extract_llm_response_text(response)
     logging.info(f"LLM conversational response:\n{text}")
     cost = _get_response_cost(response, config.client.model_id)

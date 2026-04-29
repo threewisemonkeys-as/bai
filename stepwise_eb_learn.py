@@ -30,11 +30,12 @@ from balrog.client import (
 from balrog.environments import make_env
 from balrog.utils import get_unique_seed
 
-from explore import get_default_knowledge, override_temperature, evolve_logger
+from explore import get_default_knowledge, evolve_logger
 from mixed_improve import (
     QAPair,
     _llm_call,
     _run_perception_on_observation,
+    set_meta_temperature,
     set_mock_mode,
 )
 from b_learn_improve import (
@@ -3275,6 +3276,10 @@ def stepwise_eb_learn(
     set_mock_mode(bool(eb_config.mock_mode))
     set_client_mock_mode(bool(eb_config.mock_mode))
 
+    # Route all meta/learning LLM calls through eb_config.explore_temp.
+    # The BALROG agent continues to use config.client.generate_kwargs.temperature.
+    set_meta_temperature(eb_config.explore_temp)
+
     # Check for resume
     last_ep, beliefs, perception, qa_pairs = _find_last_completed_episode_eb(output_dir)
     start_episode = last_ep + 1
@@ -3399,38 +3404,37 @@ def stepwise_eb_learn(
         # Save input state
         (episode_dir / "input_beliefs.txt").write_text(beliefs)
         (episode_dir / "input_perception.py").write_text(perception)
-        with override_temperature(config, eb_config.explore_temp):
-            (
-                beliefs,
-                perception,
-                qa_pairs,
-                current_experiment,
-                current_experiment_question,
-                episode_log,
-                steps_taken,
-                trajectory_buffer,
-                past_experiments,
-                agent_history_events,
-            ) = (
-                run_stepwise_eb_learn_episode(
-                    config=config,
-                    eb_config=eb_config,
-                    beliefs=beliefs,
-                    perception=perception,
-                    qa_pairs=qa_pairs,
-                    current_experiment=current_experiment,
-                    current_experiment_question=current_experiment_question,
-                    default_knowledge=default_knowledge,
-                    output_dir=str(episode_dir),
-                    episode_idx=episode_idx,
-                    global_step_start=global_steps_used,
-                    max_episode_steps=remaining_steps,
-                    trajectory_buffer=trajectory_buffer,
-                    past_experiments=past_experiments,
-                    agent_history_events=agent_history_events,
-                    cumulative_cost_offset=cumulative_cost,
-                )
+        (
+            beliefs,
+            perception,
+            qa_pairs,
+            current_experiment,
+            current_experiment_question,
+            episode_log,
+            steps_taken,
+            trajectory_buffer,
+            past_experiments,
+            agent_history_events,
+        ) = (
+            run_stepwise_eb_learn_episode(
+                config=config,
+                eb_config=eb_config,
+                beliefs=beliefs,
+                perception=perception,
+                qa_pairs=qa_pairs,
+                current_experiment=current_experiment,
+                current_experiment_question=current_experiment_question,
+                default_knowledge=default_knowledge,
+                output_dir=str(episode_dir),
+                episode_idx=episode_idx,
+                global_step_start=global_steps_used,
+                max_episode_steps=remaining_steps,
+                trajectory_buffer=trajectory_buffer,
+                past_experiments=past_experiments,
+                agent_history_events=agent_history_events,
+                cumulative_cost_offset=cumulative_cost,
             )
+        )
 
         global_steps_used += steps_taken
 

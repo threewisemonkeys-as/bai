@@ -39,6 +39,7 @@ SCRIPT_FILES = {
 ENVS = ["minihack", "arc_agi"]  # autumn excluded by spec.
 
 MODEL_IDS = {
+    "sonnet-4.6":       "anthropic/claude-sonnet-4.6",
     "gemini-2.5-flash": "google/gemini-2.5-flash",
     "mock":             "google/gemini-2.5-flash",
 }
