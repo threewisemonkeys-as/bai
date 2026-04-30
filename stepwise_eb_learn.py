@@ -48,8 +48,8 @@ from b_learn_improve import (
 )
 from stepwise_b_learn_improve import (
     parse_submit_signal,
-    build_perception_followup_message,
     build_perception_with_analysis_prompt,
+    build_perception_followup_message,
     build_qa_followup_message,
     _build_obs_section,
     _build_execution_report_section,
@@ -84,7 +84,12 @@ from stepwise_explore import (
     _perceive_signature_mode,
 )
 from goal_prompts import append_agent_goal, resolve_agent_goal
-from run_utils import setup_run, improve_logging, _update_summary_json
+from run_utils import (
+    setup_run,
+    improve_logging,
+    _update_summary_json,
+    is_minihack_success_episode,
+)
 
 INVALID_ACTION_RETRY_MESSAGE = "Your previous action was not formatted correctly. Retry"
 
@@ -401,6 +406,38 @@ def _critical_obs_from_buffer(
     return out
 
 
+def _middle_last_observations_from_buffer(
+    trajectory_buffer: list[dict],
+    n: int,
+) -> list[tuple[str, int]]:
+    """Return up to two uniformly sampled observations: middle and latest.
+
+    This is EB Track 1b's fallback sampler. It intentionally omits the start
+    observation so perception improvement sees only a representative middle
+    state and the latest state.
+    """
+    if n <= 0 or not trajectory_buffer:
+        return []
+
+    valid = [
+        (e["raw_long_term_context"], e["step"])
+        for e in trajectory_buffer
+        if e.get("raw_long_term_context", "").strip()
+        and not e.get("episode_boundary")
+        and e.get("action") is not None
+    ]
+    if not valid:
+        return []
+
+    max_samples = min(n, 2)
+    if max_samples == 1 or len(valid) == 1:
+        return [valid[-1]]
+
+    middle = valid[len(valid) // 2]
+    latest = valid[-1]
+    return [middle] if middle[1] == latest[1] else [middle, latest]
+
+
 def _save_prompt_images(images: list, step_dir: Path, subdir: str) -> list[str]:
     """Save each PIL image under ``step_dir/subdir/image_N.png`` (1-indexed).
 
@@ -605,14 +642,20 @@ def _apply_autumn_planning_perception(obs: dict, perception_fn) -> dict | None:
 def _images_for_sample_obs(
     trajectory_buffer: list[dict],
     sample_obs: list[tuple[str, int]],
+    include_result_images: bool = False,
+    post_image_only: bool = False,
 ) -> list:
     """Return the PIL image for each (raw_obs, step_num) sample, aligned by index.
 
     Uses the trajectory_buffer's stored pre-action image for the matching step.
+    When include_result_images is True, returns interleaved [before, after, before, after, ...]
+    pairs for each sample (after falls back to before if result_image is None).
+    When post_image_only is True, returns only each sample's post-action image.
     """
     images = []
     for _raw_obs, step_num in sample_obs:
         img = None
+        result_img = None
         for entry in trajectory_buffer:
             if entry.get("episode_boundary"):
                 continue
@@ -620,8 +663,15 @@ def _images_for_sample_obs(
                 continue
             if entry.get("step") == step_num:
                 img = entry.get("image")
+                result_img = entry.get("result_image")
                 break
-        images.append(img)
+        if post_image_only:
+            images.append(result_img if result_img is not None else img)
+        elif include_result_images:
+            images.append(img)
+            images.append(result_img if result_img is not None else img)
+        else:
+            images.append(img)
     return images
 
 
@@ -943,7 +993,7 @@ def _run_improve_loop_eb(
                 f"(>= min {eb_config.critical_id_min_for_perception})"
             )
         else:
-            sampled = _sample_observations_from_buffer(
+            sampled = _middle_last_observations_from_buffer(
                 trajectory_buffer, eb_config.num_sample_obs,
             )
             seen = {s for _, s in crits}
@@ -952,10 +1002,10 @@ def _run_improve_loop_eb(
             evolve_logger.info(
                 f"{tag} Track 1b sampling: {len(crits)} critical transitions "
                 f"(< min {eb_config.critical_id_min_for_perception}); padded to "
-                f"{len(sample_obs)} with even-spacing samples"
+                f"{len(sample_obs)} with middle/latest samples"
             )
     else:
-        sample_obs = _sample_observations_from_buffer(
+        sample_obs = _middle_last_observations_from_buffer(
             trajectory_buffer, eb_config.num_sample_obs,
         )
     sample_obs_histories = _histories_for_samples(trajectory_buffer, sample_obs)
@@ -974,11 +1024,19 @@ def _run_improve_loop_eb(
         if track1b_sample_obs
         else []
     )
-    track1b_sample_obs_images = (
-        sample_obs_images[-len(track1b_sample_obs):]
-        if track1b_sample_obs
-        else []
-    )
+    # When critical_transitions_enabled, attach only the post-action image for
+    # each sampled transition.
+    use_post_images = eb_config.critical_transitions_enabled and bool(track1b_sample_obs)
+    if use_post_images:
+        track1b_sample_obs_images = _images_for_sample_obs(
+            trajectory_buffer, track1b_sample_obs, post_image_only=True,
+        )
+    else:
+        track1b_sample_obs_images = (
+            sample_obs_images[-len(track1b_sample_obs):]
+            if track1b_sample_obs
+            else []
+        )
 
     num_answered = sum(1 for q in qa_pairs if q.answer is not None)
     evolve_logger.info(
@@ -1065,6 +1123,7 @@ Provide analysis highlighting:
                 perception, track1b_sample_obs,
                 sample_histories=track1b_sample_obs_histories, history_window=hist_window,
                 display_tail=display_tail,
+                post_image_only=use_post_images,
             )
 
             perception_from_analysis_prompt = build_perception_with_analysis_prompt(
@@ -1131,6 +1190,7 @@ Provide analysis highlighting:
                     perception, track1b_sample_obs,
                     sample_histories=track1b_sample_obs_histories, history_window=hist_window,
                     display_tail=display_tail,
+                    post_image_only=use_post_images,
                 )
 
             feedback_history.append(track1b_record)
@@ -3384,6 +3444,7 @@ def stepwise_eb_learn(
 
     cumulative_cost = 0.0
     episode_idx = start_episode
+    env_name = config.envs.names.split("-")[0]
 
     while global_steps_used < eb_config.n_environment_steps:
         remaining_steps = eb_config.n_environment_steps - global_steps_used
@@ -3452,6 +3513,13 @@ def stepwise_eb_learn(
             f"cost: ${episode_cost:.4f}, cumulative: ${cumulative_cost:.4f}, "
             f"steps: {global_steps_used}/{eb_config.n_environment_steps}"
         )
+
+        if is_minihack_success_episode(env_name, episode_log):
+            evolve_logger.info(
+                f"[g{global_steps_used}] MiniHack task success reached; "
+                "stopping run before starting another episode."
+            )
+            break
 
         episode_idx += 1
 

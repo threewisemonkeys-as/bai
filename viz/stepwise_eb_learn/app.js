@@ -239,6 +239,13 @@ function parseNumberedPromptImages(promptText, opts) {
   const parts = [];
   const seenSlots = new Set();
 
+  function addPart(slot, stepMeta, kind, label, accent) {
+    if (seenSlots.has(slot)) return;
+    const part = makePromptImagePart(slot, stepMeta, kind, label, accent);
+    if (part) parts.push(part);
+    seenSlots.add(slot);
+  }
+
   const stepBlockRe = /<step\s+n="(\d+)">([\s\S]*?)<\/step>/g;
   let stepMatch;
   while ((stepMatch = stepBlockRe.exec(promptText)) !== null) {
@@ -250,21 +257,34 @@ function parseNumberedPromptImages(promptText, opts) {
     let preMatch;
     while ((preMatch = preRe.exec(body)) !== null) {
       const slot = parseInt(preMatch[1], 10);
-      if (!seenSlots.has(slot)) {
-        const part = makePromptImagePart(slot, stepMeta, "before", "Image " + slot + " - g" + gs + " pre", false);
-        if (part) parts.push(part);
-        seenSlots.add(slot);
-      }
+      addPart(slot, stepMeta, "before", "Image " + slot + " - g" + gs + " pre", false);
     }
     const postRe = /<(?:post_state|resulting_state)>\s*\(image\s+(\d+)\)/g;
     let postMatch;
     while ((postMatch = postRe.exec(body)) !== null) {
       const slot = parseInt(postMatch[1], 10);
-      if (!seenSlots.has(slot)) {
-        const part = makePromptImagePart(slot, stepMeta, "after", "Image " + slot + " - g" + gs + " result", false);
-        if (part) parts.push(part);
-        seenSlots.add(slot);
-      }
+      addPart(slot, stepMeta, "after", "Image " + slot + " - g" + gs + " result", false);
+    }
+  }
+
+  const perceptionBlockRe = /<perception_example\s+step="(\d+)">([\s\S]*?)<\/perception_example>/g;
+  let perceptionMatch;
+  while ((perceptionMatch = perceptionBlockRe.exec(promptText)) !== null) {
+    const gs = parseInt(perceptionMatch[1], 10);
+    const stepMeta = resolveStepByGlobal(gs);
+    if (!stepMeta) continue;
+    const body = perceptionMatch[2];
+    const beforeRe = /<before_action\s+\(image\s+(\d+)\)>/g;
+    let beforeMatch;
+    while ((beforeMatch = beforeRe.exec(body)) !== null) {
+      const slot = parseInt(beforeMatch[1], 10);
+      addPart(slot, stepMeta, "before", "Image " + slot + " - g" + gs + " before", false);
+    }
+    const afterRe = /<after_action\s+\(image\s+(\d+)\)>/g;
+    let afterMatch;
+    while ((afterMatch = afterRe.exec(body)) !== null) {
+      const slot = parseInt(afterMatch[1], 10);
+      addPart(slot, stepMeta, "after", "Image " + slot + " - g" + gs + " after", false);
     }
   }
 
@@ -273,17 +293,13 @@ function parseNumberedPromptImages(promptText, opts) {
     const currentMatch = currentBlockRe.exec(promptText);
     if (currentMatch) {
       const slot = parseInt(currentMatch[1], 10);
-      if (!seenSlots.has(slot)) {
-        const part = makePromptImagePart(
-          slot,
-          opts.currentStep,
-          "before",
-          "Image " + slot + " - current (g" + opts.currentStep.global_step + ")",
-          true
-        );
-        if (part) parts.push(part);
-        seenSlots.add(slot);
-      }
+      addPart(
+        slot,
+        opts.currentStep,
+        "before",
+        "Image " + slot + " - current (g" + opts.currentStep.global_step + ")",
+        true
+      );
     }
   }
 
@@ -294,11 +310,14 @@ function parseNumberedPromptImages(promptText, opts) {
 function parseSamplePromptImages(promptText) {
   if (!promptText) return [];
   const parts = [];
+  const seenSteps = new Set();
   const sampleRe = /<(?:perception_example|execution_sample)\s+step="(\d+)">/g;
   let sampleIdx = 0;
   let sampleMatch;
   while ((sampleMatch = sampleRe.exec(promptText)) !== null) {
     const gs = parseInt(sampleMatch[1], 10);
+    if (seenSteps.has(gs)) continue;
+    seenSteps.add(gs);
     const stepMeta = resolveStepByGlobal(gs);
     const part = makePromptImagePart(
       Number.MAX_SAFE_INTEGER,
@@ -324,8 +343,10 @@ function promptImagesHtml(promptText, opts) {
   let parts = explicitPromptImageParts(opts.imagePaths, opts);
   if (parts.length === 0) {
     parts = parseNumberedPromptImages(promptText, opts);
-    const samples = parseSamplePromptImages(promptText);
-    samples.forEach((part) => parts.push(part));
+    if (parts.length === 0) {
+      const samples = parseSamplePromptImages(promptText);
+      samples.forEach((part) => parts.push(part));
+    }
   }
   if (parts.length === 0) return "";
   let html = '<div style="margin:6px 0 10px"><div style="font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;font-weight:600">Images attached (' +
@@ -1419,7 +1440,13 @@ function renderOverview(data, step) {
   if (!c) return;
   let html = "";
 
-  // Agent LLM Call section at top with bigger boxes — show only Current Observation from prompt
+  // Observation images
+  const imgHtml = obsImageHtml(step.episode_idx, step.step, data, step);
+  if (imgHtml) {
+    html += collapsible("Observation Images", imgHtml, true);
+  }
+
+  // Agent LLM Call section with bigger boxes — show only Current Observation from prompt
   const msgs = data.agent_messages || [];
   if (msgs.length > 0) {
     let lastUser = null;
@@ -1459,12 +1486,6 @@ function renderOverview(data, step) {
       }
       html += collapsible("Agent LLM Call", agentHtml, true);
     }
-  }
-
-  // Observation images
-  const imgHtml = obsImageHtml(step.episode_idx, step.step, data, step);
-  if (imgHtml) {
-    html += collapsible("Observation Images", imgHtml, true);
   }
 
   html += renderCriticalDecision(data, step);

@@ -63,25 +63,19 @@ def eb_qa_to_qa(eb_qa: EBQAPair) -> QAPair:
 # ---------------------------------------------------------------------------
 
 
-def _strip_raw_state_text(steps_context: str) -> str:
-    """Replace <pre_state> and <post_state> text content with a placeholder.
+def _strip_raw_pre_state_text(steps_context: str) -> str:
+    """Replace <pre_state> text content with a placeholder.
 
     Image annotations on the opening tag (e.g. ``<pre_state> (image 3)``) are
-    preserved so the LLM can still cross-reference screenshots.
+    preserved when present, but this is also used for text-only prompts where
+    no screenshot is attached.
     """
-    steps_context = re.sub(
+    return re.sub(
         r"(<pre_state[^>]*>[^\n]*)\n.*?(\n</pre_state>)",
-        r"\1\n(see attached image)\2",
+        r"\1\n(raw pre-state observation hidden)\2",
         steps_context,
         flags=re.DOTALL,
     )
-    steps_context = re.sub(
-        r"(<post_state[^>]*>[^\n]*)\n.*?(\n</post_state>)",
-        r"\1\n(see attached image)\2",
-        steps_context,
-        flags=re.DOTALL,
-    )
-    return steps_context
 
 
 def _strip_raw_grid_text(text: str) -> str:
@@ -221,8 +215,8 @@ async def generate_questions_from_steps(
     Returns: (new_questions, cost, prompt, raw_response)
     """
     step_history = steps_context
-    if hide_raw_obs and include_recent_history and steps_context_images:
-        step_history = _strip_raw_state_text(step_history)
+    if hide_raw_obs and include_recent_history:
+        step_history = _strip_raw_pre_state_text(step_history)
     num_steps_images = (
         len(steps_context_images)
         if include_recent_history and steps_context_images
@@ -363,8 +357,8 @@ async def formulate_experiment_from_question(
     the current experiment.
     """
     step_history = steps_context
-    if hide_raw_obs and steps_context_images:
-        step_history = _strip_raw_state_text(step_history)
+    if hide_raw_obs:
+        step_history = _strip_raw_pre_state_text(step_history)
     num_steps_images = len(steps_context_images) if steps_context_images else 0
 
     current_image_index = num_steps_images + 1 if current_image is not None else None
@@ -628,8 +622,8 @@ async def update_qa_from_trajectory(
         return current_qa, 0.0, {}
 
     display_steps_context = steps_context
-    if hide_raw_obs and steps_context_images:
-        display_steps_context = _strip_raw_state_text(display_steps_context)
+    if hide_raw_obs:
+        display_steps_context = _strip_raw_pre_state_text(display_steps_context)
 
     qa_list_text = _format_qa_list(current_qa)
 

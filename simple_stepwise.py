@@ -36,7 +36,7 @@ from balrog.utils import get_unique_seed
 
 from explore import evolve_logger, get_default_knowledge
 from goal_prompts import append_agent_goal, resolve_agent_goal
-from run_utils import setup_run, _update_summary_json
+from run_utils import setup_run, _update_summary_json, is_minihack_success_episode
 
 
 # ---------------------------------------------------------------------------
@@ -903,6 +903,7 @@ def stepwise_simple(
     cumulative_cost = 0.0
     is_first_step_in_run = True
     previous_terminal_observation: dict | None = None
+    env_name = config.envs.names.split("-")[0]
 
     evolve_logger.info(
         f"Simple agent ready (model={sc.model}, history_window={sc.history_window}, "
@@ -953,6 +954,13 @@ def stepwise_simple(
             f"return={episode_log.get('episode_return', 0.0):.2f}, "
             f"steps={steps_taken}"
         )
+
+        if is_minihack_success_episode(env_name, episode_log):
+            evolve_logger.info(
+                f"[g{global_steps_used}] MiniHack task success reached; "
+                "stopping run before starting another episode."
+            )
+            break
 
     with open(Path(output_dir) / "dynamics_history.json", "w") as f:
         json.dump(history, f, indent=2, default=str)

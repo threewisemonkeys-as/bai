@@ -132,7 +132,14 @@ def format_steps_context(
     ``<post_state>``; they are the only place a past episode's final state
     appears in the prompt.
 
-    Trimmed to longest suffix that fits ``max_chars``.
+    Trimmed to longest suffix that fits ``max_chars``. If an individual step
+    block is too large, preserve its state/action/reward/post-state fields and
+    truncate only ``<agent_reasoning>`` with an explicit marker.
+
+    When ``hide_raw_obs_when_image`` is true, raw ``<pre_state>`` text is
+    suppressed even if no screenshot is attached. This is used by image-hidden
+    prompt variants that should expose only auxiliary/perception summaries for
+    pre-action states.
 
     When ``history_window`` is set (>=1), perception is invoked with a
     per-episode rolling window via ``_run_perception_on_history``.
@@ -171,20 +178,21 @@ def format_steps_context(
         reasoning = entry.get("reasoning", "")
         reward = entry.get("reward", 0)
         display_raw_obs = (
-            "(see attached image)"
-            if hide_raw_obs_when_image and entry.get("image") is not None
+            "(raw pre-state observation hidden)"
+            if hide_raw_obs_when_image
             else raw_obs
         )
 
-        block = f"<step n=\"{entry['step']}\">\n"
-        block += (
+        block_prefix = f"<step n=\"{entry['step']}\">\n"
+        before_reasoning = (
             f"<pre_state>\n{display_raw_obs}\n</pre_state>\n\n"
             f"<auxiliary_observation>\n{raw_aux}\n</auxiliary_observation>\n\n"
             f"<perception_output>\n{perc_out if perc_out else '(no perception module)'}\n</perception_output>\n\n"
-            f"<agent_reasoning>\n{reasoning}\n</agent_reasoning>\n"
-            f"<action>{entry['action']}</action>\n"
         )
-        block += f"<reward>{reward}</reward>\n"
+        after_reasoning = (
+            f"<action>{entry['action']}</action>\n"
+            f"<reward>{reward}</reward>\n"
+        )
 
         # Append <post_state> at the end of each episode segment. The end-of-
         # buffer tail is gated by include_trailing_state so callers that render
@@ -214,12 +222,31 @@ def format_steps_context(
                         result_perc = _run_perception_on_observation(perception_code, result_raw)
                 else:
                     result_perc = ""
-                block += (
+                after_reasoning += (
                     f"\n<post_state>\n{display_result_raw}\n</post_state>\n\n"
                     f"<auxiliary_observation>\n{result_raw_aux}\n</auxiliary_observation>\n\n"
                     f"<perception_output>\n{result_perc if result_perc else '(no perception module)'}\n</perception_output>\n"
                 )
-        block += "</step>"
+        block_suffix = "</step>"
+
+        def build_block(reasoning_text: str) -> str:
+            return (
+                block_prefix
+                + before_reasoning
+                + f"<agent_reasoning>\n{reasoning_text}\n</agent_reasoning>\n"
+                + after_reasoning
+                + block_suffix
+            )
+
+        block = build_block(reasoning)
+        if len(block) > max_chars:
+            marker = "\n[agent reasoning truncated]"
+            fixed_len = len(build_block(""))
+            available = max_chars - fixed_len - len(marker)
+            if available > 0:
+                block = build_block(reasoning[:available].rstrip() + marker)
+            else:
+                block = build_block(marker)
         blocks.append(block)
 
     # Trim from the front to fit within max_chars (keep latest steps)
@@ -238,8 +265,9 @@ def format_steps_context(
 
     trimmed.reverse()
     if not trimmed:
-        # At least include the latest step, truncated
-        return blocks[-1][:max_chars]
+        # At least include the latest step. Individual oversized blocks were
+        # already compacted by truncating agent reasoning only.
+        return blocks[-1]
     return "\n".join(trimmed)
 
 
@@ -275,8 +303,8 @@ def format_current_state(
     )
     img_tag = f" (image {image_index})" if image_index is not None else ""
     raw_state_content = (
-        "(see attached image)"
-        if hide_raw_obs and image is not None
+        "(raw pre-state observation hidden)"
+        if hide_raw_obs
         else observation
     )
     return (

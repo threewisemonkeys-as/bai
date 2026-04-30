@@ -240,3 +240,5 @@ environment_files/
 log_environment_interfaces*.txt
 
 .nfs*
+
+.zed/

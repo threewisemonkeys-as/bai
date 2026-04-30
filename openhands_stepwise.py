@@ -25,7 +25,7 @@ import random
 import shutil
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +45,7 @@ from openhands.sdk import (
     TextContent,
     Tool,
 )
+from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands.sdk.tool import (
     Action,
     Observation,
@@ -60,7 +61,7 @@ from balrog.utils import get_unique_seed
 
 from explore import evolve_logger, get_default_knowledge
 from goal_prompts import append_agent_goal, resolve_agent_goal
-from run_utils import setup_run, _update_summary_json
+from run_utils import setup_run, _update_summary_json, is_minihack_success_episode
 
 
 # ---------------------------------------------------------------------------
@@ -167,9 +168,17 @@ class OpenHandsStepwiseConfig:
     openhands_base_url: str | None = None
     openhands_temperature: float | None = None
     openhands_max_output_tokens: int | None = None
+    openhands_system_prompt_filename: str | None = None
     enable_browser_tools: bool = False
     mock_mode: bool = False
     log_llm_payloads: bool = False
+    api_error_max_retries: int = 2
+    api_error_retry_delay_seconds: float = 5.0
+    context_condenser_enabled: bool = False
+    context_condenser_max_size: int = 120
+    context_condenser_max_tokens: int | None = None
+    context_condenser_keep_first: int = 2
+    context_condenser_model: str | None = None
     workspace_seed_dir: str | None = None
     workspace_checkpoint_interval: int = 0
     workspace_checkpoint_exclude_images: bool = False
@@ -447,6 +456,29 @@ def _build_openhands_llm(oh_config: OpenHandsStepwiseConfig) -> LLM:
     if oh_config.openhands_max_output_tokens is not None:
         kwargs["max_output_tokens"] = oh_config.openhands_max_output_tokens
     return LLM(**kwargs)
+
+
+def _resolve_system_prompt_filename(
+    filename: str | None,
+    original_cwd: str,
+) -> str:
+    """Resolve OpenHands system prompt template path.
+
+    Defaults to the historical prompt. Relative overrides first resolve from
+    the run's original working directory, then from this module's directory.
+    """
+    default_path = Path(__file__).parent / "openhands_system_prompt.j2"
+    if not filename:
+        return str(default_path)
+
+    path = Path(filename)
+    if path.is_absolute():
+        return str(path)
+
+    cwd_path = Path(original_cwd) / path
+    if cwd_path.exists():
+        return str(cwd_path)
+    return str(Path(__file__).parent / path)
 
 
 _LLM_PAYLOAD_LOG_COUNTER = 0
@@ -997,12 +1029,35 @@ def _run_episode(
             conversation.send_message(user_msg)
             cost_before, tokens_before = _read_conv_metrics(conversation)
             _t0 = time.time()
-            try:
-                conversation.run()
-            except Exception as e:  # noqa: BLE001
-                evolve_logger.error(
-                    f"[g{global_step}] conversation.run() raised: {e}"
-                )
+            run_error: Exception | None = None
+            max_run_attempts = max(1, 1 + int(oh_config.api_error_max_retries))
+            for attempt_idx in range(max_run_attempts):
+                try:
+                    conversation.run()
+                    run_error = None
+                    break
+                except Exception as e:  # noqa: BLE001
+                    run_error = e
+                    attempt_num = attempt_idx + 1
+                    if attempt_num >= max_run_attempts:
+                        evolve_logger.error(
+                            f"[g{global_step}] conversation.run() failed after "
+                            f"{attempt_num}/{max_run_attempts} attempts: {e}"
+                        )
+                        raise RuntimeError(
+                            "OpenHands conversation.run() failed after "
+                            f"{attempt_num} attempts at global_step={global_step}, "
+                            f"episode={episode_idx}, step={step}. Aborting instead "
+                            "of falling back to a default action."
+                        ) from e
+                    evolve_logger.warning(
+                        f"[g{global_step}] conversation.run() raised on attempt "
+                        f"{attempt_num}/{max_run_attempts}: {e}; retrying after "
+                        f"{oh_config.api_error_retry_delay_seconds:.1f}s."
+                    )
+                    if oh_config.api_error_retry_delay_seconds > 0:
+                        time.sleep(oh_config.api_error_retry_delay_seconds)
+            assert run_error is None
             dt = time.time() - _t0
             cost_after, tokens_after = _read_conv_metrics(conversation)
             step_cost = max(0.0, cost_after - cost_before)
@@ -1271,14 +1326,35 @@ def stepwise_openhands(
         evolve_logger.info(f"OpenHands LLM payload logging enabled: {payload_log_dir}")
 
     llm = _build_openhands_llm(oh_config)
+    condenser = None
+    if oh_config.context_condenser_enabled:
+        condenser_llm = llm
+        if oh_config.context_condenser_model:
+            condenser_llm = _build_openhands_llm(
+                replace(
+                    oh_config,
+                    openhands_model=oh_config.context_condenser_model,
+                )
+            )
+        condenser = LLMSummarizingCondenser(
+            llm=condenser_llm,
+            max_size=oh_config.context_condenser_max_size,
+            max_tokens=oh_config.context_condenser_max_tokens,
+            keep_first=oh_config.context_condenser_keep_first,
+        )
     tools = get_default_tools(enable_browser=oh_config.enable_browser_tools)
     sink = _SUBMIT_ACTION_SINK
     register_tool("SubmitActionTool", SubmitActionTool)
     tools = list(tools) + [Tool(name="SubmitActionTool")]
+    system_prompt_filename = _resolve_system_prompt_filename(
+        oh_config.openhands_system_prompt_filename,
+        original_cwd,
+    )
     agent = Agent(
         llm=llm,
         tools=tools,
-        system_prompt_filename=str(Path(__file__).parent / "openhands_system_prompt.j2"),
+        system_prompt_filename=system_prompt_filename,
+        condenser=condenser,
     )
     conversation = Conversation(
         agent=agent,
@@ -1289,6 +1365,8 @@ def stepwise_openhands(
     evolve_logger.info(
         f"Conversation ready (model={oh_config.openhands_model}, "
         f"workspace={workspace}, tools={[t.name for t in tools]}, "
+        f"system_prompt={system_prompt_filename}, "
+        f"condenser={type(condenser).__name__ if condenser else None}, "
         f"mock_mode={oh_config.mock_mode})"
     )
 
@@ -1298,6 +1376,7 @@ def stepwise_openhands(
     cumulative_cost = 0.0
     is_first_step_in_run = True
     previous_terminal_observation: dict | None = None
+    env_name = config.envs.names.split("-")[0]
 
     try:
         while global_steps_used < oh_config.n_environment_steps:
@@ -1340,6 +1419,12 @@ def stepwise_openhands(
                 f"return={episode_log.get('episode_return', 0.0):.2f}, "
                 f"steps={steps_taken}"
             )
+            if is_minihack_success_episode(env_name, episode_log):
+                evolve_logger.info(
+                    f"[g{global_steps_used}] MiniHack task success reached; "
+                    "stopping run before starting another episode."
+                )
+                break
     finally:
         if conversation is not None:
             try:
@@ -1375,9 +1460,23 @@ def main(config: DictConfig):
         openhands_base_url=ohcfg.get("base_url", None),
         openhands_temperature=ohcfg.get("temperature", None),
         openhands_max_output_tokens=ohcfg.get("max_output_tokens", None),
+        openhands_system_prompt_filename=ohcfg.get("system_prompt_filename", None),
         enable_browser_tools=bool(ohcfg.get("enable_browser_tools", False)),
         mock_mode=bool(ohcfg.get("mock_mode", False)),
         log_llm_payloads=bool(ohcfg.get("log_llm_payloads", False)),
+        api_error_max_retries=int(ohcfg.get("api_error_max_retries", 2)),
+        api_error_retry_delay_seconds=float(
+            ohcfg.get("api_error_retry_delay_seconds", 5.0)
+        ),
+        context_condenser_enabled=bool(ohcfg.get("context_condenser_enabled", False)),
+        context_condenser_max_size=int(ohcfg.get("context_condenser_max_size", 120)),
+        context_condenser_max_tokens=(
+            None
+            if ohcfg.get("context_condenser_max_tokens", None) is None
+            else int(ohcfg.get("context_condenser_max_tokens"))
+        ),
+        context_condenser_keep_first=int(ohcfg.get("context_condenser_keep_first", 2)),
+        context_condenser_model=ohcfg.get("context_condenser_model", None),
         workspace_seed_dir=ohcfg.get("workspace_seed_dir", None),
         workspace_checkpoint_interval=int(ohcfg.get("workspace_checkpoint_interval", 0)),
         workspace_checkpoint_exclude_images=bool(

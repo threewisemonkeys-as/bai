@@ -10,6 +10,38 @@ from omegaconf import DictConfig, OmegaConf
 
 from balrog.utils import setup_environment
 
+MINIHACK_TASK_SUCCESSFUL_STATUS = 2
+
+
+def _status_is_minihack_success(status) -> bool:
+    if status == MINIHACK_TASK_SUCCESSFUL_STATUS:
+        return True
+    if isinstance(status, str):
+        normalized = status.strip().upper()
+        return (
+            normalized == str(MINIHACK_TASK_SUCCESSFUL_STATUS)
+            or "TASK_SUCCESSFUL" in normalized
+        )
+    return False
+
+
+def is_minihack_success_episode(env_name: str, episode_log: dict | None) -> bool:
+    """Return True when a MiniHack episode ended by completing the task."""
+    if env_name != "minihack" or not isinstance(episode_log, dict):
+        return False
+
+    for key in ("end_reason", "end_status"):
+        if _status_is_minihack_success(episode_log.get(key)):
+            return True
+
+    env_stats = episode_log.get("env_stats")
+    if isinstance(env_stats, dict):
+        for key in ("end_reason", "end_status"):
+            if _status_is_minihack_success(env_stats.get(key)):
+                return True
+
+    return False
+
 
 def setup_run(
     config: DictConfig,
