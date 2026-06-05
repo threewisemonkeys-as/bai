@@ -19,18 +19,28 @@ from pathlib import Path
 
 import hydra
 import numpy as np
-from omegaconf import DictConfig
-from tqdm import tqdm
-
 from balrog.agents import AgentFactory
 from balrog.client import (
-    set_mock_mode as set_client_mock_mode,
     set_mock_action_provider,
+)
+from balrog.client import (
+    set_mock_mode as set_client_mock_mode,
 )
 from balrog.environments import make_env
 from balrog.utils import get_unique_seed
+from omegaconf import DictConfig
+from tqdm import tqdm
 
-from explore import get_default_knowledge, evolve_logger
+from b_learn_improve import (
+    _improve_beliefs_only_conversational,
+    _improve_with_perception_validation_conversational,
+    qa_forward_pass,
+    qa_get_feedback,
+    serialize_qa_feedback_results,
+)
+from explore import evolve_logger, get_default_knowledge
+from goal_prompts import append_agent_goal, resolve_agent_goal
+from llm_utils import extract_xml_key, extract_xml_kv
 from mixed_improve import (
     QAPair,
     _llm_call,
@@ -38,57 +48,61 @@ from mixed_improve import (
     set_meta_temperature,
     set_mock_mode,
 )
-from b_learn_improve import (
-    qa_forward_pass,
-    qa_get_feedback,
-    serialize_qa_feedback_results,
-    _improve_with_perception_validation_conversational,
-    _improve_beliefs_only_conversational,
-    _prepend_rejection_notice,
+from multi_theory_exploration import (
+    deserialize_theories,
+    init_theory_ensemble,
+    merge_falsifications,
+    refill_theories,
+    select_discriminating_action,
+    select_goal_action,
+    serialize_theories,
+    update_theory_posterior,
+)
+from theory_exploration import Theory
+from run_utils import (
+    _update_summary_json,
+    improve_logging,
+    is_minihack_success_episode,
+    setup_run,
+)
+from stepwise_b_learn import (
+    _compose_obs_text,
+    _flush_improve_progress,
+    _histories_for_samples,
+    _inject_beliefs,
+    _refresh_buffer_with_perception,
+    _sample_observations_from_buffer,
+    format_steps_context,
 )
 from stepwise_b_learn_improve import (
-    parse_submit_signal,
-    build_perception_with_analysis_prompt,
-    build_perception_followup_message,
-    build_qa_followup_message,
-    _build_obs_section,
     _build_execution_report_section,
+    _build_obs_section,
+    build_perception_with_analysis_prompt,
+    build_qa_followup_message,
+    parse_submit_signal,
 )
 from stepwise_eb_learn_improve import (
     EBQAPair,
-    serialize_eb_qa_pairs,
+    TRAJECTORY_REASONING_NOTE,
+    deduplicate_qa_pairs,
     deserialize_eb_qa_pairs,
     eb_qa_to_qa,
-    generate_questions_from_steps,
+    formulate_experiment_for_question,
     formulate_experiment_from_question,
-    update_qa_from_trajectory,
-    deduplicate_qa_pairs,
+    generate_questions_from_steps,
+    score_experiments_against_questions,
+    select_qa_pairs_and_formulate_experiments,
     select_qa_pairs_for_experiment,
+    serialize_eb_qa_pairs,
     trim_qa_pairs,
     trim_qa_pairs_scored,
-)
-from llm_utils import extract_xml_key, extract_xml_kv
-from stepwise_b_learn import (
-    format_steps_context,
-    _compose_obs_text,
-    _refresh_buffer_with_perception,
-    _sample_observations_from_buffer,
-    _histories_for_samples,
-    _inject_beliefs,
-    _flush_improve_progress,
+    update_qa_from_trajectory,
 )
 from stepwise_explore import (
-    load_perception_fn,
+    _perceive_signature_mode,
     apply_perception,
     apply_perception_with_history,
-    _perceive_signature_mode,
-)
-from goal_prompts import append_agent_goal, resolve_agent_goal
-from run_utils import (
-    setup_run,
-    improve_logging,
-    _update_summary_json,
-    is_minihack_success_episode,
+    load_perception_fn,
 )
 
 INVALID_ACTION_RETRY_MESSAGE = "Your previous action was not formatted correctly. Retry"
@@ -108,7 +122,7 @@ def _extract_xml_attr(attrs: str, name: str) -> str | None:
 def _normalize_q_ref(raw: str | None, max_index: int) -> int | None:
     if raw is None:
         return None
-    match = re.search(r"(?:\bQ\s*)?(\d+)", raw, re.IGNORECASE)
+    match = re.fullmatch(r"\s*(?:Q\s*)?(\d+)\s*", raw, re.IGNORECASE)
     if not match:
         return None
     idx = int(match.group(1)) - 1
@@ -137,6 +151,7 @@ def _parse_q_tag_indices(text: str, max_index: int) -> list[int]:
 # Scoped to stepwise_eb_learn so stepwise_b_learn's prompts are unaffected.
 # ---------------------------------------------------------------------------
 
+
 def _eb_perception_instructions(include_policy: bool = True) -> str:
     belief_ref = "world knowledge and policy" if include_policy else "world knowledge"
     return f"""For the perception module:
@@ -147,6 +162,14 @@ def _eb_perception_instructions(include_policy: bool = True) -> str:
 - The output should be consistent with the current {belief_ref} and should not make any additional or contradictory assumptions to them.
 - Ensure that the perception module is working correctly — that it is correctly extracting the intended information from the raw environment state and presenting it clearly.
 """
+
+
+_BELIEFS_COMPLETE_NOTE = (
+    "Output the COMPLETE beliefs inside <updated_beliefs>: restate every belief you "
+    "want to keep, not just what changed. This block fully replaces the current "
+    "beliefs, so anything you omit will be lost. Never submit an empty "
+    "<world_knowledge> unless you genuinely intend to discard all current beliefs."
+)
 
 
 def _eb_beliefs_block_template(include_policy: bool) -> str:
@@ -170,6 +193,20 @@ def _eb_beliefs_block_template(include_policy: bool) -> str:
 </updated_beliefs>"""
 
 
+_PERCEPTION_DIFF_GUIDANCE = """Provide your perception change as a **unified diff** that patches the CURRENT PERCEPTION MODULE shown above. Use standard `diff -u` syntax with `@@ ... @@` hunk headers; line numbers in the headers are ignored — context lines are matched verbatim against the current source, so quote them exactly. Keep each diff minimal: include only the lines you are changing plus a few context lines around them. Example:
+
+```diff
+@@ -10,5 +10,7 @@
+ def perceive(observation_history: list[str]) -> str:
+     obs = observation_history[-1]
+-    return obs[:100]
++    parsed = parse_grid(obs)
++    return f"player={parsed.player} target={parsed.target}"
+```
+
+If you need to rewrite the perception module from scratch, you may instead emit the full module inside a ```python ... ``` block."""
+
+
 def _build_eb_response_format(include_policy: bool = True) -> str:
     beliefs_block = _eb_beliefs_block_template(include_policy)
     return f"""Format your response as:
@@ -180,12 +217,7 @@ Analyze the step sequence and determine what needs to change.
 {beliefs_block}
 
 <updated_perception>
-```python
-def perceive(observation_history: list[str]) -> str:
-    # Your implementation here. observation_history[-1] is the current observation;
-    # earlier entries are prior observations from the same episode (capped).
-    pass
-```
+{_PERCEPTION_DIFF_GUIDANCE}
 </updated_perception>
 
 <status>CONTINUE or SUBMIT</status>
@@ -193,8 +225,23 @@ def perceive(observation_history: list[str]) -> str:
 Set status to SUBMIT if you believe your current beliefs and perception are sufficient given the available evidence otherwise set status to CONTINUE."""
 
 
-def _build_eb_qa_response_format(include_policy: bool = True) -> str:
+def _build_eb_qa_response_format(
+    include_policy: bool = True, perception_enabled: bool = True
+) -> str:
     beliefs_block = _eb_beliefs_block_template(include_policy)
+    if not perception_enabled:
+        return f"""Format your response as:
+<think>
+Analyze the feedback and determine what needs to change.
+</think>
+
+{beliefs_block}
+
+{_BELIEFS_COMPLETE_NOTE}
+
+<status>CONTINUE or SUBMIT</status>
+
+Set status to SUBMIT if you believe your current beliefs are sufficient given the available evidence otherwise set status to CONTINUE."""
     return f"""Format your response as:
 <think>
 Analyze the feedback and determine what needs to change.
@@ -202,31 +249,48 @@ Analyze the feedback and determine what needs to change.
 
 {beliefs_block}
 
-Respond with a updated perception code inside <updated_perception> only when perception needs to change.
-Otherwise set it exactly to KEEP_UNCHANGED.
+{_BELIEFS_COMPLETE_NOTE}
+
+If perception needs to change, put a unified diff inside <updated_perception> (see format below). Otherwise set the block exactly to KEEP_UNCHANGED.
 
 <updated_perception>
 KEEP_UNCHANGED
 </updated_perception>
+
+When you do change perception:
+{_PERCEPTION_DIFF_GUIDANCE}
 
 <status>CONTINUE or SUBMIT</status>
 
 Set status to SUBMIT if you believe your current beliefs and perception are sufficient given the available evidence otherwise set status to CONTINUE."""
 
 
-def _build_eb_beliefs_only_response_format(include_policy: bool = True) -> str:
+def _build_eb_beliefs_only_response_format(
+    include_policy: bool = True, include_perception_analysis: bool = True
+) -> str:
     beliefs_block = _eb_beliefs_block_template(include_policy)
     think_line = (
         "Analyze the step sequence and determine what world knowledge and policy need to change."
         if include_policy
         else "Analyze the step sequence and determine what world knowledge needs to change."
     )
+    if not include_perception_analysis:
+        return f"""Format your response as:
+<think>
+{think_line}
+</think>
+
+{beliefs_block}
+
+{_BELIEFS_COMPLETE_NOTE}"""
     return f"""Format your response as:
 <think>
 {think_line}
 </think>
 
 {beliefs_block}
+
+{_BELIEFS_COMPLETE_NOTE}
 
 <perception_analysis>
 Analysis of how the perception module could be improved:
@@ -252,18 +316,13 @@ def _build_beliefs_section_guidance(include_policy: bool = True) -> str:
 - They should be grounded in the evidence present in the step sequence, only containing inferences from what we have observed so far."""
 
 
-EB_PERCEPTION_ONLY_RESPONSE_FORMAT = """Format your response as:
+EB_PERCEPTION_ONLY_RESPONSE_FORMAT = f"""Format your response as:
 <think>
 Analyze the perception input/output examples and determine what the perception module should extract differently.
 </think>
 
 <updated_perception>
-```python
-def perceive(observation_history: list[str]) -> str:
-    # Your implementation here. observation_history[-1] is the current observation;
-    # earlier entries are prior observations from the same episode (capped).
-    pass
-```
+{_PERCEPTION_DIFF_GUIDANCE}
 </updated_perception>
 
 <status>CONTINUE or SUBMIT</status>
@@ -274,13 +333,15 @@ Set status to SUBMIT if you believe your current perception module is extracting
 @dataclass
 class StepwiseEBLearnConfig:
     n_environment_steps: int
-    max_perception_iterations: "int | list[list[int]]"  # Track 1b turns (int or schedule)
-    max_qa_iterations: "int | list[list[int]]"          # Track 2 turns (int or schedule)
+    max_perception_iterations: (
+        "int | list[list[int]]"  # Track 1b turns (int or schedule)
+    )
+    max_qa_iterations: "int | list[list[int]]"  # Track 2 turns (int or schedule)
     max_qa_per_forward: int
     max_answered_qa_pairs: int
     max_unanswered_qa_pairs: int
     trim_unanswered_at_selection: bool
-    num_questions: int                 # Questions per generation step
+    num_questions: int  # Questions per generation step
     num_sample_obs: int
     explore_temp: float
     artifact_update_interval: int
@@ -293,8 +354,44 @@ class StepwiseEBLearnConfig:
     hide_obs_when_image: bool = False
     question_gen_current_state_only: bool = False
     include_policy: bool = True
+    perception_enabled: bool = True
     question_scoring_method: str = "b_diff_light"
     question_scoring_max_concurrent: int = 8
+    # Plan B (theory_entropy scoring): regenerate competing theories each
+    # selection point, seed the bank with crux questions, and rank unanswered
+    # questions by mutual information with the theory posterior.
+    num_theories: int = 5
+    num_crux_questions: int = 5
+    # When true, the theory generator sees only the current state (text + image),
+    # not the recent step history — to test whether withholding the trajectory
+    # changes the hypotheses it proposes.
+    theory_gen_current_state_only: bool = False
+    theory_weight_decay: float = 0.6  # prior over theories: w_r ~ decay^(rank-1)
+    # MI-residual theory seeding (lever #1): after generating the initial
+    # theories, score the unanswered bank; any question the whole ensemble is
+    # agnostic about (all-UNK -> MI 0) probes a mechanism no theory models, so
+    # regenerate theories seeded with up to this many such "residual" questions
+    # (each required to be ASSUMED-true by >=1 theory), giving the ensemble a
+    # member that predicts it -> the question becomes discriminable/selectable.
+    # 0 == disabled (original behavior).
+    num_theory_seed_questions: int = 0
+    # Plan A (question_scoring_method == "theory_disagreement"): a *persistent*
+    # theory ensemble drives action selection (discriminating action) and is
+    # reweighted from pre-registered predictions each step. See
+    # multi_theory_exploration.py.
+    theory_violation_penalty: float = 0.7  # violated theory keeps (1-p) of its weight
+    theory_min_weight: float = 0.02  # drop theories below this posterior weight
+    num_candidate_actions: int = 4  # candidate actions the selector compares
+    # Plan A explore->exploit switch: once the ensemble has survived
+    # ``exploit_stable_streak`` consecutive steps without an all-violated wipe
+    # (and holds >= ``exploit_min_theories`` theories), switch from running
+    # discriminating experiments to acting toward the goal under the MAP theory.
+    exploit_enabled: bool = True
+    exploit_stable_streak: int = 2
+    exploit_min_theories: int = 2
+    experiment_selection_mode: str = "single"  # "single" | "score_topk"
+    experiment_scoring_max_concurrent: int = 8
+    score_topk_filter_questions: bool = False
     critical_transitions_enabled: bool = False
     critical_id_min_for_perception: int = 3
     mock_mode: bool = False
@@ -308,6 +405,32 @@ class StepwiseEBLearnConfig:
     autumn_eval_max_steps: int = 501
     autumn_eval_render_mode: str = "text"
     frozen_eval_autumn_planning_goal: str | None = None
+
+
+def _format_prior_attempts(prior_attempts: list[dict]) -> str:
+    """Render a short per-turn outcome log to seed the next turn's prompt.
+
+    Conversation history is reset between outer turns; this block stands in
+    for the (deliberately discarded) chat memory so the LLM still knows which
+    of its prior diffs were accepted vs. rejected.
+    """
+    if not prior_attempts:
+        return ""
+    lines = ["=== PRIOR PERCEPTION ATTEMPTS THIS LOOP ==="]
+    for entry in prior_attempts:
+        n = entry["turn"]
+        if entry.get("validated"):
+            tag_ = "perception updated" if entry.get("changed") else "no change"
+            lines.append(f"Turn {n}: accepted ({tag_})")
+        else:
+            err = (entry.get("error") or "").replace("\n", " ").strip()
+            if len(err) > 220:
+                err = err[:220] + "..."
+            lines.append(
+                f"Turn {n}: rejected — {err}. Previous perception was preserved."
+            )
+    lines.append("=== END PRIOR ATTEMPTS ===")
+    return "\n".join(lines)
 
 
 def _resolve_schedule(value: "int | list[list[int]]", global_step: int) -> int:
@@ -384,26 +507,32 @@ def _critical_obs_from_buffer(
     trajectory_buffer: list[dict],
     n: int,
 ) -> list[tuple[str, int]]:
-    """Return up to ``n`` most-recent critical transitions, in chronological order.
+    """Return the middle and latest critical transitions, in chronological order.
 
     Shape matches ``_sample_observations_from_buffer``: ``list[(raw_obs, step)]``.
     Only entries with ``critical=True``, a non-empty raw observation, and a real
     action (i.e. not a terminal/episode-boundary marker) are eligible.
     """
-    if n <= 0:
+    if n <= 0 or not trajectory_buffer:
         return []
-    out: list[tuple[str, int]] = []
-    for entry in reversed(trajectory_buffer):
-        if entry.get("critical") is not True:
-            continue
-        raw = entry.get("raw_long_term_context")
-        if not raw or entry.get("action") is None:
-            continue
-        out.append((raw, entry["step"]))
-        if len(out) >= n:
-            break
-    out.reverse()
-    return out
+
+    valid = [
+        (e["raw_long_term_context"], e["step"])
+        for e in trajectory_buffer
+        if e.get("critical") is True
+        and e.get("raw_long_term_context", "").strip()
+        and not e.get("episode_boundary")
+        and e.get("action") is not None
+    ]
+    if not valid:
+        return []
+
+    if len(valid) == 1:
+        return [valid[-1]]
+
+    middle = valid[len(valid) // 2]
+    latest = valid[-1]
+    return [middle] if middle[1] == latest[1] else [middle, latest]
 
 
 def _middle_last_observations_from_buffer(
@@ -463,7 +592,9 @@ def _save_prompt_images(images: list, step_dir: Path, subdir: str) -> list[str]:
     return rel_paths
 
 
-def _save_eval_agent_messages(step_dir: Path, agent, reasoning: str, action: str) -> list[dict]:
+def _save_eval_agent_messages(
+    step_dir: Path, agent, reasoning: str, action: str
+) -> list[dict]:
     """Persist the exact agent messages sent to the LLM for frozen eval steps."""
     try:
         runtime_messages = list(getattr(agent, "last_messages", []) or [])
@@ -479,10 +610,14 @@ def _save_eval_agent_messages(step_dir: Path, agent, reasoning: str, action: str
         }
         attachment = getattr(message, "attachment", None)
         if attachment is not None:
-            attachments = attachment if isinstance(attachment, (list, tuple)) else [attachment]
+            attachments = (
+                attachment if isinstance(attachment, (list, tuple)) else [attachment]
+            )
             attachment_paths = []
             for j, img in enumerate(attachments, 1):
-                rel_path = f"agent_message_images/message_{i:03d}_attachment_{j:02d}.png"
+                rel_path = (
+                    f"agent_message_images/message_{i:03d}_attachment_{j:02d}.png"
+                )
                 try:
                     image_dir.mkdir(parents=True, exist_ok=True)
                     img.save(step_dir / rel_path)
@@ -495,11 +630,13 @@ def _save_eval_agent_messages(step_dir: Path, agent, reasoning: str, action: str
                     record["attachment_path"] = attachment_paths[0]
         agent_messages.append(record)
 
-    agent_messages.append({
-        "role": "assistant",
-        "content": reasoning,
-        "action": action,
-    })
+    agent_messages.append(
+        {
+            "role": "assistant",
+            "content": reasoning,
+            "action": action,
+        }
+    )
 
     with open(step_dir / "agent_messages.json", "w") as amf:
         json.dump(agent_messages, amf, indent=2, default=str)
@@ -550,7 +687,9 @@ def _safe_image_label(label: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", label).strip("_").lower() or "image"
 
 
-def _save_eval_labeled_images(step_dir: Path, prefix: str, images: list[dict] | None) -> list[str]:
+def _save_eval_labeled_images(
+    step_dir: Path, prefix: str, images: list[dict] | None
+) -> list[str]:
     rel_paths = []
     for i, item in enumerate(images or [], 1):
         image = item.get("image") if isinstance(item, dict) else None
@@ -565,6 +704,7 @@ def _save_eval_labeled_images(step_dir: Path, prefix: str, images: list[dict] | 
             pass
     return rel_paths
 
+
 def _save_eval_step_images(
     step_dir: Path,
     before_image,
@@ -573,7 +713,10 @@ def _save_eval_step_images(
     after_images: list[dict] | None = None,
 ) -> dict[str, bool | list[str]]:
     """Save pre/post observation images for frozen eval viewer inspection."""
-    flags: dict[str, bool | list[str]] = {"has_obs_before": False, "has_obs_after": False}
+    flags: dict[str, bool | list[str]] = {
+        "has_obs_before": False,
+        "has_obs_after": False,
+    }
     if before_image is not None:
         try:
             before_image.save(step_dir / "obs_before.png")
@@ -617,19 +760,19 @@ def _apply_autumn_planning_perception(obs: dict, perception_fn) -> dict | None:
     current_output = _run_perception_on_planning_state(perception_fn, current_state)
     goal_output = _run_perception_on_planning_state(perception_fn, goal_state)
     section = (
-        f"\n{'='*10} Start of current-state features from Perception Module {'='*10}\n"
+        f"\n{'=' * 10} Start of current-state features from Perception Module {'=' * 10}\n"
         f"{current_output}\n\n"
-        f"{'='*10} End of current-state features from Perception Module {'='*10}\n\n"
-        f"{'='*10} Start of goal-state features from Perception Module {'='*10}\n"
+        f"{'=' * 10} End of current-state features from Perception Module {'=' * 10}\n\n"
+        f"{'=' * 10} Start of goal-state features from Perception Module {'=' * 10}\n"
         f"{goal_output}\n\n"
-        f"{'='*10} End of goal-state features from Perception Module {'='*10}\n"
+        f"{'=' * 10} End of goal-state features from Perception Module {'=' * 10}\n"
     )
     obs["text"]["short_term_context"] = (
         section
         + "\n"
-        + f"{'='*10} Start of Auxilliary Observation {'='*10}\n"
+        + f"{'=' * 10} Start of Auxilliary Observation {'=' * 10}\n"
         + obs["text"].get("short_term_context", "")
-        + f"\n\n{'='*10} End of Auxilliary Observation {'='*10}"
+        + f"\n\n{'=' * 10} End of Auxilliary Observation {'=' * 10}"
     )
     return {
         "current_state_input": current_state,
@@ -700,7 +843,9 @@ def _images_for_steps_context(
     }
     image_slots: list[tuple[int, str]] = []
 
-    for m in re.finditer(r'<step n="(\d+)">(.*?)</step>', steps_context_text, re.DOTALL):
+    for m in re.finditer(
+        r'<step n="(\d+)">(.*?)</step>', steps_context_text, re.DOTALL
+    ):
         n = int(m.group(1))
         if n in seen:
             continue
@@ -800,6 +945,29 @@ def _save_step_artifacts_eb(
             json.dump(trim_log, f, indent=4, default=str)
 
 
+def _select_residual_seed_questions(
+    scoring_log: dict, k: int
+) -> list[str]:
+    """Pick up to ``k`` unanswered questions the current theory ensemble cannot
+    predict — every theory answered UNKNOWN (p_yes == 0.5), so MI == 0. These
+    are out-of-ensemble probes: their answer is decided by a mechanism no theory
+    models. Returns their question texts (newest source_step first), to be fed
+    back into theory generation as seeds (lever #1, MI-residual variant)."""
+    if k <= 0:
+        return []
+    residual = []
+    for d in scoring_log.get("per_question", []):
+        pys = d.get("p_yes_per_theory") or []
+        if not pys:
+            continue
+        all_unknown = all(abs(float(p) - 0.5) < 1e-9 for p in pys)
+        if all_unknown and float(d.get("score", 1.0)) <= 1e-9:
+            residual.append(d)
+    # Newest first (a fresh anomaly is the most useful seed); stable otherwise.
+    residual.sort(key=lambda d: (d.get("source_step") or 0), reverse=True)
+    return [d["question"] for d in residual[:k]]
+
+
 def _save_step_log_eb(
     step_dir: Path,
     step: int,
@@ -842,8 +1010,12 @@ def _save_step_log_eb(
         "trim_cost": trim_cost,
         "critical_cost": critical_cost,
         "step_total_cost": (
-            agent_cost + extract_cost + improve_cost
-            + experiment_cost + trim_cost + critical_cost
+            agent_cost
+            + extract_cost
+            + improve_cost
+            + experiment_cost
+            + trim_cost
+            + critical_cost
         ),
         "num_qa_pairs": num_qa,
         "num_answered_questions": num_qa - num_unanswered,
@@ -870,6 +1042,7 @@ def _save_episode_artifacts_eb(
     qa_pairs: list[EBQAPair],
     trajectory_buffer: list[dict] | None = None,
     past_experiments: list[str] | None = None,
+    theories: list[Theory] | None = None,
 ):
     """Save all artifacts for a completed episode."""
     episode_dir.mkdir(parents=True, exist_ok=True)
@@ -883,18 +1056,21 @@ def _save_episode_artifacts_eb(
     if past_experiments is not None:
         with open(episode_dir / "past_experiments.json", "w") as f:
             json.dump(past_experiments, f, indent=4)
+    if theories is not None:
+        with open(episode_dir / "theories.json", "w") as f:
+            json.dump(serialize_theories(theories), f, indent=4)
 
 
 def _find_last_completed_episode_eb(
     output_dir: str,
-) -> tuple[int, str, str, list[EBQAPair]]:
+) -> tuple[int, str, str, list[EBQAPair], list[Theory]]:
     """Find the last completed episode directory and restore EB state.
 
-    Returns: (last_episode, beliefs, perception, qa_pairs)
+    Returns: (last_episode, beliefs, perception, qa_pairs, theories)
     """
     output_path = Path(output_dir)
     if not output_path.exists():
-        return -1, "", "", []
+        return -1, "", "", [], []
 
     episode_dirs = []
     for item in output_path.iterdir():
@@ -907,7 +1083,7 @@ def _find_last_completed_episode_eb(
                 continue
 
     if not episode_dirs:
-        return -1, "", "", []
+        return -1, "", "", [], []
 
     episode_dirs.sort(key=lambda x: x[0])
     last_ep, last_dir = episode_dirs[-1]
@@ -927,8 +1103,16 @@ def _find_last_completed_episode_eb(
         except (json.JSONDecodeError, TypeError):
             pass
 
+    theories: list[Theory] = []
+    theory_file = last_dir / "theories.json"
+    if theory_file.exists():
+        try:
+            theories = deserialize_theories(json.loads(theory_file.read_text()))
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     evolve_logger.info(f"Resuming from episode {last_ep} in {last_dir}")
-    return last_ep, beliefs, perception, qa_pairs
+    return last_ep, beliefs, perception, qa_pairs, theories
 
 
 # ---------------------------------------------------------------------------
@@ -960,31 +1144,46 @@ def _run_improve_loop_eb(
     feedback_history: list[dict] = []
     tag = f"[g{global_step}]"
 
-    max_perception_iters = _resolve_schedule(eb_config.max_perception_iterations, global_step)
+    max_perception_iters = _resolve_schedule(
+        eb_config.max_perception_iterations, global_step
+    )
     max_qa_iters = _resolve_schedule(eb_config.max_qa_iterations, global_step)
 
     include_policy = eb_config.include_policy
-    perception_instructions = _eb_perception_instructions(include_policy)
-    eb_response_format = _build_eb_response_format(include_policy)
-    qa_response_format = _build_eb_qa_response_format(include_policy)
-    beliefs_only_response_format = _build_eb_beliefs_only_response_format(include_policy)
-    beliefs_section_guidance = _build_beliefs_section_guidance(include_policy)
-    policy_task_phrase = (
-        "world knowledge, policy, and perception module"
-        if include_policy
-        else "world knowledge and perception module"
+    perception_enabled = eb_config.perception_enabled
+    perception_instructions = (
+        _eb_perception_instructions(include_policy) if perception_enabled else ""
     )
+    eb_response_format = _build_eb_response_format(include_policy)
+    qa_response_format = _build_eb_qa_response_format(include_policy, perception_enabled)
+    beliefs_only_response_format = _build_eb_beliefs_only_response_format(
+        include_policy, include_perception_analysis=perception_enabled
+    )
+    beliefs_section_guidance = _build_beliefs_section_guidance(include_policy)
+    if perception_enabled:
+        policy_task_phrase = (
+            "world knowledge, policy, and perception module"
+            if include_policy
+            else "world knowledge and perception module"
+        )
+    else:
+        policy_task_phrase = (
+            "world knowledge and policy" if include_policy else "world knowledge"
+        )
 
     hist_window = eb_config.perception_history_window
     display_tail = eb_config.perception_input_tail
     steps_context = format_steps_context(
-        trajectory_buffer, perception, eb_config.max_steps_context_chars,
+        trajectory_buffer,
+        perception,
+        eb_config.max_steps_context_chars,
         history_window=hist_window,
         hide_raw_obs_when_image=eb_config.hide_obs_when_image,
     )
     if eb_config.critical_transitions_enabled:
         crits = _critical_obs_from_buffer(
-            trajectory_buffer, eb_config.num_sample_obs,
+            trajectory_buffer,
+            eb_config.num_sample_obs,
         )
         if len(crits) >= eb_config.critical_id_min_for_perception:
             sample_obs = crits[: eb_config.num_sample_obs]
@@ -994,7 +1193,8 @@ def _run_improve_loop_eb(
             )
         else:
             sampled = _middle_last_observations_from_buffer(
-                trajectory_buffer, eb_config.num_sample_obs,
+                trajectory_buffer,
+                eb_config.num_sample_obs,
             )
             seen = {s for _, s in crits}
             padded = crits + [(o, s) for (o, s) in sampled if s not in seen]
@@ -1006,36 +1206,38 @@ def _run_improve_loop_eb(
             )
     else:
         sample_obs = _middle_last_observations_from_buffer(
-            trajectory_buffer, eb_config.num_sample_obs,
+            trajectory_buffer,
+            eb_config.num_sample_obs,
         )
     sample_obs_histories = _histories_for_samples(trajectory_buffer, sample_obs)
     steps_context, steps_context_images = _images_for_steps_context(
-        trajectory_buffer, steps_context,
+        trajectory_buffer,
+        steps_context,
         max_images=eb_config.max_images_context,
     )
     sample_obs_images = _images_for_sample_obs(trajectory_buffer, sample_obs)
     track1b_sample_obs = (
-        sample_obs[-eb_config.max_images_context:]
+        sample_obs[-eb_config.max_images_context :]
         if eb_config.max_images_context > 0
         else []
     )
     track1b_sample_obs_histories = (
-        sample_obs_histories[-len(track1b_sample_obs):]
-        if track1b_sample_obs
-        else []
+        sample_obs_histories[-len(track1b_sample_obs) :] if track1b_sample_obs else []
     )
     # When critical_transitions_enabled, attach only the post-action image for
     # each sampled transition.
-    use_post_images = eb_config.critical_transitions_enabled and bool(track1b_sample_obs)
+    use_post_images = eb_config.critical_transitions_enabled and bool(
+        track1b_sample_obs
+    )
     if use_post_images:
         track1b_sample_obs_images = _images_for_sample_obs(
-            trajectory_buffer, track1b_sample_obs, post_image_only=True,
+            trajectory_buffer,
+            track1b_sample_obs,
+            post_image_only=True,
         )
     else:
         track1b_sample_obs_images = (
-            sample_obs_images[-len(track1b_sample_obs):]
-            if track1b_sample_obs
-            else []
+            sample_obs_images[-len(track1b_sample_obs) :] if track1b_sample_obs else []
         )
 
     num_answered = sum(1 for q in qa_pairs if q.answer is not None)
@@ -1047,16 +1249,30 @@ def _run_improve_loop_eb(
     )
 
     try:
-
         # ========================================
         # Track 1a: Steps-based beliefs improvement
         # ========================================
         if steps_context:
-            track1a_record = {"track": "steps_beliefs", "step": step, "global_step": global_step, "turns": []}
+            track1a_record = {
+                "track": "steps_beliefs",
+                "step": step,
+                "global_step": global_step,
+                "turns": [],
+            }
 
-            steps_beliefs_prompt = f"""We are interacting with an environment and trying to figure out how it works. We maintain beliefs about the environment to guide the agent's decisions.
+            perception_analysis_bullet = (
+                "\n- Perception analysis: What information was presented in output of the perception module. What part of that information was helpful, what information was misleading / incorrect and what additional information would have helped if extracted by the perception module?"
+                if perception_enabled
+                else ""
+            )
+            step_shows_line = (
+                "Each step shows: the pre-action observation, the perception module's output on it, the agent's reasoning, and the action taken."
+                if perception_enabled
+                else "Each step shows: the pre-action observation, the agent's reasoning, and the action taken."
+            )
+            steps_beliefs_prompt = f"""We are interacting with an environment and trying to figure out how it works. We maintain beliefs about the environment to guide future actions.
 
-The agent receives the following default instructions/knowledge:
+We receive the following default instructions/knowledge:
 === DEFAULT KNOWLEDGE ===
 {default_knowledge}
 === END DEFAULT KNOWLEDGE ===
@@ -1067,8 +1283,10 @@ We maintain the following current beliefs about the environment:
 === END CURRENT BELIEFS ===
 
 Below is the actual sequence of the agent's recent interactions with the environment.
-Each step shows: the pre-action observation, the perception module's output on it, the agent's reasoning, and the action taken.
+{step_shows_line}
 Each ``<pre_state>`` (and ``<post_state>``, when present) is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state. ``<pre_state>`` is the observation before the step's action; ``<post_state>`` is the observation after the last action of an episode segment.
+
+{TRAJECTORY_REASONING_NOTE}
 
 === SEQUENCE OF STEPS ===
 {steps_context}
@@ -1079,8 +1297,7 @@ Your task is to:
 2. Update our beliefs about the environment based on confirmed knowledge from the steps.
 
 Provide analysis highlighting:
-- Belief learning: What can we infer from the observations and how should we update our current beliefs so that they more accurately reflect how the world works.
-- Perception analysis: What information was presented in output of the perception module. What part of that information was helpful, what information was misleading / incorrect and what additional information would have helped if extracted by the perception module?
+- Belief learning: What can we infer from the observations and how should we update our current beliefs so that they more accurately reflect how the world works.{perception_analysis_bullet}
 
 {beliefs_section_guidance}
 
@@ -1099,12 +1316,21 @@ Provide analysis highlighting:
             )
             total_cost += turn_cost
 
-            perception_analysis = extract_xml_key(response_text, "perception_analysis") or ""
+            perception_analysis = (
+                extract_xml_key(response_text, "perception_analysis") or ""
+            )
 
-            turn_record = {"turn": 1, "cost": turn_cost, "prompt": steps_beliefs_prompt, "response": response_text}
+            turn_record = {
+                "turn": 1,
+                "cost": turn_cost,
+                "prompt": steps_beliefs_prompt,
+                "response": response_text,
+            }
             track1a_record["turns"].append(turn_record)
 
-            evolve_logger.info(f"{tag}     Track 1a done (cost: ${turn_cost:.6f}, perception_analysis: {len(perception_analysis)} chars)")
+            evolve_logger.info(
+                f"{tag}     Track 1a done (cost: ${turn_cost:.6f}, perception_analysis: {len(perception_analysis)} chars)"
+            )
 
             feedback_history.append(track1a_record)
             if step_dir is not None:
@@ -1116,82 +1342,105 @@ Provide analysis highlighting:
         # ========================================
         # Track 1b: Perception improvement guided by beliefs analysis
         # ========================================
-        if track1b_sample_obs:
-            track1b_record = {"track": "perception_from_analysis", "step": step, "global_step": global_step, "turns": []}
+        if perception_enabled and track1b_sample_obs:
+            track1b_record = {
+                "track": "perception_from_analysis",
+                "step": step,
+                "global_step": global_step,
+                "turns": [],
+            }
             pre_perception_track1b = perception
-            obs_section_1b = _build_obs_section(
-                perception, track1b_sample_obs,
-                sample_histories=track1b_sample_obs_histories, history_window=hist_window,
-                display_tail=display_tail,
-                post_image_only=use_post_images,
-            )
-
-            perception_from_analysis_prompt = build_perception_with_analysis_prompt(
-                beliefs=beliefs,
-                perception=perception,
-                default_knowledge=default_knowledge,
-                obs_section=obs_section_1b,
-                perception_analysis=perception_analysis,
-                max_iterations=max_perception_iters,
-                perception_instructions=perception_instructions,
-                response_format=EB_PERCEPTION_ONLY_RESPONSE_FORMAT,
-            )
-
-            perception_conv_1b: list[dict] = []
-            prev_obs_section_1b = obs_section_1b
-            prev_validation_error_1b: str | None = None
+            prior_attempts_1b: list[dict] = []
 
             for turn in range(max_perception_iters):
-                evolve_logger.info(f"{tag}     Track 1b (perception from analysis) turn {turn + 1}/{max_perception_iters}")
+                evolve_logger.info(
+                    f"{tag}     Track 1b (perception from analysis) turn {turn + 1}/{max_perception_iters}"
+                )
 
-                message = perception_from_analysis_prompt if turn == 0 else build_perception_followup_message(
-                    perception, track1b_sample_obs, prev_obs_section_1b,
-                    current_turn=turn + 1, max_turns=max_perception_iters,
-                    sample_histories=track1b_sample_obs_histories, history_window=hist_window,
+                # Each turn is self-contained: rebuild the obs section from the
+                # current perception and prepend a short outcome log so the LLM
+                # knows which prior diffs were accepted/rejected without us
+                # carrying the full chat history.
+                obs_section_1b = _build_obs_section(
+                    perception,
+                    track1b_sample_obs,
+                    sample_histories=track1b_sample_obs_histories,
+                    history_window=hist_window,
                     display_tail=display_tail,
+                    post_image_only=use_post_images,
+                )
+                prior_block = _format_prior_attempts(prior_attempts_1b)
+                combined_analysis = (
+                    (prior_block + "\n\n" + perception_analysis).strip()
+                    if prior_block
+                    else perception_analysis
+                )
+
+                message = build_perception_with_analysis_prompt(
+                    beliefs=beliefs,
+                    perception=perception,
+                    default_knowledge=default_knowledge,
+                    obs_section=obs_section_1b,
+                    perception_analysis=combined_analysis,
+                    max_iterations=max_perception_iters,
                     perception_instructions=perception_instructions,
                     response_format=EB_PERCEPTION_ONLY_RESPONSE_FORMAT,
                 )
-                if prev_validation_error_1b:
-                    message = _prepend_rejection_notice(message, prev_validation_error_1b)
 
-                # Attach sample images on the first turn only; subsequent turns rely on history.
-                turn_images = track1b_sample_obs_images if turn == 0 else None
-
-                _beliefs_unused, perception, turn_cost, perception_conv_1b, response_text, prev_validation_error_1b = asyncio.run(
+                prev_perception_1b = perception
+                (
+                    _beliefs_unused,
+                    perception,
+                    turn_cost,
+                    _conv_unused,
+                    response_text,
+                    validation_error_1b,
+                ) = asyncio.run(
                     _improve_with_perception_validation_conversational(
                         config=config,
                         beliefs=beliefs,
                         perception=perception,
-                        conversation_history=perception_conv_1b,
+                        conversation_history=[],
                         user_message=message,
                         sample_observations=track1b_sample_obs,
-                        images=turn_images,
+                        images=track1b_sample_obs_images,
                         sample_histories=track1b_sample_obs_histories,
                         history_window=hist_window,
+                        extraction_mode="diff",
                     )
                 )
                 total_cost += turn_cost
 
-                turn_record = {"turn": turn + 1, "cost": turn_cost, "prompt": message, "response": response_text}
+                prior_attempts_1b.append(
+                    {
+                        "turn": turn + 1,
+                        "validated": validation_error_1b is None,
+                        "error": validation_error_1b,
+                        "changed": perception != prev_perception_1b,
+                    }
+                )
+
+                turn_record = {
+                    "turn": turn + 1,
+                    "cost": turn_cost,
+                    "prompt": message,
+                    "response": response_text,
+                    "validated": validation_error_1b is None,
+                    "validation_error": validation_error_1b,
+                    "perception_changed": perception != prev_perception_1b,
+                }
                 submitted = parse_submit_signal(response_text)
                 turn_record["submitted"] = submitted
                 track1b_record["turns"].append(turn_record)
 
                 evolve_logger.info(
                     f"{tag}     Track 1b turn {turn + 1} done "
-                    f"(cost: ${turn_cost:.6f}, submit: {submitted})"
+                    f"(cost: ${turn_cost:.6f}, submit: {submitted}, "
+                    f"validated: {validation_error_1b is None})"
                 )
 
                 if submitted:
                     break
-
-                prev_obs_section_1b = _build_obs_section(
-                    perception, track1b_sample_obs,
-                    sample_histories=track1b_sample_obs_histories, history_window=hist_window,
-                    display_tail=display_tail,
-                    post_image_only=use_post_images,
-                )
 
             feedback_history.append(track1b_record)
             if step_dir is not None:
@@ -1200,14 +1449,19 @@ Provide analysis highlighting:
             # Rebuild steps_context if perception changed during Track 1b
             if perception != pre_perception_track1b:
                 steps_context = format_steps_context(
-                    trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                    trajectory_buffer,
+                    perception,
+                    eb_config.max_steps_context_chars,
                     history_window=hist_window,
                     hide_raw_obs_when_image=eb_config.hide_obs_when_image,
                 )
                 steps_context, steps_context_images = _images_for_steps_context(
-                    trajectory_buffer, steps_context,
+                    trajectory_buffer,
+                    steps_context,
                     max_images=eb_config.max_images_context,
                 )
+        elif not perception_enabled:
+            evolve_logger.info(f"{tag}     Track 1b: perception disabled, skipping")
         else:
             evolve_logger.info(f"{tag}     Track 1b: No sample observations, skipping")
 
@@ -1219,13 +1473,20 @@ Provide analysis highlighting:
         if not answered_qa:
             evolve_logger.info(f"{tag}     Track 2: No answered questions, skipping")
         else:
-            track2_record = {"track": "qa", "step": step, "global_step": global_step, "turns": []}
+            track2_record = {
+                "track": "qa",
+                "step": step,
+                "global_step": global_step,
+                "turns": [],
+            }
 
             # Convert to QAPair for existing forward/feedback functions
             qa_for_eval = [eb_qa_to_qa(q) for q in answered_qa]
 
             # Initial QA evaluation
-            evolve_logger.info(f"{tag}     Track 2: Initial QA forward pass on {len(qa_for_eval)} answered questions...")
+            evolve_logger.info(
+                f"{tag}     Track 2: Initial QA forward pass on {len(qa_for_eval)} answered questions..."
+            )
             qa_fwd_results, qa_fwd_cost, qa_fwd_prompts, qa_fwd_responses = asyncio.run(
                 qa_forward_pass(
                     config=config,
@@ -1247,7 +1508,9 @@ Provide analysis highlighting:
 
             qa_correct = [fr for fr in qa_fb_results if fr.verdict == "CORRECT"]
             qa_incorrect = [fr for fr in qa_fb_results if fr.verdict == "INCORRECT"]
-            qa_inconclusive = [fr for fr in qa_fb_results if fr.verdict == "INCONCLUSIVE"]
+            qa_inconclusive = [
+                fr for fr in qa_fb_results if fr.verdict == "INCONCLUSIVE"
+            ]
             qa_actionable = [fr for fr in qa_fb_results if fr.verdict != "INCONCLUSIVE"]
 
             evolve_logger.info(
@@ -1263,16 +1526,23 @@ Provide analysis highlighting:
             track2_record["qa_forward_response"] = "\n---\n".join(qa_fwd_responses)
             track2_record["qa_feedback_prompt"] = "\n---\n".join(qa_fb_prompts)
             track2_record["qa_feedback_response"] = "\n---\n".join(qa_fb_responses)
-            track2_record["qa_feedback_details"] = serialize_qa_feedback_results(qa_fb_results)
+            track2_record["qa_feedback_details"] = serialize_qa_feedback_results(
+                qa_fb_results
+            )
 
             pre_track_perception = perception
-            if qa_actionable and qa_incorrect:
+            # Run the belief audit whenever there is actionable evidence — not only
+            # when a prediction was wrong. A belief can be wrong/unsupported even when
+            # the agent predicted the (narrow) question correctly, so gating on
+            # qa_incorrect would skip exactly those falsifying-but-correctly-predicted
+            # items. The prompt lets the model SUBMIT unchanged when nothing needs fixing.
+            if qa_actionable:
                 # Build initial QA improvement prompt
                 qa_blocks = []
                 for i, fr in enumerate(qa_actionable, 1):
                     actual = "YES" if fr.forward.qa_pair.answer else "NO"
                     qa_blocks.append(
-                        f"<qa_feedback n=\"{i}\">\n"
+                        f'<qa_feedback n="{i}">\n'
                         f"<question>{fr.forward.qa_pair.question}</question>\n"
                         f"<correct_answer>{actual}</correct_answer>\n"
                         f"<evidence>{fr.forward.qa_pair.evidence}</evidence>\n"
@@ -1284,13 +1554,32 @@ Provide analysis highlighting:
                     )
                 qa_text = "\n\n".join(qa_blocks)
 
-                execution_report_section = _build_execution_report_section(
-                    perception, sample_obs,
-                    sample_histories=sample_obs_histories, history_window=hist_window,
-                    display_tail=display_tail,
-                )
+                if perception_enabled:
+                    execution_report_section = _build_execution_report_section(
+                        perception,
+                        sample_obs,
+                        sample_histories=sample_obs_histories,
+                        history_window=hist_window,
+                        display_tail=display_tail,
+                    )
+                    perception_module_section = f"""
+=== CURRENT PERCEPTION MODULE ===
+{perception if perception else "(empty - no perception module yet)"}
+=== END CURRENT PERCEPTION MODULE ===
+{execution_report_section}"""
+                    incorrect_analysis_points = """1. Was the agent's world knowledge missing the relevant fact? If so, add it.
+2. Was the agent's world knowledge wrong? If so, correct it.
+3. Does the perception module need to extract different information to support this knowledge? If so, update it."""
+                    reeval_note = "your updated beliefs/perception"
+                    improve_subject = "knowledge and perception"
+                else:
+                    perception_module_section = ""
+                    incorrect_analysis_points = """1. Was the agent's world knowledge missing the relevant fact? If so, add it.
+2. Was the agent's world knowledge wrong? If so, correct it."""
+                    reeval_note = "your updated beliefs"
+                    improve_subject = "knowledge"
 
-                initial_qa_prompt = f"""You are improving an agent's knowledge and perception based on testing its understanding of the environment via question-answering.
+                initial_qa_prompt = f"""You are improving an agent's {improve_subject} based on testing its understanding of the environment via question-answering.
 
 The agent receives the following default instructions/knowledge:
 === DEFAULT KNOWLEDGE ===
@@ -1300,11 +1589,7 @@ The agent receives the following default instructions/knowledge:
 === CURRENT BELIEFS ===
 {beliefs if beliefs else "(empty - no beliefs yet)"}
 === END CURRENT BELIEFS ===
-
-=== CURRENT PERCEPTION MODULE ===
-{perception if perception else "(empty - no perception module yet)"}
-=== END CURRENT PERCEPTION MODULE ===
-{execution_report_section}
+{perception_module_section}
 We tested the agent's understanding by asking it factual questions about the environment.
 The agent answered based only on its current world knowledge.
 
@@ -1316,83 +1601,155 @@ Results: {len(qa_correct)} correct, {len(qa_incorrect)} incorrect out of {len(qa
 
 Each ``<pre_state>`` (and ``<post_state>``, when present) in the sequence below is annotated with an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached to this message — use these to cross-reference the textual observation with the actual visual state. ``<pre_state>`` is the observation before the step's action; ``<post_state>`` is the observation after the last action of an episode segment.
 
+{TRAJECTORY_REASONING_NOTE}
+
 === SEQUENCE OF STEPS (for additional context) ===
 {steps_context if steps_context else "(no steps recorded yet)"}
 === END SEQUENCE OF STEPS ===
 
-Your task: Based on the QA feedback, improve the agent's {policy_task_phrase}.
+Your task: Reconcile the agent's {policy_task_phrase} with the QA evidence below.
 
-For INCORRECT predictions, analyze:
-1. Was the agent's world knowledge missing the relevant fact? If so, add it.
-2. Was the agent's world knowledge wrong? If so, correct it.
-3. Does the perception module need to extract different information to support this knowledge? If so, update it.
+Treat each question's <correct_answer> and <evidence> as ground truth about how the environment behaves — it was derived directly from the observed trajectory, and it overrides the current beliefs wherever they disagree. This holds even for items the agent predicted CORRECTLY: a belief can still be wrong, vague, or unsupported even when it happened to yield the right yes/no answer (e.g. a narrow or compound question the agent answers correctly while still holding a wrong underlying model). Audit the evidence itself, not just the verdicts.
+
+Belief audit — go through EVERY current belief and check it against the FULL set of evidence above (both correct and incorrect items):
+- If the evidence contradicts a belief, REMOVE or REPLACE it. Do not keep a refuted belief alive by bolting on an exception or qualifier — if the core claim is wrong, rewrite the claim or mark the mechanism as unknown.
+- If a belief is only weakly supported (it was assumed or inferred, not actually observed), weaken it to match what was observed, or drop it.
+- If the evidence reveals a fact that no belief captures, add it.
+
+For INCORRECT predictions specifically, analyze:
+{incorrect_analysis_points}
 
 Guidelines:
 - Keep each beliefs section to at most 8 concise bullet points. Merge redundant points.
 - Balance safety with progress toward the objective.
+- Prefer replacing a belief over qualifying it: a hedge that preserves a wrong frame ("X is the goal, but only sometimes / needs more") is worse than restating the claim correctly or admitting the mechanism is unknown.
 - Remove beliefs that are contradicted by the QA evidence.
+- If, after auditing every belief against the evidence, nothing needs to change, leave the beliefs unchanged and SUBMIT.
 
-This is a multi-turn conversation. After each response, the QA pairs will be re-evaluated with your updated beliefs/perception. You can iterate up to {max_qa_iters} turns.
+This is a multi-turn conversation. After each response, the QA pairs will be re-evaluated with {reeval_note}. You can iterate up to {max_qa_iters} turns.
 
 {perception_instructions}
 
 {qa_response_format}"""
 
-                qa_conversation: list[dict] = []
                 prev_qa_correct = len(qa_correct)
                 prev_qa_incorrect = len(qa_incorrect)
-                prev_validation_error_2: str | None = None
+                prior_attempts_2: list[dict] = []
 
                 for turn in range(max_qa_iters):
-                    evolve_logger.info(f"{tag}     Track 2 turn {turn + 1}/{max_qa_iters}")
-
-                    message = initial_qa_prompt if turn == 0 else build_qa_followup_message(
-                        qa_fb_results, prev_qa_correct, prev_qa_incorrect,
-                        response_format=qa_response_format,
+                    evolve_logger.info(
+                        f"{tag}     Track 2 turn {turn + 1}/{max_qa_iters}"
                     )
-                    if prev_validation_error_2:
-                        message = _prepend_rejection_notice(message, prev_validation_error_2)
 
-                    # Initial turn's prompt contains both steps_context and sample_obs
-                    # raw states — attach their images. Followups re-reference via history.
-                    turn_images = None
                     if turn == 0:
-                        turn_images = list(steps_context_images) + list(sample_obs_images)
-
-                    beliefs, perception, turn_cost, qa_conversation, response_text, prev_validation_error_2 = asyncio.run(
-                        _improve_with_perception_validation_conversational(
-                            config=config,
-                            beliefs=beliefs,
-                            perception=perception,
-                            conversation_history=qa_conversation,
-                            user_message=message,
-                            sample_observations=sample_obs if sample_obs else None,
-                            images=turn_images,
-                            sample_histories=sample_obs_histories if sample_obs else None,
-                            history_window=hist_window,
-                            allow_keep_perception=True,
+                        base_message = initial_qa_prompt
+                    else:
+                        base_message = build_qa_followup_message(
+                            qa_fb_results,
+                            prev_qa_correct,
+                            prev_qa_incorrect,
+                            response_format=qa_response_format,
+                            perception_enabled=perception_enabled,
+                            current_beliefs=beliefs,
                         )
+
+                    # The prior-attempts block reports accepted/rejected perception
+                    # diffs; it is meaningless (and references perception) in
+                    # beliefs-only mode, so suppress it when perception is disabled.
+                    prior_block = (
+                        _format_prior_attempts(prior_attempts_2)
+                        if perception_enabled
+                        else ""
                     )
+                    message = (
+                        f"{prior_block}\n\n{base_message}" if prior_block else base_message
+                    )
+
+                    # History is reset each turn, so always re-attach the images
+                    # referenced by the prompt.
+                    turn_images = list(steps_context_images) + list(sample_obs_images)
+
+                    prev_perception_2 = perception
+                    if perception_enabled:
+                        (
+                            beliefs,
+                            perception,
+                            turn_cost,
+                            _conv_unused,
+                            response_text,
+                            validation_error_2,
+                        ) = asyncio.run(
+                            _improve_with_perception_validation_conversational(
+                                config=config,
+                                beliefs=beliefs,
+                                perception=perception,
+                                conversation_history=[],
+                                user_message=message,
+                                sample_observations=sample_obs if sample_obs else None,
+                                images=turn_images,
+                                sample_histories=sample_obs_histories
+                                if sample_obs
+                                else None,
+                                history_window=hist_window,
+                                allow_keep_perception=True,
+                                extraction_mode="diff",
+                            )
+                        )
+                    else:
+                        beliefs, turn_cost, _conv_unused, response_text = asyncio.run(
+                            _improve_beliefs_only_conversational(
+                                config=config,
+                                beliefs=beliefs,
+                                conversation_history=[],
+                                user_message=message,
+                                images=turn_images,
+                            )
+                        )
+                        validation_error_2 = None
                     total_cost += turn_cost
 
-                    turn_record = {"turn": turn + 1, "cost": turn_cost, "prompt": message, "response": response_text}
+                    prior_attempts_2.append(
+                        {
+                            "turn": turn + 1,
+                            "validated": validation_error_2 is None,
+                            "error": validation_error_2,
+                            "changed": perception != prev_perception_2,
+                        }
+                    )
+
+                    turn_record = {
+                        "turn": turn + 1,
+                        "cost": turn_cost,
+                        "prompt": message,
+                        "response": response_text,
+                        "validated": validation_error_2 is None,
+                        "validation_error": validation_error_2,
+                        "perception_changed": perception != prev_perception_2,
+                    }
                     submitted = parse_submit_signal(response_text)
                     turn_record["submitted"] = submitted
                     track2_record["turns"].append(turn_record)
 
                     evolve_logger.info(
                         f"{tag}     Track 2 turn {turn + 1} done "
-                        f"(cost: ${turn_cost:.6f}, submit: {submitted})"
+                        f"(cost: ${turn_cost:.6f}, submit: {submitted}, "
+                        f"validated: {validation_error_2 is None})"
                     )
 
                     if submitted:
-                        evolve_logger.info(f"{tag}     Track 2: LLM submitted after {turn + 1} turn(s)")
+                        evolve_logger.info(
+                            f"{tag}     Track 2: LLM submitted after {turn + 1} turn(s)"
+                        )
                         break
 
                     # Re-evaluate QA for next turn (unless this is the last turn)
                     if turn + 1 < max_qa_iters:
-                        prev_qa_correct = sum(1 for fr in qa_fb_results if fr.verdict == "CORRECT")
-                        prev_qa_incorrect = sum(1 for fr in qa_fb_results if fr.verdict == "INCORRECT")
+                        prev_qa_correct = sum(
+                            1 for fr in qa_fb_results if fr.verdict == "CORRECT"
+                        )
+                        prev_qa_incorrect = sum(
+                            1 for fr in qa_fb_results if fr.verdict == "INCORRECT"
+                        )
 
                         qa_fwd_results, qa_fwd_cost, _, _ = asyncio.run(
                             qa_forward_pass(
@@ -1413,15 +1770,21 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                         )
                         total_cost += qa_fb_cost
 
-                        new_correct = sum(1 for fr in qa_fb_results if fr.verdict == "CORRECT")
-                        new_incorrect = sum(1 for fr in qa_fb_results if fr.verdict == "INCORRECT")
+                        new_correct = sum(
+                            1 for fr in qa_fb_results if fr.verdict == "CORRECT"
+                        )
+                        new_incorrect = sum(
+                            1 for fr in qa_fb_results if fr.verdict == "INCORRECT"
+                        )
                         evolve_logger.info(
                             f"{tag}     Track 2 re-eval: {new_correct} correct "
                             f"({new_correct - prev_qa_correct:+d}), "
                             f"{new_incorrect} incorrect ({new_incorrect - prev_qa_incorrect:+d})"
                         )
             else:
-                evolve_logger.info(f"{tag}     Track 2: No incorrect QA, skipping improvement")
+                evolve_logger.info(
+                    f"{tag}     Track 2: No actionable QA, skipping improvement"
+                )
 
             feedback_history.append(track2_record)
             if step_dir is not None:
@@ -1430,19 +1793,24 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
             # Rebuild steps_context if perception changed during Track 2
             if perception != pre_track_perception:
                 steps_context = format_steps_context(
-                    trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                    trajectory_buffer,
+                    perception,
+                    eb_config.max_steps_context_chars,
                     history_window=hist_window,
                     hide_raw_obs_when_image=eb_config.hide_obs_when_image,
                 )
                 steps_context, steps_context_images = _images_for_steps_context(
-                    trajectory_buffer, steps_context,
+                    trajectory_buffer,
+                    steps_context,
                     max_images=eb_config.max_images_context,
                 )
 
     except Exception as e:
         evolve_logger.error(f"{tag}     Improve loop failed: {e}")
         logging.exception("Improve loop failed")
-        feedback_history.append({"error": str(e), "step": step, "global_step": global_step})
+        feedback_history.append(
+            {"error": str(e), "step": step, "global_step": global_step}
+        )
         if step_dir is not None:
             _flush_improve_progress(step_dir, feedback_history, beliefs, perception)
 
@@ -1477,7 +1845,7 @@ async def select_tied_b_diff_question(
         )
 
     tied_questions_text = "\n".join(
-        f'Q{pos + 1} (score={top_score:.6f}, source_step={qa_pairs[src_i].source_step}): '
+        f"Q{pos + 1} (score={top_score:.6f}, source_step={qa_pairs[src_i].source_step}): "
         f"{qa_pairs[src_i].question}"
         for pos, src_i in enumerate(tied_source_indices)
     )
@@ -1489,7 +1857,7 @@ async def select_tied_b_diff_question(
 === END DEFAULT KNOWLEDGE ===
 """
     n_tied = len(tied_source_indices)
-    prompt = f"""You are selecting the next experiment target for an agent learning an environment.
+    prompt = f"""You are selecting the next question target for learning about how a game works.
 
 {default_knowledge_section}
 
@@ -1501,7 +1869,7 @@ async def select_tied_b_diff_question(
 {tied_questions_text}
 === AVAILABLE QUESTIONS ===
 
-Select questions that will 
+Select questions that will
 1. That will help achieve the overall objective for the environment
 2. Cover distinct aspects of the environment
 
@@ -1521,8 +1889,12 @@ Which questions should be selected?
         selected_source_index = tied_source_indices[pos]
         break
     if selected_source_index is None:
-        for match in re.finditer(r"\d+", selected_text):
-            pos = int(match.group(0)) - 1
+        for match in re.finditer(
+            r"(?<![A-Za-z_])(?:Q\s*)?(\d+)(?![A-Za-z_])",
+            selected_text,
+            re.IGNORECASE,
+        ):
+            pos = int(match.group(1)) - 1
             if 0 <= pos < n_tied:
                 selected_source_index = tied_source_indices[pos]
                 break
@@ -1530,7 +1902,9 @@ Which questions should be selected?
     parse_error = None
     if selected_source_index is None:
         selected_source_index = tied_source_indices[0]
-        parse_error = "No valid tied source_index parsed; fell back to first ranked tied question"
+        parse_error = (
+            "No valid tied source_index parsed; fell back to first ranked tied question"
+        )
 
     tie_break_log = {
         "executed": True,
@@ -1564,16 +1938,30 @@ async def identify_critical_transition(
     default_knowledge: str,
     steps_context: str,
     steps_context_images: list,
+    current_experiment: str | None = None,
+    current_experiment_question: str | None = None,
+    perception_enabled: bool = True,
 ) -> tuple[bool, str, float, str, str]:
-    """Decide whether the most recent transition in ``steps_context`` is critical.
+    """Decide whether the current state warrants pausing to update artifacts.
 
-    A transition is "critical" when its post-state is surprising or revealing
-    given the current beliefs and perception output — i.e., it carries
-    information that should update beliefs/perception, rather than being
-    predictable from what we already know.
+    The state is "critical" when either (1) the recent transitions are
+    surprising or revealing given current beliefs + perception output, or
+    (2) the current experiment is stale and should be replaced with a new
+    one. Critical states trigger belief/perception updates and new experiment
+    selection downstream.
 
     Returns: (is_critical, reason, cost, prompt, response_text).
     """
+    if perception_enabled:
+        update_target = "beliefs/perception"
+        criterion1 = "(1) The recent state transitions demonstrate something new or surprising about the environment given current beliefs + perception module output (e.g. a post-state violates current beliefs, exposes a gap in the perception module, or reveals something the agent did not previously know)."
+        surprise_basis = "given current beliefs and perception output"
+        gap_phrase = "belief or perception gap"
+    else:
+        update_target = "beliefs"
+        criterion1 = "(1) The recent state transitions demonstrate something new or surprising about the environment given current beliefs (e.g. a post-state violates current beliefs or reveals something the agent did not previously know)."
+        surprise_basis = "given current beliefs"
+        gap_phrase = "belief gap"
     default_knowledge_section = ""
     if default_knowledge:
         default_knowledge_section = f"""=== DEFAULT KNOWLEDGE ===
@@ -1581,31 +1969,64 @@ async def identify_critical_transition(
 === END DEFAULT KNOWLEDGE ===
 """
 
-    prompt = f"""We are interacting with an environment and trying to figure out how it works. After every action we decide whether the most recent transition (pre-state, action, post-state) was *critical* — surprising or revealing given current beliefs + perception module output — or *uninformative* — predictable from current beliefs.
+    if current_experiment:
+        question_line = (
+            f"Question being investigated:\n{current_experiment_question}\n\n"
+            if current_experiment_question
+            else ""
+        )
+        current_experiment_section = f"""=== CURRENT EXPERIMENT ===
+{question_line}Experiment plan:
+{current_experiment}
+=== END CURRENT EXPERIMENT ===
+"""
+    else:
+        current_experiment_section = """=== CURRENT EXPERIMENT ===
+(none - no experiment currently active)
+=== END CURRENT EXPERIMENT ===
+"""
 
-Only critical transitions trigger belief/perception updates and new experiments downstream: if the post-state is exactly what current beliefs would predict given the action, mark it not critical. If the result violates current beliefs, exposes a gap in the perception module, or reveals something the agent did not previously know, mark it critical.
+    image_legend = ""
+    if steps_context_images:
+        image_legend = (
+            "Each ``<pre_state>`` (and ``<post_state>``, when present) is annotated with "
+            "an ``(image K)`` marker referring to the K-th (1-indexed) screenshot attached "
+            "to this message — use these to cross-reference the textual observation with "
+            "the actual visual state. ``<pre_state>`` is the observation before the step's "
+            "action; ``<post_state>`` is the observation after the last action of an episode "
+            "segment.\n\n"
+        )
+
+    prompt = f"""We are interacting with an environment and trying to figure out how it works. The agent is currently pursuing an experiment to answer a specific question about the environment. After every action we decide whether the current state is *critical* — meaning we should pause to update {update_target} and (potentially) replace the current experiment — or *uninformative* — meaning we should keep executing the current experiment.
+
+Mark the state as critical if EITHER of the following holds:
+{criterion1}
+(2) The current experiment is stale and needs to be replaced with a new one — for example, the question has effectively been answered by the evidence gathered so far, the experiment is no longer relevant given what we now believe, or the experiment is not making progress and a different question would be more valuable to investigate now.
+
+Otherwise — if the recent transitions are predictable from current beliefs AND the current experiment is still worth executing — mark it not critical.
 
 {default_knowledge_section}
 === CURRENT BELIEFS ===
 {beliefs if beliefs else "(empty - no beliefs yet)"}
 === END CURRENT BELIEFS ===
 
-=== SEQUENCE OF STEPS ===
+{current_experiment_section}
+{image_legend}=== SEQUENCE OF STEPS ===
 {steps_context}
 === END SEQUENCE OF STEPS ===
 
-Focus on the *most recent transition* (the last step shown above): the agent's pre-action observation, the action taken, and the resulting post-state. The earlier steps are background only.
+Focus on the *most recent transitions* (the last few steps shown above): the agent's pre-action observations, the actions taken, and the resulting post-states. Also consider whether continuing to pursue the current experiment is still the best use of the agent's effort given what has been observed.
 
 Decide:
-- Was the post-state surprising or revealing given current beliefs and perception output?
-- Or was it predictable from current beliefs?
+- Were the recent transitions surprising or revealing {surprise_basis}, or were they predictable?
+- Is the current experiment still worth pursuing, or has it become stale (answered, irrelevant, or stalled)?
 
 Respond exactly in this format:
 <analysis>
-Brief analysis comparing predicted vs observed post-state for the most recent transition. Identify the specific belief or perception gap if any.
+Brief analysis covering: (a) whether the recent transitions are surprising vs predictable given current beliefs (identify the specific {gap_phrase} if any); (b) whether the current experiment is still worth pursuing or has become stale.
 </analysis>
 <critical>yes</critical>
-<reason>One sentence on why critical, or why not.</reason>
+<reason>One sentence on why critical (and which of the two criteria applies), or why not.</reason>
 
 Use <critical>yes</critical> or <critical>no</critical>."""
 
@@ -1643,6 +2064,7 @@ def run_stepwise_eb_learn_episode(
     past_experiments: list[str] | None = None,
     agent_history_events: list[dict] | None = None,
     cumulative_cost_offset: float = 0.0,
+    theories: list[Theory] | None = None,
 ) -> tuple[
     str,
     str,
@@ -1654,23 +2076,29 @@ def run_stepwise_eb_learn_episode(
     list[dict],
     list[str],
     list[dict],
+    list[Theory],
 ]:
     """Run a single episode with per-step EB-learning.
 
     Returns:
         (beliefs, perception, qa_pairs, current_experiment,
          current_experiment_question, episode_stats, steps_taken, trajectory_buffer,
-         past_experiments, agent_history_events)
+         past_experiments, agent_history_events, theories)
+
+    ``theories`` carries the Plan A persistent theory ensemble (only used when
+    ``question_scoring_method == "theory_disagreement"``; otherwise empty).
     """
     # --- Setup environment and agent ---
     env_name = config.envs.names.split("-")[0]
 
     if env_name == "arc_agi":
         from arc_agi_env import make_arc_env
+
         task = config.tasks.arc_agi_tasks[0]
         env = make_arc_env(task, config)
     elif env_name == "autumn":
         from autumn_env import make_autumn_env
+
         task = config.tasks.autumn_tasks[0]
         env = make_autumn_env(task, config)
     else:
@@ -1705,6 +2133,20 @@ def run_stepwise_eb_learn_episode(
 
     # Setup instruction prompt with beliefs
     agent_goal = resolve_agent_goal(config)
+
+    # ARC-AGI exposes a game-specific (and sometimes mid-episode-changing) action
+    # set. The run-level default_knowledge was built with the generic full action
+    # list, so rebuild it from the live env's actions. This keeps every prompt
+    # that embeds default_knowledge (experiment generation, question scoring,
+    # belief improvement) referencing only actions the agent can actually take.
+    if env_name == "arc_agi":
+        live_actions = getattr(env, "language_action_space", None)
+        if live_actions:
+            default_knowledge = append_agent_goal(
+                get_default_knowledge(config, available_actions=list(live_actions)),
+                agent_goal,
+            )
+
     _inject_beliefs(config, agent, env, env_name, task, beliefs, agent_goal=agent_goal)
     agent.experiment_goal = current_experiment
 
@@ -1717,7 +2159,7 @@ def run_stepwise_eb_learn_episode(
     raw_obs_history: list[str] = [_pre_action_raw_long]
 
     # Setup perception
-    perception_fn = load_perception_fn(perception)
+    perception_fn = (load_perception_fn(perception) if eb_config.perception_enabled else None)
     if perception_fn is not None:
         apply_perception_with_history(
             obs, perception_fn, raw_obs_history, eb_config.perception_history_window
@@ -1730,7 +2172,11 @@ def run_stepwise_eb_learn_episode(
     )
 
     # Episode tracking
-    max_steps = env.max_steps if config.eval.get("max_steps_per_episode") is None else config.eval.max_steps_per_episode
+    max_steps = (
+        env.max_steps
+        if config.eval.get("max_steps_per_episode") is None
+        else config.eval.max_steps_per_episode
+    )
     if max_episode_steps is not None:
         max_steps = min(max_steps, max_episode_steps)
     episode_log: dict = {
@@ -1745,17 +2191,19 @@ def run_stepwise_eb_learn_episode(
     trajectory_buffer = trajectory_buffer if trajectory_buffer is not None else []
     # Insert episode boundary marker
     if trajectory_buffer:
-        trajectory_buffer.append({
-            "step": None,
-            "episode_boundary": True,
-            "episode_idx": episode_idx,
-            "obs_text": "",
-            "raw_long_term_context": "",
-            "action": None,
-            "reward": 0.0,
-            "reasoning": "",
-            "done": True,
-        })
+        trajectory_buffer.append(
+            {
+                "step": None,
+                "episode_boundary": True,
+                "episode_idx": episode_idx,
+                "obs_text": "",
+                "raw_long_term_context": "",
+                "action": None,
+                "reward": 0.0,
+                "reasoning": "",
+                "done": True,
+            }
+        )
     total_learn_cost = 0.0
     episode_return = 0.0
     cumulative_step_cost = 0.0
@@ -1765,17 +2213,57 @@ def run_stepwise_eb_learn_episode(
     if current_experiment and current_experiment not in past_experiments:
         past_experiments.append(current_experiment)
 
+    # --- Plan A (theory_disagreement) persistent state ---
+    # ``theories`` is the carried posterior over world-models; the pending_*
+    # vars hold the discriminating action's pre-registered predictions so the
+    # next observation can reweight the ensemble. ``theory_needs_regen`` starts
+    # True so the ensemble is generated before the first action.
+    plan_a_mode = eb_config.question_scoring_method == "theory_disagreement"
+    theories = theories if theories is not None else []
+    theory_needs_regen = True
+    pending_predictions: dict[int, str] = {}
+    pending_action_plan: str | None = None
+    # Accumulated falsification evidence (claim + observed contradiction) for
+    # every theory ruled out this episode. Fed back into regeneration so fresh
+    # theories must explain what actually happened and cannot re-propose a
+    # just-falsified mechanic. Bounded to the most recent entries.
+    falsification_memory: list[dict] = []
+    falsification_memory_cap = 16
+    # Explore->exploit switch state. ``model_stable_streak`` counts consecutive
+    # steps the ensemble survived without an all-violated wipe; once it reaches
+    # ``exploit_stable_streak`` (and >= exploit_min_theories remain), the loop
+    # acts toward the goal under the MAP theory instead of running experiments.
+    model_stable_streak = 0
+    exploit_mode = False
+
     # CSV logging
     ep_dir = Path(output_dir)
     ep_dir.mkdir(parents=True, exist_ok=True)
     csv_filename = ep_dir / "trajectory.csv"
 
-    pbar = tqdm(total=max_steps, desc=f"Stepwise EB-learn ep {episode_idx}", leave=False, dynamic_ncols=True)
+    pbar = tqdm(
+        total=max_steps,
+        desc=f"Stepwise EB-learn ep {episode_idx}",
+        leave=False,
+        dynamic_ncols=True,
+    )
     feedback_history: list[dict] = []
 
     with open(csv_filename, mode="w", newline="", encoding="utf-8") as csv_file:
-        csv_writer = csv.writer(csv_file, escapechar="\u02d8", quoting=csv.QUOTE_MINIMAL)
-        csv_writer.writerow(["Step", "Action", "Reasoning", "Observation", "Auxiliary_Observation", "Reward", "Done"])
+        csv_writer = csv.writer(
+            csv_file, escapechar="\u02d8", quoting=csv.QUOTE_MINIMAL
+        )
+        csv_writer.writerow(
+            [
+                "Step",
+                "Action",
+                "Reasoning",
+                "Observation",
+                "Auxiliary_Observation",
+                "Reward",
+                "Done",
+            ]
+        )
 
         action = None
         step = 0
@@ -1812,13 +2300,24 @@ def run_stepwise_eb_learn_episode(
 
             # Write preliminary step_log
             _save_step_log_eb(
-                step_dir=step_dir, step=step, global_step=global_step,
-                action=None, reward=0.0, done=False, episode_return=episode_return,
-                agent_cost=0.0, extract_cost=0.0, improve_cost=0.0, experiment_cost=0.0,
+                step_dir=step_dir,
+                step=step,
+                global_step=global_step,
+                action=None,
+                reward=0.0,
+                done=False,
+                episode_return=episode_return,
+                agent_cost=0.0,
+                extract_cost=0.0,
+                improve_cost=0.0,
+                experiment_cost=0.0,
                 trim_cost=0.0,
-                num_qa=len(qa_pairs), num_unanswered=num_unanswered,
-                did_gen_questions=False, did_formulate_experiment=False,
-                active_experiment=current_experiment, phase="started",
+                num_qa=len(qa_pairs),
+                num_unanswered=num_unanswered,
+                did_gen_questions=False,
+                did_formulate_experiment=False,
+                active_experiment=current_experiment,
+                phase="started",
                 active_experiment_question=current_experiment_question,
             )
 
@@ -1830,27 +2329,210 @@ def run_stepwise_eb_learn_episode(
             did_gen_questions = False
             did_formulate_experiment = False
 
-            if should_gen_experiments:
+            if plan_a_mode:
+                # --- Plan A: persistent theory ensemble -> discriminating action ---
+                # Runs every step (the discriminating action is a single action);
+                # the theory ensemble is only (re)generated on cold start, on a
+                # surprise flagged by the previous posterior update, or when it
+                # has shrunk below N. Replaces question-gen / scoring / formulation.
+                evolve_logger.info(
+                    f"[g{global_step}] Plan A: selecting discriminating action "
+                    f"(ensemble size {len(theories)})..."
+                )
+                pa_steps_context = format_steps_context(
+                    trajectory_buffer,
+                    perception,
+                    eb_config.max_steps_context_chars,
+                    history_window=eb_config.perception_history_window,
+                    hide_raw_obs_when_image=eb_config.hide_obs_when_image,
+                    include_trailing_state=False,
+                )
+                pa_steps_context, pa_steps_context_images = _images_for_steps_context(
+                    trajectory_buffer,
+                    pa_steps_context,
+                    max_images=eb_config.max_images_context,
+                )
+                theory_gen_log = None
+                action_obj = None
+                sel_log = None
+                with improve_logging(step_dir):
+                    # --- Decide explore vs exploit from the carried posterior ---
+                    # ``theories`` is reindexed by weight after each update, so
+                    # theories[0] is the current MAP theory. Enter exploit once the
+                    # ensemble has been stable (no all-violated wipe) for
+                    # ``exploit_stable_streak`` steps; stay until a single
+                    # violation/wipe drops the streak to 0 (hysteresis).
+                    map_t = theories[0] if theories else None
+                    can_exploit = (
+                        eb_config.exploit_enabled
+                        and map_t is not None
+                        and len(theories) >= eb_config.exploit_min_theories
+                    )
+                    if exploit_mode:
+                        exploit_mode = can_exploit and model_stable_streak >= 1
+                    else:
+                        exploit_mode = (
+                            can_exploit
+                            and model_stable_streak >= eb_config.exploit_stable_streak
+                        )
+
+                    if exploit_mode and map_t is not None:
+                        # EXPLOIT: act toward the goal under the MAP theory (no
+                        # regeneration; the MAP prediction keeps the posterior live).
+                        action_obj, sel_cost, sel_log = asyncio.run(
+                            select_goal_action(
+                                config=config,
+                                map_theory=map_t,
+                                beliefs=beliefs,
+                                default_knowledge=default_knowledge,
+                                goal=agent_goal,
+                                steps_context=pa_steps_context,
+                                current_observation=_pre_action_raw_long,
+                                current_image=_pre_action_image,
+                                steps_context_images=pa_steps_context_images,
+                            )
+                        )
+                        step_experiment_cost += sel_cost
+                        total_learn_cost += sel_cost
+                    else:
+                        # EXPLORE: (re)generate theories then run a discriminating
+                        # experiment. Genuine cold start only when there is nothing
+                        # to learn from yet; once falsification evidence exists,
+                        # route regeneration through refill so fresh theories see
+                        # what was ruled out (init has no falsification memory).
+                        if not theories and not falsification_memory:
+                            theories, t_cost, theory_gen_log = asyncio.run(
+                                init_theory_ensemble(
+                                    config=config,
+                                    beliefs=beliefs,
+                                    default_knowledge=default_knowledge,
+                                    num_theories=eb_config.num_theories,
+                                    decay=eb_config.theory_weight_decay,
+                                    steps_context=pa_steps_context,
+                                    current_observation=_pre_action_raw_long,
+                                    current_image=_pre_action_image,
+                                    steps_context_images=pa_steps_context_images,
+                                    goal=agent_goal,
+                                )
+                            )
+                            step_experiment_cost += t_cost
+                            total_learn_cost += t_cost
+                            theory_needs_regen = False
+                        elif theory_needs_regen or len(theories) < eb_config.num_theories:
+                            theories, t_cost, theory_gen_log = asyncio.run(
+                                refill_theories(
+                                    config=config,
+                                    theories=theories,
+                                    beliefs=beliefs,
+                                    default_knowledge=default_knowledge,
+                                    num_theories=eb_config.num_theories,
+                                    steps_context=pa_steps_context,
+                                    current_observation=_pre_action_raw_long,
+                                    current_image=_pre_action_image,
+                                    steps_context_images=pa_steps_context_images,
+                                    falsifications=falsification_memory,
+                                    goal=agent_goal,
+                                )
+                            )
+                            step_experiment_cost += t_cost
+                            total_learn_cost += t_cost
+                            theory_needs_regen = False
+
+                        action_obj, sel_cost, sel_log = asyncio.run(
+                            select_discriminating_action(
+                                config=config,
+                                theories=theories,
+                                beliefs=beliefs,
+                                default_knowledge=default_knowledge,
+                                steps_context=pa_steps_context,
+                                current_observation=_pre_action_raw_long,
+                                current_image=_pre_action_image,
+                                steps_context_images=pa_steps_context_images,
+                                num_candidate_actions=eb_config.num_candidate_actions,
+                                goal=agent_goal,
+                            )
+                        )
+                        step_experiment_cost += sel_cost
+                        total_learn_cost += sel_cost
+
+                if action_obj is not None:
+                    if current_experiment and current_experiment not in past_experiments:
+                        past_experiments.append(current_experiment)
+                    current_experiment = action_obj.plan
+                    current_experiment_question = (
+                        "goal action (Plan A exploit)"
+                        if exploit_mode else "discriminating action (Plan A)"
+                    )
+                    pending_predictions = dict(action_obj.predictions)
+                    pending_action_plan = action_obj.plan
+                    did_formulate_experiment = True
+                    evolve_logger.info(
+                        f"[g{global_step}] Plan A {'EXPLOIT' if exploit_mode else 'explore'} "
+                        f"action: {action_obj.plan[:110]}"
+                    )
+                else:
+                    evolve_logger.warning(
+                        f"[g{global_step}] Plan A: no action "
+                        f"(mode={'exploit' if exploit_mode else 'explore'}, "
+                        f"theories={len(theories)}); keeping current experiment."
+                    )
+                    pending_predictions = {}
+                    pending_action_plan = None
+
+                with open(step_dir / "theory_log.json", "w") as f:
+                    json.dump(
+                        {
+                            "theories": serialize_theories(theories),
+                            "theory_generation": theory_gen_log,
+                            "select_action": sel_log,
+                        },
+                        f,
+                        indent=4,
+                        default=str,
+                    )
+                step_experiment_log = {
+                    "mode": "theory_disagreement",
+                    "active_experiment": current_experiment,
+                    "active_experiment_question": current_experiment_question,
+                    "num_theories": len(theories),
+                    "theory_weights": {t.rank: t.weight for t in theories},
+                    "selected_action": (
+                        {
+                            "plan": action_obj.plan,
+                            "rationale": action_obj.rationale,
+                            "predictions": action_obj.predictions,
+                            "candidate_actions": action_obj.candidate_actions,
+                        }
+                        if action_obj is not None
+                        else None
+                    ),
+                }
+                agent.experiment_goal = current_experiment
+                with open(step_dir / "experiment_log.json", "w") as f:
+                    json.dump(step_experiment_log, f, indent=4, default=str)
+                evolve_logger.info(
+                    f"[g{global_step}] Plan A experiment set — "
+                    f"cost: ${step_experiment_cost:.6f}"
+                )
+
+            elif should_gen_experiments:
                 evolve_logger.info(f"[g{global_step}] Generating questions...")
                 exp_steps_context = format_steps_context(
-                    trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                    trajectory_buffer,
+                    perception,
+                    eb_config.max_steps_context_chars,
                     history_window=eb_config.perception_history_window,
                     hide_raw_obs_when_image=eb_config.hide_obs_when_image,
                     include_trailing_state=False,
                 )
                 q_steps_context, q_steps_context_images = _images_for_steps_context(
-                    trajectory_buffer, exp_steps_context,
+                    trajectory_buffer,
+                    exp_steps_context,
                 )
                 exp_steps_context, exp_steps_context_images = _images_for_steps_context(
                     trajectory_buffer,
                     exp_steps_context,
                     max_images=eb_config.max_images_context,
-                )
-                q_steps_context = (
-                    "" if eb_config.question_gen_current_state_only else q_steps_context
-                )
-                q_steps_context_images = (
-                    [] if eb_config.question_gen_current_state_only else q_steps_context_images
                 )
                 with improve_logging(step_dir):
                     # Step 1: Generate questions
@@ -1869,7 +2551,7 @@ def run_stepwise_eb_learn_episode(
                             current_image=_pre_action_image,
                             steps_context_images=q_steps_context_images,
                             hide_raw_obs=eb_config.hide_obs_when_image,
-                            include_recent_history=not eb_config.question_gen_current_state_only,
+                            include_recent_history=True,
                         )
                     )
                     qa_pairs.extend(new_questions)
@@ -1881,6 +2563,156 @@ def run_stepwise_eb_learn_episode(
                         f"[g{global_step}] Generated {len(new_questions)} questions — cost: ${q_cost:.6f}"
                     )
 
+                    # Plan B: theory generation + theory-seeded crux questions.
+                    # Stateless — regenerate competing theories from the current
+                    # state/beliefs each selection point, then add crux questions
+                    # (designed to split the theories) to the bank before dedup.
+                    theories: list = []
+                    theory_gen_log = None
+                    crux_log = None
+                    if eb_config.question_scoring_method == "theory_entropy":
+                        from theory_exploration import (
+                            generate_crux_questions,
+                            generate_theories,
+                        )
+
+                        _theory_state_only = eb_config.theory_gen_current_state_only
+
+                        def _gen_theories(seed_questions=None):
+                            return generate_theories(
+                                config=config,
+                                beliefs=beliefs,
+                                default_knowledge=default_knowledge,
+                                steps_context=(
+                                    "" if _theory_state_only else q_steps_context
+                                ),
+                                current_observation=_pre_action_raw_long,
+                                current_image=_pre_action_image,
+                                steps_context_images=(
+                                    None if _theory_state_only else q_steps_context_images
+                                ),
+                                num_theories=eb_config.num_theories,
+                                decay=eb_config.theory_weight_decay,
+                                seed_questions=seed_questions,
+                            )
+
+                        theories, theory_cost, theory_gen_log = asyncio.run(
+                            _gen_theories()
+                        )
+                        step_experiment_cost += theory_cost
+
+                        # Lever #1 (MI-residual): score the unanswered bank
+                        # against this initial ensemble; any question every
+                        # theory is agnostic about (all-UNK -> MI 0) probes a
+                        # mechanism no theory models. Regenerate theories seeded
+                        # with those residual questions so the new ensemble has a
+                        # member that predicts them -> they become selectable.
+                        theory_seed_log: dict | None = None
+                        _num_seed = eb_config.num_theory_seed_questions
+                        if _num_seed > 0 and len(theories) >= 2:
+                            from theory_exploration import (
+                                score_questions_theory_entropy,
+                            )
+
+                            _resid_cands = [
+                                i
+                                for i, qa in enumerate(qa_pairs)
+                                if qa.answer is None
+                            ]
+                            _pre_scores, _pre_cost, _pre_log = asyncio.run(
+                                score_questions_theory_entropy(
+                                    config=config,
+                                    theories=theories,
+                                    qa_pairs=qa_pairs,
+                                    candidate_indices=_resid_cands,
+                                    default_knowledge=default_knowledge,
+                                    max_concurrent=(
+                                        eb_config.question_scoring_max_concurrent
+                                    ),
+                                )
+                            )
+                            step_experiment_cost += _pre_cost
+                            total_learn_cost += _pre_cost
+                            _seed_qs = _select_residual_seed_questions(
+                                _pre_log, _num_seed
+                            )
+                            theory_seed_log = {
+                                "residual_prescore": _pre_log,
+                                "seed_questions": _seed_qs,
+                                "initial_theories": theory_gen_log,
+                                "seed_theories": None,
+                                "num_added": 0,
+                            }
+                            if _seed_qs:
+                                (
+                                    _seeded,
+                                    _seed_cost,
+                                    _seed_gen_log,
+                                ) = asyncio.run(_gen_theories(seed_questions=_seed_qs))
+                                step_experiment_cost += _seed_cost
+                                total_learn_cost += _seed_cost
+                                # Use the seeded ensemble (same context + the
+                                # residual mechanisms now covered). It is ranked
+                                # 1..M with proper decay weights, so the covered
+                                # theory carries real weight (unlike appending).
+                                if _seeded:
+                                    theories = _seeded
+                                    theory_gen_log = _seed_gen_log
+                                    theory_seed_log["seed_theories"] = _seed_gen_log
+                                    theory_seed_log["num_added"] = len(_seeded)
+                                evolve_logger.info(
+                                    f"[g{global_step}] MI-residual seeding: "
+                                    f"{len(_seed_qs)} residual Q -> regenerated "
+                                    f"{len(theories)} theories"
+                                )
+                            else:
+                                evolve_logger.info(
+                                    f"[g{global_step}] MI-residual seeding: no "
+                                    f"all-UNK residual questions; ensemble "
+                                    f"unchanged"
+                                )
+                            with open(
+                                step_dir / "theory_seed_log.json", "w"
+                            ) as f:
+                                json.dump(theory_seed_log, f, indent=4, default=str)
+                        total_learn_cost += theory_cost
+
+                        crux_qs, crux_cost, crux_log = asyncio.run(
+                            generate_crux_questions(
+                                config=config,
+                                theories=theories,
+                                beliefs=beliefs,
+                                default_knowledge=default_knowledge,
+                                num_crux=eb_config.num_crux_questions,
+                            )
+                        )
+                        step_experiment_cost += crux_cost
+                        total_learn_cost += crux_cost
+                        for cq in crux_qs:
+                            qa_pairs.append(
+                                EBQAPair(
+                                    question=cq,
+                                    answer=None,
+                                    evidence="",
+                                    source_step=global_step,
+                                )
+                            )
+                        evolve_logger.info(
+                            f"[g{global_step}] Theories: {len(theories)} generated; "
+                            f"crux questions added: {len(crux_qs)} — "
+                            f"cost: ${theory_cost + crux_cost:.6f}"
+                        )
+                        with open(step_dir / "theory_log.json", "w") as f:
+                            json.dump(
+                                {
+                                    "theories": theory_gen_log,
+                                    "crux_questions": crux_log,
+                                },
+                                f,
+                                indent=4,
+                                default=str,
+                            )
+
                     # Step 2: De-duplicate the maintained bank, then select a
                     # capped probe subset for this experiment prompt. Unlike
                     # the old trim path, low-scoring questions remain in the
@@ -1889,6 +2721,21 @@ def run_stepwise_eb_learn_episode(
                     qa_pairs_for_experiment = list(qa_pairs)
                     selected_source_indices = list(range(len(qa_pairs)))
                     scoring_method = eb_config.question_scoring_method
+                    selection_mode = eb_config.experiment_selection_mode
+                    if selection_mode not in ("single", "score_topk"):
+                        raise ValueError(
+                            f"Unknown experiment_selection_mode: {selection_mode!r}"
+                        )
+                    if scoring_method not in (
+                        "b_diff_full",
+                        "b_diff_light",
+                        "llm_trim",
+                        "theory_entropy",
+                    ):
+                        raise ValueError(
+                            f"Unknown question_scoring_method: {scoring_method!r}"
+                        )
+                    combined_candidate_experiments: list[dict] = []
                     destructive_unanswered_dropped_count = 0
                     destructive_unanswered_dropped_questions: list[str] = []
 
@@ -1900,21 +2747,46 @@ def run_stepwise_eb_learn_episode(
                     )
                     selection_cost_total += dedup_cost
 
-                    (
-                        qa_pairs_for_experiment,
-                        selected_source_indices,
-                        select_cost,
-                        selection_log,
-                    ) = asyncio.run(
-                        select_qa_pairs_for_experiment(
-                            config=config,
-                            current_qa=qa_pairs,
-                            max_answered_qa_pairs=eb_config.max_answered_qa_pairs,
-                            max_unanswered_qa_pairs=eb_config.max_unanswered_qa_pairs,
-                            default_knowledge=default_knowledge,
-                            beliefs=beliefs,
+                    if selection_mode == "score_topk":
+                        (
+                            qa_pairs_for_experiment,
+                            selected_source_indices,
+                            combined_candidate_experiments,
+                            select_cost,
+                            selection_log,
+                        ) = asyncio.run(
+                            select_qa_pairs_and_formulate_experiments(
+                                config=config,
+                                current_qa=qa_pairs,
+                                max_unanswered_qa_pairs=eb_config.max_unanswered_qa_pairs,
+                                beliefs=beliefs,
+                                perception_code=perception,
+                                steps_context=exp_steps_context,
+                                current_observation=_pre_action_raw_long,
+                                current_aux_observation=_pre_action_raw_short,
+                                default_knowledge=default_knowledge,
+                                current_image=_pre_action_image,
+                                steps_context_images=exp_steps_context_images,
+                                hide_raw_obs=eb_config.hide_obs_when_image,
+                                filter_questions=eb_config.score_topk_filter_questions,
+                            )
                         )
-                    )
+                    else:
+                        (
+                            qa_pairs_for_experiment,
+                            selected_source_indices,
+                            select_cost,
+                            selection_log,
+                        ) = asyncio.run(
+                            select_qa_pairs_for_experiment(
+                                config=config,
+                                current_qa=qa_pairs,
+                                max_answered_qa_pairs=eb_config.max_answered_qa_pairs,
+                                max_unanswered_qa_pairs=eb_config.max_unanswered_qa_pairs,
+                                default_knowledge=default_knowledge,
+                                beliefs=beliefs,
+                            )
+                        )
                     selection_cost_total += select_cost
 
                     if eb_config.trim_unanswered_at_selection:
@@ -1927,7 +2799,8 @@ def run_stepwise_eb_learn_episode(
                         dropped_unanswered_indices = [
                             i
                             for i, qa in enumerate(qa_pairs)
-                            if qa.answer is None and i not in selected_unanswered_indices
+                            if qa.answer is None
+                            and i not in selected_unanswered_indices
                         ]
                         destructive_unanswered_dropped_count = len(
                             dropped_unanswered_indices
@@ -1938,13 +2811,23 @@ def run_stepwise_eb_learn_episode(
 
                         source_to_filtered_index = {
                             source_idx: filtered_idx
-                            for filtered_idx, source_idx in enumerate(kept_source_indices)
+                            for filtered_idx, source_idx in enumerate(
+                                kept_source_indices
+                            )
                         }
                         selected_source_indices = [
                             source_to_filtered_index[i]
                             for i in selected_source_indices
                             if i in source_to_filtered_index
                         ]
+                        for cand in combined_candidate_experiments:
+                            old_source_index = cand.get("source_index")
+                            if old_source_index not in source_to_filtered_index:
+                                cand["source_index"] = None
+                                continue
+                            cand["source_index"] = source_to_filtered_index[
+                                old_source_index
+                            ]
                         qa_pairs = [qa_pairs[i] for i in kept_source_indices]
                         qa_pairs_for_experiment = [
                             qa_pairs[i] for i in selected_source_indices
@@ -1971,28 +2854,52 @@ def run_stepwise_eb_learn_episode(
                     ranked_unanswered_indices: list[int] = []
                     target_experiment_question_index: int | None = None
                     target_experiment_question_source_index: int | None = None
-                    if scoring_method in ("b_diff_full", "b_diff_light"):
-                        from question_scoring import score_questions_b_diff
-
+                    # b_diff selects a single target question for the
+                    # single-mode formulation prompt; score_topk replaces that
+                    # with experiment-level scoring, so b_diff is skipped.
+                    if selection_mode == "single" and scoring_method in (
+                        "b_diff_full",
+                        "b_diff_light",
+                        "theory_entropy",
+                    ):
                         candidate_indices = [
-                            i for i in selected_source_indices
+                            i
+                            for i in selected_source_indices
                             if qa_pairs[i].answer is None
                         ]
-                        method_suffix = (
-                            "full" if scoring_method == "b_diff_full" else "light"
-                        )
-                        scores, score_cost, scoring_log = asyncio.run(
-                            score_questions_b_diff(
-                                config=config,
-                                beliefs=beliefs,
-                                qa_pairs=qa_pairs,
-                                method=method_suffix,
-                                include_policy=eb_config.include_policy,
-                                max_concurrent=eb_config.question_scoring_max_concurrent,
-                                candidate_indices=candidate_indices,
-                                default_knowledge=default_knowledge,
+                        if scoring_method == "theory_entropy":
+                            from theory_exploration import (
+                                score_questions_theory_entropy,
                             )
-                        )
+
+                            scores, score_cost, scoring_log = asyncio.run(
+                                score_questions_theory_entropy(
+                                    config=config,
+                                    theories=theories,
+                                    qa_pairs=qa_pairs,
+                                    candidate_indices=candidate_indices,
+                                    default_knowledge=default_knowledge,
+                                    max_concurrent=eb_config.question_scoring_max_concurrent,
+                                )
+                            )
+                        else:
+                            from question_scoring import score_questions_b_diff
+
+                            method_suffix = (
+                                "full" if scoring_method == "b_diff_full" else "light"
+                            )
+                            scores, score_cost, scoring_log = asyncio.run(
+                                score_questions_b_diff(
+                                    config=config,
+                                    beliefs=beliefs,
+                                    qa_pairs=qa_pairs,
+                                    method=method_suffix,
+                                    include_policy=eb_config.include_policy,
+                                    max_concurrent=eb_config.question_scoring_max_concurrent,
+                                    candidate_indices=candidate_indices,
+                                    default_knowledge=default_knowledge,
+                                )
+                            )
                         selection_cost_total += score_cost
 
                         ranked_unanswered_indices = sorted(
@@ -2031,17 +2938,22 @@ def run_stepwise_eb_learn_episode(
                                 )
                                 selection_cost_total += tie_break_cost
                             else:
-                                selected_tied_source_index = ranked_unanswered_indices[0]
+                                selected_tied_source_index = ranked_unanswered_indices[
+                                    0
+                                ]
                                 tie_break_log = {
                                     "executed": False,
                                     "reason": "no_top_score_tie",
                                     "top_score": top_score,
                                     "candidate_source_indices": tied_top_indices,
                                     "selected_source_index": selected_tied_source_index,
-                                    "selected_question": qa_pairs[selected_tied_source_index].question,
+                                    "selected_question": qa_pairs[
+                                        selected_tied_source_index
+                                    ].question,
                                 }
                         selected_answered_indices = [
-                            i for i in selected_source_indices
+                            i
+                            for i in selected_source_indices
                             if qa_pairs[i].answer is not None
                         ]
                         ranked_source_indices = (
@@ -2052,9 +2964,13 @@ def run_stepwise_eb_learn_episode(
                         ]
                         selected_source_indices = ranked_source_indices
                         if selected_tied_source_index is not None:
-                            target_experiment_question_source_index = selected_tied_source_index
-                            target_experiment_question_index = selected_source_indices.index(
+                            target_experiment_question_source_index = (
                                 selected_tied_source_index
+                            )
+                            target_experiment_question_index = (
+                                selected_source_indices.index(
+                                    selected_tied_source_index
+                                )
                             )
 
                         scoring_log["ranked_unanswered"] = [
@@ -2082,13 +2998,10 @@ def run_stepwise_eb_learn_episode(
                             if target_experiment_question_source_index is not None
                             else None
                         )
-                    elif scoring_method != "llm_trim":
-                        raise ValueError(
-                            f"Unknown question_scoring_method: {scoring_method!r}"
-                        )
 
                     step_trim_log = {
-                        "method": f"probe_selection_{scoring_method}",
+                        "method": f"probe_selection_{scoring_method}_{selection_mode}",
+                        "experiment_selection_mode": selection_mode,
                         "pre_trim_count": dedup_log.get("pre_dedup_count"),
                         "post_trim_count": len(qa_pairs),
                         "pre_trim_answered": dedup_log.get("pre_dedup_answered"),
@@ -2148,9 +3061,12 @@ def run_stepwise_eb_learn_episode(
                     with open(step_dir / "question_selection_log.json", "w") as f:
                         json.dump(step_trim_log, f, indent=4, default=str)
                     if scoring_log is not None:
-                        method_suffix = (
-                            "full" if scoring_method == "b_diff_full" else "light"
-                        )
+                        if scoring_method == "theory_entropy":
+                            method_suffix = "theory_entropy"
+                        elif scoring_method == "b_diff_full":
+                            method_suffix = "full"
+                        else:
+                            method_suffix = "light"
                         scoring_artifact = {
                             "step": global_step,
                             "method": method_suffix,
@@ -2158,15 +3074,27 @@ def run_stepwise_eb_learn_episode(
                             "did_trim": False,
                             "num_qa_before_trim": step_trim_log.get("pre_trim_count"),
                             "num_qa_after_trim": step_trim_log.get("post_trim_count"),
-                            "num_answered_before_trim": step_trim_log.get("pre_trim_answered"),
-                            "num_answered_after_trim": step_trim_log.get("post_trim_answered"),
-                            "num_unanswered_before_trim": step_trim_log.get("pre_trim_unanswered"),
-                            "num_unanswered_after_trim": step_trim_log.get("post_trim_unanswered"),
+                            "num_answered_before_trim": step_trim_log.get(
+                                "pre_trim_answered"
+                            ),
+                            "num_answered_after_trim": step_trim_log.get(
+                                "post_trim_answered"
+                            ),
+                            "num_unanswered_before_trim": step_trim_log.get(
+                                "pre_trim_unanswered"
+                            ),
+                            "num_unanswered_after_trim": step_trim_log.get(
+                                "post_trim_unanswered"
+                            ),
                             "cap_answered": step_trim_log.get("max_answered_qa_pairs"),
-                            "cap_unanswered": step_trim_log.get("max_unanswered_qa_pairs"),
+                            "cap_unanswered": step_trim_log.get(
+                                "max_unanswered_qa_pairs"
+                            ),
                             "dropped_count": step_trim_log.get("dropped_count"),
                             "cost_usd": selection_cost_total,
-                            "ranked_unanswered": scoring_log.get("ranked_unanswered", []),
+                            "ranked_unanswered": scoring_log.get(
+                                "ranked_unanswered", []
+                            ),
                             "kept_unanswered_questions": [
                                 qa_pairs[i].question for i in ranked_unanswered_indices
                             ],
@@ -2193,44 +3121,375 @@ def run_stepwise_eb_learn_episode(
                         f"cost: ${selection_cost_total:.6f}"
                     )
 
-                    # Step 3: Formulate experiment from question
-                    evolve_logger.info(f"[g{global_step}] Formulating experiment from questions...")
-                    experiment_plan, q_idx, e_cost, e_prompt, e_response = asyncio.run(
-                        formulate_experiment_from_question(
-                            config=config,
-                            beliefs=beliefs,
-                            perception_code=perception,
-                            steps_context=exp_steps_context,
-                            current_qa=qa_pairs_for_experiment,
-                            current_experiment=current_experiment,
-                            current_experiment_question=current_experiment_question,
-                            current_observation=_pre_action_raw_long,
-                            current_aux_observation=_pre_action_raw_short,
-                            default_knowledge=default_knowledge,
-                            current_image=_pre_action_image,
-                            steps_context_images=exp_steps_context_images,
-                            hide_raw_obs=eb_config.hide_obs_when_image,
-                            target_question_index=target_experiment_question_index,
-                        )
-                    )
-                    step_experiment_cost += e_cost
-                    total_learn_cost += e_cost
+                    # Step 3: Formulate experiment(s).
+                    # In "single" mode formulation is now driven entirely by
+                    # question selection (no separate gating LLM call): the
+                    # scorer above picks a single target question, and we
+                    # formulate a fresh experiment for it *iff* it differs from
+                    # the question the active experiment is already pursuing.
+                    # If the selected question is the same (or no unanswered
+                    # candidate was selected), the active experiment is kept
+                    # verbatim. In "score_topk" mode Step 2 already selected
+                    # top-k questions and wrote their fresh experiment plans in
+                    # one prompt; here we score each candidate against the full
+                    # unanswered bank and pick the one with the most YES
+                    # verdicts.
+                    experiment_scoring_log: dict | None = None
+                    if selection_mode == "single" and scoring_method in (
+                        "b_diff_full",
+                        "b_diff_light",
+                        "theory_entropy",
+                    ):
+                        # Selection-driven formulation: the scorer above already
+                        # picked a single target question. Formulate a fresh
+                        # experiment for it iff it differs from the active
+                        # experiment's question; otherwise keep the current
+                        # experiment. No separate gating LLM call / null return.
+                        experiment_plan = None
+                        q_idx = target_experiment_question_index
+                        e_cost = 0.0
+                        e_prompt = ""
+                        e_response = ""
+                        selected_question_text = None
 
-                    if experiment_plan is not None:
-                        selected_question_text = (
-                            qa_pairs_for_experiment[q_idx].question
-                            if q_idx is not None
-                            and 0 <= q_idx < len(qa_pairs_for_experiment)
+                        selected_q_text = (
+                            qa_pairs[target_experiment_question_source_index].question
+                            if target_experiment_question_source_index is not None
                             else None
                         )
-                        # Move old active experiment to past if it exists
-                        if current_experiment and current_experiment not in past_experiments:
-                            past_experiments.append(current_experiment)
-                        current_experiment = experiment_plan
-                        current_experiment_question = selected_question_text
-                        did_formulate_experiment = True
+                        active_q_norm = (
+                            current_experiment_question.strip().lower()
+                            if current_experiment_question
+                            else None
+                        )
+                        is_new_question = selected_q_text is not None and (
+                            current_experiment is None
+                            or active_q_norm is None
+                            or selected_q_text.strip().lower() != active_q_norm
+                        )
+
+                        if is_new_question:
+                            evolve_logger.info(
+                                f"[g{global_step}] New question selected; "
+                                f"formulating experiment for it..."
+                            )
+                            experiment_plan, e_cost, e_prompt, e_response = (
+                                asyncio.run(
+                                    formulate_experiment_for_question(
+                                        config=config,
+                                        beliefs=beliefs,
+                                        perception_code=perception,
+                                        steps_context=exp_steps_context,
+                                        target_question=selected_q_text,
+                                        current_observation=_pre_action_raw_long,
+                                        current_aux_observation=_pre_action_raw_short,
+                                        default_knowledge=default_knowledge,
+                                        current_image=_pre_action_image,
+                                        steps_context_images=exp_steps_context_images,
+                                        hide_raw_obs=eb_config.hide_obs_when_image,
+                                    )
+                                )
+                            )
+                            step_experiment_cost += e_cost
+                            total_learn_cost += e_cost
+
+                            if experiment_plan:
+                                # Move old active experiment to past if it exists
+                                if (
+                                    current_experiment
+                                    and current_experiment not in past_experiments
+                                ):
+                                    past_experiments.append(current_experiment)
+                                current_experiment = experiment_plan
+                                current_experiment_question = selected_q_text
+                                selected_question_text = selected_q_text
+                                did_formulate_experiment = True
+                            else:
+                                evolve_logger.warning(
+                                    f"[g{global_step}] Formulation returned no plan; "
+                                    f"keeping current experiment."
+                                )
+                        else:
+                            reason = (
+                                "no unanswered candidate selected"
+                                if selected_q_text is None
+                                else "selected question unchanged"
+                            )
+                            evolve_logger.info(
+                                f"[g{global_step}] Keeping current experiment ({reason})."
+                            )
+                            selected_question_text = current_experiment_question
+                    elif selection_mode == "single":
+                        # Legacy single-mode path for scorers that do not select
+                        # a single target question (e.g. llm_trim): the gated
+                        # formulation call performs its own question selection and
+                        # may return null to keep the current experiment.
+                        evolve_logger.info(
+                            f"[g{global_step}] Formulating experiment from questions..."
+                        )
+                        experiment_plan, q_idx, e_cost, e_prompt, e_response = (
+                            asyncio.run(
+                                formulate_experiment_from_question(
+                                    config=config,
+                                    beliefs=beliefs,
+                                    perception_code=perception,
+                                    steps_context=exp_steps_context,
+                                    current_qa=qa_pairs_for_experiment,
+                                    current_experiment=current_experiment,
+                                    current_experiment_question=current_experiment_question,
+                                    current_observation=_pre_action_raw_long,
+                                    current_aux_observation=_pre_action_raw_short,
+                                    default_knowledge=default_knowledge,
+                                    current_image=_pre_action_image,
+                                    steps_context_images=exp_steps_context_images,
+                                    hide_raw_obs=eb_config.hide_obs_when_image,
+                                    target_question_index=target_experiment_question_index,
+                                )
+                            )
+                        )
+                        step_experiment_cost += e_cost
+                        total_learn_cost += e_cost
+
+                        if experiment_plan is not None:
+                            selected_question_text = (
+                                qa_pairs_for_experiment[q_idx].question
+                                if q_idx is not None
+                                and 0 <= q_idx < len(qa_pairs_for_experiment)
+                                else None
+                            )
+                            # Move old active experiment to past if it exists
+                            if (
+                                current_experiment
+                                and current_experiment not in past_experiments
+                            ):
+                                past_experiments.append(current_experiment)
+                            current_experiment = experiment_plan
+                            current_experiment_question = selected_question_text
+                            did_formulate_experiment = True
+                        else:
+                            selected_question_text = None
                     else:
+                        # score_topk mode
+                        candidates: list[dict] = list(combined_candidate_experiments)
+                        topk_unanswered_order = [
+                            src_idx
+                            for src_idx in selected_source_indices
+                            if qa_pairs[src_idx].answer is None
+                        ]
+                        evolve_logger.info(
+                            f"[g{global_step}] Scoring {len(candidates)} combined selected/formulated candidate experiments..."
+                        )
+
+                        if current_experiment:
+                            active_source_index: int | None = None
+                            if current_experiment_question:
+                                key = current_experiment_question.strip().lower()
+                                for i, qa in enumerate(qa_pairs):
+                                    if qa.question.strip().lower() == key:
+                                        active_source_index = i
+                                        break
+                            candidates.append(
+                                {
+                                    "kind": "active",
+                                    "source_index": active_source_index,
+                                    "question": current_experiment_question,
+                                    "plan": current_experiment,
+                                    "topk_rank": len(topk_unanswered_order),
+                                    "formulation_prompt": None,
+                                    "formulation_response": None,
+                                    "formulation_cost": 0.0,
+                                }
+                            )
+
+                        # Score every candidate against the full unanswered bank.
+                        unanswered_pool_indices = [
+                            i for i, qa in enumerate(qa_pairs) if qa.answer is None
+                        ]
+                        unanswered_pool_qa = [
+                            qa_pairs[i] for i in unanswered_pool_indices
+                        ]
+
+                        if candidates:
+                            (
+                                scores_per_candidate,
+                                per_candidate_yes,
+                                unified_score_cost,
+                                unified_score_prompt,
+                                unified_score_response,
+                                scoring_parsed_ok,
+                            ) = asyncio.run(
+                                score_experiments_against_questions(
+                                    config=config,
+                                    candidates=candidates,
+                                    unanswered_qa=unanswered_pool_qa,
+                                    unanswered_source_indices=unanswered_pool_indices,
+                                    beliefs=beliefs,
+                                    default_knowledge=default_knowledge,
+                                )
+                            )
+                        else:
+                            scores_per_candidate = []
+                            per_candidate_yes = []
+                            unified_score_cost = 0.0
+                            unified_score_prompt = ""
+                            unified_score_response = ""
+                            scoring_parsed_ok = True
+
+                        step_experiment_cost += unified_score_cost
+                        total_learn_cost += unified_score_cost
+
+                        # All candidates are scored in one prompt; attach the
+                        # shared prompt/response/cost to the first candidate so
+                        # the per-candidate viz still surfaces them once, and
+                        # zero out the rest to avoid double-counting.
+                        for i, cand in enumerate(candidates):
+                            cand["score"] = scores_per_candidate[i]
+                            cand["per_question_yes_source_indices"] = sorted(
+                                src for src, v in per_candidate_yes[i].items() if v
+                            )
+                            cand["score_prompt"] = (
+                                unified_score_prompt if i == 0 else None
+                            )
+                            cand["score_response"] = (
+                                unified_score_response if i == 0 else None
+                            )
+                            cand["score_cost"] = unified_score_cost if i == 0 else 0.0
+
+                        # Pick winner: highest score, ties broken by topk_rank
+                        # (earliest topk position wins; active candidate goes
+                        # last because its topk_rank is len(topk)).
+                        winner_index: int | None = None
+                        winner_fallback_reason: str | None = None
+                        if candidates:
+                            winner_index = max(
+                                range(len(candidates)),
+                                key=lambda i: (
+                                    candidates[i]["score"],
+                                    -candidates[i]["topk_rank"],
+                                ),
+                            )
+                            # If the scoring LLM response was unparseable, keep
+                            # the current active experiment rather than picking
+                            # an arbitrary fresh candidate via tie-break.
+                            if not scoring_parsed_ok:
+                                active_idx = next(
+                                    (
+                                        i
+                                        for i, c in enumerate(candidates)
+                                        if c["kind"] == "active"
+                                    ),
+                                    None,
+                                )
+                                if active_idx is not None:
+                                    winner_index = active_idx
+                                    winner_fallback_reason = "scoring_parse_failed"
+                                    evolve_logger.warning(
+                                        f"[g{global_step}] Experiment scoring response "
+                                        "unparseable — falling back to active experiment."
+                                    )
+
+                        experiment_scoring_log = {
+                            "mode": "score_topk",
+                            "parsed_ok": scoring_parsed_ok,
+                            "winner_fallback_reason": winner_fallback_reason,
+                            "topk_source_indices": list(selected_source_indices),
+                            "topk_unanswered_source_indices": topk_unanswered_order,
+                            "unanswered_pool_source_indices": unanswered_pool_indices,
+                            "candidates": [
+                                {
+                                    "kind": c["kind"],
+                                    "source_index": c["source_index"],
+                                    "question": c["question"],
+                                    "plan": c["plan"],
+                                    "score": c.get("score", 0),
+                                    "per_question_yes_source_indices": (
+                                        c.get("per_question_yes_source_indices", [])
+                                    ),
+                                    "topk_rank": c["topk_rank"],
+                                    "formulation_cost": c["formulation_cost"],
+                                    "score_cost": c.get("score_cost", 0.0),
+                                    "formulation_prompt": c["formulation_prompt"],
+                                    "formulation_response": c["formulation_response"],
+                                    "score_prompt": c.get("score_prompt"),
+                                    "score_response": c.get("score_response"),
+                                }
+                                for c in candidates
+                            ],
+                            "winner_index": winner_index,
+                            "winner_kind": (
+                                candidates[winner_index]["kind"]
+                                if winner_index is not None
+                                else None
+                            ),
+                            "winner_source_index": (
+                                candidates[winner_index]["source_index"]
+                                if winner_index is not None
+                                else None
+                            ),
+                            "winner_score": (
+                                candidates[winner_index]["score"]
+                                if winner_index is not None
+                                else None
+                            ),
+                            "selection_formulation_cost": select_cost,
+                            "score_cost": sum(
+                                c.get("score_cost", 0.0) for c in candidates
+                            ),
+                            "total_cost": (
+                                select_cost
+                                + sum(c.get("score_cost", 0.0) for c in candidates)
+                            ),
+                        }
+
+                        # Apply the winner.
+                        experiment_plan = None
+                        q_idx = None
                         selected_question_text = None
+                        e_prompt = selection_log.get("prompt", "")
+                        e_response = selection_log.get("response", "")
+                        e_cost = experiment_scoring_log["total_cost"]
+                        if winner_index is not None:
+                            winner = candidates[winner_index]
+                            if winner["kind"] == "fresh":
+                                if (
+                                    current_experiment
+                                    and current_experiment not in past_experiments
+                                    and current_experiment != winner["plan"]
+                                ):
+                                    past_experiments.append(current_experiment)
+                                current_experiment = winner["plan"]
+                                current_experiment_question = winner["question"]
+                                experiment_plan = winner["plan"]
+                                selected_question_text = winner["question"]
+                                if (
+                                    winner["source_index"] is not None
+                                    and winner["source_index"]
+                                    in selected_source_indices
+                                ):
+                                    q_idx = selected_source_indices.index(
+                                        winner["source_index"]
+                                    )
+                                did_formulate_experiment = True
+                            else:
+                                # active candidate won — keep current
+                                selected_question_text = current_experiment_question
+                                experiment_plan = current_experiment
+                                if (
+                                    winner["source_index"] is not None
+                                    and winner["source_index"]
+                                    in selected_source_indices
+                                ):
+                                    q_idx = selected_source_indices.index(
+                                        winner["source_index"]
+                                    )
+                        evolve_logger.info(
+                            f"[g{global_step}] Scored {len(candidates)} candidate experiments — "
+                            f"winner: "
+                            f"{candidates[winner_index]['kind'] if winner_index is not None else 'none'} "
+                            f"score="
+                            f"{candidates[winner_index]['score'] if winner_index is not None else 'n/a'}, "
+                            f"cost: ${experiment_scoring_log['total_cost']:.6f}"
+                        )
 
                     # Experiment prompts use the capped trajectory-image
                     # sequence plus the current pre-action image. Question
@@ -2240,26 +3499,21 @@ def run_stepwise_eb_learn_episode(
                     if _pre_action_image is not None:
                         exp_prompt_images.append(_pre_action_image)
                     exp_image_paths = _save_prompt_images(
-                        exp_prompt_images, step_dir, "experiment_log_images",
+                        exp_prompt_images,
+                        step_dir,
+                        "experiment_log_images",
                     )
-                    if eb_config.question_gen_current_state_only:
+                    q_prompt_images = list(q_steps_context_images or [])
+                    if _pre_action_image is not None:
+                        q_prompt_images.append(_pre_action_image)
+                    if q_prompt_images == exp_prompt_images:
+                        q_image_paths = exp_image_paths
+                    else:
                         q_image_paths = _save_prompt_images(
-                            [_pre_action_image] if _pre_action_image is not None else [],
+                            q_prompt_images,
                             step_dir,
                             "question_gen_log_images",
                         )
-                    else:
-                        q_prompt_images = list(q_steps_context_images or [])
-                        if _pre_action_image is not None:
-                            q_prompt_images.append(_pre_action_image)
-                        if q_prompt_images == exp_prompt_images:
-                            q_image_paths = exp_image_paths
-                        else:
-                            q_image_paths = _save_prompt_images(
-                                q_prompt_images,
-                                step_dir,
-                                "question_gen_log_images",
-                            )
 
                     step_experiment_log = {
                         "question_gen_prompt": q_prompt,
@@ -2287,12 +3541,14 @@ def run_stepwise_eb_learn_episode(
                         ),
                         "active_experiment": current_experiment,
                         "active_experiment_question": current_experiment_question,
+                        "experiment_selection_mode": selection_mode,
                         "question_selection_method": scoring_method,
                         "qa_pairs_for_experiment": serialize_eb_qa_pairs(
                             qa_pairs_for_experiment
                         ),
                         "qa_pairs_for_experiment_source_indices": selected_source_indices,
                         "qa_pairs_at_formulation": serialize_eb_qa_pairs(qa_pairs),
+                        "experiment_scoring": experiment_scoring_log,
                     }
 
                 # Update current experiment and inject into agent
@@ -2301,6 +3557,14 @@ def run_stepwise_eb_learn_episode(
                 # Write experiment artifacts immediately
                 with open(step_dir / "experiment_log.json", "w") as f:
                     json.dump(step_experiment_log, f, indent=4, default=str)
+                if experiment_scoring_log is not None:
+                    with open(step_dir / "experiment_scoring_log.json", "w") as f:
+                        json.dump(
+                            experiment_scoring_log,
+                            f,
+                            indent=4,
+                            default=str,
+                        )
                 with open(step_dir / "qa_pairs.json", "w") as f:
                     json.dump(serialize_eb_qa_pairs(qa_pairs), f, indent=4)
 
@@ -2313,14 +3577,25 @@ def run_stepwise_eb_learn_episode(
 
             # Update step_log: experiment phase done, agent about to act
             _save_step_log_eb(
-                step_dir=step_dir, step=step, global_step=global_step,
-                action=None, reward=0.0, done=False, episode_return=episode_return,
-                agent_cost=0.0, extract_cost=0.0, improve_cost=0.0, experiment_cost=step_experiment_cost,
+                step_dir=step_dir,
+                step=step,
+                global_step=global_step,
+                action=None,
+                reward=0.0,
+                done=False,
+                episode_return=episode_return,
+                agent_cost=0.0,
+                extract_cost=0.0,
+                improve_cost=0.0,
+                experiment_cost=step_experiment_cost,
                 trim_cost=step_trim_cost,
-                num_qa=len(qa_pairs), num_unanswered=num_unanswered,
-                did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                num_qa=len(qa_pairs),
+                num_unanswered=num_unanswered,
+                did_gen_questions=did_gen_questions,
+                did_formulate_experiment=did_formulate_experiment,
                 did_trim=did_trim_step,
-                active_experiment=current_experiment, phase="acting",
+                active_experiment=current_experiment,
+                phase="acting",
                 active_experiment_question=current_experiment_question,
             )
 
@@ -2371,7 +3646,10 @@ def run_stepwise_eb_learn_episode(
             # re-applying would nest the Auxiliary Observation block again)
             if perception_fn is not None and not invalid_action:
                 apply_perception_with_history(
-                    obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+                    obs,
+                    perception_fn,
+                    raw_obs_history,
+                    eb_config.perception_history_window,
                 )
 
             result_obs_text = _compose_obs_text(
@@ -2382,16 +3660,17 @@ def run_stepwise_eb_learn_episode(
             # Capture agent messages
             try:
                 agent_messages = [
-                    {"role": m.role, "content": m.content}
-                    for m in agent.last_messages
+                    {"role": m.role, "content": m.content} for m in agent.last_messages
                 ]
             except Exception:
                 agent_messages = []
-            agent_messages.append({
-                "role": "assistant",
-                "content": reasoning,
-                "action": action,
-            })
+            agent_messages.append(
+                {
+                    "role": "assistant",
+                    "content": reasoning,
+                    "action": action,
+                }
+            )
 
             with open(step_dir / "agent_messages.json", "w") as amf:
                 json.dump(agent_messages, amf, indent=2, default=str)
@@ -2410,52 +3689,77 @@ def run_stepwise_eb_learn_episode(
                     pass
 
             # Write CSV row immediately
-            csv_writer.writerow([step, action, reasoning, _pre_action_obs_text, _pre_action_raw_short, reward, done])
+            csv_writer.writerow(
+                [
+                    step,
+                    action,
+                    reasoning,
+                    _pre_action_obs_text,
+                    _pre_action_raw_short,
+                    reward,
+                    done,
+                ]
+            )
             csv_file.flush()
 
             # Update step_log with action/reward/done
             _save_step_log_eb(
-                step_dir=step_dir, step=step, global_step=global_step,
-                action=action, reward=reward, done=done, episode_return=episode_return,
-                agent_cost=agent_step_cost, extract_cost=0.0, improve_cost=0.0, experiment_cost=step_experiment_cost,
+                step_dir=step_dir,
+                step=step,
+                global_step=global_step,
+                action=action,
+                reward=reward,
+                done=done,
+                episode_return=episode_return,
+                agent_cost=agent_step_cost,
+                extract_cost=0.0,
+                improve_cost=0.0,
+                experiment_cost=step_experiment_cost,
                 trim_cost=step_trim_cost,
-                num_qa=len(qa_pairs), num_unanswered=num_unanswered,
-                did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                num_qa=len(qa_pairs),
+                num_unanswered=num_unanswered,
+                did_gen_questions=did_gen_questions,
+                did_formulate_experiment=did_formulate_experiment,
                 did_trim=did_trim_step,
-                active_experiment=current_experiment, phase="extracting",
+                active_experiment=current_experiment,
+                phase="extracting",
                 active_experiment_question=current_experiment_question,
                 env_info=info if isinstance(info, dict) else None,
             )
 
             # Append buffer entry (image is the pre-action obs image;
             # result_image is the post-action obs image).
-            trajectory_buffer.append({
-                "step": global_step,
-                "obs_text": _pre_action_obs_text,
-                "raw_long_term_context": _pre_action_raw_long,
-                "raw_short_term_context": _pre_action_raw_short,
-                "result_raw_long_term_context": new_raw_long,
-                "result_raw_short_term_context": new_raw_short,
-                "image": _pre_action_image,
-                "result_image": _post_action_image,
-                "action": action,
-                "reward": reward,
-                "reasoning": reasoning,
-                "done": False,
-            })
+            trajectory_buffer.append(
+                {
+                    "step": global_step,
+                    "obs_text": _pre_action_obs_text,
+                    "raw_long_term_context": _pre_action_raw_long,
+                    "raw_short_term_context": _pre_action_raw_short,
+                    "result_raw_long_term_context": new_raw_long,
+                    "result_raw_short_term_context": new_raw_short,
+                    "image": _pre_action_image,
+                    "result_image": _post_action_image,
+                    "action": action,
+                    "reward": reward,
+                    "reasoning": reasoning,
+                    "done": False,
+                }
+            )
 
             if done:
-                trajectory_buffer.append({
-                    "step": global_step + 1,
-                    "obs_text": result_obs_text,
-                    "raw_long_term_context": new_raw_long,
-                    "raw_short_term_context": new_raw_short,
-                    "image": _post_action_image,
-                    "action": None,
-                    "reward": 0.0,
-                    "reasoning": "",
-                    "done": True,
-                })
+                trajectory_buffer.append(
+                    {
+                        "step": global_step + 1,
+                        "obs_text": result_obs_text,
+                        "raw_long_term_context": new_raw_long,
+                        "raw_short_term_context": new_raw_short,
+                        "image": _post_action_image,
+                        "action": None,
+                        "reward": 0.0,
+                        "reasoning": "",
+                        "done": True,
+                    }
+                )
 
             pbar.update(1)
 
@@ -2472,7 +3776,9 @@ def run_stepwise_eb_learn_episode(
             # step and experiment-gen in the next step.
             if eb_config.critical_transitions_enabled:
                 crit_steps_context = format_steps_context(
-                    trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                    trajectory_buffer,
+                    perception,
+                    eb_config.max_steps_context_chars,
                     history_window=eb_config.perception_history_window,
                     hide_raw_obs_when_image=eb_config.hide_obs_when_image,
                     include_trailing_state=True,
@@ -2497,6 +3803,9 @@ def run_stepwise_eb_learn_episode(
                             default_knowledge=default_knowledge,
                             steps_context=crit_steps_context,
                             steps_context_images=crit_images,
+                            current_experiment=current_experiment,
+                            current_experiment_question=current_experiment_question,
+                            perception_enabled=eb_config.perception_enabled,
                         )
                     )
                 step_critical_cost = c_cost
@@ -2518,7 +3827,9 @@ def run_stepwise_eb_learn_episode(
                     "prompt": c_prompt,
                     "response": c_response,
                     "prompt_image_paths": _save_prompt_images(
-                        crit_images, step_dir, "critical_id_log_images",
+                        crit_images,
+                        step_dir,
+                        "critical_id_log_images",
                     ),
                 }
                 with open(step_dir / "critical_id_log.json", "w") as f:
@@ -2528,6 +3839,61 @@ def run_stepwise_eb_learn_episode(
                     f"[g{global_step}] critical_id: {critical_this_step} "
                     f"(cost: ${c_cost:.6f}) — {critical_reason[:120]}"
                 )
+
+            # --- Plan A: reweight the theory posterior from the observed outcome ---
+            # The discriminating action registered a per-theory prediction; mark
+            # each consistent/violated against the real post-action state and
+            # update weights. A violated MAP theory sets the surprise flag, which
+            # gates ensemble regeneration at the next step's selection.
+            if plan_a_mode and pending_predictions:
+                with improve_logging(step_dir):
+                    theories, theory_update_log = asyncio.run(
+                        update_theory_posterior(
+                            config=config,
+                            theories=theories,
+                            predictions=pending_predictions,
+                            action_taken=pending_action_plan or (action or ""),
+                            observed_outcome=new_raw_long,
+                            observed_image=_post_action_image,
+                            default_knowledge=default_knowledge,
+                            violation_penalty=eb_config.theory_violation_penalty,
+                            min_weight=eb_config.theory_min_weight,
+                        )
+                    )
+                upd_cost = theory_update_log.get("cost", 0.0)
+                step_critical_cost += upd_cost
+                total_learn_cost += upd_cost
+                theory_needs_regen = bool(theory_update_log.get("surprise", False))
+                # Stability streak for the explore->exploit switch: reset on an
+                # all-violated wipe, otherwise the ensemble survived this step.
+                if theory_update_log.get("all_violated"):
+                    model_stable_streak = 0
+                else:
+                    model_stable_streak += 1
+                # Accumulate this step's falsification evidence and keep only the
+                # most recent entries so regeneration is grounded but the prompt
+                # stays bounded.
+                new_falsifications = theory_update_log.get("falsifications", []) or []
+                if new_falsifications:
+                    merge_falsifications(
+                        falsification_memory,
+                        new_falsifications,
+                        falsification_memory_cap,
+                    )
+                with open(step_dir / "theory_update_log.json", "w") as f:
+                    json.dump(theory_update_log, f, indent=4, default=str)
+                with open(step_dir / "falsification_memory.json", "w") as f:
+                    json.dump(falsification_memory, f, indent=4, default=str)
+                evolve_logger.info(
+                    f"[g{global_step}] Plan A posterior: surprise="
+                    f"{theory_needs_regen}, dropped="
+                    f"{theory_update_log.get('num_dropped', 0)}, "
+                    f"survivors={len(theories)}, "
+                    f"stable_streak={model_stable_streak}, "
+                    f"falsif_mem={len(falsification_memory)} (cost: ${upd_cost:.6f})"
+                )
+                pending_predictions = {}
+                pending_action_plan = None
 
             # --- Determine what to do this step ---
             steps_in = step + 1
@@ -2540,21 +3906,27 @@ def run_stepwise_eb_learn_episode(
                 critical_flag_for_experiment_gen = critical_this_step
             else:
                 should_update_artifacts = (
-                    (steps_in % eb_config.artifact_update_interval == 0)
-                    or done
-                )
-                should_improve = (
-                    (steps_in % eb_config.improve_interval == 0)
-                    or done
-                )
+                    steps_in % eb_config.artifact_update_interval == 0
+                ) or done
+                should_improve = (steps_in % eb_config.improve_interval == 0) or done
 
             # --- Artifact update (update Q from trajectory) ---
             if should_update_artifacts and len(trajectory_buffer) > 0:
-                evolve_logger.info(f"[g{global_step}] Updating Q from {len(trajectory_buffer)} buffered steps...")
+                evolve_logger.info(
+                    f"[g{global_step}] Updating Q from {len(trajectory_buffer)} buffered steps..."
+                )
+                # For ARC-AGI the raw <pre_state>/<post_state> bodies are huge
+                # numeric grids that the image + perception output already
+                # cover, so force-strip them from the QA-update prompt.
+                qa_hide_raw_obs = (
+                    eb_config.hide_obs_when_image or env_name == "arc_agi"
+                )
                 steps_context = format_steps_context(
-                    trajectory_buffer, perception, eb_config.max_steps_context_chars,
+                    trajectory_buffer,
+                    perception,
+                    eb_config.max_steps_context_chars,
                     history_window=eb_config.perception_history_window,
-                    hide_raw_obs_when_image=eb_config.hide_obs_when_image,
+                    hide_raw_obs_when_image=qa_hide_raw_obs,
                 )
                 steps_context, steps_context_images_update = _images_for_steps_context(
                     trajectory_buffer,
@@ -2569,7 +3941,7 @@ def run_stepwise_eb_learn_episode(
                             steps_context=steps_context,
                             current_step=global_step,
                             steps_context_images=steps_context_images_update,
-                            hide_raw_obs=eb_config.hide_obs_when_image,
+                            hide_raw_obs=qa_hide_raw_obs,
                         )
                     )
                     step_extract_cost = extract_cost
@@ -2578,7 +3950,9 @@ def run_stepwise_eb_learn_episode(
                 # Save images attached to the extraction prompt so the viz can
                 # render them alongside.
                 step_extraction_log["prompt_image_paths"] = _save_prompt_images(
-                    steps_context_images_update, step_dir, "extraction_log_images",
+                    steps_context_images_update,
+                    step_dir,
+                    "extraction_log_images",
                 )
 
                 # Write extraction artifacts immediately
@@ -2595,14 +3969,25 @@ def run_stepwise_eb_learn_episode(
 
                 # Update step_log: extraction done, improve starting
                 _save_step_log_eb(
-                    step_dir=step_dir, step=step, global_step=global_step,
-                    action=action, reward=reward, done=done, episode_return=episode_return,
-                    agent_cost=agent_step_cost, extract_cost=step_extract_cost, improve_cost=0.0,
-                    experiment_cost=step_experiment_cost, trim_cost=step_trim_cost,
-                    num_qa=len(qa_pairs), num_unanswered=num_unanswered,
-                    did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                    step_dir=step_dir,
+                    step=step,
+                    global_step=global_step,
+                    action=action,
+                    reward=reward,
+                    done=done,
+                    episode_return=episode_return,
+                    agent_cost=agent_step_cost,
+                    extract_cost=step_extract_cost,
+                    improve_cost=0.0,
+                    experiment_cost=step_experiment_cost,
+                    trim_cost=step_trim_cost,
+                    num_qa=len(qa_pairs),
+                    num_unanswered=num_unanswered,
+                    did_gen_questions=did_gen_questions,
+                    did_formulate_experiment=did_formulate_experiment,
                     did_trim=did_trim_step,
-                    active_experiment=current_experiment, phase="improving",
+                    active_experiment=current_experiment,
+                    phase="improving",
                     active_experiment_question=current_experiment_question,
                     env_info=info if isinstance(info, dict) else None,
                     critical_cost=step_critical_cost,
@@ -2612,7 +3997,9 @@ def run_stepwise_eb_learn_episode(
 
             # --- Improve loop (beliefs/perception + QA) ---
             if should_improve:
-                _perc_iters = _resolve_schedule(eb_config.max_perception_iterations, global_step)
+                _perc_iters = _resolve_schedule(
+                    eb_config.max_perception_iterations, global_step
+                )
                 _qa_iters = _resolve_schedule(eb_config.max_qa_iterations, global_step)
                 evolve_logger.info(
                     f"[g{global_step}] Running improve loop (perception={_perc_iters}, "
@@ -2620,17 +4007,19 @@ def run_stepwise_eb_learn_episode(
                 )
                 pre_improve_perception = perception
                 with improve_logging(step_dir):
-                    beliefs, perception, qa_pairs, improve_cost, iter_records = _run_improve_loop_eb(
-                        config=config,
-                        eb_config=eb_config,
-                        beliefs=beliefs,
-                        perception=perception,
-                        qa_pairs=qa_pairs,
-                        trajectory_buffer=trajectory_buffer,
-                        default_knowledge=default_knowledge,
-                        step=step,
-                        global_step=global_step,
-                        step_dir=step_dir,
+                    beliefs, perception, qa_pairs, improve_cost, iter_records = (
+                        _run_improve_loop_eb(
+                            config=config,
+                            eb_config=eb_config,
+                            beliefs=beliefs,
+                            perception=perception,
+                            qa_pairs=qa_pairs,
+                            trajectory_buffer=trajectory_buffer,
+                            default_knowledge=default_knowledge,
+                            step=step,
+                            global_step=global_step,
+                            step_dir=step_dir,
+                        )
                     )
                     step_improve_cost = improve_cost
                     total_learn_cost += improve_cost
@@ -2640,7 +4029,7 @@ def run_stepwise_eb_learn_episode(
                 perception_changed = perception != pre_improve_perception
 
                 # Reload perception after improvement
-                perception_fn = load_perception_fn(perception)
+                perception_fn = (load_perception_fn(perception) if eb_config.perception_enabled else None)
 
                 # Re-apply updated perception to current obs for the agent's next step.
                 # Invalid-action feedback keeps the observation unchanged, so the
@@ -2651,20 +4040,29 @@ def run_stepwise_eb_learn_episode(
                     obs["text"]["short_term_context"] = new_raw_short
                     if perception_fn is not None and not invalid_action:
                         apply_perception_with_history(
-                            obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+                            obs,
+                            perception_fn,
+                            raw_obs_history,
+                            eb_config.perception_history_window,
                         )
 
                 # Rebuild all buffered observations with the latest perception
                 if perception_changed:
                     _refresh_buffer_with_perception(
-                        trajectory_buffer, perception_fn,
+                        trajectory_buffer,
+                        perception_fn,
                         history_window=eb_config.perception_history_window,
                     )
 
                 # Inject updated beliefs for next step
                 if not done:
                     _inject_beliefs(
-                        config, agent, env, env_name, task, beliefs,
+                        config,
+                        agent,
+                        env,
+                        env_name,
+                        task,
+                        beliefs,
                         agent_goal=agent_goal,
                     )
 
@@ -2688,8 +4086,12 @@ def run_stepwise_eb_learn_episode(
 
             # --- Per-step artifact save ---
             step_total_cost = (
-                agent_step_cost + step_extract_cost + step_improve_cost
-                + step_experiment_cost + step_trim_cost + step_critical_cost
+                agent_step_cost
+                + step_extract_cost
+                + step_improve_cost
+                + step_experiment_cost
+                + step_trim_cost
+                + step_critical_cost
             )
             cumulative_step_cost += step_total_cost
 
@@ -2701,7 +4103,10 @@ def run_stepwise_eb_learn_episode(
             )
             if did_learn:
                 _save_step_artifacts_eb(
-                    step_dir, beliefs, perception, qa_pairs,
+                    step_dir,
+                    beliefs,
+                    perception,
+                    qa_pairs,
                     step_feedback_records,
                     extraction_log=step_extraction_log,
                     experiment_log=step_experiment_log,
@@ -2710,15 +4115,25 @@ def run_stepwise_eb_learn_episode(
 
             num_unanswered = sum(1 for q in qa_pairs if q.answer is None)
             _save_step_log_eb(
-                step_dir=step_dir, step=step, global_step=global_step,
-                action=action, reward=reward, done=done, episode_return=episode_return,
-                agent_cost=agent_step_cost, extract_cost=step_extract_cost,
-                improve_cost=step_improve_cost, experiment_cost=step_experiment_cost,
+                step_dir=step_dir,
+                step=step,
+                global_step=global_step,
+                action=action,
+                reward=reward,
+                done=done,
+                episode_return=episode_return,
+                agent_cost=agent_step_cost,
+                extract_cost=step_extract_cost,
+                improve_cost=step_improve_cost,
+                experiment_cost=step_experiment_cost,
                 trim_cost=step_trim_cost,
-                num_qa=len(qa_pairs), num_unanswered=num_unanswered,
-                did_gen_questions=did_gen_questions, did_formulate_experiment=did_formulate_experiment,
+                num_qa=len(qa_pairs),
+                num_unanswered=num_unanswered,
+                did_gen_questions=did_gen_questions,
+                did_formulate_experiment=did_formulate_experiment,
                 did_trim=did_trim_step,
-                active_experiment=current_experiment, phase="complete",
+                active_experiment=current_experiment,
+                phase="complete",
                 active_experiment_question=current_experiment_question,
                 env_info=info if isinstance(info, dict) else None,
                 critical_cost=step_critical_cost,
@@ -2747,7 +4162,9 @@ def run_stepwise_eb_learn_episode(
                     "did_formulate_experiment": did_formulate_experiment,
                     "did_trim": did_trim_step,
                     "did_critical_id": did_critical_id_this_step,
-                    "critical": critical_this_step if did_critical_id_this_step else None,
+                    "critical": critical_this_step
+                    if did_critical_id_this_step
+                    else None,
                 },
             )
 
@@ -2765,7 +4182,9 @@ def run_stepwise_eb_learn_episode(
         # regardless of whether the episode ended via `done` or by hitting max_steps.
         # This lets the viewer show the state *after* the final action.
         if result_obs_text is not None:
-            csv_writer.writerow([step + 1, "", "", result_obs_text, new_raw_short, 0.0, done])
+            csv_writer.writerow(
+                [step + 1, "", "", result_obs_text, new_raw_short, 0.0, done]
+            )
             csv_file.flush()
 
     if pbar.n < pbar.total:
@@ -2781,9 +4200,12 @@ def run_stepwise_eb_learn_episode(
     episode_log["total_learn_cost"] = total_learn_cost
     episode_log["cumulative_step_cost"] = cumulative_step_cost
     episode_log["num_qa_pairs"] = len(qa_pairs)
-    episode_log["num_answered_questions"] = sum(1 for q in qa_pairs if q.answer is not None)
-    episode_log["num_unanswered_questions"] = sum(1 for q in qa_pairs if q.answer is None)
-
+    episode_log["num_answered_questions"] = sum(
+        1 for q in qa_pairs if q.answer is not None
+    )
+    episode_log["num_unanswered_questions"] = sum(
+        1 for q in qa_pairs if q.answer is None
+    )
 
     json_filename = ep_dir / "episode_log.json"
     with open(json_filename, "w") as f:
@@ -2811,6 +4233,7 @@ def run_stepwise_eb_learn_episode(
         trajectory_buffer,
         past_experiments,
         agent_history_events,
+        theories,
     )
 
 
@@ -2893,7 +4316,7 @@ def _run_frozen_autumn_task_eval(
         goal_override=eval_goal,
     )
 
-    perception_fn = load_perception_fn(perception)
+    perception_fn = (load_perception_fn(perception) if eb_config.perception_enabled else None)
     raw_obs_history = [
         (obs.get("planning_eval") or {}).get(
             "current_state_text", obs["text"]["long_term_context"]
@@ -2959,7 +4382,10 @@ def _run_frozen_autumn_task_eval(
             planning_perception = _apply_autumn_planning_perception(obs, perception_fn)
             if planning_perception is None:
                 apply_perception_with_history(
-                    obs, perception_fn, raw_obs_history, eb_config.perception_history_window
+                    obs,
+                    perception_fn,
+                    raw_obs_history,
+                    eb_config.perception_history_window,
                 )
 
         trajectory.append(
@@ -3125,7 +4551,7 @@ def _run_frozen_task_eval(
         goal_override=eval_goal,
     )
 
-    perception_fn = load_perception_fn(perception)
+    perception_fn = (load_perception_fn(perception) if eb_config.perception_enabled else None)
     raw_obs_history = [obs["text"]["long_term_context"]]
     if perception_fn is not None:
         apply_perception_with_history(
@@ -3265,7 +4691,9 @@ def run_frozen_environment_evaluation(
     seed_index = 0
     for env_name in env_names:
         if env_name not in ("minihack", "arc_agi"):
-            evolve_logger.info(f"Skipping generic frozen eval for unsupported env: {env_name}")
+            evolve_logger.info(
+                f"Skipping generic frozen eval for unsupported env: {env_name}"
+            )
             continue
 
         tasks = list(config.tasks[f"{env_name}_tasks"])
@@ -3341,7 +4769,9 @@ def stepwise_eb_learn(
     set_meta_temperature(eb_config.explore_temp)
 
     # Check for resume
-    last_ep, beliefs, perception, qa_pairs = _find_last_completed_episode_eb(output_dir)
+    last_ep, beliefs, perception, qa_pairs, theories = _find_last_completed_episode_eb(
+        output_dir
+    )
     start_episode = last_ep + 1
 
     current_experiment: str | None = None
@@ -3352,7 +4782,9 @@ def stepwise_eb_learn(
     global_steps_used = 0
     if start_episode > 0:
         num_unanswered = sum(1 for q in qa_pairs if q.answer is None)
-        evolve_logger.info(f"Resuming from episode {start_episode} ({len(qa_pairs)} QA, {num_unanswered} unanswered)")
+        evolve_logger.info(
+            f"Resuming from episode {start_episode} ({len(qa_pairs)} QA, {num_unanswered} unanswered)"
+        )
         # Recover active experiment from last episode's step logs
         last_ep_dir = Path(output_dir) / f"episode_{last_ep}"
         for step_dir in sorted(last_ep_dir.glob("step_*"), reverse=True):
@@ -3397,7 +4829,9 @@ def stepwise_eb_learn(
                 trajectory_buffer = json.loads(traj_file.read_text())
             except (json.JSONDecodeError, TypeError):
                 trajectory_buffer = []
-        past_exp_file = Path(output_dir) / f"episode_{last_ep}" / "past_experiments.json"
+        past_exp_file = (
+            Path(output_dir) / f"episode_{last_ep}" / "past_experiments.json"
+        )
         if past_exp_file.exists():
             try:
                 past_experiments = json.loads(past_exp_file.read_text())
@@ -3424,23 +4858,39 @@ def stepwise_eb_learn(
 
     evolve_logger.info(f"Stepwise EB-learn config:")
     evolve_logger.info(f"  Total env steps: {eb_config.n_environment_steps}")
-    evolve_logger.info(f"  Improve iterations: perception={eb_config.max_perception_iterations}, qa={eb_config.max_qa_iterations} (schedule or fixed)")
-    evolve_logger.info(f"  Artifact update interval: {eb_config.artifact_update_interval}")
+    evolve_logger.info(
+        f"  Improve iterations: perception={eb_config.max_perception_iterations}, qa={eb_config.max_qa_iterations} (schedule or fixed)"
+    )
+    evolve_logger.info(
+        f"  Artifact update interval: {eb_config.artifact_update_interval}"
+    )
     evolve_logger.info(f"  Improve interval: {eb_config.improve_interval}")
     evolve_logger.info(f"  Experiment interval: {eb_config.experiment_interval}")
     evolve_logger.info(f"  Num questions per gen: {eb_config.num_questions}")
     evolve_logger.info(f"  Max answered QA pairs: {eb_config.max_answered_qa_pairs}")
-    evolve_logger.info(f"  Max unanswered QA pairs: {eb_config.max_unanswered_qa_pairs}")
-    evolve_logger.info(f"  Trim unanswered at selection: {eb_config.trim_unanswered_at_selection}")
-    evolve_logger.info(f"  Question scoring method: {eb_config.question_scoring_method}")
-    evolve_logger.info(f"  Question scoring max concurrent: {eb_config.question_scoring_max_concurrent}")
-    evolve_logger.info(f"  Max steps context chars: {eb_config.max_steps_context_chars}")
+    evolve_logger.info(
+        f"  Max unanswered QA pairs: {eb_config.max_unanswered_qa_pairs}"
+    )
+    evolve_logger.info(
+        f"  Trim unanswered at selection: {eb_config.trim_unanswered_at_selection}"
+    )
+    evolve_logger.info(
+        f"  Question scoring method: {eb_config.question_scoring_method}"
+    )
+    evolve_logger.info(
+        f"  Question scoring max concurrent: {eb_config.question_scoring_max_concurrent}"
+    )
+    evolve_logger.info(
+        f"  Max steps context chars: {eb_config.max_steps_context_chars}"
+    )
     evolve_logger.info(f"  Max images context: {eb_config.max_images_context}")
     evolve_logger.info(f"  Explore temp: {eb_config.explore_temp}")
-    evolve_logger.info(f"  Question gen current-state only: {eb_config.question_gen_current_state_only}")
+    evolve_logger.info("  Question gen trajectory context: enabled")
     evolve_logger.info(f"  Include policy: {eb_config.include_policy}")
     if eb_config.mock_mode:
-        evolve_logger.info(f"  MOCK MODE: enabled — no LLM calls; random actions and artifact perturbations")
+        evolve_logger.info(
+            f"  MOCK MODE: enabled — no LLM calls; random actions and artifact perturbations"
+        )
 
     cumulative_cost = 0.0
     episode_idx = start_episode
@@ -3450,14 +4900,16 @@ def stepwise_eb_learn(
         remaining_steps = eb_config.n_environment_steps - global_steps_used
 
         num_unanswered = sum(1 for q in qa_pairs if q.answer is None)
-        evolve_logger.info(f"\n{'='*80}")
+        evolve_logger.info(f"\n{'=' * 80}")
         evolve_logger.info(
             f"STEPWISE EB-LEARN EPISODE {episode_idx} "
             f"(global steps: {global_steps_used}/{eb_config.n_environment_steps}, "
             f"remaining: {remaining_steps})"
         )
-        evolve_logger.info(f"QA pairs: {len(qa_pairs)} ({num_unanswered} unanswered), Experiment: {current_experiment or 'none'}")
-        evolve_logger.info(f"{'='*80}")
+        evolve_logger.info(
+            f"QA pairs: {len(qa_pairs)} ({num_unanswered} unanswered), Experiment: {current_experiment or 'none'}"
+        )
+        evolve_logger.info(f"{'=' * 80}")
 
         episode_dir = Path(output_dir) / f"episode_{episode_idx}"
         episode_dir.mkdir(parents=True, exist_ok=True)
@@ -3476,37 +4928,43 @@ def stepwise_eb_learn(
             trajectory_buffer,
             past_experiments,
             agent_history_events,
-        ) = (
-            run_stepwise_eb_learn_episode(
-                config=config,
-                eb_config=eb_config,
-                beliefs=beliefs,
-                perception=perception,
-                qa_pairs=qa_pairs,
-                current_experiment=current_experiment,
-                current_experiment_question=current_experiment_question,
-                default_knowledge=default_knowledge,
-                output_dir=str(episode_dir),
-                episode_idx=episode_idx,
-                global_step_start=global_steps_used,
-                max_episode_steps=remaining_steps,
-                trajectory_buffer=trajectory_buffer,
-                past_experiments=past_experiments,
-                agent_history_events=agent_history_events,
-                cumulative_cost_offset=cumulative_cost,
-            )
+            theories,
+        ) = run_stepwise_eb_learn_episode(
+            config=config,
+            eb_config=eb_config,
+            beliefs=beliefs,
+            perception=perception,
+            qa_pairs=qa_pairs,
+            current_experiment=current_experiment,
+            current_experiment_question=current_experiment_question,
+            default_knowledge=default_knowledge,
+            output_dir=str(episode_dir),
+            episode_idx=episode_idx,
+            global_step_start=global_steps_used,
+            max_episode_steps=remaining_steps,
+            trajectory_buffer=trajectory_buffer,
+            past_experiments=past_experiments,
+            agent_history_events=agent_history_events,
+            cumulative_cost_offset=cumulative_cost,
+            theories=theories,
         )
 
         global_steps_used += steps_taken
 
         # Save episode artifacts
         _save_episode_artifacts_eb(
-            episode_dir, beliefs, perception, qa_pairs,
+            episode_dir,
+            beliefs,
+            perception,
+            qa_pairs,
             trajectory_buffer=trajectory_buffer,
             past_experiments=past_experiments,
+            theories=theories,
         )
 
-        episode_cost = episode_log.get("total_cost", 0.0) + episode_log.get("total_learn_cost", 0.0)
+        episode_cost = episode_log.get("total_cost", 0.0) + episode_log.get(
+            "total_learn_cost", 0.0
+        )
         cumulative_cost += episode_cost
         evolve_logger.info(
             f"[g{global_steps_used}] Episode {episode_idx} done — "
@@ -3535,9 +4993,8 @@ def stepwise_eb_learn(
             output_dir=output_dir,
         )
     frozen_eval_envs = eb_config.frozen_eval_envs or [config.envs.names.split("-")[0]]
-    if (
-        eb_config.frozen_eval_after_learn
-        and any(env_name in ("minihack", "arc_agi") for env_name in frozen_eval_envs)
+    if eb_config.frozen_eval_after_learn and any(
+        env_name in ("minihack", "arc_agi") for env_name in frozen_eval_envs
     ):
         run_frozen_environment_evaluation(
             config=config,
@@ -3563,11 +5020,15 @@ def build_stepwise_eb_config(config: DictConfig) -> StepwiseEBLearnConfig:
         n_environment_steps=evolve_cfg.get("n_environment_steps", 100),
         max_perception_iterations=evolve_cfg.get(
             "max_perception_iterations",
-            evolve_cfg.get("max_improve_iterations", evolve_cfg.get("num_improve_iterations", 5)),
+            evolve_cfg.get(
+                "max_improve_iterations", evolve_cfg.get("num_improve_iterations", 5)
+            ),
         ),
         max_qa_iterations=evolve_cfg.get(
             "max_qa_iterations",
-            evolve_cfg.get("max_improve_iterations", evolve_cfg.get("num_improve_iterations", 5)),
+            evolve_cfg.get(
+                "max_improve_iterations", evolve_cfg.get("num_improve_iterations", 5)
+            ),
         ),
         max_qa_per_forward=evolve_cfg.get("max_qa_per_forward", 10),
         max_answered_qa_pairs=evolve_cfg.get(
@@ -3590,12 +5051,43 @@ def build_stepwise_eb_config(config: DictConfig) -> StepwiseEBLearnConfig:
         perception_history_window=evolve_cfg.get("perception_history_window", 10),
         perception_input_tail=evolve_cfg.get("perception_input_tail", 2),
         hide_obs_when_image=evolve_cfg.get("hide_obs_when_image", False),
-        question_gen_current_state_only=evolve_cfg.get("question_gen_current_state_only", False),
+        question_gen_current_state_only=evolve_cfg.get(
+            "question_gen_current_state_only", False
+        ),
         include_policy=evolve_cfg.get("include_policy", True),
-        question_scoring_method=evolve_cfg.get("question_scoring_method", "b_diff_light"),
-        question_scoring_max_concurrent=evolve_cfg.get("question_scoring_max_concurrent", 8),
-        critical_transitions_enabled=evolve_cfg.get("critical_transitions_enabled", False),
-        critical_id_min_for_perception=evolve_cfg.get("critical_id_min_for_perception", 3),
+        perception_enabled=evolve_cfg.get("perception_enabled", True),
+        question_scoring_method=evolve_cfg.get(
+            "question_scoring_method", "b_diff_light"
+        ),
+        question_scoring_max_concurrent=evolve_cfg.get(
+            "question_scoring_max_concurrent", 8
+        ),
+        num_theories=evolve_cfg.get("num_theories", 5),
+        num_crux_questions=evolve_cfg.get("num_crux_questions", 5),
+        num_theory_seed_questions=evolve_cfg.get("num_theory_seed_questions", 0),
+        theory_gen_current_state_only=evolve_cfg.get(
+            "theory_gen_current_state_only", False
+        ),
+        theory_weight_decay=evolve_cfg.get("theory_weight_decay", 0.6),
+        theory_violation_penalty=evolve_cfg.get("theory_violation_penalty", 0.7),
+        theory_min_weight=evolve_cfg.get("theory_min_weight", 0.02),
+        num_candidate_actions=evolve_cfg.get("num_candidate_actions", 4),
+        exploit_enabled=evolve_cfg.get("exploit_enabled", True),
+        exploit_stable_streak=evolve_cfg.get("exploit_stable_streak", 2),
+        exploit_min_theories=evolve_cfg.get("exploit_min_theories", 2),
+        experiment_selection_mode=evolve_cfg.get("experiment_selection_mode", "single"),
+        experiment_scoring_max_concurrent=evolve_cfg.get(
+            "experiment_scoring_max_concurrent", 8
+        ),
+        score_topk_filter_questions=evolve_cfg.get(
+            "score_topk_filter_questions", False
+        ),
+        critical_transitions_enabled=evolve_cfg.get(
+            "critical_transitions_enabled", False
+        ),
+        critical_id_min_for_perception=evolve_cfg.get(
+            "critical_id_min_for_perception", 3
+        ),
         mock_mode=evolve_cfg.get("mock_mode", False),
         frozen_eval_after_learn=evolve_cfg.get("frozen_eval_after_learn", False),
         frozen_eval_envs=(
@@ -3623,7 +5115,12 @@ def build_stepwise_eb_config(config: DictConfig) -> StepwiseEBLearnConfig:
     )
 
 
-@hydra.main(config_path="BALROG/balrog/config", config_name="config", version_base="1.1")
+@hydra.main(
+    config_path="BALROG/balrog/config", config_name="config", version_base="1.1"
+)
+@hydra.main(
+    config_path="BALROG/balrog/config", config_name="config", version_base="1.1"
+)
 def main(config: DictConfig):
     run_name_suffix = f"{config.agent.type}_{config.client.model_id.replace('/', '_')}_stepwise_eb_learn"
 

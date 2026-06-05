@@ -126,11 +126,19 @@ def _compute_rollout_cost(rollout_results: dict[str, dict]) -> float:
     return cost
 
 
-def get_default_knowledge(config: DictConfig) -> str:
+def get_default_knowledge(
+    config: DictConfig, available_actions: list[str] | None = None
+) -> str:
     """Get the default instructions/knowledge for the environment.
 
     Args:
         config: BALROG configuration
+        available_actions: For environments with game-specific action sets
+            (ARC-AGI), the actions actually available in the current game. When
+            omitted the generic full action set is used; callers that have a live
+            env should pass its actions so downstream prompts (experiment
+            generation, question scoring, belief improvement) only reference
+            actions the agent can really take.
 
     Returns:
         String containing default environment instructions/actions. The run-level
@@ -140,7 +148,7 @@ def get_default_knowledge(config: DictConfig) -> str:
 
     if env_name == "arc_agi":
         from arc_agi_prompts import get_arc_instruction_prompt
-        return get_arc_instruction_prompt()
+        return get_arc_instruction_prompt(available_actions)
 
     if env_name == "autumn":
         from autumn_env import INSTRUCTION_PROMPT

@@ -3,27 +3,44 @@
 import asyncio
 import logging
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 
 from omegaconf import DictConfig
 
+from improve import validate_perception_code
+from llm_utils import extract_xml_key
 from mixed_improve import (
     CriticalMoment,
+    QAPair,
+    _action_in_set,
+    _build_execution_report,
     _llm_call,
     _llm_call_conversational,
     _run_perception_on_observation,
-    _action_in_set,
-    process_trajectories,
-    generate_experiments_from_gaps,
-    serialize_moments,
     deserialize_moments,
-    serialize_qa_pairs,
     deserialize_qa_pairs,
-    _build_execution_report,
-    QAPair,
+    generate_experiments_from_gaps,
+    process_trajectories,
+    serialize_moments,
+    serialize_qa_pairs,
 )
-from improve import validate_perception_code
-from llm_utils import extract_xml_key
+
+
+def _updated_beliefs_has_content(updated_beliefs: str | None) -> bool:
+    """True if an extracted <updated_beliefs> block carries real content.
+
+    Guards against the model emitting an empty <world_knowledge></world_knowledge>
+    (e.g. on a follow-up turn when it decides nothing needs changing, or when it
+    restates only a delta) which would otherwise wipe the accumulated beliefs.
+    """
+    if not updated_beliefs or not updated_beliefs.strip():
+        return False
+    wk = extract_xml_key(updated_beliefs, "world_knowledge") or ""
+    policy = extract_xml_key(updated_beliefs, "policy") or ""
+    if wk.strip() or policy.strip():
+        return True
+    # No recognized sections — fall back to any non-tag text remaining.
+    return bool(re.sub(r"<[^>]+>", "", updated_beliefs).strip())
 
 
 @dataclass
@@ -37,8 +54,8 @@ class ForwardResult:
 @dataclass
 class FeedbackResult:
     forward: ForwardResult
-    feedback: str           # explanation of why correct/incorrect
-    verdict: str            # "CORRECT" | "INCORRECT" | "INCONCLUSIVE"
+    feedback: str  # explanation of why correct/incorrect
+    verdict: str  # "CORRECT" | "INCORRECT" | "INCONCLUSIVE"
 
 
 async def _forward_pass_batch(
@@ -92,12 +109,14 @@ For each situation, respond with reasoning and an action in this format:
         else:
             reasoning = ""
             action = "MISSING"
-        results.append(ForwardResult(
-            moment=m,
-            predicted_action=action.strip(),
-            reasoning=reasoning.strip(),
-            perception_output=perc_out,
-        ))
+        results.append(
+            ForwardResult(
+                moment=m,
+                predicted_action=action.strip(),
+                reasoning=reasoning.strip(),
+                perception_output=perc_out,
+            )
+        )
 
     return results, cost
 
@@ -120,23 +139,26 @@ async def forward_pass(
 
     # Pre-compute perception outputs
     perc_outputs = [
-        _run_perception_on_observation(perception, m.raw_observation)
-        for m in moments
+        _run_perception_on_observation(perception, m.raw_observation) for m in moments
     ]
 
     # Split into batches
     batches = []
     for start in range(0, len(moments), max_per_batch):
         end = start + max_per_batch
-        batches.append((
-            moments[start:end],
-            perc_outputs[start:end],
-            start,
-        ))
+        batches.append(
+            (
+                moments[start:end],
+                perc_outputs[start:end],
+                start,
+            )
+        )
 
     # Run batches in parallel
     tasks = [
-        _forward_pass_batch(config, beliefs, perception, batch_moments, batch_perc, offset)
+        _forward_pass_batch(
+            config, beliefs, perception, batch_moments, batch_perc, offset
+        )
         for batch_moments, batch_perc, offset in batches
     ]
     batch_results = await asyncio.gather(*tasks)
@@ -226,11 +248,13 @@ For each situation, respond in this format:
         else:
             verdict = "INCONCLUSIVE"
 
-        results.append(FeedbackResult(
-            forward=fr,
-            feedback=feedback_str.strip(),
-            verdict=verdict,
-        ))
+        results.append(
+            FeedbackResult(
+                forward=fr,
+                feedback=feedback_str.strip(),
+                verdict=verdict,
+            )
+        )
 
     return results, cost, prompt, text
 
@@ -426,31 +450,43 @@ Please fix the error in your perception code.
 
         # Extract beliefs
         updated_beliefs = extract_xml_key(text, "updated_beliefs")
-        if updated_beliefs:
+        if _updated_beliefs_has_content(updated_beliefs):
             new_beliefs = updated_beliefs.strip()
+        elif updated_beliefs:
+            logging.warning(
+                "updated_beliefs block was empty; keeping prior beliefs"
+            )
 
         # Extract perception code
         candidate_perception = extract_xml_key(text, "updated_perception")
         if not candidate_perception:
-            logging.warning(f"Failed to extract updated_perception (attempt {attempt + 1})")
+            logging.warning(
+                f"Failed to extract updated_perception (attempt {attempt + 1})"
+            )
             perception_error = "No <updated_perception> block found in response."
             continue
 
         candidate_perception = candidate_perception.strip()
         # Strip markdown markers
         if candidate_perception.startswith("```python"):
-            candidate_perception = candidate_perception[len("```python"):].strip()
+            candidate_perception = candidate_perception[len("```python") :].strip()
         elif candidate_perception.startswith("```"):
-            candidate_perception = candidate_perception[len("```"):].strip()
+            candidate_perception = candidate_perception[len("```") :].strip()
         if candidate_perception.endswith("```"):
-            candidate_perception = candidate_perception[:-len("```")].strip()
+            candidate_perception = candidate_perception[: -len("```")].strip()
 
         # Validate perception code
-        test_obs = [raw for raw, _ in sample_observations[:3]] if sample_observations else None
-        is_valid, error_msg = validate_perception_code(candidate_perception, test_observations=test_obs)
+        test_obs = (
+            [raw for raw, _ in sample_observations[:3]] if sample_observations else None
+        )
+        is_valid, error_msg = validate_perception_code(
+            candidate_perception, test_observations=test_obs
+        )
         if not is_valid:
             perception_error = error_msg
-            logging.warning(f"Perception code validation failed (attempt {attempt + 1}/{max_retries}): {error_msg}")
+            logging.warning(
+                f"Perception code validation failed (attempt {attempt + 1}/{max_retries}): {error_msg}"
+            )
             continue
 
         # Execution verification: check for output degradation
@@ -472,14 +508,19 @@ Please fix the error in your perception code.
                     )
 
             if degraded_samples:
-                new_report = _build_execution_report(candidate_perception, sample_observations)
+                new_report = _build_execution_report(
+                    candidate_perception, sample_observations
+                )
                 perception_error = (
                     f"Perception output appears degraded on real observations:\n\n"
-                    + "\n\n".join(degraded_samples) + "\n\n"
+                    + "\n\n".join(degraded_samples)
+                    + "\n\n"
                     f"Full execution I/O:\n{new_report}\n\n"
                     f"Please fix the perception code to correctly parse these observations."
                 )
-                logging.warning(f"Perception degradation detected (attempt {attempt + 1}/{max_retries})")
+                logging.warning(
+                    f"Perception degradation detected (attempt {attempt + 1}/{max_retries})"
+                )
                 continue
 
         new_perception = candidate_perception
@@ -487,7 +528,9 @@ Please fix the error in your perception code.
         return new_beliefs, new_perception, total_cost, base_prompt, text
 
     # All retries failed for perception — keep new beliefs but old perception
-    logging.error(f"All {max_retries} attempts to generate valid perception failed. Keeping previous perception.")
+    logging.error(
+        f"All {max_retries} attempts to generate valid perception failed. Keeping previous perception."
+    )
     return new_beliefs, perception, total_cost, base_prompt, text
 
 
@@ -536,23 +579,26 @@ def serialize_feedback_results(results: list[FeedbackResult]) -> list[dict]:
     """Serialize feedback results for JSON storage."""
     serialized = []
     for fr in results:
-        serialized.append({
-            "moment_state": fr.forward.moment.state,
-            "moment_goal": fr.forward.moment.goal,
-            "moment_good_actions": fr.forward.moment.good_actions,
-            "moment_bad_actions": fr.forward.moment.bad_actions,
-            "predicted_action": fr.forward.predicted_action,
-            "reasoning": fr.forward.reasoning,
-            "perception_output": fr.forward.perception_output,
-            "verdict": fr.verdict,
-            "feedback": fr.feedback,
-        })
+        serialized.append(
+            {
+                "moment_state": fr.forward.moment.state,
+                "moment_goal": fr.forward.moment.goal,
+                "moment_good_actions": fr.forward.moment.good_actions,
+                "moment_bad_actions": fr.forward.moment.bad_actions,
+                "predicted_action": fr.forward.predicted_action,
+                "reasoning": fr.forward.reasoning,
+                "perception_output": fr.forward.perception_output,
+                "verdict": fr.verdict,
+                "feedback": fr.feedback,
+            }
+        )
     return serialized
 
 
 # ============================================================
 # Knowledge extraction (QA + moments)
 # ============================================================
+
 
 async def extract_and_consolidate_knowledge(
     config: DictConfig,
@@ -563,9 +609,17 @@ async def extract_and_consolidate_knowledge(
     existing_moments: list[CriticalMoment],
     default_knowledge: str,
     step: int,
-) -> tuple[str, list[list[QAPair]], list[list[CriticalMoment]],
-           list[QAPair], list[CriticalMoment],
-           list[int], list[int], float, list[dict]]:
+) -> tuple[
+    str,
+    list[list[QAPair]],
+    list[list[CriticalMoment]],
+    list[QAPair],
+    list[CriticalMoment],
+    list[int],
+    list[int],
+    float,
+    list[dict],
+]:
     """Extract QA pairs and moments from trajectories and consolidate.
 
     Wraps process_trajectories with use_qa=True, use_moments=True.
@@ -591,6 +645,7 @@ async def extract_and_consolidate_knowledge(
 # ============================================================
 # Summary-based improvement
 # ============================================================
+
 
 async def improve_from_summaries(
     config: DictConfig,
@@ -619,7 +674,7 @@ async def improve_from_summaries(
         for raw_obs, step_num in sample_observations:
             perc_out = _run_perception_on_observation(perception, raw_obs)
             obs_blocks.append(
-                f"<perception_example step=\"{step_num}\">\n"
+                f'<perception_example step="{step_num}">\n'
                 f"<perception_input>\n{raw_obs}\n</perception_input>\n"
                 f"<perception_output>\n{perc_out if perc_out else '(empty)'}\n</perception_output>\n"
                 f"</perception_example>"
@@ -696,7 +751,11 @@ def perceive(observation_text: str) -> str:
 </updated_perception>"""
 
     return await _improve_with_perception_validation(
-        config, beliefs, perception, base_prompt, sample_observations,
+        config,
+        beliefs,
+        perception,
+        base_prompt,
+        sample_observations,
     )
 
 
@@ -704,18 +763,19 @@ def perceive(observation_text: str) -> str:
 # QA-based improvement
 # ============================================================
 
+
 @dataclass
 class QAForwardResult:
     qa_pair: QAPair
-    predicted_answer: str   # "YES" or "NO"
+    predicted_answer: str  # "YES" or "NO"
     reasoning: str
 
 
 @dataclass
 class QAFeedbackResult:
     forward: QAForwardResult
-    feedback: str           # explanation of why correct/incorrect
-    verdict: str            # "CORRECT" | "INCORRECT" | "INCONCLUSIVE"
+    feedback: str  # explanation of why correct/incorrect
+    verdict: str  # "CORRECT" | "INCORRECT" | "INCONCLUSIVE"
 
 
 def _extract_tag_attr(attrs: str, name: str) -> str | None:
@@ -866,11 +926,13 @@ For each question Qn (e.g. Q1, Q2, ...), respond in this format:
         else:
             predicted = "MISSING"
 
-        results.append(QAForwardResult(
-            qa_pair=qa,
-            predicted_answer=predicted,
-            reasoning=reasoning.strip(),
-        ))
+        results.append(
+            QAForwardResult(
+                qa_pair=qa,
+                predicted_answer=predicted,
+                reasoning=reasoning.strip(),
+            )
+        )
 
     return results, cost, prompt, text
 
@@ -930,7 +992,7 @@ async def _qa_feedback_batch(
         )
     items_text = "\n\n".join(item_blocks)
 
-    prompt = f"""You are evaluating whether an agent's predicted answers to questions about an environment are correct.
+    prompt = f"""You are evaluating whether predicted answers to questions about an environment are correct.
 
 For each question below, you are given:
 - The question about the environment
@@ -997,11 +1059,13 @@ For each question Qn (e.g. Q1, Q2, ...), respond in this format:
         else:
             verdict = "INCONCLUSIVE"
 
-        results.append(QAFeedbackResult(
-            forward=fr,
-            feedback=feedback_str.strip(),
-            verdict=verdict,
-        ))
+        results.append(
+            QAFeedbackResult(
+                forward=fr,
+                feedback=feedback_str.strip(),
+                verdict=verdict,
+            )
+        )
 
     return results, cost, prompt, text
 
@@ -1122,13 +1186,18 @@ def perceive(observation_text: str) -> str:
 </updated_perception>"""
 
     return await _improve_with_perception_validation(
-        config, beliefs, perception, base_prompt, sample_observations,
+        config,
+        beliefs,
+        perception,
+        base_prompt,
+        sample_observations,
     )
 
 
 # ============================================================
 # Shared perception validation helper
 # ============================================================
+
 
 async def _improve_with_perception_validation(
     config: DictConfig,
@@ -1168,30 +1237,42 @@ Please fix the error in your perception code.
 
         # Extract beliefs
         updated_beliefs = extract_xml_key(text, "updated_beliefs")
-        if updated_beliefs:
+        if _updated_beliefs_has_content(updated_beliefs):
             new_beliefs = updated_beliefs.strip()
+        elif updated_beliefs:
+            logging.warning(
+                "updated_beliefs block was empty; keeping prior beliefs"
+            )
 
         # Extract perception code
         candidate_perception = extract_xml_key(text, "updated_perception")
         if not candidate_perception:
-            logging.warning(f"Failed to extract updated_perception (attempt {attempt + 1})")
+            logging.warning(
+                f"Failed to extract updated_perception (attempt {attempt + 1})"
+            )
             perception_error = "No <updated_perception> block found in response."
             continue
 
         candidate_perception = candidate_perception.strip()
         if candidate_perception.startswith("```python"):
-            candidate_perception = candidate_perception[len("```python"):].strip()
+            candidate_perception = candidate_perception[len("```python") :].strip()
         elif candidate_perception.startswith("```"):
-            candidate_perception = candidate_perception[len("```"):].strip()
+            candidate_perception = candidate_perception[len("```") :].strip()
         if candidate_perception.endswith("```"):
-            candidate_perception = candidate_perception[:-len("```")].strip()
+            candidate_perception = candidate_perception[: -len("```")].strip()
 
         # Validate perception code
-        test_obs = [raw for raw, _ in sample_observations[:3]] if sample_observations else None
-        is_valid, error_msg = validate_perception_code(candidate_perception, test_observations=test_obs)
+        test_obs = (
+            [raw for raw, _ in sample_observations[:3]] if sample_observations else None
+        )
+        is_valid, error_msg = validate_perception_code(
+            candidate_perception, test_observations=test_obs
+        )
         if not is_valid:
             perception_error = error_msg
-            logging.warning(f"Perception code validation failed (attempt {attempt + 1}/{max_retries}): {error_msg}")
+            logging.warning(
+                f"Perception code validation failed (attempt {attempt + 1}/{max_retries}): {error_msg}"
+            )
             continue
 
         # Execution verification: check for output degradation
@@ -1209,21 +1290,28 @@ Please fix the error in your perception code.
                     )
 
             if degraded_samples:
-                new_report = _build_execution_report(candidate_perception, sample_observations)
+                new_report = _build_execution_report(
+                    candidate_perception, sample_observations
+                )
                 perception_error = (
                     f"Perception output appears degraded on real observations:\n\n"
-                    + "\n\n".join(degraded_samples) + "\n\n"
+                    + "\n\n".join(degraded_samples)
+                    + "\n\n"
                     f"Full execution I/O:\n{new_report}\n\n"
                     f"Please fix the perception code to correctly parse these observations."
                 )
-                logging.warning(f"Perception degradation detected (attempt {attempt + 1}/{max_retries})")
+                logging.warning(
+                    f"Perception degradation detected (attempt {attempt + 1}/{max_retries})"
+                )
                 continue
 
         new_perception = candidate_perception
         logging.info(f"Perception code validated successfully on attempt {attempt + 1}")
         return new_beliefs, new_perception, total_cost, base_prompt, text
 
-    logging.error(f"All {max_retries} attempts to generate valid perception failed. Keeping previous perception.")
+    logging.error(
+        f"All {max_retries} attempts to generate valid perception failed. Keeping previous perception."
+    )
     return new_beliefs, perception, total_cost, base_prompt, text
 
 
@@ -1258,6 +1346,7 @@ async def _improve_with_perception_validation_conversational(
     sample_histories: list[list[str]] | None = None,
     history_window: int | None = None,
     allow_keep_perception: bool = False,
+    extraction_mode: str = "full",
 ) -> tuple[str, str, float, list[dict], str, str | None]:
     """Run an improve prompt with perception validation using multi-turn conversation.
 
@@ -1277,10 +1366,19 @@ async def _improve_with_perception_validation_conversational(
     ``<updated_perception>`` or set it to ``KEEP_UNCHANGED``. In that case the
     current perception module is preserved without a retry.
 
+    ``extraction_mode`` controls how the ``<updated_perception>`` block is
+    interpreted:
+      - ``"full"`` (default): the block contains complete Python source for the
+        perceive module.
+      - ``"diff"``: the block contains a unified diff to apply to the current
+        perception. If the block instead contains a full ``def perceive`` (no
+        ``@@`` hunk headers), it is treated as a full replacement.
+
     Returns: (new_beliefs, new_perception, total_cost, updated_history, llm_response,
              validation_error). validation_error is None on success, or the last
              error message when all retries failed and perception was reverted.
     """
+    from diff_utils import apply_unified_diff, looks_like_unified_diff, strip_code_fences
     from mixed_improve import _run_perception_on_history
 
     perception_error = None
@@ -1319,22 +1417,33 @@ async def _improve_with_perception_validation_conversational(
         turn_images = initial_images if attempt == 0 else None
 
         text, cost, current_history = await _llm_call_conversational(
-            config, current_history, current_message, images=turn_images,
+            config,
+            current_history,
+            current_message,
+            images=turn_images,
         )
         total_cost += cost
 
         # Extract beliefs
         updated_beliefs = extract_xml_key(text, "updated_beliefs")
-        if updated_beliefs:
+        if _updated_beliefs_has_content(updated_beliefs):
             new_beliefs = updated_beliefs.strip()
+        elif updated_beliefs:
+            logging.warning(
+                "updated_beliefs block was empty; keeping prior beliefs"
+            )
 
         # Extract perception code
         candidate_perception = extract_xml_key(text, "updated_perception")
         if not candidate_perception:
             if allow_keep_perception:
-                logging.info("No updated_perception provided; keeping existing perception module")
+                logging.info(
+                    "No updated_perception provided; keeping existing perception module"
+                )
                 return new_beliefs, perception, total_cost, current_history, text, None
-            logging.warning(f"Failed to extract updated_perception (attempt {attempt + 1})")
+            logging.warning(
+                f"Failed to extract updated_perception (attempt {attempt + 1})"
+            )
             perception_error = "No <updated_perception> block found in response."
             continue
 
@@ -1344,26 +1453,58 @@ async def _improve_with_perception_validation_conversational(
             "UNCHANGED",
             "NO_CHANGE",
         }:
-            logging.info("LLM requested KEEP_UNCHANGED; keeping existing perception module")
+            logging.info(
+                "LLM requested KEEP_UNCHANGED; keeping existing perception module"
+            )
             return new_beliefs, perception, total_cost, current_history, text, None
 
-        if candidate_perception.startswith("```python"):
-            candidate_perception = candidate_perception[len("```python"):].strip()
-        elif candidate_perception.startswith("```"):
-            candidate_perception = candidate_perception[len("```"):].strip()
-        if candidate_perception.endswith("```"):
-            candidate_perception = candidate_perception[:-len("```")].strip()
+        candidate_perception = strip_code_fences(candidate_perception)
         if allow_keep_perception and candidate_perception.strip().upper() in {
             "KEEP_UNCHANGED",
             "UNCHANGED",
             "NO_CHANGE",
         }:
-            logging.info("LLM requested KEEP_UNCHANGED; keeping existing perception module")
+            logging.info(
+                "LLM requested KEEP_UNCHANGED; keeping existing perception module"
+            )
             return new_beliefs, perception, total_cost, current_history, text, None
 
+        if extraction_mode == "diff":
+            if looks_like_unified_diff(candidate_perception):
+                if not perception.strip():
+                    perception_error = (
+                        "Cannot apply a diff because there is no existing "
+                        "perception module yet. Please provide the full "
+                        "perception code in a ```python ... ``` block instead "
+                        "of a unified diff."
+                    )
+                    logging.warning(
+                        f"Diff supplied but base perception is empty (attempt {attempt + 1}/{max_retries})"
+                    )
+                    continue
+                applied, diff_err = apply_unified_diff(
+                    perception, candidate_perception
+                )
+                if applied is None:
+                    perception_error = (
+                        f"Could not apply your perception diff: {diff_err}"
+                    )
+                    logging.warning(
+                        f"Diff application failed (attempt {attempt + 1}/{max_retries}): {diff_err}"
+                    )
+                    continue
+                candidate_perception = applied
+            # else: treat as full code (escape hatch / first-time path)
+
         # Validate perception code using the same inputs shown in the prompt.
-        test_obs = [raw for raw, _ in sample_observations[:3]] if sample_observations else None
-        test_hists = [sample_histories[i] for i in range(min(3, len(sample_histories)))] if use_history else None
+        test_obs = (
+            [raw for raw, _ in sample_observations[:3]] if sample_observations else None
+        )
+        test_hists = (
+            [sample_histories[i] for i in range(min(3, len(sample_histories)))]
+            if use_history
+            else None
+        )
         is_valid, error_msg = validate_perception_code(
             candidate_perception,
             test_observations=test_obs,
@@ -1372,7 +1513,9 @@ async def _improve_with_perception_validation_conversational(
         )
         if not is_valid:
             perception_error = error_msg
-            logging.warning(f"Perception code validation failed (attempt {attempt + 1}/{max_retries}): {error_msg}")
+            logging.warning(
+                f"Perception code validation failed (attempt {attempt + 1}/{max_retries}): {error_msg}"
+            )
             continue
 
         # Execution verification: check for output degradation using the same
@@ -1382,10 +1525,14 @@ async def _improve_with_perception_validation_conversational(
             for idx, (raw_obs, step_num) in enumerate(sample_observations[:3]):
                 if use_history:
                     new_out = _run_perception_on_history(
-                        candidate_perception, sample_histories[idx], history_window,
+                        candidate_perception,
+                        sample_histories[idx],
+                        history_window,
                     )
                 else:
-                    new_out = _run_perception_on_observation(candidate_perception, raw_obs)
+                    new_out = _run_perception_on_observation(
+                        candidate_perception, raw_obs
+                    )
                 raw_has_map = "map:" in raw_obs and len(raw_obs) > 500
                 new_line_count = len(new_out.strip().splitlines()) if new_out else 0
                 if raw_has_map and new_line_count <= 3:
@@ -1396,21 +1543,28 @@ async def _improve_with_perception_validation_conversational(
                     )
 
             if degraded_samples:
-                new_report = _build_execution_report(candidate_perception, sample_observations)
+                new_report = _build_execution_report(
+                    candidate_perception, sample_observations
+                )
                 perception_error = (
                     f"Perception output appears degraded on real observations:\n\n"
-                    + "\n\n".join(degraded_samples) + "\n\n"
+                    + "\n\n".join(degraded_samples)
+                    + "\n\n"
                     f"Full execution I/O:\n{new_report}\n\n"
                     f"Please fix the perception code to correctly parse these observations."
                 )
-                logging.warning(f"Perception degradation detected (attempt {attempt + 1}/{max_retries})")
+                logging.warning(
+                    f"Perception degradation detected (attempt {attempt + 1}/{max_retries})"
+                )
                 continue
 
         new_perception = candidate_perception
         logging.info(f"Perception code validated successfully on attempt {attempt + 1}")
         return new_beliefs, new_perception, total_cost, current_history, text, None
 
-    logging.error(f"All {max_retries} attempts to generate valid perception failed. Keeping previous perception.")
+    logging.error(
+        f"All {max_retries} attempts to generate valid perception failed. Keeping previous perception."
+    )
     return new_beliefs, perception, total_cost, current_history, text, perception_error
 
 
@@ -1429,11 +1583,20 @@ async def _improve_beliefs_only_conversational(
     Returns: (new_beliefs, total_cost, updated_history, llm_response)
     """
     text, cost, current_history = await _llm_call_conversational(
-        config, conversation_history, user_message, images=images,
+        config,
+        conversation_history,
+        user_message,
+        images=images,
     )
 
     updated_beliefs = extract_xml_key(text, "updated_beliefs")
-    new_beliefs = updated_beliefs.strip() if updated_beliefs else beliefs
+    if _updated_beliefs_has_content(updated_beliefs):
+        new_beliefs = updated_beliefs.strip()
+    else:
+        logging.warning(
+            "updated_beliefs block was empty/missing; keeping prior beliefs"
+        )
+        new_beliefs = beliefs
 
     return new_beliefs, cost, current_history, text
 
@@ -1442,13 +1605,15 @@ def serialize_qa_feedback_results(results: list[QAFeedbackResult]) -> list[dict]
     """Serialize QA feedback results for JSON storage."""
     serialized = []
     for fr in results:
-        serialized.append({
-            "question": fr.forward.qa_pair.question,
-            "correct_answer": "YES" if fr.forward.qa_pair.answer else "NO",
-            "evidence": fr.forward.qa_pair.evidence,
-            "predicted_answer": fr.forward.predicted_answer,
-            "reasoning": fr.forward.reasoning,
-            "verdict": fr.verdict,
-            "feedback": fr.feedback,
-        })
+        serialized.append(
+            {
+                "question": fr.forward.qa_pair.question,
+                "correct_answer": "YES" if fr.forward.qa_pair.answer else "NO",
+                "evidence": fr.forward.qa_pair.evidence,
+                "predicted_answer": fr.forward.predicted_answer,
+                "reasoning": fr.forward.reasoning,
+                "verdict": fr.verdict,
+                "feedback": fr.feedback,
+            }
+        )
     return serialized

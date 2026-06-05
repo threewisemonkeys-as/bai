@@ -4,22 +4,13 @@ from __future__ import annotations
 
 from omegaconf import DictConfig, OmegaConf
 
-
-AGENT_GOAL_PERFORMANCE = "Your goal is to get as far as possible in the game."
-AGENT_GOAL_DYNAMICS = (
-    "Your goal is to understand how the environment works."
-)
+AGENT_GOAL_PERFORMANCE = "Your goal is to progress as much as possible in the game."
+AGENT_GOAL_DYNAMICS = "Your goal is to understand how the environment works."
 
 # TODO: customize these env-specific eval goals. Used by ExploreEval phase 2.
-AGENT_GOAL_MINIHACK_EVAL = (
-    "Your goal is to reach the stairs down ('>')"
-)
-AGENT_GOAL_ARC_AGI_EVAL = (
-    "Your goal is to get as far as possible in the game."
-)
-AGENT_GOAL_AUTUMN_EVAL = (
-    "You are shown the current state grid and target goal grid. Your task is to execute actions that transform the current state to the goal state."
-)
+AGENT_GOAL_MINIHACK_EVAL = "Your goal is to reach the stairs down ('>')"
+AGENT_GOAL_ARC_AGI_EVAL = "Your goal is to progress as much as possible in the game."
+AGENT_GOAL_AUTUMN_EVAL = "You are shown the current state grid and target goal grid. Your task is to execute actions that transform the current state to the goal state."
 
 AGENT_GOAL_TEXTS = {
     "performance": AGENT_GOAL_PERFORMANCE,

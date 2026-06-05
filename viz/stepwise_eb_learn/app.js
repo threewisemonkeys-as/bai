@@ -19,6 +19,7 @@ if (VIEWER_CONFIG.dataIndexPath && !/^https?:\/\//.test(VIEWER_CONFIG.dataIndexP
 const TABS = [
   ["overview", "Overview"],
   ["experiments", "Questions & Experiments"],
+  ["theories", "Theories"],
   ["agent_messages", "Agent Messages"],
   ["artifacts", "Artifacts"],
   ["feedback", "Feedback"],
@@ -48,8 +49,17 @@ function isEBRun() {
   );
 }
 
+// The Theories tab is meaningful only for Plan B (theory_entropy) runs, which
+// write theory_log.json per step. Hidden otherwise.
+function hasTheoryData() {
+  if (!DATA || !Array.isArray(DATA.steps)) return false;
+  return DATA.steps.some((s) => s.has_theory_log);
+}
+
 function visibleTabs() {
-  return isEBRun() ? TABS : TABS.filter((t) => !EB_ONLY_TABS.has(t[0]));
+  let tabs = isEBRun() ? TABS : TABS.filter((t) => !EB_ONLY_TABS.has(t[0]));
+  if (!hasTheoryData()) tabs = tabs.filter((t) => t[0] !== "theories");
+  return tabs;
 }
 
 function currentParams() {
@@ -113,6 +123,74 @@ function collapsible(title, content, open) {
   return '<div class="card"><div class="card-header" onclick="toggleCard(this)">' + title +
     ' <span class="toggle">' + (open ? "&#9660;" : "&#9654;") + '</span></div>' +
     '<div class="card-body ' + (open ? "" : "collapsed") + '">' + content + "</div></div>";
+}
+
+// Render a unified-diff payload (with or without ```diff fences) as a colored
+// per-line block: `@@` headers in accent, `+` lines green, `-` lines red.
+function renderUnifiedDiffPayload(diffText) {
+  let body = (diffText || "").trim();
+  body = body.replace(/^```(?:diff|patch)?\s*\n?/i, "").replace(/\n?```\s*$/, "");
+  const lines = body.split("\n");
+  let html = '<div style="font-family:var(--font-mono);font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;overflow-x:auto;white-space:pre;line-height:1.5">';
+  for (const line of lines) {
+    let style;
+    if (line.startsWith("@@")) {
+      style = "color:var(--accent3);font-weight:600";
+    } else if (line.startsWith("+++") || line.startsWith("---")) {
+      style = "color:var(--text-muted)";
+    } else if (line.charAt(0) === "+") {
+      style = "color:#56d364;background:rgba(63,185,80,0.10)";
+    } else if (line.charAt(0) === "-") {
+      style = "color:#f85149;background:rgba(248,81,73,0.10)";
+    } else {
+      style = "color:var(--text)";
+    }
+    html += '<div style="' + style + '">' + esc(line || " ") + "</div>";
+  }
+  html += "</div>";
+  return html;
+}
+
+// Render an LLM response, special-casing <updated_perception>...</updated_perception>
+// when its body looks like a unified diff. Other text is rendered as a normal <pre>.
+function renderResponseBody(response) {
+  const fallback = '<pre style="max-height:400px;margin:0;border:none;padding:0;background:transparent">' + esc(response || "") + "</pre>";
+  if (!response) return fallback;
+  const upRe = /<updated_perception>([\s\S]*?)<\/updated_perception>/;
+  const m = upRe.exec(response);
+  if (!m) return fallback;
+  const inner = m[1] || "";
+  const isDiff = /```diff/i.test(inner) || /(^|\n)\s*@@[^\n]*@@/.test(inner);
+  if (!isDiff) return fallback;
+  const before = response.substring(0, m.index);
+  const after = response.substring(m.index + m[0].length);
+  let html = "";
+  if (before.trim()) {
+    html += '<pre style="max-height:none;margin:0 0 6px 0;border:none;padding:0;background:transparent">' + esc(before) + "</pre>";
+  }
+  html += '<div style="font-size:10px;text-transform:uppercase;color:var(--accent3);margin:4px 0;font-weight:600">&lt;updated_perception&gt; (unified diff)</div>';
+  html += renderUnifiedDiffPayload(inner);
+  if (after.trim()) {
+    html += '<pre style="max-height:none;margin:6px 0 0 0;border:none;padding:0;background:transparent">' + esc(after) + "</pre>";
+  }
+  return html;
+}
+
+// Render a small validated/rejected/changed badge for a Track 1b/Track 2 turn.
+// Returns empty string when the turn was logged before the diff-mode rollout
+// (legacy turns don't carry `validated`).
+function validationBadgesHtml(turn) {
+  if (!turn || turn.validated === undefined || turn.validated === null) return "";
+  if (turn.validated) {
+    const changedTxt = turn.perception_changed ? "perception updated" : "no change";
+    return '<span style="background:rgba(63,185,80,0.15);color:var(--accent2);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-left:6px" title="Perception code validated successfully">VALIDATED · ' +
+      esc(changedTxt) + "</span>";
+  }
+  const errFull = turn.validation_error || "";
+  const errShort = errFull.split("\n")[0].slice(0, 80);
+  return '<span title="' + esc(errFull) +
+    '" style="background:rgba(248,81,73,0.15);color:var(--danger);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-left:6px">REJECTED' +
+    (errShort ? " · " + esc(errShort) : "") + "</span>";
 }
 
 function promptResponseBlock(label, prompt, response, imageOpts) {
@@ -853,6 +931,7 @@ function renderStep(idx) {
   if (currentTab === "overview") loadStepDetailForTab(step.episode_idx, step.step, "overview", step);
   else if (currentTab === "artifacts") loadStepDetailForTab(step.episode_idx, step.step, "artifacts");
   else if (currentTab === "experiments") loadStepDetailForTab(step.episode_idx, step.step, "experiments");
+  else if (currentTab === "theories") loadStepDetailForTab(step.episode_idx, step.step, "theories");
   else if (currentTab === "feedback") loadStepDetailForTab(step.episode_idx, step.step, "feedback");
   else if (currentTab === "agent_messages") loadStepDetailForTab(step.episode_idx, step.step, "agent_messages");
   else if (currentTab === "trajectory") loadTrajectory(step.episode_idx, step.step);
@@ -878,6 +957,7 @@ async function loadStepDetailForTab(epIdx, stepIdx, tab, stepOverview) {
   if (tab === "overview") renderOverview(data, stepOverview);
   else if (tab === "artifacts") renderArtifacts(data);
   else if (tab === "experiments") renderExperiments(data);
+  else if (tab === "theories") renderTheories(data);
   else if (tab === "feedback") renderFeedback(data);
   else if (tab === "agent_messages") renderAgentMessages(data);
   else if (tab === "logs") renderLogs(data);
@@ -1251,6 +1331,7 @@ function renderExperimentSelectionScoring(data) {
   let html = "";
   html += renderScoringArtifact("Online Scoring (full)", artifacts.online_full);
   html += renderScoringArtifact("Online Scoring (light)", artifacts.online_light);
+  html += renderScoringArtifact("Online Scoring (theory-entropy)", artifacts.online_theory_entropy);
   if (html) return html;
 
   const qSelectLog = data.question_selection_log || {};
@@ -1271,6 +1352,117 @@ function renderExperimentSelectionScoring(data) {
     selectionHtml += promptResponseBlock("Probe Selection", selectionLog.prompt, selectionLog.response);
   }
   return selectionHtml;
+}
+
+function experimentScoringLog(data) {
+  const direct = data.experiment_scoring_log;
+  if (direct && typeof direct === "object" && Object.keys(direct).length > 0) return direct;
+  const expLog = data.experiment_log || {};
+  const nested = expLog.experiment_scoring;
+  if (nested && typeof nested === "object" && Object.keys(nested).length > 0) return nested;
+  return null;
+}
+
+function sourceIndexLabel(idx) {
+  return idx != null ? "Q" + (idx + 1) : "";
+}
+
+function renderSourceQuestionCoverage(indices, qaBank) {
+  if (!Array.isArray(indices) || indices.length === 0) {
+    return '<div style="color:var(--text-muted)">No YES-covered questions recorded.</div>';
+  }
+  let html = '<table class="data-table"><tr><th>Bank #</th><th>Question</th><th>Src Step</th></tr>';
+  indices.forEach((idx) => {
+    const qa = Array.isArray(qaBank) && Number.isInteger(idx) ? qaBank[idx] : null;
+    html += '<tr><td>' + esc(sourceIndexLabel(idx)) + '</td><td style="max-width:520px">' +
+      esc((qa && qa.question) || "") + '</td><td>' + esc(qa && qa.source_step) + "</td></tr>";
+  });
+  html += "</table>";
+  return html;
+}
+
+function renderExperimentCandidateScoring(data) {
+  const scoreLog = experimentScoringLog(data);
+  if (!scoreLog || scoreLog.mode !== "score_topk") return "";
+
+  const expLog = data.experiment_log || {};
+  const qaBank = expLog.qa_pairs_at_formulation || data.qa_pairs || [];
+  const candidates = Array.isArray(scoreLog.candidates) ? scoreLog.candidates : [];
+  const winnerIndex = scoreLog.winner_index;
+
+  let html = '<table class="data-table" style="margin-bottom:12px">';
+  html += '<tr><th style="width:220px">Mode</th><td>' + esc(scoreLog.mode) + "</td></tr>";
+  html += '<tr><th>Candidates Scored</th><td>' + candidates.length + "</td></tr>";
+  if (scoreLog.topk_unanswered_source_indices) html += '<tr><th>Fresh Candidate Targets</th><td>' + scoreLog.topk_unanswered_source_indices.map(sourceIndexLabel).join(", ") + "</td></tr>";
+  if (scoreLog.unanswered_pool_source_indices) html += '<tr><th>Scored Against Pool</th><td>' + scoreLog.unanswered_pool_source_indices.length + " unanswered questions</td></tr>";
+  if (scoreLog.winner_kind) html += '<tr><th>Winner</th><td><strong style="color:var(--accent2)">' + esc(scoreLog.winner_kind) + "</strong>" +
+    (scoreLog.winner_source_index != null ? " / bank " + esc(sourceIndexLabel(scoreLog.winner_source_index)) : "") +
+    (scoreLog.winner_score != null ? " / score " + Number(scoreLog.winner_score || 0).toFixed(0) : "") + "</td></tr>";
+  if (scoreLog.total_cost != null) html += '<tr><th>Candidate Formulation + Scoring Cost</th><td style="font-family:var(--font-mono)">$' + Number(scoreLog.total_cost || 0).toFixed(4) + "</td></tr>";
+  html += "</table>";
+
+  if (!candidates.length) {
+    html += '<div style="color:var(--text-muted)">No candidate experiments recorded.</div>';
+    return html;
+  }
+
+  const sharedScorePrompt = candidates.map((c) => c && c.score_prompt).find((p) => p) || "";
+  const sharedScoreResponse = candidates.map((c) => c && c.score_response).find((r) => r) || "";
+  if (sharedScorePrompt || sharedScoreResponse) {
+    html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">All candidates are scored in one unified LLM call against the unanswered question pool — the prompt/response below is shared across every candidate.</div>';
+    html += promptResponseBlock("YES Coverage Scoring (shared)", sharedScorePrompt, sharedScoreResponse);
+  }
+
+  html += '<table class="data-table" style="margin-bottom:12px"><tr><th></th><th>Kind</th><th>Bank #</th><th>Top-k Rank</th><th>Score</th><th>YES Coverage</th><th>Cost</th><th>Question</th></tr>';
+  candidates.forEach((cand, idx) => {
+    const isWinner = idx === winnerIndex;
+    const yesCount = Array.isArray(cand.per_question_yes_source_indices) ? cand.per_question_yes_source_indices.length : 0;
+    const cost = Number(cand.formulation_cost || 0) + Number(cand.score_cost || 0);
+    html += '<tr style="' + (isWinner ? "background:rgba(63,185,80,0.08)" : "") + '">' +
+      '<td>' + (isWinner ? '<span class="verdict verdict-correct">winner</span>' : "") + '</td>' +
+      '<td>' + esc(cand.kind || "") + '</td>' +
+      '<td>' + esc(sourceIndexLabel(cand.source_index)) + '</td>' +
+      '<td>' + (cand.topk_rank != null ? cand.topk_rank + 1 : "") + '</td>' +
+      '<td style="font-family:var(--font-mono)">' + Number(cand.score || 0).toFixed(0) + '</td>' +
+      '<td>' + yesCount + '</td>' +
+      '<td style="font-family:var(--font-mono)">$' + cost.toFixed(4) + '</td>' +
+      '<td style="max-width:420px">' + esc(cand.question || "") + "</td></tr>";
+  });
+  html += "</table>";
+
+  candidates.forEach((cand, idx) => {
+    const isWinner = idx === winnerIndex;
+    let candHtml = "";
+    candHtml += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' +
+      "kind: " + esc(cand.kind || "") +
+      (cand.source_index != null ? " | bank " + esc(sourceIndexLabel(cand.source_index)) : "") +
+      (cand.topk_rank != null ? " | top-k rank " + (cand.topk_rank + 1) : "") +
+      " | score " + Number(cand.score || 0).toFixed(0) +
+      " | cost $" + (Number(cand.formulation_cost || 0) + Number(cand.score_cost || 0)).toFixed(4) +
+      "</div>";
+    if (cand.question) {
+      candHtml += '<div style="font-size:12px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;margin-bottom:8px">' +
+        '<strong style="color:var(--accent3)">Question:</strong> ' + esc(cand.question) + "</div>";
+    }
+    candHtml += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin:12px 0 6px">Plan</div>';
+    candHtml += '<pre style="max-height:none">' + esc(cand.plan || "") + "</pre>";
+    candHtml += collapsible(
+      "YES Coverage (" + (Array.isArray(cand.per_question_yes_source_indices) ? cand.per_question_yes_source_indices.length : 0) + ")",
+      renderSourceQuestionCoverage(cand.per_question_yes_source_indices, qaBank),
+      true,
+    );
+    candHtml += promptResponseBlock("Candidate Formulation", cand.formulation_prompt, cand.formulation_response);
+
+    html += collapsible(
+      (isWinner ? "Winning Candidate: " : "Candidate " + (idx + 1) + ": ") +
+        esc(cand.kind || "candidate") +
+        (cand.source_index != null ? " " + esc(sourceIndexLabel(cand.source_index)) : ""),
+      candHtml,
+      isWinner,
+    );
+  });
+
+  return html;
 }
 
 function parseQuestionBlockFromPrompt(prompt) {
@@ -1305,6 +1497,45 @@ function filterDroppedQuestions(items, droppedIndices) {
   return items.filter((item, idx) => !dropped.has(item.original_index != null ? item.original_index : idx));
 }
 
+function afterDedupQuestionsFromLog(items, dedupLog) {
+  if (!Array.isArray(items) || !items.length) return [];
+  const log = dedupLog || {};
+  const dropped = new Set(Array.isArray(log.dropped_indices) ? log.dropped_indices : []);
+  const replacementsByFirstIndex = new Map();
+  const groups = Array.isArray(log.replacement_groups) ? log.replacement_groups : [];
+
+  groups.forEach((group) => {
+    const memberIndices = Array.isArray(group.member_indices)
+      ? group.member_indices.filter((idx) => Number.isInteger(idx))
+      : [];
+    if (!memberIndices.length) return;
+    replacementsByFirstIndex.set(Math.min(...memberIndices), {
+      replacement_question: group.replacement_question || "",
+      member_questions: Array.isArray(group.member_questions) ? group.member_questions : [],
+      member_indices: memberIndices,
+      answer_preserved: group.answer_preserved,
+    });
+  });
+
+  return items
+    .map((item, idx) => {
+      const originalIndex = item.original_index != null ? item.original_index : idx;
+      if (dropped.has(originalIndex)) return null;
+      const replacement = replacementsByFirstIndex.get(originalIndex);
+      if (!replacement) return item;
+      const replacementQuestion = replacement.replacement_question || item.question || "";
+      return {
+        ...item,
+        question: replacementQuestion,
+        retained_original_question: item.question || "",
+        dedup_member_questions: replacement.member_questions,
+        dedup_member_indices: replacement.member_indices,
+        dedup_answer_preserved: replacement.answer_preserved,
+      };
+    })
+    .filter(Boolean);
+}
+
 function questionItemsFromIndices(items, indices) {
   if (!Array.isArray(items) || !items.length || !Array.isArray(indices)) return [];
   return indices
@@ -1313,6 +1544,62 @@ function questionItemsFromIndices(items, indices) {
       return items[idx];
     })
     .filter(Boolean);
+}
+
+function answerLabelForQuestion(item) {
+  if (!item || item.answer === null || item.answer === undefined) return "UNANSWERED";
+  if (item.answer === true) return "YES";
+  if (item.answer === false) return "NO";
+  return String(item.answer || "UNANSWERED");
+}
+
+function topKQuestionLines(items, indices) {
+  if (!Array.isArray(items) || !Array.isArray(indices)) return "";
+  return indices
+    .map((idx) => {
+      if (!Number.isInteger(idx)) return null;
+      const item = items[idx];
+      if (!item) return null;
+      return "Q" + (idx + 1) + ": " + (item.question || "") + " -> " + answerLabelForQuestion(item);
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function renderTopKPromptResponse(selectionLog, candidateQuestions) {
+  const log = selectionLog || {};
+  if (log.prompt || log.response) {
+    return promptResponseBlock("Top-k Selection", log.prompt, log.response);
+  }
+
+  const candidateIndices = Array.isArray(log.candidate_source_indices) ? log.candidate_source_indices : [];
+  const selectedIndices = Array.isArray(log.selected_source_indices) ? log.selected_source_indices : [];
+  const candidateText = topKQuestionLines(candidateQuestions, candidateIndices);
+  const selectedText = selectedIndices.length
+    ? selectedIndices.map((idx) => '<q n="Q' + (idx + 1) + '" />').join("\n")
+    : "NONE";
+
+  const prompt = [
+    "No LLM prompt was sent for this top-k selection.",
+    "",
+    "Reason: " + (log.note || "selection was resolved without an LLM call"),
+    "Unanswered questions: " + (log.pre_selection_unanswered != null ? log.pre_selection_unanswered : "?"),
+    "Unanswered cap: " + (log.max_unanswered_qa_pairs != null ? log.max_unanswered_qa_pairs : "?"),
+    "",
+    "Equivalent candidate input:",
+    "=== AVAILABLE QUESTIONS ===",
+    candidateText || "(none)",
+    "=== END AVAILABLE QUESTIONS ===",
+  ].join("\n");
+
+  const response = [
+    "Deterministic top-k shortcut response:",
+    "<selected_questions>",
+    selectedText,
+    "</selected_questions>",
+  ].join("\n");
+
+  return promptResponseBlock("Top-k Selection", prompt, response);
 }
 
 function renderSimpleQuestionList(questions) {
@@ -1351,7 +1638,21 @@ function renderExperimentQuestionTable(items, options) {
     if (opts.showOriginalIndex) {
       html += '<td style="color:var(--text-muted)">' + (item.original_index != null ? "Q" + (item.original_index + 1) : "") + "</td>";
     }
-    html += '<td style="max-width:420px">' + esc(item.question || "") + "</td>" +
+    let questionHtml = '<div>' + esc(item.question || "") + "</div>";
+    if (item.retained_original_question && item.retained_original_question !== item.question) {
+      questionHtml += '<div style="margin-top:4px;font-size:11px;color:var(--text-muted)">Retained original: ' +
+        esc(item.retained_original_question) + "</div>";
+    }
+    if (Array.isArray(item.dedup_member_questions) && item.dedup_member_questions.length) {
+      const members = item.dedup_member_questions.map((question, memberIdx) => {
+        const originalIdx = Array.isArray(item.dedup_member_indices) ? item.dedup_member_indices[memberIdx] : null;
+        const label = originalIdx != null ? "Q" + (originalIdx + 1) + ": " : "";
+        return esc(label + question);
+      }).join("<br>");
+      questionHtml += '<details style="margin-top:4px;font-size:11px;color:var(--text-muted)"><summary>Replacement group (' +
+        item.dedup_member_questions.length + ")</summary><div style=\"margin-top:4px;line-height:1.4\">" + members + "</div></details>";
+    }
+    html += '<td style="max-width:420px">' + questionHtml + "</td>" +
       '<td><span class="verdict ' + verdictClass + '">' + esc(answer) + "</span></td>" +
       '<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(item.evidence || "") + '">' + esc(item.evidence || "") + "</td>" +
       "<td>" + esc(item.source_step) + "</td></tr>";
@@ -1364,9 +1665,16 @@ function renderSelectionQuestionTable(items) {
   if (!Array.isArray(items) || items.length === 0) {
     return '<div style="color:var(--text-muted)">No selected questions recorded.</div>';
   }
-  let html = '<table class="data-table"><tr><th>#</th><th>Question</th><th>Src Step</th></tr>';
+  const hasSourceIndex = items.some((item) => item && typeof item === "object" && item.source_index != null);
+  let html = '<table class="data-table"><tr><th>#</th>';
+  if (hasSourceIndex) html += "<th>Bank #</th>";
+  html += "<th>Question</th><th>Src Step</th></tr>";
   items.forEach((item, idx) => {
-    html += '<tr><td>Q' + (idx + 1) + '</td><td style="max-width:520px">' + esc(item.question || item) +
+    html += '<tr><td>Q' + (idx + 1) + "</td>";
+    if (hasSourceIndex) {
+      html += '<td style="color:var(--text-muted)">' + (item.source_index != null ? "Q" + (item.source_index + 1) : "") + "</td>";
+    }
+    html += '<td style="max-width:520px">' + esc(item.question || item) +
       '</td><td>' + esc(item.source_step) + "</td></tr>";
   });
   html += "</table>";
@@ -1375,7 +1683,7 @@ function renderSelectionQuestionTable(items) {
 
 function primaryOnlineScoringArtifact(data) {
   const artifacts = data.question_scoring || {};
-  return artifacts.online_full || artifacts.online_light || null;
+  return artifacts.online_full || artifacts.online_light || artifacts.online_theory_entropy || null;
 }
 
 function renderScoringPipelineSection(artifact, scoringLog) {
@@ -1506,6 +1814,11 @@ function renderOverview(data, step) {
         expContent += '<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--accent3);border-radius:4px">' +
           '<span style="color:var(--accent3);font-weight:600">Selected Question (prompt Q' + (selectedQIdx + 1) + '):</span>' + sourceLabel + " " + esc(selectedQ.question) + "</div>";
       }
+    } else if (expLog.selected_question || expLog.active_experiment_question) {
+      const sourceIdx = expLog.selected_question_source_index;
+      const sourceLabel = sourceIdx != null ? ' <span style="color:var(--text-muted)">(bank Q' + (sourceIdx + 1) + ")</span>" : "";
+      expContent += '<div style="font-size:12px;margin-bottom:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--accent3);border-radius:4px">' +
+        '<span style="color:var(--accent3);font-weight:600">Experiment Question:</span>' + sourceLabel + " " + esc(expLog.selected_question || expLog.active_experiment_question) + "</div>";
     }
     expContent += '<pre style="max-height:none">' + esc(step.active_experiment) + "</pre>";
     html += '<div class="card" style="margin-bottom:16px;border-left:3px solid var(--accent2)">' +
@@ -1628,13 +1941,22 @@ function renderExperiments(data) {
   const selectionLog = qSelectLog.selection || {};
   const scoringArtifact = primaryOnlineScoringArtifact(data);
   const scoringLog = qSelectLog.scoring || (scoringArtifact && scoringArtifact.scoring_log) || {};
+  const expScoringLog = experimentScoringLog(data);
+  const selectionMode = expLog.experiment_selection_mode || qSelectLog.experiment_selection_mode || (expScoringLog && expScoringLog.mode) || "single";
   const stepMeta = DATA.steps[selectedStepIdx] || {};
   const didGenQ = stepMeta.did_gen_questions;
   const didFormulate = stepMeta.did_formulate_experiment;
   const beforeDedupQuestions = parseQuestionBlockFromPrompt(dedupLog.prompt);
-  const afterDedupQuestions = filterDroppedQuestions(beforeDedupQuestions, dedupLog.dropped_indices);
+  const afterDedupQuestions = afterDedupQuestionsFromLog(beforeDedupQuestions, dedupLog);
   const scoringCandidateIndices = scoringLog.candidate_indices || scoringLog.projection_unanswered_indices;
-  let selectedForScoring = questionItemsFromIndices(afterDedupQuestions, scoringCandidateIndices);
+  let selectedForScoring = [];
+  if (Array.isArray(qSelectLog.experiment_questions) && qSelectLog.experiment_questions.length) {
+    selectedForScoring = qSelectLog.experiment_questions;
+  } else if (Array.isArray(selectionLog.selected_questions) && selectionLog.selected_questions.length) {
+    selectedForScoring = selectionLog.selected_questions;
+  } else {
+    selectedForScoring = questionItemsFromIndices(afterDedupQuestions, scoringCandidateIndices);
+  }
   if (!selectedForScoring.length && Array.isArray(scoringLog.per_question)) {
     selectedForScoring = scoringLog.per_question.map((item) => ({
       question: item.question,
@@ -1645,9 +1967,14 @@ function renderExperiments(data) {
   html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px">' +
     (didGenQ
       ? 'Questions were <strong style="color:var(--accent3)">generated at the start of this step</strong>. ' +
-        (didFormulate
-          ? 'A new <strong style="color:var(--accent2)">experiment was formulated</strong> from an unanswered question.'
-          : "The current experiment was <strong>kept</strong> (LLM returned null).")
+        (selectionMode === "score_topk"
+          ? ('Mode: <strong style="color:var(--accent3)">score_topk</strong>. Candidate experiments were formulated for the selected top-k questions, scored against the unanswered bank, and the ' +
+            ((expScoringLog && expScoringLog.winner_kind === "active")
+              ? "active experiment won, so it was <strong>kept</strong>."
+              : (didFormulate ? 'best fresh candidate became the <strong style="color:var(--accent2)">active experiment</strong>.' : "current experiment was <strong>kept</strong>.")))
+          : (didFormulate
+            ? 'A new <strong style="color:var(--accent2)">experiment was formulated</strong> from an unanswered question.'
+            : "The current experiment was <strong>kept</strong> (LLM returned null)."))
       : "No question generation this step — the agent used the experiment carried over from the previous cycle.") +
     "</div>";
 
@@ -1680,11 +2007,12 @@ function renderExperiments(data) {
 
   if (selectionLog.prompt || selectionLog.response || selectedForScoring.length) {
     let topKHtml = "";
-    topKHtml += promptResponseBlock("Top-k Selection", selectionLog.prompt, selectionLog.response);
+    topKHtml += renderTopKPromptResponse(selectionLog, afterDedupQuestions);
     if (selectionLog.note) {
       topKHtml += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' + esc(selectionLog.note) + "</div>";
     }
-    topKHtml += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin:12px 0 6px">Selected Questions for Scoring (' +
+    topKHtml += '<div style="font-weight:600;font-size:12px;color:var(--text-muted);margin:12px 0 6px">' +
+      (selectionMode === "score_topk" ? "Selected Questions for Candidate Experiments" : "Selected Questions for Scoring") + " (" +
       selectedForScoring.length + ")</div>";
     topKHtml += renderSelectionQuestionTable(selectedForScoring);
     html += collapsible("3. Top-k Selection", topKHtml, true);
@@ -1699,14 +2027,20 @@ function renderExperiments(data) {
     html += collapsible("5. Top-Score Tie-break", tieBreakHtml, true);
   }
 
+  const candidateScoringHtml = renderExperimentCandidateScoring(data);
+  if (candidateScoringHtml) {
+    html += collapsible("6. Candidate Experiment Scoring", candidateScoringHtml, true);
+  }
+
   const qaBank = expLog.qa_pairs_at_formulation || data.qa_pairs || [];
   const qaForExperiment = expLog.qa_pairs_for_experiment || qSelectLog.experiment_questions || qaBank;
 
-  if (expLog.target_question || expLog.selected_question_index != null || expLog.selected_question_source_index != null) {
+  if (expLog.target_question || expLog.selected_question || expLog.selected_question_index != null || expLog.selected_question_source_index != null) {
     let selectedHtml = "";
     const qIdx = expLog.selected_question_index;
     let selectedQ = null;
     if (qIdx != null && qIdx < qaForExperiment.length) selectedQ = qaForExperiment[qIdx];
+    if (!selectedQ && expLog.selected_question) selectedQ = { question: expLog.selected_question };
     if (!selectedQ && expLog.target_question) selectedQ = { question: expLog.target_question };
     if (selectedQ) {
       const sourceIdx = expLog.selected_question_source_index != null ? expLog.selected_question_source_index : expLog.target_question_source_index;
@@ -1716,10 +2050,10 @@ function renderExperiments(data) {
         '<span style="color:var(--accent3);font-weight:600">Selected Question (' + promptLabel + '):</span>' +
         sourceLabel + " " + esc(selectedQ.question || "") + "</div>";
     }
-    html += collapsible("6. Selected Question", selectedHtml || '<div style="color:var(--text-muted)">No selected question recorded.</div>', true);
+    html += collapsible((selectionMode === "score_topk" ? "7. Winning Experiment Question" : "6. Selected Question"), selectedHtml || '<div style="color:var(--text-muted)">No selected question recorded.</div>', true);
   }
 
-  if (expLog.experiment_prompt || expLog.experiment_response) {
+  if (selectionMode !== "score_topk" && (expLog.experiment_prompt || expLog.experiment_response)) {
     const expHtml = promptResponseBlock("Experiment Formulation", expLog.experiment_prompt, expLog.experiment_response, {
       currentStep: stepMeta,
       stepMeta: stepMeta,
@@ -1732,12 +2066,15 @@ function renderExperiments(data) {
   if (expLog.experiment_plan || expLog.experiment_response) {
     let resultHtml = "";
     if (expLog.experiment_plan) {
+      const resultLabel = selectionMode === "score_topk" && expScoringLog && expScoringLog.winner_kind === "active"
+        ? "Kept Active Experiment"
+        : "Formulated Experiment";
       resultHtml += '<div style="font-size:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--accent2);border-radius:6px">' +
-        '<strong style="color:var(--accent2)">Formulated Experiment:</strong> ' + esc(expLog.experiment_plan) + "</div>";
+        '<strong style="color:var(--accent2)">' + resultLabel + ':</strong> ' + esc(expLog.experiment_plan) + "</div>";
     } else {
       resultHtml += '<div style="color:var(--text-muted);font-size:12px;padding:8px 12px;background:var(--surface);border-radius:4px">LLM chose to keep the current experiment (returned null).</div>';
     }
-    html += collapsible("8. Formulated Experiment", resultHtml, true);
+    html += collapsible(selectionMode === "score_topk" ? "8. Experiment Result" : "8. Formulated Experiment", resultHtml, true);
   }
 
   if (!html) html = '<div style="color:var(--text-muted);padding:20px">No experiment data for this step.</div>';
@@ -1749,6 +2086,128 @@ function getTrackMeta(track) {
   if (track === "perception_from_analysis") return { label: "Track 1b: Perception (from Analysis)", color: "var(--accent3)" };
   if (track === "qa") return { label: "Track 2: QA", color: "var(--purple)" };
   return { label: "Track: " + track, color: "var(--text-muted)" };
+}
+
+// Render one YES/NO/UNKNOWN prediction cell from a p_yes probability:
+// 1.0 -> YES (green), 0.0 -> NO (red), anything else (0.5) -> "?" (muted).
+function theoryPredCell(p) {
+  if (p == null) return '<td style="text-align:center;color:var(--text-muted)">·</td>';
+  if (p >= 0.999) return '<td style="text-align:center;background:rgba(63,185,80,0.18);color:var(--accent2);font-weight:600">Y</td>';
+  if (p <= 0.001) return '<td style="text-align:center;background:rgba(229,85,85,0.18);color:#e55;font-weight:600">N</td>';
+  return '<td style="text-align:center;color:var(--text-muted)">?</td>';
+}
+
+function renderTheories(data) {
+  const c = document.getElementById("theories-container");
+  if (!c) return;
+  const tlog = data.theory_log || {};
+  const gen = tlog.theories || {};
+  const cruxGen = tlog.crux_questions || {};
+  const theories = Array.isArray(gen.theories) ? gen.theories : [];
+  const cruxQuestions = Array.isArray(cruxGen.questions) ? cruxGen.questions : [];
+  const scoring = (data.question_scoring || {}).online_theory_entropy || null;
+  const scoreLog = (scoring && scoring.scoring_log) || {};
+  const perQuestion = Array.isArray(scoreLog.per_question) ? scoreLog.per_question : [];
+  const weights = Array.isArray(scoreLog.theory_weights) ? scoreLog.theory_weights : theories.map((t) => t.weight);
+
+  if (!theories.length && !cruxQuestions.length && !perQuestion.length) {
+    c.innerHTML = '<div style="color:var(--text-muted);padding:20px">No theory data recorded for this step.</div>';
+    return;
+  }
+
+  const cruxSet = new Set(cruxQuestions);
+  const selectedQ = scoreLog.target_experiment_question;
+  const maxWeight = theories.reduce((m, t) => Math.max(m, t.weight || 0), 0) || 1;
+
+  let html = "";
+
+  // Summary banner.
+  html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px">' +
+    '<strong style="color:var(--accent3)">Theory-entropy selection (Plan B).</strong> ' +
+    theories.length + ' theories generated (rank-weighted, decay=' + (gen.decay != null ? gen.decay : "?") + '), ' +
+    cruxQuestions.length + ' crux questions seeded. ' +
+    'Questions are scored by mutual information I(answer; theory) — high when the theories disagree on the answer.' +
+    (selectedQ ? ' Selected target: <span style="color:var(--accent3)">' + esc(selectedQ) + '</span>' : '') +
+    "</div>";
+
+  // 1. Theory ensemble — ranked cards with weight bars.
+  if (theories.length) {
+    let tHtml = "";
+    theories.forEach((t, i) => {
+      const w = t.weight || 0;
+      const barPct = Math.round((w / maxWeight) * 100);
+      tHtml += '<div style="border:1px solid var(--border);border-radius:5px;margin-bottom:10px;overflow:hidden">';
+      tHtml += '<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--surface2);border-bottom:1px solid var(--border)">' +
+        '<span style="font-weight:700;color:var(--accent3)">T' + (i + 1) + '</span>' +
+        '<span style="font-size:11px;color:var(--text-muted)">rank ' + (t.rank != null ? t.rank : i + 1) +
+        (t.likelihood ? ' &middot; ' + esc(t.likelihood) : "") + '</span>' +
+        '<div style="flex:1;height:10px;background:var(--bg);border-radius:5px;overflow:hidden;max-width:240px;margin-left:auto">' +
+        '<div style="height:100%;width:' + barPct + '%;background:var(--accent3)"></div></div>' +
+        '<span style="font-family:var(--font-mono);font-size:12px;font-weight:600">w=' + w.toFixed(3) + '</span>' +
+        "</div>";
+      tHtml += '<div style="padding:8px 10px"><pre style="margin:0;white-space:pre-wrap;font-size:12px">' +
+        esc(t.world_knowledge || "") + "</pre>";
+      if (t.rationale) {
+        tHtml += '<div style="margin-top:6px;font-size:12px;color:var(--text-muted)"><em>Rationale:</em> ' + esc(t.rationale) + "</div>";
+      }
+      tHtml += "</div></div>";
+    });
+    html += collapsible("1. Theory Ensemble (" + theories.length + ")", tHtml, true);
+  }
+
+  // 2. Crux questions seeded from the theory disagreements.
+  if (cruxQuestions.length) {
+    let cqHtml = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Questions designed to split the ensemble; added to the unanswered bank for scoring.</div>';
+    cqHtml += '<table class="data-table"><tr><th>#</th><th>Crux Question</th></tr>';
+    cruxQuestions.forEach((q, i) => {
+      cqHtml += '<tr><td>' + (i + 1) + '</td><td>' + esc(q) + "</td></tr>";
+    });
+    cqHtml += "</table>";
+    cqHtml += promptResponseBlock("Crux Generation", cruxGen.prompt, cruxGen.response);
+    html += collapsible("2. Seeded Crux Questions (" + cruxQuestions.length + ")", cqHtml, true);
+  }
+
+  // 3. MI ranking + per-theory prediction matrix (the "why" behind selection).
+  if (perQuestion.length) {
+    const ranked = perQuestion.slice().sort((a, b) => (b.score || 0) - (a.score || 0));
+    const nTheories = weights.length || (ranked[0] && ranked[0].p_yes_per_theory ? ranked[0].p_yes_per_theory.length : 0);
+    let mHtml = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">' +
+      'Each row is a candidate question; columns T1..T' + nTheories + ' are each theory\'s predicted answer ' +
+      '(<span style="color:var(--accent2);font-weight:600">Y</span>=yes, <span style="color:#e55;font-weight:600">N</span>=no, ?=unknown). ' +
+      'MI is highest when weighted predictions are most split.</div>';
+    mHtml += '<table class="data-table"><tr><th>Rank</th><th>MI (bits)</th>';
+    for (let k = 0; k < nTheories; k++) {
+      mHtml += '<th title="weight ' + (weights[k] != null ? weights[k].toFixed(3) : "?") + '">T' + (k + 1) + "</th>";
+    }
+    mHtml += "<th>Question</th></tr>";
+    ranked.forEach((row, idx) => {
+      const isCrux = cruxSet.has(row.question);
+      const isSel = selectedQ && row.question === selectedQ;
+      const rowStyle = isSel ? ' style="background:rgba(210,153,34,0.12)"' : "";
+      mHtml += "<tr" + rowStyle + "><td>" + (idx + 1) + '</td><td style="font-family:var(--font-mono)">' +
+        Number(row.score || 0).toFixed(4) + "</td>";
+      const preds = row.p_yes_per_theory || [];
+      for (let k = 0; k < nTheories; k++) mHtml += theoryPredCell(preds[k]);
+      mHtml += '<td style="max-width:420px">' + esc(row.question) +
+        (isCrux ? ' <span style="font-size:10px;color:var(--accent3);font-weight:700">[CRUX]</span>' : "") +
+        (isSel ? ' <span style="font-size:10px;color:var(--accent3);font-weight:700">&#9733; SELECTED</span>' : "") +
+        "</td></tr>";
+    });
+    mHtml += "</table>";
+    if (scoring && scoring.tie_break) {
+      const tb = renderTieBreakSection(scoring.tie_break);
+      if (tb) mHtml += '<div style="margin-top:10px">' + tb + "</div>";
+    }
+    html += collapsible("3. Theory-Entropy Scoring (MI ranking)", mHtml, true);
+  }
+
+  // 4. Raw generation prompt/response for auditing.
+  if (gen.prompt || gen.response) {
+    html += collapsible("4. Theory Generation Prompt & Response",
+      promptResponseBlock("Theory Generation", gen.prompt, gen.response), false);
+  }
+
+  c.innerHTML = html;
 }
 
 function renderFeedback(data) {
@@ -1803,6 +2262,7 @@ function renderFeedback(data) {
         const submitBadge = turn.submitted
           ? '<span style="background:rgba(63,185,80,0.15);color:var(--accent2);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">SUBMITTED</span>'
           : '<span style="background:rgba(88,166,255,0.1);color:var(--accent);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">CONTINUE</span>';
+        const validationBadge = validationBadgesHtml(turn);
 
         const turnImagesHtml = promptImagesHtml(turn.prompt || "");
 
@@ -1811,6 +2271,7 @@ function renderFeedback(data) {
           '<span style="font-weight:600;color:' + meta.color + '">Turn ' + turn.turn + '</span>' +
           '<span style="color:var(--accent3);font-family:var(--font-mono);font-size:11px;margin-left:8px">$' + (turn.cost || 0).toFixed(4) + "</span>" +
           submitBadge +
+          validationBadge +
           '<span style="margin-left:auto;font-size:11px;color:var(--text-muted)">&#9654;</span>' +
           "</div>" +
           '<div class="extraction-body">' +
@@ -1820,7 +2281,7 @@ function renderFeedback(data) {
           '<pre style="max-height:400px;margin:0;border:none;padding:0;background:transparent">' + esc(turn.prompt || "") + "</pre></div></div>" +
           '<div style="margin-bottom:6px"><div style="font-size:10px;text-transform:uppercase;color:var(--accent2);margin-bottom:4px;font-weight:600">Response</div>' +
           '<div style="background:rgba(88,166,255,0.05);border:1px solid rgba(88,166,255,0.2);border-radius:8px;padding:10px 14px">' +
-          '<pre style="max-height:400px;margin:0;border:none;padding:0;background:transparent">' + esc(turn.response || "") + "</pre></div></div>" +
+          renderResponseBody(turn.response || "") + "</div></div>" +
           "</div></div>";
       });
       turnsHtml += "</div>";
@@ -2115,7 +2576,7 @@ async function loadExperimentTimeline(highlightGlobalStep) {
     return;
   }
 
-  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px">Experiment formulation events. Each event shows the selected question and the experiment formulated to investigate it.</div>';
+  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px">Experiment events. Score-top-k events show candidate scoring and whether a fresh candidate or the already-active experiment won.</div>';
   if (timeline.length > 1) {
     const maxQ = Math.max(...timeline.map((item) => item.cumulative_questions), 1);
     html += '<div class="card" style="margin-bottom:16px"><div class="card-header" onclick="toggleCard(this)">Cumulative Questions Generated <span class="toggle">&#9660;</span></div><div class="card-body">';
@@ -2144,8 +2605,20 @@ async function loadExperimentTimeline(highlightGlobalStep) {
     eventHtml += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">';
     eventHtml += '<span style="font-size:12px;font-weight:600;color:var(--accent)">g' + item.global_step + "</span>";
     eventHtml += '<span style="font-size:11px;color:var(--text-muted)">ep' + item.episode_idx + " step " + item.step + "</span>";
-    if (item.experiment_plan) {
+    if (item.experiment_selection_mode) {
+      eventHtml += '<span style="font-size:11px;padding:2px 8px;background:rgba(80,120,220,0.15);color:var(--accent3);border-radius:4px;font-weight:600">' + esc(item.experiment_selection_mode) + "</span>";
+    }
+    if (item.did_formulate_experiment) {
       eventHtml += '<span style="font-size:11px;padding:2px 8px;background:rgba(63,185,80,0.15);color:var(--accent2);border-radius:4px;font-weight:600">new experiment</span>';
+    } else if (item.experiment_plan) {
+      eventHtml += '<span style="font-size:11px;padding:2px 8px;background:rgba(139,148,158,0.15);color:var(--text-muted);border-radius:4px;font-weight:600">kept active</span>';
+    }
+    if (item.candidate_count) {
+      eventHtml += '<span style="font-size:11px;color:var(--text-muted)">' + item.candidate_count + " candidates</span>";
+    }
+    if (item.winner_kind) {
+      eventHtml += '<span style="font-size:11px;color:var(--text-muted)">winner: <strong style="color:var(--accent2)">' + esc(item.winner_kind) + "</strong>" +
+        (item.winner_score != null ? " score " + Number(item.winner_score || 0).toFixed(0) : "") + "</span>";
     }
     eventHtml += "</div>";
 
@@ -2160,7 +2633,7 @@ async function loadExperimentTimeline(highlightGlobalStep) {
     }
 
     if (item.experiment_plan) {
-      eventHtml += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">FORMULATED EXPERIMENT:</div>';
+      eventHtml += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">' + (item.did_formulate_experiment ? "FORMULATED EXPERIMENT:" : "ACTIVE EXPERIMENT WON:") + "</div>";
       eventHtml += '<div style="font-size:12px;padding:6px 10px;background:var(--bg);border:1px solid var(--accent2);border-radius:4px">' + esc(item.experiment_plan) + "</div>";
     }
     eventHtml += "</div>";

@@ -17,27 +17,16 @@ from pathlib import Path
 
 import hydra
 import numpy as np
-from omegaconf import DictConfig
-from tqdm import tqdm
-
 from balrog.agents import AgentFactory
 from balrog.environments import make_env
 from balrog.utils import get_unique_seed
+from omegaconf import DictConfig
+from tqdm import tqdm
 
-from explore import get_default_knowledge, override_temperature, evolve_logger
-from mixed_improve import (
-    QAPair,
-    CriticalMoment,
-    extract_qa_and_moments_from_trajectory,
-    consolidate_qa_and_moments,
-    serialize_qa_pairs,
-    deserialize_qa_pairs,
-    serialize_moments,
-    deserialize_moments,
-    extract_perception_input,
-    _run_perception_on_observation,
-)
 from b_learn_improve import (
+    _improve_beliefs_only_conversational,
+    _improve_with_perception_validation_conversational,
+    _prepend_rejection_notice,
     forward_pass,
     get_feedback,
     qa_forward_pass,
@@ -45,38 +34,46 @@ from b_learn_improve import (
     serialize_feedback_results,
     serialize_qa_feedback_results,
 )
+from explore import evolve_logger, get_default_knowledge, override_temperature
+from goal_prompts import append_agent_goal, resolve_agent_goal
+from llm_utils import extract_xml_key
+from mixed_improve import (
+    CriticalMoment,
+    QAPair,
+    _run_perception_on_observation,
+    consolidate_qa_and_moments,
+    deserialize_moments,
+    deserialize_qa_pairs,
+    extract_perception_input,
+    extract_qa_and_moments_from_trajectory,
+    serialize_moments,
+    serialize_qa_pairs,
+)
+from run_utils import _update_summary_json, improve_logging, setup_run
 from stepwise_b_learn_improve import (
-    improve_from_steps,
-    improve_from_feedback_with_steps,
-    improve_from_qa_feedback_with_steps,
-    generate_experiments_from_steps,
-    parse_submit_signal,
-    build_steps_followup_message,
+    BELIEFS_ONLY_RESPONSE_FORMAT,
+    PERCEPTION_INSTRUCTIONS,
+    RESPONSE_FORMAT,
+    _build_execution_report_section,
+    _build_obs_section,
+    build_moments_followup_message,
     build_perception_followup_message,
     build_perception_with_analysis_prompt,
     build_qa_followup_message,
-    build_moments_followup_message,
-    _build_obs_section,
-    _build_execution_report_section,
-    PERCEPTION_INSTRUCTIONS,
-    RESPONSE_FORMAT,
-    BELIEFS_ONLY_RESPONSE_FORMAT,
+    build_steps_followup_message,
+    generate_experiments_from_steps,
+    improve_from_feedback_with_steps,
+    improve_from_qa_feedback_with_steps,
+    improve_from_steps,
+    parse_submit_signal,
 )
-from b_learn_improve import (
-    _improve_with_perception_validation_conversational,
-    _improve_beliefs_only_conversational,
-    _prepend_rejection_notice,
-)
-from llm_utils import extract_xml_key
 from stepwise_explore import (
-    load_perception_fn,
-    apply_perception,
-    format_segment_text,
-    find_last_completed_episode,
     _save_episode_artifacts,
+    apply_perception,
+    find_last_completed_episode,
+    format_segment_text,
+    load_perception_fn,
 )
-from goal_prompts import append_agent_goal, resolve_agent_goal
-from run_utils import setup_run, improve_logging, _update_summary_json
 
 
 @dataclass
@@ -158,6 +155,11 @@ def format_steps_context(
             blocks.append(f"<episode_boundary episode=\"{entry.get('episode_idx', '?')}\" />\n")
             ep_history = []
             continue
+            blocks.append(
+                f'<episode_boundary episode="{entry.get("episode_idx", "?")}" />\n'
+            )
+            ep_history = []
+            continue
 
         # Skip terminal entries — their obs is already in the preceding action
         # entry's result_raw_long_term_context.
@@ -178,32 +180,37 @@ def format_steps_context(
         reasoning = entry.get("reasoning", "")
         reward = entry.get("reward", 0)
         display_raw_obs = (
-            "(raw pre-state observation hidden)"
-            if hide_raw_obs_when_image
-            else raw_obs
+            "(raw pre-state observation hidden)" if hide_raw_obs_when_image else raw_obs
         )
 
-        block_prefix = f"<step n=\"{entry['step']}\">\n"
+        block_prefix = f'<step n="{entry["step"]}">\n'
+        perc_block = (
+            f"<perception_output>\n{perc_out if perc_out else '(no perception module)'}\n</perception_output>\n\n"
+            if perception_code
+            else ""
+        )
         before_reasoning = (
             f"<pre_state>\n{display_raw_obs}\n</pre_state>\n\n"
             f"<auxiliary_observation>\n{raw_aux}\n</auxiliary_observation>\n\n"
-            f"<perception_output>\n{perc_out if perc_out else '(no perception module)'}\n</perception_output>\n\n"
+            f"{perc_block}"
         )
         after_reasoning = (
-            f"<action>{entry['action']}</action>\n"
-            f"<reward>{reward}</reward>\n"
+            f"<action>{entry['action']}</action>\n<reward>{reward}</reward>\n"
         )
 
         # Append <post_state> at the end of each episode segment. The end-of-
         # buffer tail is gated by include_trailing_state so callers that render
         # their own CURRENT STATE block can suppress the duplicate.
-        next_entry = trajectory_buffer[i + 1] if i + 1 < len(trajectory_buffer) else None
+        next_entry = (
+            trajectory_buffer[i + 1] if i + 1 < len(trajectory_buffer) else None
+        )
         is_end_of_buffer = next_entry is None
         is_mid_buffer_break = next_entry is not None and (
-            next_entry.get("episode_boundary")
-            or next_entry.get("action") is None
+            next_entry.get("episode_boundary") or next_entry.get("action") is None
         )
-        include_post = is_mid_buffer_break or (is_end_of_buffer and include_trailing_state)
+        include_post = is_mid_buffer_break or (
+            is_end_of_buffer and include_trailing_state
+        )
 
         if include_post:
             result_raw = entry.get("result_raw_long_term_context", "")
@@ -217,15 +224,24 @@ def format_steps_context(
                 if perception_code:
                     if history_window is not None:
                         result_hist = ep_history + [result_raw]
-                        result_perc = _run_perc_hist(perception_code, result_hist, history_window)
+                        result_perc = _run_perc_hist(
+                            perception_code, result_hist, history_window
+                        )
                     else:
-                        result_perc = _run_perception_on_observation(perception_code, result_raw)
+                        result_perc = _run_perception_on_observation(
+                            perception_code, result_raw
+                        )
                 else:
                     result_perc = ""
+                result_perc_block = (
+                    f"<perception_output>\n{result_perc if result_perc else '(no perception module)'}\n</perception_output>\n"
+                    if perception_code
+                    else ""
+                )
                 after_reasoning += (
                     f"\n<post_state>\n{display_result_raw}\n</post_state>\n\n"
                     f"<auxiliary_observation>\n{result_raw_aux}\n</auxiliary_observation>\n\n"
-                    f"<perception_output>\n{result_perc if result_perc else '(no perception module)'}\n</perception_output>\n"
+                    f"{result_perc_block}"
                 )
         block_suffix = "</step>"
 
@@ -303,9 +319,12 @@ def format_current_state(
     )
     img_tag = f" (image {image_index})" if image_index is not None else ""
     raw_state_content = (
-        "(raw pre-state observation hidden)"
-        if hide_raw_obs
-        else observation
+        "(raw pre-state observation hidden)" if hide_raw_obs else observation
+    )
+    perc_block = (
+        f"<perception_output>\n{current_perception if current_perception else '(no perception module)'}\n</perception_output>\n"
+        if perception_code
+        else ""
     )
     return (
         f"\n=== {section_title} ===\n"
@@ -313,7 +332,7 @@ def format_current_state(
         f"{raw_state_content}\n"
         f"</pre_state>\n\n"
         f"<auxiliary_observation>\n{aux_observation or ''}\n</auxiliary_observation>\n\n"
-        f"<perception_output>\n{current_perception if current_perception else '(no perception module)'}\n</perception_output>\n"
+        f"{perc_block}"
         f"=== END {section_title} ===\n"
     )
 
@@ -322,9 +341,9 @@ def _compose_obs_text(short_term_context: str, long_term_context: str) -> str:
     """Build the canonical observation text block used in trajectory buffers."""
     return (
         f"{short_term_context}\n\n"
-        f"{'='*10} Start of Direct Observation {'='*10}\n"
+        f"{'=' * 10} Start of Direct Observation {'=' * 10}\n"
         f"{long_term_context}\n\n"
-        f"{'='*10} End of Direct Observation {'='*10}"
+        f"{'=' * 10} End of Direct Observation {'=' * 10}"
     )
 
 
@@ -339,6 +358,7 @@ def _refresh_buffer_with_perception(
     via apply_perception_with_history; otherwise legacy apply_perception is used.
     """
     from stepwise_explore import apply_perception_with_history
+
     ep_history: list[str] = []
     for entry in trajectory_buffer:
         if entry.get("episode_boundary"):
@@ -440,7 +460,9 @@ def _histories_for_samples(
         if step_num in wanted_steps and step_num not in snapshots:
             snapshots[step_num] = list(ep_history)
 
-    return [snapshots.get(step, [raw] if raw else []) for raw, step in sample_observations]
+    return [
+        snapshots.get(step, [raw] if raw else []) for raw, step in sample_observations
+    ]
 
 
 async def extract_knowledge_from_buffer(
@@ -469,7 +491,13 @@ async def extract_knowledge_from_buffer(
     )
 
     # Extract new Q&A and moments
-    new_qa, new_moments, extract_cost, extract_prompt, extract_response = await extract_qa_and_moments_from_trajectory(
+    (
+        new_qa,
+        new_moments,
+        extract_cost,
+        extract_prompt,
+        extract_response,
+    ) = await extract_qa_and_moments_from_trajectory(
         config=config,
         traj_text=segment_text,
         trajectory_path="",
@@ -485,7 +513,11 @@ async def extract_knowledge_from_buffer(
     extraction_log["new_moments_count"] = len(new_moments)
 
     # Attach raw observations from buffer to new moments
-    step_to_raw = {e["step"]: e.get("raw_long_term_context", "") for e in trajectory_buffer if not e.get("episode_boundary")}
+    step_to_raw = {
+        e["step"]: e.get("raw_long_term_context", "")
+        for e in trajectory_buffer
+        if not e.get("episode_boundary")
+    }
     for moment in new_moments:
         if moment.traj_step_number >= 0 and moment.traj_step_number in step_to_raw:
             moment.raw_observation = step_to_raw[moment.traj_step_number]
@@ -510,11 +542,15 @@ async def extract_knowledge_from_buffer(
         # Apply removals
         if remove_qa_indices:
             existing_qa = [
-                qa for i, qa in enumerate(existing_qa) if i not in set(remove_qa_indices)
+                qa
+                for i, qa in enumerate(existing_qa)
+                if i not in set(remove_qa_indices)
             ]
         if remove_moment_indices:
             existing_moments = [
-                m for i, m in enumerate(existing_moments) if i not in set(remove_moment_indices)
+                m
+                for i, m in enumerate(existing_moments)
+                if i not in set(remove_moment_indices)
             ]
 
         existing_qa = existing_qa + kept_qa
@@ -547,7 +583,9 @@ async def extract_knowledge_from_buffer(
 # ---------------------------------------------------------------------------
 
 
-def _flush_improve_progress(step_dir: Path, feedback_history: list[dict], beliefs: str, perception: str) -> None:
+def _flush_improve_progress(
+    step_dir: Path, feedback_history: list[dict], beliefs: str, perception: str
+) -> None:
     """Write in-progress improve state to disk so the visualizer can show live updates."""
     (step_dir / "beliefs.txt").write_text(beliefs)
     (step_dir / "perception.py").write_text(perception)
@@ -658,7 +696,17 @@ def run_stepwise_b_learn_episode(
     trajectory_buffer: list[dict] | None = None,
     past_experiments: list[str] | None = None,
     cumulative_cost_offset: float = 0.0,
-) -> tuple[str, str, list[QAPair], list[CriticalMoment], list[str], dict, int, list[dict], list[str]]:
+) -> tuple[
+    str,
+    str,
+    list[QAPair],
+    list[CriticalMoment],
+    list[str],
+    dict,
+    int,
+    list[dict],
+    list[str],
+]:
     """Run a single episode with per-step B-learning.
 
     Directory structure:
@@ -716,7 +764,11 @@ def run_stepwise_b_learn_episode(
     )
 
     # Episode tracking
-    max_steps = env.max_steps if config.eval.get("max_steps_per_episode") is None else config.eval.max_steps_per_episode
+    max_steps = (
+        env.max_steps
+        if config.eval.get("max_steps_per_episode") is None
+        else config.eval.max_steps_per_episode
+    )
     if max_episode_steps is not None:
         max_steps = min(max_steps, max_episode_steps)
     episode_log = {
@@ -730,17 +782,19 @@ def run_stepwise_b_learn_episode(
     trajectory_buffer = trajectory_buffer if trajectory_buffer is not None else []
     # Insert episode boundary marker so cross-episode history is clearly delineated
     if trajectory_buffer:
-        trajectory_buffer.append({
-            "step": None,
-            "episode_boundary": True,
-            "episode_idx": episode_idx,
-            "obs_text": "",
-            "raw_long_term_context": "",
-            "action": None,
-            "reward": 0.0,
-            "reasoning": "",
-            "done": True,
-        })
+        trajectory_buffer.append(
+            {
+                "step": None,
+                "episode_boundary": True,
+                "episode_idx": episode_idx,
+                "obs_text": "",
+                "raw_long_term_context": "",
+                "action": None,
+                "reward": 0.0,
+                "reasoning": "",
+                "done": True,
+            }
+        )
     total_learn_cost = 0.0
     episode_return = 0.0
     cumulative_step_cost = 0.0
@@ -755,12 +809,29 @@ def run_stepwise_b_learn_episode(
     ep_dir.mkdir(parents=True, exist_ok=True)
     csv_filename = ep_dir / "trajectory.csv"
 
-    pbar = tqdm(total=max_steps, desc=f"Stepwise B-learn ep {episode_idx}", leave=False, dynamic_ncols=True)
+    pbar = tqdm(
+        total=max_steps,
+        desc=f"Stepwise B-learn ep {episode_idx}",
+        leave=False,
+        dynamic_ncols=True,
+    )
     feedback_history = []
 
     with open(csv_filename, mode="w", newline="", encoding="utf-8") as csv_file:
-        csv_writer = csv.writer(csv_file, escapechar="\u02d8", quoting=csv.QUOTE_MINIMAL)
-        csv_writer.writerow(["Step", "Action", "Reasoning", "Observation", "Auxiliary_Observation", "Reward", "Done"])
+        csv_writer = csv.writer(
+            csv_file, escapechar="\u02d8", quoting=csv.QUOTE_MINIMAL
+        )
+        csv_writer.writerow(
+            [
+                "Step",
+                "Action",
+                "Reasoning",
+                "Observation",
+                "Auxiliary_Observation",
+                "Reward",
+                "Done",
+            ]
+        )
 
         action = None
         step = 0
@@ -781,11 +852,22 @@ def run_stepwise_b_learn_episode(
 
             # Write preliminary step_log immediately so the step appears in the visualizer sidebar
             _save_step_log(
-                step_dir=step_dir, step=step, global_step=global_step,
-                action=None, reward=0.0, done=False, episode_return=episode_return,
-                agent_cost=0.0, extract_cost=0.0, improve_cost=0.0, experiment_cost=0.0,
-                num_qa=len(qa_pairs), num_moments=len(moments), num_experiments=len(experiments),
-                did_gen_experiments=False, active_experiment=current_experiment,
+                step_dir=step_dir,
+                step=step,
+                global_step=global_step,
+                action=None,
+                reward=0.0,
+                done=False,
+                episode_return=episode_return,
+                agent_cost=0.0,
+                extract_cost=0.0,
+                improve_cost=0.0,
+                experiment_cost=0.0,
+                num_qa=len(qa_pairs),
+                num_moments=len(moments),
+                num_experiments=len(experiments),
+                did_gen_experiments=False,
+                active_experiment=current_experiment,
                 phase="started",
             )
 
@@ -795,11 +877,17 @@ def run_stepwise_b_learn_episode(
                 evolve_logger.info(f"[g{global_step}] Generating experiments...")
                 old_experiments = list(experiments)
                 exp_steps_context = format_steps_context(
-                    trajectory_buffer, perception, bl_config.max_steps_context_chars,
+                    trajectory_buffer,
+                    perception,
+                    bl_config.max_steps_context_chars,
                     include_trailing_state=False,
                 )
                 with improve_logging(step_dir):
-                    forward_moments = [m for m in moments if m.raw_observation and m.raw_observation.strip()]
+                    forward_moments = [
+                        m
+                        for m in moments
+                        if m.raw_observation and m.raw_observation.strip()
+                    ]
                     experiments, exp_cost, exp_prompt, exp_response = asyncio.run(
                         generate_experiments_from_steps(
                             config=config,
@@ -845,11 +933,22 @@ def run_stepwise_b_learn_episode(
 
             # Update step_log to reflect experiment phase done, agent about to act
             _save_step_log(
-                step_dir=step_dir, step=step, global_step=global_step,
-                action=None, reward=0.0, done=False, episode_return=episode_return,
-                agent_cost=0.0, extract_cost=0.0, improve_cost=0.0, experiment_cost=step_experiment_cost,
-                num_qa=len(qa_pairs), num_moments=len(moments), num_experiments=len(experiments),
-                did_gen_experiments=should_gen_experiments, active_experiment=current_experiment,
+                step_dir=step_dir,
+                step=step,
+                global_step=global_step,
+                action=None,
+                reward=0.0,
+                done=False,
+                episode_return=episode_return,
+                agent_cost=0.0,
+                extract_cost=0.0,
+                improve_cost=0.0,
+                experiment_cost=step_experiment_cost,
+                num_qa=len(qa_pairs),
+                num_moments=len(moments),
+                num_experiments=len(experiments),
+                did_gen_experiments=should_gen_experiments,
+                active_experiment=current_experiment,
                 phase="acting",
             )
 
@@ -898,62 +997,88 @@ def run_stepwise_b_learn_episode(
             # Capture agent messages (the actual prompt sent to the LLM) + response
             try:
                 agent_messages = [
-                    {"role": m.role, "content": m.content}
-                    for m in agent.last_messages
+                    {"role": m.role, "content": m.content} for m in agent.last_messages
                 ]
             except Exception:
                 agent_messages = []
-            agent_messages.append({
-                "role": "assistant",
-                "content": reasoning,
-                "action": action,
-            })
+            agent_messages.append(
+                {
+                    "role": "assistant",
+                    "content": reasoning,
+                    "action": action,
+                }
+            )
 
             # Save agent messages for this step immediately
             with open(step_dir / "agent_messages.json", "w") as amf:
                 json.dump(agent_messages, amf, indent=2, default=str)
 
             # Write CSV row immediately after env step so trajectory is live
-            csv_writer.writerow([step, action, reasoning, _pre_action_obs_text, _pre_action_raw_short, reward, done])
+            csv_writer.writerow(
+                [
+                    step,
+                    action,
+                    reasoning,
+                    _pre_action_obs_text,
+                    _pre_action_raw_short,
+                    reward,
+                    done,
+                ]
+            )
             csv_file.flush()
 
             # Update step_log with action/reward/done so sidebar shows live info
             _save_step_log(
-                step_dir=step_dir, step=step, global_step=global_step,
-                action=action, reward=reward, done=done, episode_return=episode_return,
-                agent_cost=agent_step_cost, extract_cost=0.0, improve_cost=0.0, experiment_cost=step_experiment_cost,
-                num_qa=len(qa_pairs), num_moments=len(moments), num_experiments=len(experiments),
-                did_gen_experiments=should_gen_experiments, active_experiment=current_experiment,
+                step_dir=step_dir,
+                step=step,
+                global_step=global_step,
+                action=action,
+                reward=reward,
+                done=done,
+                episode_return=episode_return,
+                agent_cost=agent_step_cost,
+                extract_cost=0.0,
+                improve_cost=0.0,
+                experiment_cost=step_experiment_cost,
+                num_qa=len(qa_pairs),
+                num_moments=len(moments),
+                num_experiments=len(experiments),
+                did_gen_experiments=should_gen_experiments,
+                active_experiment=current_experiment,
                 phase="extracting",
             )
 
             # Append buffer entry: pre-action state s_step paired with action a_step and its reward.
             # Sequence: s0, a0, s1, a1, ..., s_{t-1}, a_{t-1}, s_t
-            trajectory_buffer.append({
-                "step": global_step,
-                "obs_text": _pre_action_obs_text,
-                "raw_long_term_context": _pre_action_raw_long,
-                "raw_short_term_context": _pre_action_raw_short,
-                "result_raw_long_term_context": new_raw_long,
-                "result_raw_short_term_context": new_raw_short,
-                "action": action,
-                "reward": reward,
-                "reasoning": reasoning,
-                "done": False,
-            })
+            trajectory_buffer.append(
+                {
+                    "step": global_step,
+                    "obs_text": _pre_action_obs_text,
+                    "raw_long_term_context": _pre_action_raw_long,
+                    "raw_short_term_context": _pre_action_raw_short,
+                    "result_raw_long_term_context": new_raw_long,
+                    "result_raw_short_term_context": new_raw_short,
+                    "action": action,
+                    "reward": reward,
+                    "reasoning": reasoning,
+                    "done": False,
+                }
+            )
 
             # Append the terminal state s_{step+1} as a separate no-action entry
             if done:
-                trajectory_buffer.append({
-                    "step": global_step + 1,
-                    "obs_text": result_obs_text,
-                    "raw_long_term_context": new_raw_long,
-                    "raw_short_term_context": new_raw_short,
-                    "action": None,
-                    "reward": 0.0,
-                    "reasoning": "",
-                    "done": True,
-                })
+                trajectory_buffer.append(
+                    {
+                        "step": global_step + 1,
+                        "obs_text": result_obs_text,
+                        "raw_long_term_context": new_raw_long,
+                        "raw_short_term_context": new_raw_short,
+                        "action": None,
+                        "reward": 0.0,
+                        "reasoning": "",
+                        "done": True,
+                    }
+                )
 
             pbar.update(1)
 
@@ -966,17 +1091,15 @@ def run_stepwise_b_learn_episode(
             # --- Determine what to do this step ---
             steps_in = step + 1
             should_update_artifacts = (
-                (steps_in % bl_config.artifact_update_interval == 0)
-                or done
-            )
-            should_improve = (
-                (steps_in % bl_config.improve_interval == 0)
-                or done
-            )
+                steps_in % bl_config.artifact_update_interval == 0
+            ) or done
+            should_improve = (steps_in % bl_config.improve_interval == 0) or done
 
             # --- Artifact update (extract Q&A + moments) ---
             if should_update_artifacts and len(trajectory_buffer) > 0:
-                evolve_logger.info(f"[g{global_step}] Extracting knowledge from {len(trajectory_buffer)} buffered steps...")
+                evolve_logger.info(
+                    f"[g{global_step}] Extracting knowledge from {len(trajectory_buffer)} buffered steps..."
+                )
                 with improve_logging(step_dir):
                     qa_pairs, moments, extract_cost, step_extraction_log = asyncio.run(
                         extract_knowledge_from_buffer(
@@ -1009,11 +1132,22 @@ def run_stepwise_b_learn_episode(
 
                 # Update step_log: extraction done, improve starting
                 _save_step_log(
-                    step_dir=step_dir, step=step, global_step=global_step,
-                    action=action, reward=reward, done=done, episode_return=episode_return,
-                    agent_cost=agent_step_cost, extract_cost=step_extract_cost, improve_cost=0.0, experiment_cost=step_experiment_cost,
-                    num_qa=len(qa_pairs), num_moments=len(moments), num_experiments=len(experiments),
-                    did_gen_experiments=should_gen_experiments, active_experiment=current_experiment,
+                    step_dir=step_dir,
+                    step=step,
+                    global_step=global_step,
+                    action=action,
+                    reward=reward,
+                    done=done,
+                    episode_return=episode_return,
+                    agent_cost=agent_step_cost,
+                    extract_cost=step_extract_cost,
+                    improve_cost=0.0,
+                    experiment_cost=step_experiment_cost,
+                    num_qa=len(qa_pairs),
+                    num_moments=len(moments),
+                    num_experiments=len(experiments),
+                    did_gen_experiments=should_gen_experiments,
+                    active_experiment=current_experiment,
                     phase="improving",
                 )
 
@@ -1024,7 +1158,14 @@ def run_stepwise_b_learn_episode(
                 )
                 pre_improve_perception = perception
                 with improve_logging(step_dir):
-                    beliefs, perception, qa_pairs, moments, improve_cost, iter_records = _run_improve_loop(
+                    (
+                        beliefs,
+                        perception,
+                        qa_pairs,
+                        moments,
+                        improve_cost,
+                        iter_records,
+                    ) = _run_improve_loop(
                         config=config,
                         bl_config=bl_config,
                         beliefs=beliefs,
@@ -1083,14 +1224,26 @@ def run_stepwise_b_learn_episode(
                 )
 
             # --- Per-step artifact save ---
-            step_total_cost = agent_step_cost + step_extract_cost + step_improve_cost + step_experiment_cost
+            step_total_cost = (
+                agent_step_cost
+                + step_extract_cost
+                + step_improve_cost
+                + step_experiment_cost
+            )
             cumulative_step_cost += step_total_cost
 
-            did_learn = should_update_artifacts or should_improve or should_gen_experiments
+            did_learn = (
+                should_update_artifacts or should_improve or should_gen_experiments
+            )
             if did_learn:
                 _save_step_artifacts(
-                    step_dir, beliefs, perception, qa_pairs, moments,
-                    experiments, step_feedback_records,
+                    step_dir,
+                    beliefs,
+                    perception,
+                    qa_pairs,
+                    moments,
+                    experiments,
+                    step_feedback_records,
                     extraction_log=step_extraction_log,
                     experiment_log=step_experiment_log,
                 )
@@ -1140,7 +1293,9 @@ def run_stepwise_b_learn_episode(
             if done:
                 # Write terminal state s_T as a no-action row so the full
                 # trajectory s0,a0,s1,...,s_{T-1},a_{T-1},s_T is in the CSV.
-                csv_writer.writerow([step + 1, "", "", result_obs_text, new_raw_short, 0.0, True])
+                csv_writer.writerow(
+                    [step + 1, "", "", result_obs_text, new_raw_short, 0.0, True]
+                )
                 csv_file.flush()
                 evolve_logger.info(
                     f"[g{global_step}] Episode {episode_idx} DONE — "
@@ -1180,7 +1335,17 @@ def run_stepwise_b_learn_episode(
         f"learn cost: ${total_learn_cost:.4f}, agent cost: ${episode_log['total_cost']:.4f}"
     )
 
-    return beliefs, perception, qa_pairs, moments, experiments, episode_log, step + 1, trajectory_buffer, past_experiments
+    return (
+        beliefs,
+        perception,
+        qa_pairs,
+        moments,
+        experiments,
+        episode_log,
+        step + 1,
+        trajectory_buffer,
+        past_experiments,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1202,6 +1367,7 @@ def _inject_beliefs(
     instructions = None
     if env_name == "babyai":
         from balrog.environments import make_env as _  # noqa: F401
+
         instructions = getattr(env, "mission", None)
 
     goal_text = goal_override or agent_goal or resolve_agent_goal(config)
@@ -1233,12 +1399,30 @@ def _run_improve_loop(
     """Dispatch to conversational or independent improve loop based on config."""
     if bl_config.conversational_improve:
         return _run_improve_loop_conversational(
-            config, bl_config, beliefs, perception, qa_pairs, moments,
-            trajectory_buffer, default_knowledge, step, global_step, step_dir=step_dir,
+            config,
+            bl_config,
+            beliefs,
+            perception,
+            qa_pairs,
+            moments,
+            trajectory_buffer,
+            default_knowledge,
+            step,
+            global_step,
+            step_dir=step_dir,
         )
     return _run_improve_loop_independent(
-        config, bl_config, beliefs, perception, qa_pairs, moments,
-        trajectory_buffer, default_knowledge, step, global_step, step_dir=step_dir,
+        config,
+        bl_config,
+        beliefs,
+        perception,
+        qa_pairs,
+        moments,
+        trajectory_buffer,
+        default_knowledge,
+        step,
+        global_step,
+        step_dir=step_dir,
     )
 
 
@@ -1264,12 +1448,17 @@ def _run_improve_loop_independent(
     tag = f"[g{global_step}]"
 
     steps_context = format_steps_context(
-        trajectory_buffer, perception, bl_config.max_steps_context_chars,
+        trajectory_buffer,
+        perception,
+        bl_config.max_steps_context_chars,
     )
     sample_obs = _sample_observations_from_buffer(
-        trajectory_buffer, bl_config.num_sample_obs,
+        trajectory_buffer,
+        bl_config.num_sample_obs,
     )
-    forward_moments = [m for m in moments if m.raw_observation and m.raw_observation.strip()]
+    forward_moments = [
+        m for m in moments if m.raw_observation and m.raw_observation.strip()
+    ]
 
     evolve_logger.info(
         f"{tag} Improve loop (independent): steps={bl_config.max_steps_iterations}, qa={bl_config.max_qa_iterations}, moments={bl_config.max_moments_iterations} iters, "
@@ -1278,20 +1467,30 @@ def _run_improve_loop_independent(
     )
 
     for inner_iter in range(bl_config.max_steps_iterations):
-        evolve_logger.info(f"{tag}   iter {inner_iter + 1}/{bl_config.max_steps_iterations}")
-        iter_record = {"iteration": inner_iter + 1, "step": step, "global_step": global_step}
+        evolve_logger.info(
+            f"{tag}   iter {inner_iter + 1}/{bl_config.max_steps_iterations}"
+        )
+        iter_record = {
+            "iteration": inner_iter + 1,
+            "step": step,
+            "global_step": global_step,
+        }
 
         try:
             # Track 1: Steps-based improvement
             if steps_context:
                 evolve_logger.info(f"{tag}     Track 1: Steps-based improvement...")
                 prev_perception = perception
-                beliefs, perception, steps_cost, steps_prompt, steps_response = asyncio.run(
-                    improve_from_steps(
-                        config=config, beliefs=beliefs, perception=perception,
-                        steps_context=steps_context,
-                        sample_observations=sample_obs if sample_obs else None,
-                        default_knowledge=default_knowledge,
+                beliefs, perception, steps_cost, steps_prompt, steps_response = (
+                    asyncio.run(
+                        improve_from_steps(
+                            config=config,
+                            beliefs=beliefs,
+                            perception=perception,
+                            steps_context=steps_context,
+                            sample_observations=sample_obs if sample_obs else None,
+                            default_knowledge=default_knowledge,
+                        )
                     )
                 )
                 total_cost += steps_cost
@@ -1303,32 +1502,51 @@ def _run_improve_loop_independent(
                 # Rebuild steps_context if perception changed
                 if perception != prev_perception:
                     steps_context = format_steps_context(
-                        trajectory_buffer, perception, bl_config.max_steps_context_chars,
+                        trajectory_buffer,
+                        perception,
+                        bl_config.max_steps_context_chars,
                     )
             else:
                 evolve_logger.info(f"{tag}     Track 1: No steps context, skipping")
 
             # Track 2: QA-based improvement
             if not bl_config.use_qa:
-                evolve_logger.info(f"{tag}     Track 2: Disabled (use_qa=False), skipping")
+                evolve_logger.info(
+                    f"{tag}     Track 2: Disabled (use_qa=False), skipping"
+                )
             elif qa_pairs:
-                evolve_logger.info(f"{tag}     Track 2a: QA forward pass on {len(qa_pairs)} questions...")
-                qa_fwd_results, qa_fwd_cost, qa_fwd_prompts, qa_fwd_responses = asyncio.run(
-                    qa_forward_pass(config=config, beliefs=beliefs, qa_pairs=qa_pairs,
-                                    max_per_batch=bl_config.max_qa_per_forward)
+                evolve_logger.info(
+                    f"{tag}     Track 2a: QA forward pass on {len(qa_pairs)} questions..."
+                )
+                qa_fwd_results, qa_fwd_cost, qa_fwd_prompts, qa_fwd_responses = (
+                    asyncio.run(
+                        qa_forward_pass(
+                            config=config,
+                            beliefs=beliefs,
+                            qa_pairs=qa_pairs,
+                            max_per_batch=bl_config.max_qa_per_forward,
+                        )
+                    )
                 )
                 total_cost += qa_fwd_cost
 
                 qa_fb_results, qa_fb_cost, qa_fb_prompts, qa_fb_responses = asyncio.run(
-                    qa_get_feedback(config=config, qa_forward_results=qa_fwd_results,
-                                    max_per_batch=bl_config.max_qa_per_forward)
+                    qa_get_feedback(
+                        config=config,
+                        qa_forward_results=qa_fwd_results,
+                        max_per_batch=bl_config.max_qa_per_forward,
+                    )
                 )
                 total_cost += qa_fb_cost
 
                 qa_correct = [fr for fr in qa_fb_results if fr.verdict == "CORRECT"]
                 qa_incorrect = [fr for fr in qa_fb_results if fr.verdict == "INCORRECT"]
-                qa_inconclusive = [fr for fr in qa_fb_results if fr.verdict == "INCONCLUSIVE"]
-                qa_actionable = [fr for fr in qa_fb_results if fr.verdict != "INCONCLUSIVE"]
+                qa_inconclusive = [
+                    fr for fr in qa_fb_results if fr.verdict == "INCONCLUSIVE"
+                ]
+                qa_actionable = [
+                    fr for fr in qa_fb_results if fr.verdict != "INCONCLUSIVE"
+                ]
 
                 evolve_logger.info(
                     f"      Track 2b: {len(qa_correct)} correct, {len(qa_incorrect)} incorrect, "
@@ -1344,21 +1562,36 @@ def _run_improve_loop_independent(
                 iter_record["qa_forward_response"] = "\n---\n".join(qa_fwd_responses)
                 iter_record["qa_feedback_prompt"] = "\n---\n".join(qa_fb_prompts)
                 iter_record["qa_feedback_response"] = "\n---\n".join(qa_fb_responses)
-                iter_record["qa_feedback_details"] = serialize_qa_feedback_results(qa_fb_results)
+                iter_record["qa_feedback_details"] = serialize_qa_feedback_results(
+                    qa_fb_results
+                )
 
                 if qa_actionable and qa_incorrect:
-                    evolve_logger.info(f"{tag}     Track 2c: Improving from {len(qa_actionable)} QA feedback items...")
+                    evolve_logger.info(
+                        f"{tag}     Track 2c: Improving from {len(qa_actionable)} QA feedback items..."
+                    )
                     prev_perception = perception
-                    beliefs, perception, qa_improve_cost, qa_improve_prompt, qa_improve_response = asyncio.run(
+                    (
+                        beliefs,
+                        perception,
+                        qa_improve_cost,
+                        qa_improve_prompt,
+                        qa_improve_response,
+                    ) = asyncio.run(
                         improve_from_qa_feedback_with_steps(
-                            config=config, beliefs=beliefs, perception=perception,
-                            qa_feedback_results=qa_actionable, default_knowledge=default_knowledge,
+                            config=config,
+                            beliefs=beliefs,
+                            perception=perception,
+                            qa_feedback_results=qa_actionable,
+                            default_knowledge=default_knowledge,
                             steps_context=steps_context,
                             sample_observations=sample_obs if sample_obs else None,
                         )
                     )
                     total_cost += qa_improve_cost
-                    evolve_logger.info(f"{tag}     Track 2c done (cost: ${qa_improve_cost:.6f})")
+                    evolve_logger.info(
+                        f"{tag}     Track 2c done (cost: ${qa_improve_cost:.6f})"
+                    )
                     iter_record["qa_improve_cost"] = qa_improve_cost
                     iter_record["qa_improve_prompt"] = qa_improve_prompt
                     iter_record["qa_improve_response"] = qa_improve_response
@@ -1366,7 +1599,9 @@ def _run_improve_loop_independent(
                     # Rebuild steps_context if perception changed
                     if perception != prev_perception:
                         steps_context = format_steps_context(
-                            trajectory_buffer, perception, bl_config.max_steps_context_chars,
+                            trajectory_buffer,
+                            perception,
+                            bl_config.max_steps_context_chars,
                         )
                 else:
                     evolve_logger.info(f"{tag}     Track 2c: No incorrect QA, skipping")
@@ -1375,18 +1610,30 @@ def _run_improve_loop_independent(
 
             # Track 3: Critical moment improvement
             if not bl_config.use_moments:
-                evolve_logger.info(f"{tag}     Track 3: Disabled (use_moments=False), skipping")
+                evolve_logger.info(
+                    f"{tag}     Track 3: Disabled (use_moments=False), skipping"
+                )
             elif forward_moments:
-                evolve_logger.info(f"{tag}     Track 3a: Forward pass on {len(forward_moments)} moments...")
+                evolve_logger.info(
+                    f"{tag}     Track 3a: Forward pass on {len(forward_moments)} moments..."
+                )
                 fwd_results, fwd_cost = asyncio.run(
-                    forward_pass(config, beliefs, perception, forward_moments,
-                                 max_per_batch=bl_config.max_moments_per_forward)
+                    forward_pass(
+                        config,
+                        beliefs,
+                        perception,
+                        forward_moments,
+                        max_per_batch=bl_config.max_moments_per_forward,
+                    )
                 )
                 total_cost += fwd_cost
 
                 fb_results, fb_cost, _, _ = asyncio.run(
-                    get_feedback(config, fwd_results,
-                                 max_per_batch=bl_config.max_moments_per_forward)
+                    get_feedback(
+                        config,
+                        fwd_results,
+                        max_per_batch=bl_config.max_moments_per_forward,
+                    )
                 )
                 total_cost += fb_cost
 
@@ -1405,21 +1652,36 @@ def _run_improve_loop_independent(
                 iter_record["moment_num_inconclusive"] = len(inconclusive)
                 iter_record["moment_forward_cost"] = fwd_cost
                 iter_record["moment_feedback_cost"] = fb_cost
-                iter_record["moment_feedback_details"] = serialize_feedback_results(fb_results)
+                iter_record["moment_feedback_details"] = serialize_feedback_results(
+                    fb_results
+                )
 
                 if actionable and incorrect:
-                    evolve_logger.info(f"{tag}     Track 3c: Improving from {len(actionable)} moment feedback items...")
+                    evolve_logger.info(
+                        f"{tag}     Track 3c: Improving from {len(actionable)} moment feedback items..."
+                    )
                     prev_perception = perception
-                    beliefs, perception, improve_cost, improve_prompt, improve_response = asyncio.run(
+                    (
+                        beliefs,
+                        perception,
+                        improve_cost,
+                        improve_prompt,
+                        improve_response,
+                    ) = asyncio.run(
                         improve_from_feedback_with_steps(
-                            config=config, beliefs=beliefs, perception=perception,
-                            feedback_results=actionable, default_knowledge=default_knowledge,
+                            config=config,
+                            beliefs=beliefs,
+                            perception=perception,
+                            feedback_results=actionable,
+                            default_knowledge=default_knowledge,
                             steps_context=steps_context,
                             sample_observations=sample_obs if sample_obs else None,
                         )
                     )
                     total_cost += improve_cost
-                    evolve_logger.info(f"{tag}     Track 3c done (cost: ${improve_cost:.6f})")
+                    evolve_logger.info(
+                        f"{tag}     Track 3c done (cost: ${improve_cost:.6f})"
+                    )
                     iter_record["moment_improve_cost"] = improve_cost
                     iter_record["moment_improve_prompt"] = improve_prompt
                     iter_record["moment_improve_response"] = improve_response
@@ -1427,10 +1689,14 @@ def _run_improve_loop_independent(
                     # Rebuild steps_context if perception changed
                     if perception != prev_perception:
                         steps_context = format_steps_context(
-                            trajectory_buffer, perception, bl_config.max_steps_context_chars,
+                            trajectory_buffer,
+                            perception,
+                            bl_config.max_steps_context_chars,
                         )
                 else:
-                    evolve_logger.info(f"{tag}     Track 3c: No incorrect moments, skipping")
+                    evolve_logger.info(
+                        f"{tag}     Track 3c: No incorrect moments, skipping"
+                    )
             else:
                 evolve_logger.info(f"{tag}     Track 3: No forward moments, skipping")
 
@@ -1476,16 +1742,21 @@ def _run_improve_loop_conversational(
 
     # Build steps context (rebuilt when perception changes)
     steps_context = format_steps_context(
-        trajectory_buffer, perception, bl_config.max_steps_context_chars,
+        trajectory_buffer,
+        perception,
+        bl_config.max_steps_context_chars,
     )
 
     # Build sample observations for perception validation
     sample_obs = _sample_observations_from_buffer(
-        trajectory_buffer, bl_config.num_sample_obs,
+        trajectory_buffer,
+        bl_config.num_sample_obs,
     )
 
     # Filter moments with raw observations for forward pass
-    forward_moments = [m for m in moments if m.raw_observation and m.raw_observation.strip()]
+    forward_moments = [
+        m for m in moments if m.raw_observation and m.raw_observation.strip()
+    ]
 
     evolve_logger.info(
         f"{tag} Improve loop: steps={bl_config.max_steps_iterations}, perception_from_analysis={bl_config.max_perception_iterations}, qa={bl_config.max_qa_iterations}, moments={bl_config.max_moments_iterations} iters, "
@@ -1494,16 +1765,20 @@ def _run_improve_loop_conversational(
     )
 
     try:
-
         # ========================================
         # Track 1b: Steps-based beliefs improvement
         # ========================================
         if steps_context:
-            track1b_record = {"track": "steps_beliefs", "step": step, "global_step": global_step, "turns": []}
+            track1b_record = {
+                "track": "steps_beliefs",
+                "step": step,
+                "global_step": global_step,
+                "turns": [],
+            }
 
-            steps_beliefs_prompt = f"""We are interacting with an environment and trying to figure out how it works. We maintain beliefs about the environment to guide the agent's decisions.
+            steps_beliefs_prompt = f"""We are interacting with an environment and trying to figure out how it works. We maintain beliefs about the environment to guide future actions.
 
-The agent receives the following default instructions/knowledge:
+We receive the following default instructions/knowledge:
 === DEFAULT KNOWLEDGE ===
 {default_knowledge}
 === END DEFAULT KNOWLEDGE ===
@@ -1549,12 +1824,21 @@ For beliefs:
             )
             total_cost += turn_cost
 
-            perception_analysis = extract_xml_key(response_text, "perception_analysis") or ""
+            perception_analysis = (
+                extract_xml_key(response_text, "perception_analysis") or ""
+            )
 
-            turn_record = {"turn": 1, "cost": turn_cost, "prompt": steps_beliefs_prompt, "response": response_text}
+            turn_record = {
+                "turn": 1,
+                "cost": turn_cost,
+                "prompt": steps_beliefs_prompt,
+                "response": response_text,
+            }
             track1b_record["turns"].append(turn_record)
 
-            evolve_logger.info(f"{tag}     Track 1b done (cost: ${turn_cost:.6f}, perception_analysis: {len(perception_analysis)} chars)")
+            evolve_logger.info(
+                f"{tag}     Track 1b done (cost: ${turn_cost:.6f}, perception_analysis: {len(perception_analysis)} chars)"
+            )
 
             feedback_history.append(track1b_record)
             if step_dir is not None:
@@ -1567,7 +1851,12 @@ For beliefs:
         # Track 1c: Perception improvement guided by beliefs analysis
         # ========================================
         if sample_obs:
-            track1c_record = {"track": "perception_from_analysis", "step": step, "global_step": global_step, "turns": []}
+            track1c_record = {
+                "track": "perception_from_analysis",
+                "step": step,
+                "global_step": global_step,
+                "turns": [],
+            }
             pre_perception_track1c = perception
             obs_section_1c = _build_obs_section(perception, sample_obs)
 
@@ -1585,16 +1874,34 @@ For beliefs:
             prev_validation_error_1c: str | None = None
 
             for turn in range(bl_config.max_perception_iterations):
-                evolve_logger.info(f"{tag}     Track 1c (perception from analysis) turn {turn + 1}/{bl_config.max_perception_iterations}")
+                evolve_logger.info(
+                    f"{tag}     Track 1c (perception from analysis) turn {turn + 1}/{bl_config.max_perception_iterations}"
+                )
 
-                message = perception_from_analysis_prompt if turn == 0 else build_perception_followup_message(
-                    perception, sample_obs, prev_obs_section_1c,
-                    current_turn=turn + 1, max_turns=bl_config.max_perception_iterations,
+                message = (
+                    perception_from_analysis_prompt
+                    if turn == 0
+                    else build_perception_followup_message(
+                        perception,
+                        sample_obs,
+                        prev_obs_section_1c,
+                        current_turn=turn + 1,
+                        max_turns=bl_config.max_perception_iterations,
+                    )
                 )
                 if prev_validation_error_1c:
-                    message = _prepend_rejection_notice(message, prev_validation_error_1c)
+                    message = _prepend_rejection_notice(
+                        message, prev_validation_error_1c
+                    )
 
-                _beliefs_unused, perception, turn_cost, perception_conv_1c, response_text, prev_validation_error_1c = asyncio.run(
+                (
+                    _beliefs_unused,
+                    perception,
+                    turn_cost,
+                    perception_conv_1c,
+                    response_text,
+                    prev_validation_error_1c,
+                ) = asyncio.run(
                     _improve_with_perception_validation_conversational(
                         config=config,
                         beliefs=beliefs,
@@ -1606,7 +1913,12 @@ For beliefs:
                 )
                 total_cost += turn_cost
 
-                turn_record = {"turn": turn + 1, "cost": turn_cost, "prompt": message, "response": response_text}
+                turn_record = {
+                    "turn": turn + 1,
+                    "cost": turn_cost,
+                    "prompt": message,
+                    "response": response_text,
+                }
                 submitted = parse_submit_signal(response_text)
                 turn_record["submitted"] = submitted
                 track1c_record["turns"].append(turn_record)
@@ -1628,7 +1940,9 @@ For beliefs:
             # Rebuild steps_context if perception changed during Track 1c
             if perception != pre_perception_track1c:
                 steps_context = format_steps_context(
-                    trajectory_buffer, perception, bl_config.max_steps_context_chars,
+                    trajectory_buffer,
+                    perception,
+                    bl_config.max_steps_context_chars,
                 )
         else:
             evolve_logger.info(f"{tag}     Track 1c: No sample observations, skipping")
@@ -1639,10 +1953,17 @@ For beliefs:
         if not bl_config.use_qa:
             evolve_logger.info(f"{tag}     Track 2: Disabled (use_qa=False), skipping")
         elif qa_pairs:
-            track2_record = {"track": "qa", "step": step, "global_step": global_step, "turns": []}
+            track2_record = {
+                "track": "qa",
+                "step": step,
+                "global_step": global_step,
+                "turns": [],
+            }
 
             # Initial QA evaluation
-            evolve_logger.info(f"{tag}     Track 2: Initial QA forward pass on {len(qa_pairs)} questions...")
+            evolve_logger.info(
+                f"{tag}     Track 2: Initial QA forward pass on {len(qa_pairs)} questions..."
+            )
             qa_fwd_results, qa_fwd_cost, qa_fwd_prompts, qa_fwd_responses = asyncio.run(
                 qa_forward_pass(
                     config=config,
@@ -1664,7 +1985,9 @@ For beliefs:
 
             qa_correct = [fr for fr in qa_fb_results if fr.verdict == "CORRECT"]
             qa_incorrect = [fr for fr in qa_fb_results if fr.verdict == "INCORRECT"]
-            qa_inconclusive = [fr for fr in qa_fb_results if fr.verdict == "INCONCLUSIVE"]
+            qa_inconclusive = [
+                fr for fr in qa_fb_results if fr.verdict == "INCONCLUSIVE"
+            ]
             qa_actionable = [fr for fr in qa_fb_results if fr.verdict != "INCONCLUSIVE"]
 
             evolve_logger.info(
@@ -1680,7 +2003,9 @@ For beliefs:
             track2_record["qa_forward_response"] = "\n---\n".join(qa_fwd_responses)
             track2_record["qa_feedback_prompt"] = "\n---\n".join(qa_fb_prompts)
             track2_record["qa_feedback_response"] = "\n---\n".join(qa_fb_responses)
-            track2_record["qa_feedback_details"] = serialize_qa_feedback_results(qa_fb_results)
+            track2_record["qa_feedback_details"] = serialize_qa_feedback_results(
+                qa_fb_results
+            )
 
             pre_track_perception = perception
             if qa_actionable and qa_incorrect:
@@ -1689,7 +2014,7 @@ For beliefs:
                 for i, fr in enumerate(qa_actionable, 1):
                     actual = "YES" if fr.forward.qa_pair.answer else "NO"
                     qa_blocks.append(
-                        f"<qa_feedback n=\"{i}\">\n"
+                        f'<qa_feedback n="{i}">\n'
                         f"<question>{fr.forward.qa_pair.question}</question>\n"
                         f"<correct_answer>{actual}</correct_answer>\n"
                         f"<evidence>{fr.forward.qa_pair.evidence}</evidence>\n"
@@ -1701,7 +2026,9 @@ For beliefs:
                     )
                 qa_text = "\n\n".join(qa_blocks)
 
-                execution_report_section = _build_execution_report_section(perception, sample_obs)
+                execution_report_section = _build_execution_report_section(
+                    perception, sample_obs
+                )
 
                 initial_qa_prompt = f"""You are improving an agent's knowledge and perception based on testing its understanding of the environment via question-answering.
 
@@ -1755,15 +2082,32 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                 prev_validation_error_2b: str | None = None
 
                 for turn in range(bl_config.max_qa_iterations):
-                    evolve_logger.info(f"{tag}     Track 2 turn {turn + 1}/{bl_config.max_qa_iterations}")
+                    evolve_logger.info(
+                        f"{tag}     Track 2 turn {turn + 1}/{bl_config.max_qa_iterations}"
+                    )
 
-                    message = initial_qa_prompt if turn == 0 else build_qa_followup_message(
-                        qa_fb_results, prev_qa_correct, prev_qa_incorrect,
+                    message = (
+                        initial_qa_prompt
+                        if turn == 0
+                        else build_qa_followup_message(
+                            qa_fb_results,
+                            prev_qa_correct,
+                            prev_qa_incorrect,
+                        )
                     )
                     if prev_validation_error_2b:
-                        message = _prepend_rejection_notice(message, prev_validation_error_2b)
+                        message = _prepend_rejection_notice(
+                            message, prev_validation_error_2b
+                        )
 
-                    beliefs, perception, turn_cost, qa_conversation, response_text, prev_validation_error_2b = asyncio.run(
+                    (
+                        beliefs,
+                        perception,
+                        turn_cost,
+                        qa_conversation,
+                        response_text,
+                        prev_validation_error_2b,
+                    ) = asyncio.run(
                         _improve_with_perception_validation_conversational(
                             config=config,
                             beliefs=beliefs,
@@ -1775,7 +2119,12 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                     )
                     total_cost += turn_cost
 
-                    turn_record = {"turn": turn + 1, "cost": turn_cost, "prompt": message, "response": response_text}
+                    turn_record = {
+                        "turn": turn + 1,
+                        "cost": turn_cost,
+                        "prompt": message,
+                        "response": response_text,
+                    }
                     submitted = parse_submit_signal(response_text)
                     turn_record["submitted"] = submitted
                     track2_record["turns"].append(turn_record)
@@ -1786,13 +2135,19 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                     )
 
                     if submitted:
-                        evolve_logger.info(f"{tag}     Track 2: LLM submitted after {turn + 1} turn(s)")
+                        evolve_logger.info(
+                            f"{tag}     Track 2: LLM submitted after {turn + 1} turn(s)"
+                        )
                         break
 
                     # Re-evaluate QA for next turn (unless this is the last turn)
                     if turn + 1 < bl_config.max_qa_iterations:
-                        prev_qa_correct = sum(1 for fr in qa_fb_results if fr.verdict == "CORRECT")
-                        prev_qa_incorrect = sum(1 for fr in qa_fb_results if fr.verdict == "INCORRECT")
+                        prev_qa_correct = sum(
+                            1 for fr in qa_fb_results if fr.verdict == "CORRECT"
+                        )
+                        prev_qa_incorrect = sum(
+                            1 for fr in qa_fb_results if fr.verdict == "INCORRECT"
+                        )
 
                         qa_fwd_results, qa_fwd_cost, _, _ = asyncio.run(
                             qa_forward_pass(
@@ -1813,15 +2168,21 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                         )
                         total_cost += qa_fb_cost
 
-                        new_correct = sum(1 for fr in qa_fb_results if fr.verdict == "CORRECT")
-                        new_incorrect = sum(1 for fr in qa_fb_results if fr.verdict == "INCORRECT")
+                        new_correct = sum(
+                            1 for fr in qa_fb_results if fr.verdict == "CORRECT"
+                        )
+                        new_incorrect = sum(
+                            1 for fr in qa_fb_results if fr.verdict == "INCORRECT"
+                        )
                         evolve_logger.info(
                             f"{tag}     Track 2 re-eval: {new_correct} correct "
                             f"({new_correct - prev_qa_correct:+d}), "
                             f"{new_incorrect} incorrect ({new_incorrect - prev_qa_incorrect:+d})"
                         )
             else:
-                evolve_logger.info(f"{tag}     Track 2: No incorrect QA, skipping improvement")
+                evolve_logger.info(
+                    f"{tag}     Track 2: No incorrect QA, skipping improvement"
+                )
 
             feedback_history.append(track2_record)
             if step_dir is not None:
@@ -1830,7 +2191,9 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
             # Rebuild steps_context if perception changed during Track 2
             if perception != pre_track_perception:
                 steps_context = format_steps_context(
-                    trajectory_buffer, perception, bl_config.max_steps_context_chars,
+                    trajectory_buffer,
+                    perception,
+                    bl_config.max_steps_context_chars,
                 )
         else:
             evolve_logger.info(f"{tag}     Track 2: No QA pairs, skipping")
@@ -1839,15 +2202,27 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
         # Track 3: Critical moment conversational improvement
         # ========================================
         if not bl_config.use_moments:
-            evolve_logger.info(f"{tag}     Track 3: Disabled (use_moments=False), skipping")
+            evolve_logger.info(
+                f"{tag}     Track 3: Disabled (use_moments=False), skipping"
+            )
         elif forward_moments:
-            track3_record = {"track": "moments", "step": step, "global_step": global_step, "turns": []}
+            track3_record = {
+                "track": "moments",
+                "step": step,
+                "global_step": global_step,
+                "turns": [],
+            }
 
             # Initial moment evaluation
-            evolve_logger.info(f"{tag}     Track 3: Initial forward pass on {len(forward_moments)} moments...")
+            evolve_logger.info(
+                f"{tag}     Track 3: Initial forward pass on {len(forward_moments)} moments..."
+            )
             fwd_results, fwd_cost = asyncio.run(
                 forward_pass(
-                    config, beliefs, perception, forward_moments,
+                    config,
+                    beliefs,
+                    perception,
+                    forward_moments,
                     max_per_batch=bl_config.max_moments_per_forward,
                 )
             )
@@ -1855,7 +2230,8 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
 
             fb_results, fb_cost, _, _ = asyncio.run(
                 get_feedback(
-                    config, fwd_results,
+                    config,
+                    fwd_results,
                     max_per_batch=bl_config.max_moments_per_forward,
                 )
             )
@@ -1875,7 +2251,9 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
             track3_record["initial_incorrect"] = len(incorrect)
             track3_record["moment_forward_cost"] = fwd_cost
             track3_record["moment_feedback_cost"] = fb_cost
-            track3_record["moment_feedback_details"] = serialize_feedback_results(fb_results)
+            track3_record["moment_feedback_details"] = serialize_feedback_results(
+                fb_results
+            )
 
             if actionable and incorrect:
                 # Build initial moments improvement prompt
@@ -1885,7 +2263,7 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                     good = ", ".join(m.good_actions) if m.good_actions else "NONE"
                     bad = ", ".join(m.bad_actions) if m.bad_actions else "NONE"
                     feedback_blocks.append(
-                        f"<moment_feedback n=\"{i}\">\n"
+                        f'<moment_feedback n="{i}">\n'
                         f"<goal>{m.goal}</goal>\n"
                         f"<raw_observation>\n{m.raw_observation[:1500]}\n</raw_observation>\n"
                         f"<perception_output>\n{fr.forward.perception_output if fr.forward.perception_output else '(empty)'}\n</perception_output>\n"
@@ -1899,7 +2277,9 @@ This is a multi-turn conversation. After each response, the QA pairs will be re-
                     )
                 feedback_text = "\n\n".join(feedback_blocks)
 
-                execution_report_section = _build_execution_report_section(perception, sample_obs)
+                execution_report_section = _build_execution_report_section(
+                    perception, sample_obs
+                )
 
                 initial_moment_prompt = f"""You are improving an agent's knowledge and perception based on feedback from testing its decision-making.
 
@@ -1954,15 +2334,32 @@ This is a multi-turn conversation. After each response, the critical moments wil
                 prev_validation_error_3: str | None = None
 
                 for turn in range(bl_config.max_moments_iterations):
-                    evolve_logger.info(f"{tag}     Track 3 turn {turn + 1}/{bl_config.max_moments_iterations}")
+                    evolve_logger.info(
+                        f"{tag}     Track 3 turn {turn + 1}/{bl_config.max_moments_iterations}"
+                    )
 
-                    message = initial_moment_prompt if turn == 0 else build_moments_followup_message(
-                        fb_results, prev_correct, prev_incorrect,
+                    message = (
+                        initial_moment_prompt
+                        if turn == 0
+                        else build_moments_followup_message(
+                            fb_results,
+                            prev_correct,
+                            prev_incorrect,
+                        )
                     )
                     if prev_validation_error_3:
-                        message = _prepend_rejection_notice(message, prev_validation_error_3)
+                        message = _prepend_rejection_notice(
+                            message, prev_validation_error_3
+                        )
 
-                    beliefs, perception, turn_cost, moment_conversation, response_text, prev_validation_error_3 = asyncio.run(
+                    (
+                        beliefs,
+                        perception,
+                        turn_cost,
+                        moment_conversation,
+                        response_text,
+                        prev_validation_error_3,
+                    ) = asyncio.run(
                         _improve_with_perception_validation_conversational(
                             config=config,
                             beliefs=beliefs,
@@ -1974,7 +2371,12 @@ This is a multi-turn conversation. After each response, the critical moments wil
                     )
                     total_cost += turn_cost
 
-                    turn_record = {"turn": turn + 1, "cost": turn_cost, "prompt": message, "response": response_text}
+                    turn_record = {
+                        "turn": turn + 1,
+                        "cost": turn_cost,
+                        "prompt": message,
+                        "response": response_text,
+                    }
                     submitted = parse_submit_signal(response_text)
                     turn_record["submitted"] = submitted
                     track3_record["turns"].append(turn_record)
@@ -1985,17 +2387,26 @@ This is a multi-turn conversation. After each response, the critical moments wil
                     )
 
                     if submitted:
-                        evolve_logger.info(f"{tag}     Track 3: LLM submitted after {turn + 1} turn(s)")
+                        evolve_logger.info(
+                            f"{tag}     Track 3: LLM submitted after {turn + 1} turn(s)"
+                        )
                         break
 
                     # Re-evaluate moments for next turn (unless this is the last turn)
                     if turn + 1 < bl_config.max_moments_iterations:
-                        prev_correct = sum(1 for fr in fb_results if fr.verdict == "CORRECT")
-                        prev_incorrect = sum(1 for fr in fb_results if fr.verdict == "INCORRECT")
+                        prev_correct = sum(
+                            1 for fr in fb_results if fr.verdict == "CORRECT"
+                        )
+                        prev_incorrect = sum(
+                            1 for fr in fb_results if fr.verdict == "INCORRECT"
+                        )
 
                         fwd_results, fwd_cost = asyncio.run(
                             forward_pass(
-                                config, beliefs, perception, forward_moments,
+                                config,
+                                beliefs,
+                                perception,
+                                forward_moments,
                                 max_per_batch=bl_config.max_moments_per_forward,
                             )
                         )
@@ -2003,21 +2414,28 @@ This is a multi-turn conversation. After each response, the critical moments wil
 
                         fb_results, fb_cost, _, _ = asyncio.run(
                             get_feedback(
-                                config, fwd_results,
+                                config,
+                                fwd_results,
                                 max_per_batch=bl_config.max_moments_per_forward,
                             )
                         )
                         total_cost += fb_cost
 
-                        new_correct = sum(1 for fr in fb_results if fr.verdict == "CORRECT")
-                        new_incorrect = sum(1 for fr in fb_results if fr.verdict == "INCORRECT")
+                        new_correct = sum(
+                            1 for fr in fb_results if fr.verdict == "CORRECT"
+                        )
+                        new_incorrect = sum(
+                            1 for fr in fb_results if fr.verdict == "INCORRECT"
+                        )
                         evolve_logger.info(
                             f"{tag}     Track 3 re-eval: {new_correct} correct "
                             f"({new_correct - prev_correct:+d}), "
                             f"{new_incorrect} incorrect ({new_incorrect - prev_incorrect:+d})"
                         )
             else:
-                evolve_logger.info(f"{tag}     Track 3: No incorrect moments, skipping improvement")
+                evolve_logger.info(
+                    f"{tag}     Track 3: No incorrect moments, skipping improvement"
+                )
 
             feedback_history.append(track3_record)
             if step_dir is not None:
@@ -2028,7 +2446,9 @@ This is a multi-turn conversation. After each response, the critical moments wil
     except Exception as e:
         evolve_logger.error(f"{tag}     Improve loop failed: {e}")
         logging.exception("Improve loop failed")
-        feedback_history.append({"error": str(e), "step": step, "global_step": global_step})
+        feedback_history.append(
+            {"error": str(e), "step": step, "global_step": global_step}
+        )
         if step_dir is not None:
             _flush_improve_progress(step_dir, feedback_history, beliefs, perception)
 
@@ -2050,14 +2470,18 @@ def stepwise_b_learn(
     evolve_logger.info("Starting stepwise B-learning")
 
     # Check for resume
-    last_ep, beliefs, perception, qa_pairs, moments = find_last_completed_episode(output_dir)
+    last_ep, beliefs, perception, qa_pairs, moments = find_last_completed_episode(
+        output_dir
+    )
     start_episode = last_ep + 1
 
     # Also restore experiments and global step count
     experiments = []
     global_steps_used = 0
     if start_episode > 0:
-        evolve_logger.info(f"Resuming from episode {start_episode} ({len(qa_pairs)} QA, {len(moments)} moments)")
+        evolve_logger.info(
+            f"Resuming from episode {start_episode} ({len(qa_pairs)} QA, {len(moments)} moments)"
+        )
         # Recover experiments from last episode dir
         exp_file = Path(output_dir) / f"episode_{last_ep}" / "experiments.json"
         if exp_file.exists():
@@ -2067,7 +2491,9 @@ def stepwise_b_learn(
                 pass
         # Recover global step count from episode logs
         for ep_idx in range(start_episode):
-            ep_json = list((Path(output_dir) / f"episode_{ep_idx}").glob("*_run_*.json"))
+            ep_json = list(
+                (Path(output_dir) / f"episode_{ep_idx}").glob("*_run_*.json")
+            )
             for jf in ep_json:
                 try:
                     ep_data = json.loads(jf.read_text())
@@ -2094,11 +2520,17 @@ def stepwise_b_learn(
 
     evolve_logger.info(f"Stepwise B-learn config:")
     evolve_logger.info(f"  Total env steps: {bl_config.n_environment_steps}")
-    evolve_logger.info(f"  Improve iterations: perception={bl_config.max_perception_iterations}, steps={bl_config.max_steps_iterations}, qa={bl_config.max_qa_iterations}, moments={bl_config.max_moments_iterations} ({'conversational' if bl_config.conversational_improve else 'independent'})")
-    evolve_logger.info(f"  Artifact update interval: {bl_config.artifact_update_interval}")
+    evolve_logger.info(
+        f"  Improve iterations: perception={bl_config.max_perception_iterations}, steps={bl_config.max_steps_iterations}, qa={bl_config.max_qa_iterations}, moments={bl_config.max_moments_iterations} ({'conversational' if bl_config.conversational_improve else 'independent'})"
+    )
+    evolve_logger.info(
+        f"  Artifact update interval: {bl_config.artifact_update_interval}"
+    )
     evolve_logger.info(f"  Improve interval: {bl_config.improve_interval}")
     evolve_logger.info(f"  Experiment interval: {bl_config.experiment_interval}")
-    evolve_logger.info(f"  Max steps context chars: {bl_config.max_steps_context_chars}")
+    evolve_logger.info(
+        f"  Max steps context chars: {bl_config.max_steps_context_chars}"
+    )
     evolve_logger.info(f"  Explore temp: {bl_config.explore_temp}")
 
     cumulative_cost = 0.0
@@ -2109,14 +2541,16 @@ def stepwise_b_learn(
     while global_steps_used < bl_config.n_environment_steps:
         remaining_steps = bl_config.n_environment_steps - global_steps_used
 
-        evolve_logger.info(f"\n{'='*80}")
+        evolve_logger.info(f"\n{'=' * 80}")
         evolve_logger.info(
             f"STEPWISE B-LEARN EPISODE {episode_idx} "
             f"(global steps: {global_steps_used}/{bl_config.n_environment_steps}, "
             f"remaining: {remaining_steps})"
         )
-        evolve_logger.info(f"QA pairs: {len(qa_pairs)}, Moments: {len(moments)}, Experiments: {len(experiments)}")
-        evolve_logger.info(f"{'='*80}")
+        evolve_logger.info(
+            f"QA pairs: {len(qa_pairs)}, Moments: {len(moments)}, Experiments: {len(experiments)}"
+        )
+        evolve_logger.info(f"{'=' * 80}")
 
         episode_dir = Path(output_dir) / f"episode_{episode_idx}"
         episode_dir.mkdir(parents=True, exist_ok=True)
@@ -2128,25 +2562,33 @@ def stepwise_b_learn(
             json.dump(experiments, f, indent=4)
 
         with override_temperature(config, bl_config.explore_temp):
-            beliefs, perception, qa_pairs, moments, experiments, episode_log, steps_taken, trajectory_buffer, past_experiments = (
-                run_stepwise_b_learn_episode(
-                    config=config,
-                    bl_config=bl_config,
-                    beliefs=beliefs,
-                    perception=perception,
-                    qa_pairs=qa_pairs,
-                    moments=moments,
-                    experiments=experiments,
-                    default_knowledge=default_knowledge,
-                    original_cwd=original_cwd,
-                    output_dir=str(episode_dir),
-                    episode_idx=episode_idx,
-                    global_step_start=global_steps_used,
-                    max_episode_steps=remaining_steps,
-                    trajectory_buffer=trajectory_buffer,
-                    past_experiments=past_experiments,
-                    cumulative_cost_offset=cumulative_cost,
-                )
+            (
+                beliefs,
+                perception,
+                qa_pairs,
+                moments,
+                experiments,
+                episode_log,
+                steps_taken,
+                trajectory_buffer,
+                past_experiments,
+            ) = run_stepwise_b_learn_episode(
+                config=config,
+                bl_config=bl_config,
+                beliefs=beliefs,
+                perception=perception,
+                qa_pairs=qa_pairs,
+                moments=moments,
+                experiments=experiments,
+                default_knowledge=default_knowledge,
+                original_cwd=original_cwd,
+                output_dir=str(episode_dir),
+                episode_idx=episode_idx,
+                global_step_start=global_steps_used,
+                max_episode_steps=remaining_steps,
+                trajectory_buffer=trajectory_buffer,
+                past_experiments=past_experiments,
+                cumulative_cost_offset=cumulative_cost,
             )
 
         global_steps_used += steps_taken
@@ -2156,7 +2598,9 @@ def stepwise_b_learn(
         with open(episode_dir / "experiments.json", "w") as f:
             json.dump(experiments, f, indent=4)
 
-        episode_cost = episode_log.get("total_cost", 0.0) + episode_log.get("total_learn_cost", 0.0)
+        episode_cost = episode_log.get("total_cost", 0.0) + episode_log.get(
+            "total_learn_cost", 0.0
+        )
         cumulative_cost += episode_cost
         evolve_logger.info(
             f"[g{global_steps_used}] Episode {episode_idx} done — "
@@ -2172,7 +2616,9 @@ def stepwise_b_learn(
 # ---------------------------------------------------------------------------
 
 
-@hydra.main(config_path="BALROG/balrog/config", config_name="config", version_base="1.1")
+@hydra.main(
+    config_path="BALROG/balrog/config", config_name="config", version_base="1.1"
+)
 def main(config: DictConfig):
     run_name_suffix = f"{config.agent.type}_{config.client.model_id.replace('/', '_')}_stepwise_b_learn"
 
@@ -2190,25 +2636,34 @@ def main(config: DictConfig):
         n_environment_steps=evolve_cfg.get("n_environment_steps", 100),
         max_steps_iterations=evolve_cfg.get(
             "max_steps_iterations",
-            evolve_cfg.get("max_improve_iterations", evolve_cfg.get("num_improve_iterations", 1)),
+            evolve_cfg.get(
+                "max_improve_iterations", evolve_cfg.get("num_improve_iterations", 1)
+            ),
         ),
         max_perception_iterations=evolve_cfg.get(
             "max_perception_iterations",
-            evolve_cfg.get("max_steps_iterations",
-                           evolve_cfg.get("max_improve_iterations", evolve_cfg.get("num_improve_iterations", 5))),
+            evolve_cfg.get(
+                "max_steps_iterations",
+                evolve_cfg.get(
+                    "max_improve_iterations",
+                    evolve_cfg.get("num_improve_iterations", 5),
+                ),
+            ),
         ),
         use_qa=evolve_cfg.get("use_qa_improve", True),
         use_moments=evolve_cfg.get("use_moments_improve", True),
         max_qa_iterations=evolve_cfg.get(
             "max_qa_iterations",
-            evolve_cfg.get("max_improve_iterations", evolve_cfg.get("num_improve_iterations", 1)),
+            evolve_cfg.get(
+                "max_improve_iterations", evolve_cfg.get("num_improve_iterations", 1)
+            ),
         ),
         max_moments_iterations=evolve_cfg.get(
             "max_moments_iterations",
-            evolve_cfg.get("max_improve_iterations", evolve_cfg.get("num_improve_iterations", 1)),
+            evolve_cfg.get(
+                "max_improve_iterations", evolve_cfg.get("num_improve_iterations", 1)
+            ),
         ),
-        max_moments_per_forward=evolve_cfg.get("max_moments_per_forward", 10),
-        max_qa_per_forward=evolve_cfg.get("max_qa_per_forward", 10),
         max_total_moments=evolve_cfg.get("max_total_moments", 50),
         max_total_qa_pairs=evolve_cfg.get("max_total_qa_pairs", 50),
         num_experiments=evolve_cfg.get("num_experiments", 5),

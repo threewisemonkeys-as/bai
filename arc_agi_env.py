@@ -65,59 +65,46 @@ _IMAGE_SCALE = 2  # 64px -> 128px, matching reference repo
 
 
 def _frames_to_pil_image(frame_data: FrameDataRaw) -> Optional[Image.Image]:
-    """Convert FrameDataRaw frames to a scaled PIL Image.
+    """Convert the final FrameDataRaw frame layer to a scaled PIL Image.
 
-    Renders the last frame layer using the 16-color palette and scales
-    up with nearest-neighbor interpolation to preserve crisp pixel art.
-    Multiple frame layers are stacked horizontally.
+    A single observation can carry multiple frame layers when an action
+    triggers a reactive cascade/animation. Only the last (settled) layer is
+    rendered — using the 16-color palette and nearest-neighbor upscaling to
+    keep the pixel art crisp — so the image is always a single panel showing
+    the resulting state.
     """
     if not frame_data.frame:
         return None
 
-    images = []
-    for frame in frame_data.frame:
-        h, w = frame.shape[:2]
-        img_array = np.zeros((h, w, 3), dtype=np.uint8)
+    frame = frame_data.frame[-1]
+    h, w = frame.shape[:2]
+    img_array = np.zeros((h, w, 3), dtype=np.uint8)
 
-        for val, rgb in _PALETTE.items():
-            mask = frame == val
-            if mask.ndim == 3:
-                mask = mask[:, :, 0]
-            img_array[mask] = rgb
+    for val, rgb in _PALETTE.items():
+        mask = frame == val
+        if mask.ndim == 3:
+            mask = mask[:, :, 0]
+        img_array[mask] = rgb
 
-        img = Image.fromarray(img_array, mode="RGB")
-        # Scale up with nearest-neighbor to keep pixel art crisp
-        img = img.resize(
-            (w * _IMAGE_SCALE, h * _IMAGE_SCALE), Image.NEAREST
-        )
-        images.append(img)
-
-    if len(images) == 1:
-        return images[0]
-
-    # Stack multiple layers horizontally with a separator
-    sep_width = 4
-    total_w = sum(im.width for im in images) + sep_width * (len(images) - 1)
-    max_h = max(im.height for im in images)
-    combined = Image.new("RGB", (total_w, max_h), (40, 40, 40))
-    x_offset = 0
-    for im in images:
-        combined.paste(im, (x_offset, 0))
-        x_offset += im.width + sep_width
-
-    return combined
+    img = Image.fromarray(img_array, mode="RGB")
+    # Scale up with nearest-neighbor to keep pixel art crisp
+    return img.resize((w * _IMAGE_SCALE, h * _IMAGE_SCALE), Image.NEAREST)
 
 
 def _render_frames_as_text(frame_data: FrameDataRaw) -> str:
-    """Convert all frame layers to pretty-printed grid text.
+    """Convert the final frame layer to pretty-printed grid text.
 
-    Uses the row-by-row format from the reference ARC-AGI 3 agents,
-    which is more readable than flat JSON for 64x64 grids.
+    A single observation can carry multiple frame layers when an action
+    triggers a reactive cascade/animation; only the last (settled) layer is
+    rendered, mirroring the single-panel image, so the textual state stays
+    compact and consistent with the visual one. Uses the row-by-row format
+    from the reference ARC-AGI 3 agents, which is more readable than flat
+    JSON for 64x64 grids.
     """
     if not frame_data.frame:
         return "(no frame data)"
 
-    return _pretty_print_frames(frame_data.frame)
+    return _pretty_print_frames(frame_data.frame[-1:])
 
 
 def _build_action_strings(available_action_ids: list[int]) -> list[str]:
@@ -219,6 +206,7 @@ class ArcAgiEnvWrapper:
         self._prev_levels_completed = 0
         self._last_frame_data: Optional[FrameDataRaw] = None
         self._available_actions: list[str] = []
+        self._last_action_feedback: Optional[str] = None
 
         # Set up from initial observation
         initial = self._env.observation_space
@@ -256,6 +244,8 @@ class ArcAgiEnvWrapper:
             f"Levels completed: {frame_data.levels_completed}/{frame_data.win_levels}\n"
             f"Action count: {self._steps_taken}"
         )
+        if self._last_action_feedback:
+            short_term = f"{self._last_action_feedback}\n{short_term}"
 
         current_image = _frames_to_pil_image(frame_data)
 
@@ -271,6 +261,7 @@ class ArcAgiEnvWrapper:
         """Reset the environment. Returns (obs, info)."""
         self._steps_taken = 0
         self.failed_candidates = []
+        self._last_action_feedback = None
 
         frame_data = self._env.reset()
         if frame_data is None:
@@ -295,21 +286,64 @@ class ArcAgiEnvWrapper:
 
         return obs, info
 
+    def _validate_action(
+        self, ga: Optional[GameAction], data: Optional[dict], raw_action: str
+    ) -> Optional[str]:
+        """Return a feedback message if the action is invalid, else None.
+
+        Rejects unrecognized action names, actions not currently available, and
+        complex actions (ACTION6) missing x,y coordinates. Surfacing these as
+        feedback lets the agent self-correct instead of the engine silently
+        no-opping an unavailable action or crashing on missing coordinates.
+        """
+        available = ", ".join(self._available_actions) or "(none)"
+        if ga is None:
+            return (
+                f"'{raw_action.strip()}' is not a recognized action. "
+                f"Choose one of the available actions: {available}."
+            )
+        if ga.name not in self._available_actions:
+            return (
+                f"Action '{ga.name}' is not available right now. "
+                f"Available actions: {available}."
+            )
+        if ga.is_complex() and not (data and "x" in data and "y" in data):
+            return (
+                f"Action '{ga.name}' requires coordinates. Use the format "
+                f"'{ga.name} x=<int> y=<int>' with x and y each between 0 and 63."
+            )
+        return None
+
     def step(self, action: str) -> tuple[dict, float, bool, bool, dict]:
         """Take a step. Returns (obs, reward, terminated, truncated, info)."""
         self._steps_taken += 1
 
-        # Parse and validate action
+        # Parse and validate action. Invalid/unavailable actions (and ACTION6
+        # without coordinates) are not sent to the engine; instead we attach
+        # feedback to the next observation so the agent can correct itself.
         ga, data = _parse_action(action)
-        if ga is None:
+        feedback = self._validate_action(ga, data, action)
+        if feedback is not None:
             self.failed_candidates.append(action)
-            ga = GameAction.from_name(self.default_action)
-            data = None
+            self._last_action_feedback = feedback
+            obs = self._make_obs(self._last_frame_data) if self._last_frame_data else {
+                "text": {"long_term_context": "", "short_term_context": feedback},
+                "image": None,
+            }
+            truncated = self._steps_taken >= self._max_steps
+            info = {"game_id": self.game_id, "invalid_action": True}
+            return obs, 0.0, False, truncated, info
+
+        self._last_action_feedback = None
 
         # Execute action
         frame_data = self._env.step(ga, data=data)
         if frame_data is None:
-            # Step failed — return current state with no reward
+            # Step failed — surface feedback and return current state, no reward
+            self._last_action_feedback = (
+                f"The engine could not perform action '{action.strip()}'. "
+                f"Please try a different action."
+            )
             obs = self._make_obs(self._last_frame_data) if self._last_frame_data else {
                 "text": {"long_term_context": "(step failed)", "short_term_context": ""},
                 "image": None,

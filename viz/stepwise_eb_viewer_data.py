@@ -310,6 +310,7 @@ def load_log_dir(log_dir):
                 "has_experiment_log": os.path.exists(os.path.join(s_path, "experiment_log.json")),
                 "has_critical_id_log": os.path.exists(os.path.join(s_path, "critical_id_log.json")),
                 "has_agent_messages": os.path.exists(os.path.join(s_path, "agent_messages.json")),
+                "has_theory_log": os.path.exists(os.path.join(s_path, "theory_log.json")),
                 "has_obs_before": os.path.exists(os.path.join(s_path, "obs_before.png")),
                 "has_obs_after": os.path.exists(os.path.join(s_path, "obs_after.png")),
                 "env_info": step_log.get("env_info"),
@@ -358,6 +359,13 @@ def load_step_detail(log_dir, episode_idx, step_idx):
         "online_light": read_json(os.path.join(step_path, "scoring_online_light.json")),
         "offline_full": read_json(os.path.join(step_path, "scoring_offline_full.json")),
         "offline_light": read_json(os.path.join(step_path, "scoring_offline_light.json")),
+        # Plan B theory-entropy selection. The on-disk file already carries the
+        # full probe-selection shape (ranked_unanswered / scoring_log / tie_break
+        # / selection_log / dedup_log), so it slots straight into the existing
+        # scoring renderers without the b_diff reconstruction below.
+        "online_theory_entropy": read_json(
+            os.path.join(step_path, "scoring_online_theory_entropy.json")
+        ),
     }
     if (
         question_scoring["online_full"] is None
@@ -386,7 +394,7 @@ def load_step_detail(log_dir, episode_idx, step_idx):
         }
     if (
         question_scoring["online_full"] is None
-        and selection_source_log.get("method") == "probe_selection_b_diff_full"
+        and selection_source_log.get("method", "").startswith("probe_selection_b_diff_full")
         and isinstance(selection_source_log.get("scoring"), dict)
     ):
         scoring = selection_source_log["scoring"]
@@ -444,7 +452,7 @@ def load_step_detail(log_dir, episode_idx, step_idx):
         }
     if (
         question_scoring["online_light"] is None
-        and selection_source_log.get("method") == "probe_selection_b_diff_light"
+        and selection_source_log.get("method", "").startswith("probe_selection_b_diff_light")
         and isinstance(selection_source_log.get("scoring"), dict)
     ):
         scoring = selection_source_log["scoring"]
@@ -491,6 +499,11 @@ def load_step_detail(log_dir, episode_idx, step_idx):
             artifact["tie_break"] = scoring.get("tie_break")
     qa_pairs = read_json(os.path.join(step_path, "qa_pairs.json")) or []
     experiment_log = read_json(os.path.join(step_path, "experiment_log.json")) or {}
+    experiment_scoring_log = (
+        read_json(os.path.join(step_path, "experiment_scoring_log.json"))
+        or experiment_log.get("experiment_scoring")
+        or {}
+    )
     ordered_qa_pairs, ordered_qa_source_indices = ordered_qa_pairs_for_display(
         qa_pairs,
         question_selection_log=selection_source_log,
@@ -508,7 +521,10 @@ def load_step_detail(log_dir, episode_idx, step_idx):
         "trim_log": trim_log,
         "question_selection_log": question_selection_log,
         "experiment_log": experiment_log,
+        "experiment_scoring_log": experiment_scoring_log,
         "agent_messages": read_json(os.path.join(step_path, "agent_messages.json")) or [],
+        # Plan B: theory ensemble + seeded crux questions for this step.
+        "theory_log": read_json(os.path.join(step_path, "theory_log.json")) or {},
         "improve_log": read_file(os.path.join(step_path, "improve.log")),
         "step_log": read_json(os.path.join(step_path, "step_log.json")) or {},
         "question_scoring": {
@@ -673,12 +689,26 @@ def load_experiment_timeline(log_dir):
 
             new_questions = exp_log.get("new_questions", [])
             experiment_plan = exp_log.get("experiment_plan")
+            experiment_scoring = (
+                read_json(os.path.join(s_path, "experiment_scoring_log.json"))
+                or exp_log.get("experiment_scoring")
+                or {}
+            )
+            selection_mode = exp_log.get("experiment_selection_mode")
+            winner_kind = experiment_scoring.get("winner_kind")
+            winner_score = experiment_scoring.get("winner_score")
+            winner_source_idx = experiment_scoring.get("winner_source_index")
+            candidate_count = len(experiment_scoring.get("candidates", [])) if isinstance(experiment_scoring.get("candidates"), list) else 0
+            did_formulate = bool(step_log.get("did_formulate_experiment"))
             selected_q_idx = exp_log.get("selected_question_index")
             selected_q_source_idx = exp_log.get("selected_question_source_index")
+            if selected_q_source_idx is None and winner_source_idx is not None:
+                selected_q_source_idx = winner_source_idx
 
             # Try to resolve the selected question text from qa_pairs
             selected_question_text = None
-            if selected_q_idx is not None:
+            selected_question_text = exp_log.get("selected_question")
+            if selected_q_idx is not None and not selected_question_text:
                 qa_pairs_for_experiment = exp_log.get("qa_pairs_for_experiment") or []
                 if 0 <= selected_q_idx < len(qa_pairs_for_experiment):
                     selected_question_text = qa_pairs_for_experiment[selected_q_idx].get("question", "")
@@ -693,7 +723,7 @@ def load_experiment_timeline(log_dir):
                         selected_question_text = qa_pairs[fallback_idx].get("question", "")
 
             total_questions_generated += len(new_questions)
-            if experiment_plan:
+            if did_formulate:
                 total_experiments_formulated += 1
 
             timeline.append({
@@ -702,6 +732,12 @@ def load_experiment_timeline(log_dir):
                 "global_step": step_log.get("global_step", s_idx),
                 "new_questions": new_questions,
                 "experiment_plan": experiment_plan,
+                "did_formulate_experiment": did_formulate,
+                "experiment_selection_mode": selection_mode,
+                "winner_kind": winner_kind,
+                "winner_score": winner_score,
+                "winner_source_index": winner_source_idx,
+                "candidate_count": candidate_count,
                 "selected_question_index": selected_q_idx,
                 "selected_question_source_index": selected_q_source_idx,
                 "selected_question_text": selected_question_text,

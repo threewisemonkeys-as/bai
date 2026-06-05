@@ -8,6 +8,9 @@ Usage:
     uv run launch.py --log-dir logs/matrix --dry-run
     uv run launch.py --log-dir logs/matrix --scripts eb_learn --envs minihack,autumn
     uv run launch.py --log-dir logs/matrix --models gemini-2.5-flash --parallel 2
+    # Run 5 ARC-AGI 3 games in parallel:
+    uv run launch.py --log-dir logs/matrix --scripts eb_learn --envs arc_agi \
+        --models gemini-2.5-flash --arc-games ls20,sp80,tn36,vc33,ft09 --parallel 5
 
 Outputs land under <log_dir>/<timestamp>/<cell_name>/ with stdout.log,
 stderr.log, and cmd.txt (the exact command that was run). Override the
@@ -40,6 +43,11 @@ ENVS = [
     "arc_agi",
     "autumn",
 ]
+
+# ARC-AGI 3 games to fan out over when env=arc_agi. Each game becomes its own
+# cell (own process, own output dir, own beliefs/perception/QA). The default
+# picks 5 distinct games; override with --arc-games.
+ARC_GAMES = ["ls20", "sp80", "tn36", "vc33", "ft09"]
 
 # model → provider model ID. All scripts route via OpenRouter; to use a
 # direct provider, change the id here and adjust `model_overrides` below.
@@ -89,9 +97,19 @@ EB_LEARN_DEFAULT = {
     "agent.max_text_history": 4,
     "agent.max_image_history": 0,
     "agent.max_cot_history": 4,
-    "eval.evolve.question_scoring_method": "b_diff_full",
+    # v3 theory-generation setup (theory_entropy + single selection, 5 theories).
+    "eval.evolve.question_scoring_method": "theory_entropy",
+    "eval.evolve.experiment_selection_mode": "single",
+    "eval.evolve.num_theories": 5,
+    "eval.evolve.num_crux_questions": 5,
     "eval.evolve.question_scoring_max_concurrent": 8,
-    "eval.evolve.max_unanswered_qa_pairs": 20,
+    "eval.evolve.improve_interval": 1,
+    "eval.evolve.include_policy": False,
+    "eval.evolve.perception_enabled": False,
+    "eval.evolve.max_qa_per_forward": 20,
+    "eval.evolve.max_answered_qa_pairs": 40,
+    "eval.evolve.max_unanswered_qa_pairs": 10,
+    "eval.evolve.num_sample_obs": 3,
     "eval.evolve.critical_transitions_enabled": True,
 }
 EB_LEARN_OVERRIDES: dict[tuple[str, str], dict] = {
@@ -109,9 +127,11 @@ EB_LEARN_OVERRIDES: dict[tuple[str, str], dict] = {
     },
     ("arc_agi", "gemini-2.5-flash"): {
         "eval.evolve.n_environment_steps": 50,
-        "eval.evolve.hide_obs_when_image": False,
+        "eval.evolve.hide_obs_when_image": True,
         "agent.max_text_history": 4,
         "agent.max_image_history": 4,
+        # Match matrix_v5: theory_entropy scoring, no seeding, perception off.
+        "eval.evolve.question_scoring_method": "theory_entropy",
     },
     ("arc_agi", "sonnet-4.6"): {
         "eval.evolve.n_environment_steps": 5,
@@ -165,10 +185,14 @@ class Cell:
     env: str
     model: str
     overrides: dict = field(default_factory=dict)
+    game: str | None = None  # ARC-AGI game id when env=arc_agi; None otherwise.
 
     @property
     def name(self) -> str:
-        return f"{self.script}__{self.env}__{self.model}".replace(".", "p")
+        base = f"{self.script}__{self.env}__{self.model}"
+        if self.game is not None:
+            base = f"{base}__{self.game}"
+        return base.replace(".", "p")
 
 
 # Hydra key for "number of env steps" per script — used by --num-steps.
@@ -196,7 +220,8 @@ def _simple_env_overrides(env: str, model: str) -> dict:
     }
 
 
-def build_cells() -> list[Cell]:
+def build_cells(arc_games: list[str] | None = None) -> list[Cell]:
+    games = arc_games if arc_games is not None else ARC_GAMES
     cells: list[Cell] = []
     for script, env, model in itertools.product(SCRIPT_FILES, ENVS, MODELS):
         ov: dict = {"envs.names": env, **model_overrides(model, script)}
@@ -209,7 +234,20 @@ def build_cells() -> list[Cell]:
             )
         elif script == "simple":
             ov.update(_simple_env_overrides(env, model))
-        cells.append(Cell(script=script, env=env, model=model, overrides=ov))
+        if env == "arc_agi":
+            for game in games:
+                game_ov = {**ov, "tasks.arc_agi_tasks": f"[{game}]"}
+                cells.append(
+                    Cell(
+                        script=script,
+                        env=env,
+                        model=model,
+                        overrides=game_ov,
+                        game=game,
+                    )
+                )
+        else:
+            cells.append(Cell(script=script, env=env, model=model, overrides=ov))
     return cells
 
 
@@ -218,14 +256,17 @@ def build_cells() -> list[Cell]:
 # ---------------------------------------------------------------------------
 
 
-def filter_cells(cells, scripts, envs, models) -> list[Cell]:
+def filter_cells(cells, scripts, envs, models, games=None) -> list[Cell]:
     def match(values, v):
         return values is None or v in values
 
     return [
         c
         for c in cells
-        if match(scripts, c.script) and match(envs, c.env) and match(models, c.model)
+        if match(scripts, c.script)
+        and match(envs, c.env)
+        and match(models, c.model)
+        and (c.game is None or match(games, c.game))
     ]
 
 
@@ -282,6 +323,15 @@ def main():
     p.add_argument("--envs", type=parse_csv, default=None, help=f"Subset of {ENVS}")
     p.add_argument("--models", type=parse_csv, default=None, help=f"Subset of {MODELS}")
     p.add_argument(
+        "--arc-games",
+        type=parse_csv,
+        default=None,
+        help=(
+            f"ARC-AGI 3 game IDs to fan out per cell when env=arc_agi "
+            f"(default: {ARC_GAMES}). Each game runs as its own subprocess."
+        ),
+    )
+    p.add_argument(
         "--log-dir",
         type=Path,
         required=True,
@@ -313,7 +363,14 @@ def main():
     _validate(args.envs, ENVS, "env")
     _validate(args.models, MODELS, "model")
 
-    cells = filter_cells(build_cells(), args.scripts, args.envs, args.models)
+    arc_games = args.arc_games if args.arc_games is not None else ARC_GAMES
+    cells = filter_cells(
+        build_cells(arc_games=arc_games),
+        args.scripts,
+        args.envs,
+        args.models,
+        games=arc_games,
+    )
     if not cells:
         sys.exit("No cells matched filters.")
 

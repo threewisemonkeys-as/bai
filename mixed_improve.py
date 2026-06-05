@@ -21,6 +21,10 @@ from omegaconf import DictConfig
 
 _MOCK_MODE = False
 
+# Fraction of perception updates in mock mode that emit a unified diff against
+# the current perception (the rest fall back to a full-rewrite escape hatch).
+_MOCK_DIFF_RATIO = 0.7
+
 
 def set_mock_mode(enabled: bool) -> None:
     """Enable or disable mock mode globally (affects all _llm_call* calls)."""
@@ -68,7 +72,99 @@ def _mock_llm_response(prompt: str) -> str:
             "<questions>\n" + "\n".join(blocks) + "\n</questions>"
         )
 
+    # --- Theory generation (theory_exploration.generate_theories) ---
+    if "propose exactly" in p and "<theories>" in p:
+        m = re.search(r"propose exactly (\d+) DISTINCT theories", p)
+        n = int(m.group(1)) if m else 5
+        blocks = [
+            f'<theory rank="{i}" likelihood="mock">\n'
+            f"<world_knowledge>\n- [mock] theory {i} claim about mechanics.\n"
+            f"- [mock] win-condition variant {i}.\n</world_knowledge>\n"
+            f"<rationale>[mock] rationale {i}</rationale>\n</theory>"
+            for i in range(1, n + 1)
+        ]
+        return "<theories>\n" + "\n".join(blocks) + "\n</theories>"
+
+    # --- Crux question generation (theory_exploration.generate_crux_questions) ---
+    if "<crux_questions>" in p and "CRUX questions" in p:
+        m = re.search(r"up to (\d+) CRUX questions", p)
+        n = int(m.group(1)) if m else 5
+        blocks = [
+            f"<q>[mock] crux question {i} that splits the theories?</q>"
+            for i in range(1, n + 1)
+        ]
+        return "<crux_questions>\n" + "\n".join(blocks) + "\n</crux_questions>"
+
+    # --- Plan A: refill theories (multi_theory_exploration.refill_theories) ---
+    if "NEW, DISTINCT theories" in p and "<theories>" in p:
+        m = re.search(r"Propose (\d+) NEW", p)
+        n = int(m.group(1)) if m else 2
+        blocks = [
+            f'<theory rank="{i}" likelihood="mock">\n'
+            f"<world_knowledge>\n- [mock] alternative theory {i} claim.\n"
+            f"</world_knowledge>\n<rationale>[mock] alt rationale {i}</rationale>\n</theory>"
+            for i in range(1, n + 1)
+        ]
+        return "<theories>\n" + "\n".join(blocks) + "\n</theories>"
+
+    # --- Plan A: discriminating-action selection
+    # (multi_theory_exploration.select_discriminating_action) ---
+    if "<candidates>" in p and "COMPETING THEORIES" in p:
+        ranks = re.findall(r"THEORY (\d+) \(posterior weight", p) or ["1", "2"]
+        # Candidate 1: all theories agree (group A) -> EIG 0, should be rejected.
+        cand1_lines = "\n".join(
+            f'<theory rank="{r}" group="A"><outcome>[mock] same outcome under '
+            f"theory {r}.</outcome></theory>"
+            for r in ranks
+        )
+        # Candidate 2: split the ensemble into two groups -> EIG > 0, selected.
+        cand2_lines = "\n".join(
+            f'<theory rank="{r}" group="{"A" if i < len(ranks) / 2 else "B"}">'
+            f"<outcome>[mock] group-{'A' if i < len(ranks) / 2 else 'B'} outcome under "
+            f"theory {r}.</outcome></theory>"
+            for i, r in enumerate(ranks)
+        )
+        return (
+            "<candidates>\n"
+            '<candidate id="1">\n'
+            "<action>[mock] candidate action 1 (all theories agree)</action>\n"
+            f"{cand1_lines}\n"
+            "</candidate>\n"
+            '<candidate id="2">\n'
+            "<action>[mock] candidate action 2 (splits the ensemble)</action>\n"
+            f"{cand2_lines}\n"
+            "</candidate>\n"
+            "</candidates>"
+        )
+
+    # --- Plan A: goal-directed exploit action (select_goal_action) ---
+    if "<goal_action>" in p and "EXPLOITATION step" in p:
+        return (
+            "<goal_action>\n"
+            "<plan>[mock] execute the goal-advancing action under the best model.</plan>\n"
+            "<rationale>[mock] this advances the win condition under the MAP theory.</rationale>\n"
+            "<expected_outcome>[mock] the expected observable outcome under the model.</expected_outcome>\n"
+            "</goal_action>"
+        )
+
+    # --- Plan A: posterior update verdicts
+    # (multi_theory_exploration.update_theory_posterior) ---
+    if "<verdicts>" in p and "survived an experiment" in p:
+        ranks = re.findall(r"THEORY (\d+) \(weight", p) or ["1"]
+        blocks = [
+            f'<theory rank="{r}">\n'
+            f"<verdict>{random.choice(['CONSISTENT', 'VIOLATED', 'PARTIAL'])}</verdict>\n"
+            f"<explanation>[mock] verdict for theory {r}</explanation>\n</theory>"
+            for r in ranks
+        ]
+        return "<verdicts>\n" + "\n".join(blocks) + "\n</verdicts>"
+
     # --- Probe-bank de-duplication (deduplicate_qa_pairs) ---
+    if "<dynamic_replacement_groups>" in p:
+        return (
+            "<think>[mock] no shared underlying dynamics detected</think>\n"
+            "<dynamic_replacement_groups>NONE</dynamic_replacement_groups>"
+        )
     if "<duplicate_drop_indices>" in p:
         return (
             "<think>[mock] no semantic duplicates detected</think>\n"
@@ -101,6 +197,66 @@ def _mock_llm_response(prompt: str) -> str:
         return (
             "<think>[mock] selecting prompt probes</think>\n"
             "<selected_questions>\n" + "\n".join(lines) + "\n</selected_questions>"
+        )
+
+    # --- Combined probe selection and formulation
+    # (select_qa_pairs_and_formulate_experiments, score_topk mode) ---
+    if "<selected_experiments>" in p:
+        qs_section = p.split("=== AVAILABLE UNANSWERED QUESTIONS ===", 1)[-1]
+        qs_section = qs_section.split("=== END AVAILABLE UNANSWERED QUESTIONS ===", 1)[0]
+        q_numbers = re.findall(r"^Q(\d+):", qs_section, re.MULTILINE)
+        if not q_numbers:
+            q_numbers = ["1"]
+        cap_match = re.search(r"Select up to\s+(\d+)\s+questions", p)
+        cap = int(cap_match.group(1)) if cap_match else len(q_numbers)
+        lines = [
+            f'<q n="Q{idx}"><experiment_plan>[mock] Probe a candidate action '
+            f'targeted at Q{idx} and observe the resulting state change.'
+            f'</experiment_plan></q>'
+            for idx in q_numbers[:cap]
+        ]
+        return (
+            "<think>[mock] selecting targets and crafting experiments</think>\n"
+            "<selected_experiments>\n" + "\n".join(lines) + "\n</selected_experiments>"
+        )
+
+    # --- Experiment scoring against unanswered bank
+    # (score_experiments_against_questions, score_topk mode) ---
+    if "scoring candidate experiments by judging which open questions" in p:
+        exps_section = p.split("=== CANDIDATE EXPERIMENTS ===", 1)[-1]
+        exps_section = exps_section.split("=== END CANDIDATE EXPERIMENTS ===", 1)[0]
+        e_numbers = re.findall(r"^E(\d+):", exps_section, re.MULTILINE)
+        if not e_numbers:
+            e_numbers = ["1"]
+        qs_section = p.split("=== UNANSWERED QUESTIONS ===", 1)[-1]
+        qs_section = qs_section.split("=== END UNANSWERED QUESTIONS ===", 1)[0]
+        q_numbers = re.findall(r"^Q(\d+):", qs_section, re.MULTILINE)
+        if not q_numbers:
+            q_numbers = ["1"]
+        e_blocks = []
+        for e_idx in e_numbers:
+            score_lines = [
+                f'<q n="Q{idx}"><answer>{random.choice(["YES", "NO"])}</answer></q>'
+                for idx in q_numbers
+            ]
+            e_blocks.append(
+                f'<e n="E{e_idx}">\n' + "\n".join(score_lines) + "\n</e>"
+            )
+        return (
+            "<think>[mock] judging which questions each experiment touches</think>\n"
+            "<scores>\n" + "\n".join(e_blocks) + "\n</scores>"
+        )
+
+    # --- Experiment formulation for a pre-selected question
+    # (formulate_experiment_for_question, single mode). No null option:
+    # selection already chose the target, so always emit a plan. Must precede
+    # the legacy "designing the next experiment" branch below since the prompt
+    # shares that opening phrase. ---
+    if "Question selection has already chosen the question" in p:
+        return (
+            "<think>[mock] formulating experiment for the selected question</think>\n"
+            "<experiment_plan>[mock] Execute a targeted action aimed at the selected "
+            "question and observe the resulting state change.</experiment_plan>"
         )
 
     # --- Experiment formulation (formulate_experiment_from_question) ---
@@ -215,7 +371,7 @@ def _mock_llm_response(prompt: str) -> str:
         return "\n".join(blocks) if blocks else "<Q n=1>\n<reasoning>[mock]</reasoning>\n<answer>YES</answer>\n</Q n=1>"
 
     # --- QA feedback (_qa_feedback_batch) ---
-    if "evaluating whether an agent's predicted answers" in p:
+    if "evaluating whether predicted answers" in p:
         nums = re.findall(r"---\s*(?:Question\s+|Q)(\d+)\s*---", p)
         blocks = []
         for n in nums:
@@ -260,8 +416,86 @@ def _mock_llm_response(prompt: str) -> str:
     return "<think>[mock] response for unrecognized prompt</think>"
 
 
+_CURRENT_PERCEPTION_RE = re.compile(
+    r"=== CURRENT PERCEPTION MODULE ===\n(.*?)\n=== END CURRENT PERCEPTION MODULE ===",
+    re.DOTALL,
+)
+
+
+def _extract_current_perception_from_prompt(prompt: str) -> str | None:
+    """Pull the perception module body out of an improve prompt, or None if empty."""
+    m = _CURRENT_PERCEPTION_RE.search(prompt)
+    if not m:
+        return None
+    body = m.group(1).strip()
+    if not body or body.startswith("(empty"):
+        return None
+    return body
+
+
+_MOCK_FULL_PERCEPTION = (
+    "```python\n"
+    "def perceive(observation_history: list[str]) -> str:\n"
+    "    # [mock] perception v{vsn}\n"
+    "    if not observation_history:\n"
+    "        return \"\"\n"
+    "    obs = observation_history[-1]\n"
+    "    return obs[:2000]\n"
+    "```"
+)
+
+
+def _build_mock_perception_diff(current_perception: str) -> str | None:
+    """Build a unified-diff payload that swaps one line in ``current_perception``.
+
+    Returns a fenced ```diff block on success, or None when no unambiguous
+    single-line edit can be constructed (caller should fall back to full-code).
+    """
+    lines = current_perception.splitlines()
+    candidates = [
+        i for i, line in enumerate(lines)
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    if not candidates:
+        return None
+    random.shuffle(candidates)
+    suffix = f"  # [mock] diff v{random.randint(100, 999)}"
+    for idx in candidates:
+        target = lines[idx]
+        # Skip lines that already contain our mock suffix marker.
+        if "[mock] diff v" in target:
+            continue
+        ctx_above = lines[idx - 1] if idx > 0 else None
+        ctx_below = lines[idx + 1] if idx + 1 < len(lines) else None
+        before_parts = []
+        if ctx_above is not None:
+            before_parts.append(ctx_above)
+        before_parts.append(target)
+        if ctx_below is not None:
+            before_parts.append(ctx_below)
+        before_block = "\n".join(before_parts)
+        if current_perception.count(before_block) != 1:
+            continue
+        hunk_lines = []
+        if ctx_above is not None:
+            hunk_lines.append(f" {ctx_above}")
+        hunk_lines.append(f"-{target}")
+        hunk_lines.append(f"+{target}{suffix}")
+        if ctx_below is not None:
+            hunk_lines.append(f" {ctx_below}")
+        hunk = "@@ -1,3 +1,3 @@\n" + "\n".join(hunk_lines)
+        return f"```diff\n{hunk}\n```"
+    return None
+
+
 def _mock_improve_response(prompt: str, include_beliefs: bool, include_perception: bool) -> str:
-    """Build an improve-style response with optional beliefs/perception blocks and a status tag."""
+    """Build an improve-style response with optional beliefs/perception blocks and a status tag.
+
+    When the prompt requests a unified-diff style perception update and there
+    is an existing perception module to patch, this emits a real diff with
+    probability ``_MOCK_DIFF_RATIO`` so mock mode exercises the diff
+    parser/applier rather than always taking the full-rewrite escape hatch.
+    """
     parts = ["<think>[mock] improve analysis</think>"]
     # Some improve prompts (beliefs-only Track 1a) expect a <perception_analysis> sibling
     if "<perception_analysis>" in prompt:
@@ -279,18 +513,25 @@ def _mock_improve_response(prompt: str, include_beliefs: bool, include_perceptio
             "</updated_beliefs>"
         )
     if include_perception:
-        parts.append(
-            "<updated_perception>\n"
-            "```python\n"
-            "def perceive(observation_history: list[str]) -> str:\n"
-            f"    # [mock] perception v{random.randint(100, 999)}\n"
-            "    if not observation_history:\n"
-            "        return \"\"\n"
-            "    obs = observation_history[-1]\n"
-            "    return obs[:2000]\n"
-            "```\n"
-            "</updated_perception>"
-        )
+        diff_payload = None
+        wants_diff = "unified diff" in prompt.lower() or "```diff" in prompt
+        if wants_diff:
+            current = _extract_current_perception_from_prompt(prompt)
+            if current:
+                if random.random() < _MOCK_DIFF_RATIO:
+                    diff_payload = _build_mock_perception_diff(current)
+        if diff_payload is not None:
+            parts.append(
+                "<updated_perception>\n"
+                f"{diff_payload}\n"
+                "</updated_perception>"
+            )
+        else:
+            parts.append(
+                "<updated_perception>\n"
+                f"{_MOCK_FULL_PERCEPTION.format(vsn=random.randint(100, 999))}\n"
+                "</updated_perception>"
+            )
     # Only improve prompts with a <status> tag in their format request it
     if "<status>" in prompt:
         status = "SUBMIT" if random.random() < 0.4 else "CONTINUE"
@@ -1415,8 +1656,13 @@ async def improve_beliefs_simple(
     beliefs: str,
     default_knowledge: str,
     episode_summaries: str,
+    trace: dict | None = None,
 ) -> tuple[str, float]:
-    """Fallback belief improvement when both toggles are off. Directly improves from summaries."""
+    """Fallback belief improvement when both toggles are off. Directly improves from summaries.
+
+    If ``trace`` is provided, the prompt and raw response are written into it as
+    ``trace["prompt"]`` and ``trace["response"]`` — useful for downstream viewers.
+    """
     prompt = f"""You are improving beliefs about an environment based on episode trajectories.
 
 The agent receives the following default instructions/knowledge by default:
@@ -1460,6 +1706,9 @@ Analyze what we learned from the trajectories.
 </updated_beliefs>"""
 
     text, cost = await _llm_call(config, prompt)
+    if trace is not None:
+        trace["prompt"] = prompt
+        trace["response"] = text
 
     updated_beliefs = extract_xml_key(text, "updated_beliefs")
     if not updated_beliefs:

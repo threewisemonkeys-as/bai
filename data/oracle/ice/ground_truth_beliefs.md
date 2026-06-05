@@ -1,0 +1,83 @@
+<!--
+Ground-truth beliefs for AutumnBench task 'ice'.
+Drafted by an LLM; REVIEW AND EDIT before relying on this file.
+Lines starting with `- ` are parsed as individual beliefs by
+judge_beliefs_against_gt. Everything else is treated as commentary.
+-->
+
+- `GRID_SIZE` is set to `16`.
+- The game has a persistent `celestialBody` object.
+- The initial `celestialBody.origin` is `(0,0)`.
+- The initial `celestialBody.day` value is `true`.
+- A `CelestialBody` renders a cell at local offset `(0,0)`.
+- A `CelestialBody` renders a cell at local offset `(0,1)`.
+- A `CelestialBody` renders a cell at local offset `(1,0)`.
+- A `CelestialBody` renders a cell at local offset `(1,1)`.
+- A `CelestialBody` cell is `"gold"` when `celestialBody.day` is `true`.
+- A `CelestialBody` cell is `"gray"` when `celestialBody.day` is `false`.
+- If no `clicked` event changes it, `celestialBody.day` keeps its previous value.
+- The program never changes `celestialBody.origin` after initialization.
+- The game has a persistent `cloud` object.
+- The initial `cloud.origin` is `(4,0)`.
+- A `Cloud` renders a gray cell at local offset `(-1,0)`.
+- A `Cloud` renders a gray cell at local offset `(0,0)`.
+- A `Cloud` renders a gray cell at local offset `(1,0)`.
+- The program never changes `cloud.origin.y`.
+- If no left or right input changes it, `cloud.origin` keeps its previous value.
+- `nextCloud` tests the moved cloud with `isWithinBounds`.
+- `nextCloud` returns the moved cloud when the moved cloud is within bounds.
+- `nextCloud` returns the original cloud when the moved cloud is outside bounds.
+- `nextCloud` does not test whether the moved cloud overlaps another object.
+- On the 16-cell grid, the cloud cannot move to an origin x-coordinate below `1`.
+- On the 16-cell grid, the cloud cannot move to an origin x-coordinate above `14`.
+- A `left` input attempts to move the cloud by `(-1,0)`.
+- A valid `left` input decreases `cloud.origin.x` by `1`.
+- An invalid `left` input leaves `cloud.origin` unchanged.
+- A `right` input attempts to move the cloud by `(1,0)`.
+- A valid `right` input increases `cloud.origin.x` by `1`.
+- An invalid `right` input leaves `cloud.origin` unchanged.
+- Cloud movement can overlap water if the moved cloud remains within bounds.
+- Cloud movement can overlap the celestial body if the moved cloud remains within bounds.
+- The game has a persistent `water` list.
+- The initial `water` list is empty.
+- Every `Water` object has a `liquid` boolean field.
+- A `Water` object renders one cell at local offset `(0,0)`.
+- A `Water` cell is `"blue"` when its `liquid` field is `true`.
+- A `Water` cell is `"lightblue"` when its `liquid` field is `false`.
+- The default next `water` list is computed from `prev water`.
+- The default water update applies `nextWater` to each existing drop.
+- Automatic water updating does not create new drops.
+- Automatic water updating does not remove drops.
+- `nextWater` sends a drop to `nextLiquid` when `drop.liquid` is `true`.
+- `nextWater` sends a drop to `nextSolid` when `drop.liquid` is `false`.
+- Automatic water movement preserves each drop's `liquid` field.
+- A solid drop attempts to move one cell downward each update.
+- A solid drop stays in place when the downward move is blocked.
+- A solid drop stays in place when the downward move is out of bounds.
+- A solid drop does not use horizontal liquid-flow behavior.
+- A liquid drop attempts to move one cell downward when downward movement is valid.
+- A liquid drop searches for lower-row holes when direct downward movement is not valid.
+- A liquid drop attempts to move toward the closest available hole found by the liquid rule.
+- A liquid drop stays in place when the liquid rule finds no valid move.
+- Water movement refuses moves into occupied cells.
+- Water movement refuses moves outside the grid.
+- A `down` input adds one new `Water` object to the `water` list.
+- A `down` input does not remove existing water objects.
+- A new drop's `liquid` value equals the current `celestialBody.day` value.
+- A new drop's x-coordinate equals the current `cloud.origin.x`.
+- A new drop's y-coordinate equals the current `cloud.origin.y + 1`.
+- With this program's cloud, a newly spawned drop has y-coordinate `1`.
+- The `down` handler does not check whether the spawn position is within bounds.
+- The `down` handler does not check whether the spawn position is occupied.
+- Pressing `down` before any click creates a blue liquid drop.
+- A `clicked` event toggles `celestialBody.day`.
+- A `clicked` event toggles the `liquid` field of each existing water drop.
+- A `clicked` event leaves the number of water drops unchanged.
+- A `clicked` event does not move the cloud.
+- The `clicked` handler does not test which object was clicked.
+- In reachable states, every spawned water drop's `liquid` value matches `celestialBody.day`.
+- The program has no handler for `up`.
+- The program defines no score variable.
+- The program defines no win condition.
+- The program defines no lose condition.
+- The program defines no terminal-state rule.

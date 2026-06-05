@@ -509,6 +509,12 @@ def load_eval_step_detail(log_dir: Path, episode_idx: int, step_idx: int) -> dic
     episode_log = read_json(task_run["episode_log_path"]) or {}
     step_dir = _step_dir(task_run, logged_step_idx)
     qa_pairs = read_json(step_dir / "qa_pairs.json") or []
+    experiment_log = read_json(step_dir / "experiment_log.json") or {}
+    experiment_scoring_log = (
+        read_json(step_dir / "experiment_scoring_log.json")
+        or experiment_log.get("experiment_scoring")
+        or {}
+    )
     return {
         "beliefs": read_file(step_dir / "beliefs.txt") or read_file(task_run["artifact_dir"] / "beliefs.txt"),
         "perception": read_file(step_dir / "perception.py") or read_file(task_run["artifact_dir"] / "perception.py"),
@@ -519,7 +525,7 @@ def load_eval_step_detail(log_dir: Path, episode_idx: int, step_idx: int) -> dic
         "trim_log": read_json(step_dir / "trim_log.json") or {},
         "question_selection_log": read_json(step_dir / "question_selection_log.json") or {},
         "experiment_log": {
-            **(read_json(step_dir / "experiment_log.json") or {}),
+            **experiment_log,
             "artifact_label": task_run["artifact_label"],
             "run_key": task_run["run_key"],
             "eval_type": task_run["eval_type"],
@@ -528,6 +534,7 @@ def load_eval_step_detail(log_dir: Path, episode_idx: int, step_idx: int) -> dic
             "trajectory_row": row,
             "agent_messages_path": str(step_dir / "agent_messages.json"),
         },
+        "experiment_scoring_log": experiment_scoring_log,
         "agent_messages": _logged_agent_messages(task_run, logged_step_idx, row, episode_log),
         "improve_log": read_file(step_dir / "improve.log"),
         "step_log": {**row, **(read_json(step_dir / "step_log.json") or {}), "path": str(step_dir)},

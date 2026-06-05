@@ -1,0 +1,131 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue]{hyperref}
+
+\newcommand{\YES}{\textsc{yes}}
+\newcommand{\NO}{\textsc{no}}
+\newcommand{\UNK}{\textsc{unknown}}
+\newcommand{\Hb}{H_{\mathrm{b}}}
+
+\title{Myopic Information-Gain Selection over a Theory Ensemble}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Setup}
+
+At a selection point we generate an ensemble of $M$ theories $T_1,\dots,T_M$,
+ranked $1$ (most likely) to $M$. The candidate question set is the unanswered
+bank $\mathcal{Q}$ (after it has been augmented with the crux questions).
+
+\section{Prior over theories (rank $\to$ weight)}
+
+\texttt{assign\_rank\_weights} puts a geometric prior on rank, with decay
+$\gamma \in (0,1]$:
+\[
+\pi_k \;=\; P(T = T_k) \;=\; \frac{\gamma^{\,r_k - 1}}{\sum_{j=1}^{M}\gamma^{\,r_j - 1}},
+\qquad r_k = \text{rank of } T_k .
+\]
+$\gamma < 1$ concentrates mass on top-ranked theories; $\gamma = 1$ gives a
+uniform prior. (Default $\gamma = 0.6$.)
+
+\section{Per-theory answer predictions}
+
+For each candidate question $q_i$ and theory $T_k$, one
+\texttt{\_predict\_answer\_vector} call yields a label in
+$\{\YES, \NO, \UNK\}$, mapped to the theory's predicted probability that the
+answer is \YES:
+\[
+a_{k,i} \;=\; P(A_i = \YES \mid T_k) \;=\;
+\begin{cases}
+1 & \YES \\[2pt]
+0 & \NO \\[2pt]
+\tfrac12 & \UNK \ (\text{agnostic})
+\end{cases}
+\]
+So the per-theory binary answer model is $P(A_i{=}\YES \mid T_k) = a_{k,i}$,
+$P(A_i{=}\NO \mid T_k) = 1 - a_{k,i}$. Cost: $M$ LLM calls total (independent
+of $|\mathcal{Q}|$), versus B-diff's $\approx 4|\mathcal{Q}|$.
+
+\section{Marginal answer and Bayesian posterior}
+
+Marginal probability of a \YES{} under the prior:
+\[
+\rho_i \;=\; P(A_i = \YES) \;=\; \sum_{k=1}^{M}\pi_k\, a_{k,i}.
+\]
+Posterior over theories after observing each answer (Bayes):
+\[
+P(T_k \mid A_i{=}\YES) = \frac{\pi_k\, a_{k,i}}{\rho_i},
+\qquad
+P(T_k \mid A_i{=}\NO) = \frac{\pi_k\,(1 - a_{k,i})}{1 - \rho_i}.
+\]
+
+\section{Score = mutual information (expected info gain over theory identity)}
+
+\[
+\boxed{\;\text{score}(q_i) = I(A_i; T) = H(T) - \mathbb{E}_{A_i}\!\big[H(T \mid A_i)\big]\;}
+\]
+with everything in bits:
+\[
+H(T) = -\sum_k \pi_k \log_2 \pi_k,
+\]
+\[
+H(T \mid A_i) = \rho_i\, H\!\big(T \mid A_i{=}\YES\big)
++ (1 - \rho_i)\, H\!\big(T \mid A_i{=}\NO\big),
+\]
+\[
+H(T \mid A_i{=}a) = -\sum_k P(T_k \mid A_i{=}a)\,\log_2 P(T_k \mid A_i{=}a).
+\]
+This is exactly \texttt{mutual\_information(weights, p\_yes\_per\_theory)}: it
+normalizes $\text{yes\_weights} = \pi_k a_{k,i}$ and
+$\text{no\_weights} = \pi_k(1 - a_{k,i})$ to get the two posteriors, weights
+their entropies by $\rho_i,\ 1-\rho_i$, and returns
+$\max\big(0,\ H(T) - H(T \mid A_i)\big)$.
+
+\paragraph{Equivalent dual form} (cheaper to state, useful as a sanity check ---
+the code uses the form above):
+\[
+I(A_i; T) = H(A_i) - H(A_i \mid T)
+= \Hb(\rho_i) \;-\; \sum_k \pi_k\, \Hb(a_{k,i}),
+\]
+where $\Hb(p) = -p\log_2 p - (1-p)\log_2(1-p)$ is the binary entropy. From this
+it is immediate that:
+\begin{itemize}[nosep]
+  \item theories agree ($a_{k,i}$ all equal) $\Rightarrow H(A_i \mid T) = \Hb(\rho_i)
+        \Rightarrow I = 0$ (\texttt{test\_mi\_zero\_when\_theories\_agree});
+  \item two equal-weight theories that disagree ($a = \{1,0\}$,
+        $\pi = \{\tfrac12,\tfrac12\}$) $\Rightarrow I = \Hb(\tfrac12) = 1$ bit
+        (\texttt{test\_mi\_max\_for\_even\_split});
+  \item an all-\UNK{} question scores $0$ (each $\Hb(\tfrac12)$ cancels).
+\end{itemize}
+
+\section{Selection}
+
+Probe-selection (the LLM) narrows the bank to a candidate set $S$; the pursued
+target is
+\[
+q^\star = \arg\max_{q_i \in S} I(A_i; T),
+\]
+with an LLM tie-break if the top score is shared. The experiment plan is then
+formulated from $q^\star$. The crux questions are, by construction, drafted to
+make $a_{\cdot,i}$ disagree across theories --- i.e.\ to be high-$I(A_i; T)$
+candidates injected directly into $\mathcal{Q}$.
+
+\section*{What this is not (the B vs.\ A boundary)}
+
+This is the myopic, one-step, stateless version. The prior $\pi$ comes only
+from the LLM's rank ordering, and $T$ is regenerated fresh each selection point
+--- there is no carried-forward posterior update from the actually observed
+outcome:
+\[
+\pi_k \;\not\leftarrow\; \frac{\pi_k\, P(o_t \mid T_k)}{\sum_j \pi_j\, P(o_t \mid T_j)}.
+\]
+Adding that recursive Bayesian update (theories persist across steps, weights
+updated by observed transitions, action chosen to maximize $I$ over a horizon)
+is precisely the step up to Plan A.
+
+\end{document}

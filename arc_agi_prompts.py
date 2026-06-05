@@ -22,13 +22,13 @@ ARC_COLORS = {
 
 
 ARC_ACTION_DESCRIPTIONS = {
-    "ACTION1": "ACTION1: Simple action - varies by game (semantically mapped to up)",
-    "ACTION2": "ACTION2: Simple action - varies by game (semantically mapped to down)",
-    "ACTION3": "ACTION3: Simple action - varies by game (semantically mapped to left)",
-    "ACTION4": "ACTION4: Simple action - varies by game (semantically mapped to right)",
-    # "ACTION5": "ACTION5: Simple action - e.g., interact, select, rotate, attach/detach, execute, etc.",
-    # "ACTION6": "ACTION6 x=<int> y=<int>: Complex action requiring x,y coordinates (0-63 range)",
-    # "ACTION7": "ACTION7: Simple action - Undo (e.g., interact, select)",
+    "ACTION1": "ACTION1: Simple action - varies by game (often mapped to up / move-up)",
+    "ACTION2": "ACTION2: Simple action - varies by game (often mapped to down / move-down)",
+    "ACTION3": "ACTION3: Simple action - varies by game (often mapped to left / move-left)",
+    "ACTION4": "ACTION4: Simple action - varies by game (often mapped to right / move-right)",
+    "ACTION5": "ACTION5: Simple action - varies by game (often an interaction: select / confirm / rotate / execute)",
+    "ACTION6": "ACTION6 x=<int> y=<int>: Complex action - click/select the cell at coordinates x,y (each in 0-63)",
+    "ACTION7": "ACTION7: Simple action - varies by game (e.g. a secondary interaction or undo)",
 }
 
 
@@ -37,9 +37,10 @@ def get_arc_instruction_prompt(available_actions: list[str] | None = None) -> st
 
     if available_actions:
         action_lines = [
-            ARC_ACTION_DESCRIPTIONS[name]
+            ARC_ACTION_DESCRIPTIONS.get(
+                name, f"{name}: action available in this game"
+            )
             for name in available_actions
-            if name in ARC_ACTION_DESCRIPTIONS
         ]
     else:
         action_lines = list(ARC_ACTION_DESCRIPTIONS.values())
