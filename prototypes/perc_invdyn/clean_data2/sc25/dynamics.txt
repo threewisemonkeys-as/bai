@@ -1,0 +1,141 @@
+sc25 (game_id sc25-635fd71a) — game mechanics
+
+OVERVIEW
+- A top-down "spellcasting maze". You steer a wizard (the player sprite) through
+  a walled maze and out an exit portal to advance to the next level. Most exits
+  are blocked by geometry or obstacles that can only be cleared by CASTING A
+  SPELL. A spell is cast by drawing its 3x3 glyph on a clickable pad at the
+  bottom of the screen. There are 6 levels; levels 1-3 each teach one spell,
+  levels 4-6 combine them.
+- Reaching the exit gives reward +0.1 and loads the next level. Clearing level 6
+  wins. Spending too many actions in a level loses it.
+
+GRID & LAYERS
+- One 64x64 grid layer (a single <grid_0>), 16-color palette (index 0..15).
+- Coordinate convention used below and on the CLI: (X = column, Y = row), X
+  grows rightward, Y grows downward. A CLI `click_X_Y` -> ACTION6 with x=X, y=Y.
+
+PALETTE (index -> rendered color -> meaning)
+- 5  = black  : maze WALLS (the level's `duvwsv-*` sprite; fills the screen,
+                with transparent holes where corridors are). Player cannot enter.
+- 2  = gray   : walkable CORRIDOR / room floor; also a 3x3 pad cell that is OFF.
+- 0  = white  : a 3x3 pad cell that is part of the level's TARGET glyph (a hint
+                of which cells you must fill). Off-but-target cells render white.
+- 3  = dark gray : border frame of the bottom 3x3 pad panel (and some obstacles).
+- 9 / 10 = blue / light-blue : the PLAYER wizard (`pluyoo`) AND the EXIT portal
+                (`exydhv`). Both use these two colors; the exit is a hollow 5x5
+                framed square, the player a filled 2x2 block (scaled).
+- 14 = green  : the BUDGET METER, a vertical bar at the far-right columns
+                (x=62-63). It fills toward black as you spend actions.
+- 15 = magenta: the spell-selector icon at the bottom-left, and the lit color of
+                a filled pad cell when the selected/required spell is
+                sieesc_chwjgc.
+- 11 = lit color of a filled pad cell for spell tevyeq.
+- 6  = lit color of a filled pad cell for spell fibcey; also the color of a
+       `tagsmh` destructible-target box (and the fibcey fireball flickers 6/7).
+- 13 = a `dosorb` obstacle block (a wall segment that a fireball can clear).
+- 8  = pad cells flash this color during the cast wind-up animation.
+Only the final settled frame of any multi-frame cast/teleport/slide animation is
+rendered.
+
+THE PLAYER
+- `pluyoo` wizard. Has a position, a facing direction (0=up,1=down,2=left,
+  3=right) and a SCALE of 1 (small, 2x2 px) or 2 (big, 4x4 px). Starts at scale 2
+  in levels 1-3.
+- Facing controls the aim of the fibcey fireball.
+
+PLAYER ACTIONS (movement) — ACTION1/2/3/4
+- ACTION1 = move UP   (sets facing=up).
+- ACTION2 = move DOWN (sets facing=down).
+- ACTION3 = move LEFT (sets facing=left).
+- ACTION4 = move RIGHT(sets facing=right).
+- Step size is 4 px when player scale=2, 2 px when scale=1.
+- Movement is collision-checked: the player will not pass through walls (color 5)
+  or solid obstacles. IMPORTANT: a big (scale-2) player is 4x4 px and cannot fit
+  through a 1-cell/narrow gap; a small (scale-1) player can. So narrow passages
+  require the shrink spell first.
+- Even when a move is BLOCKED (no translation), it still (a) updates the player's
+  facing/rotation — a visible change — and (b) costs one action from the budget.
+- Walking the player onto/into the exit portal `exydhv` triggers a short slide
+  animation and then advances to the next level.
+
+CLICK (ACTION6) — the 3x3 spell pad
+- A 3x3 pad sits at the bottom-center. Its nine cells map to display-click
+  coordinates as: x = 25 + 5*col, y = 50 + 5*row, for row,col in {0,1,2}:
+        (r0,c0)=click_25_50  (r0,c1)=click_30_50  (r0,c2)=click_35_50
+        (r1,c0)=click_25_55  (r1,c1)=click_30_55  (r1,c2)=click_35_55
+        (r2,c0)=click_25_60  (r2,c1)=click_30_60  (r2,c2)=click_35_60
+- Clicking a pad cell TOGGLES it (off->on or on->off). Off cells render gray
+  (or white if they belong to the target glyph); on cells render in the selected
+  spell's lit color.
+- A click that lands elsewhere (a spell-selector icon, empty space, a wall) does
+  not toggle the pad; clicking the currently-selected spell icon replays its
+  demo animation. Only pad-cell clicks matter for casting.
+
+SPELLS — the three 3x3 glyphs (row-major, X=filled)
+  tevyeq          sieesc_chwjgc        fibcey
+  X X .           . X .                . X .
+  . X .           X . X                . X .
+  . . .           . X .                . X .
+  cells/clicks:
+  - tevyeq        = (0,0),(0,1),(1,1) -> click_25_50, click_30_50, click_30_55
+  - sieesc_chwjgc = (0,1),(1,0),(1,2),(2,1)
+                    -> click_30_50, click_25_55, click_35_55, click_30_60
+  - fibcey        = (0,1),(1,1),(2,1) -> click_30_50, click_30_55, click_30_60
+
+- A spell fires the instant the pad EXACTLY matches a glyph that is ALLOWED in
+  the current level (level data field `efvw`). On firing, a cast animation plays
+  and the pad is cleared back to all-off.
+- If you draw a valid glyph that is NOT allowed in this level (e.g. the fibcey
+  line while in level 1, which only allows sieesc_chwjgc), NOTHING happens and
+  the filled cells simply stay lit until you toggle them off. This lets you build
+  up to one glyph by passing through another.
+
+SPELL EFFECTS
+- sieesc_chwjgc (the plus/diamond) = RESIZE. Toggles the player between scale 2
+  and scale 1. Shrinking lets the wizard fit narrow gaps. Growing only succeeds
+  if there is room; if blocked it just flashes red and stays small. (Growing into
+  a `enjehv-pahtoz` pickup removes it and refunds 10 budget — seen in later
+  levels.)
+- tevyeq (the corner L) = TELEPORT. Warps the player to the next `tevyeq-tagsmh`
+  beacon in the level, cycling through them on repeated casts. (Level 2 has one
+  beacon up near its exit.)
+- fibcey (the vertical line) = FIREBALL. Launches a projectile in the player's
+  current FACING direction. It flies until it hits something; if it strikes a
+  `tagsmh` target box it destroys that box AND all `dosorb` obstacle blocks in
+  the level, opening paths. So: face the target, then draw fibcey.
+
+ACTION BUDGET / METER / LOSS
+- Each level has an action budget `slfh` (observed: L1=50, L2=25, L3=50, L4=35,
+  L5=65, L6=60). Every movement action AND every pad-cell toggle spends 1. A
+  spell-completing click spends 2 (the toggle plus the cast tick).
+- The green meter at the right edge fills (turns black) in proportion to budget
+  spent. If spent count exceeds the budget, you LOSE the level.
+
+AVAILABLE-ACTION TRANSITIONS
+- In every observed state the available actions are exactly
+  [ACTION1, ACTION2, ACTION3, ACTION4, ACTION6]. They do not change by state.
+  (Movement may be a no-op against a wall, and a click may be a no-op off the
+  pad, but the actions are always offered.)
+
+LEVEL / GOAL STRUCTURE
+- Level 1 (allows sieesc_chwjgc): wizard starts big in a horizontal corridor; the
+  exit is to the left behind a narrow gap. SHRINK (sieesc) to fit through, walk
+  left into the exit.
+- Level 2 (allows tevyeq): exit is up past a barrier. TELEPORT (tevyeq) to the
+  beacon near the top, then walk up into the exit.
+- Level 3 (allows fibcey): a `dosorb` wall blocks the corridor down to the exit;
+  a `tagsmh` target sits to the right. Face right, FIREBALL (fibcey) the target
+  to clear the dosorb, then walk down/left into the exit.
+- Levels 4-6 allow multiple spells (combinations of the above) and are larger.
+
+TUTORIAL QUIRK (level 1 only)
+- The FIRST action taken after reset in level 1 is consumed by a demo: it blinks
+  the required glyph (sieesc_chwjgc) on the pad, then returns. The player does NOT
+  move and the budget is NOT charged for that first action. From the second
+  action on, the game behaves normally.
+
+WIN / TERMINATION / REWARD
+- Reward +0.1 per level cleared (entering an exit). No other reward signal.
+- Losing fires when the per-level action budget is exceeded.
+- The game has 6 levels (win_levels=6); clearing level 6 wins.

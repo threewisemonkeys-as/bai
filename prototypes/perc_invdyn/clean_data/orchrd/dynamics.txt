@@ -1,0 +1,40 @@
+ORCHRD - Game Dynamics
+
+Grid: 16 x 16.
+
+Objects:
+- Sun: a 2x2 block in the top-left corner, occupying cells (0,0), (1,0), (0,1), (1,1).
+  Carries a boolean "day" flag. Colored gold when day is true, gray when day is false (night).
+  Starts with day = true (gold).
+- Farmer: a single brown cell the player drives. Starts at position (8,8).
+- Trees: four single-cell trees at fixed positions (3,3), (12,4), (7,11), (11,12).
+  Each carries a boolean "ripe" flag. Colored darkgreen when unripe, red when ripe.
+  All four start unripe (darkgreen).
+
+Player actions:
+- left / right / up / down: move the farmer one cell in that direction. Movement is blocked at
+  the grid boundary (if the target cell is out of bounds, the farmer stays put).
+- click: clicking the Sun toggles its day flag (day <-> night), which flips its color gold <-> gray.
+  Click LOCATION matters: only clicks on the Sun's cells trigger the toggle; clicks elsewhere do nothing.
+- noop: no effect.
+
+Passive / clock dynamics (evaluated each step on the tree list):
+- Ripening (hidden rule): at NIGHT (sun.day is false), any unripe tree becomes ripe (turns red).
+  Trees do NOT ripen during the day. The check uses the previous sun state.
+- Harvesting: a ripe tree that the farmer is orthogonally adjacent to (Manhattan distance 1) resets
+  to unripe (back to darkgreen). The harvest check takes priority over ripening for that tree.
+- The Sun and Farmer have no autonomous per-step behavior; they change only via player actions.
+
+Spawning / despawning: none. Object set is fixed for the whole game.
+
+Color changes:
+- Sun: gold (day) <-> gray (night), toggled by clicking the sun.
+- Tree: darkgreen (unripe) -> red (ripe) when night falls; red (ripe) -> darkgreen (unripe) when
+  harvested by an adjacent farmer.
+
+Collisions / interactions:
+- Only interaction is farmer-adjacency-based harvesting of ripe trees. No blocking between objects;
+  the farmer can occupy/pass tree or sun cells freely (movement is constrained only by grid bounds).
+
+Win / termination / reward: none defined. There is no explicit goal, win condition, or reward in the
+program; the orchard simply cycles between day/night ripening and farmer harvesting.

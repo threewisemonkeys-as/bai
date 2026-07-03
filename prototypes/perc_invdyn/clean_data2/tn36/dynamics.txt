@@ -1,0 +1,113 @@
+tn36 (tn36-ef4dde99) — game mechanics
+
+OVERVIEW
+- This is a "visual program the robot" puzzle. You build a short fixed-length
+  program by toggling bits in a row of editor cells below a board, then press a
+  RUN button. The program is executed instruction-by-instruction, moving a
+  robot sprite around the board. You WIN the level when, after the program
+  finishes, the robot's position/rotation/scale/color exactly match a target.
+- A timer bar at the very top of the screen recedes a little on EVERY action
+  (every click). If it runs out before you solve the level, you LOSE.
+- It is a click-only game: the only available action is ACTION6 (a click with
+  x,y). `avail` is always ['ACTION6'] in every state observed.
+
+GRID & LAYERS
+- 64x64 display grid, 16-color palette. Exactly ONE <grid> layer is emitted per
+  observation (the final settled frame; a RUN triggers a multi-frame animation
+  internally but only the settled result is rendered).
+- Background fill color = 5 (medium gray), letterbox/padding = 3.
+- Coordinate convention for clicks: click_X_Y -> ACTION6 x=X y=Y, with
+  x = COLUMN, y = ROW. Display coords equal the internal sprite coords (a sprite
+  placed at set_position(cx,cy) appears with its top-left at column cx, row cy).
+
+OBJECTS / PALETTE (Level 1 layout, what you see)
+- TIMER BAR: a horizontal color-9 (blue) bar along row 1 (cols ~1-61). It
+  shortens from the right by ~1 column per action. When it has fully receded the
+  level is lost.
+- BOARD: a checkerboard panel (alternating colors 4 and 5) framed in white
+  (color 5 outline), occupying roughly rows 8-40, cols 14-49. This is the
+  "grsysj" play field on which the robot moves.
+- ROBOT (movable): a small color-11 (yellow) sprite. In Level 1 it starts near
+  the top-center of the board at sprite pos (30,13) and renders as a downward
+  "flag/notch" block around rows 13-16, cols 30-33.
+- TARGET: a color-11 (yellow) "U / cup" outline (the taptxx sprite) lower on the
+  board, Level 1 at sprite pos (29,32), rendered around rows 33-37, cols ~29-34.
+  The robot must be made to land here.
+- PROGRAM EDITOR: a strip of editor CELLS just below the board (Level 1: 5 cells
+  at sprite x = 19,24,29,34,39, spanning rows ~41-47). Each cell is a small
+  segment display showing a number; its lit segments are color 5 when a bit is
+  ON and color 1 (blue) when OFF.
+- RUN BUTTON: a color-9 (blue) filled circle below the editor (sprite pos
+  (32,51), ~9x9, center near col 36 row 55). Clicking it executes the program.
+
+PROGRAM EDITOR — BIT TOGGLING (the core editing mechanic)
+- Each editor cell encodes one instruction as a small unsigned integer built
+  from independent toggle BITS stacked vertically inside the cell. In Level 1
+  each cell has 2 bits:
+    * TOP bit (rows ~41-43 of the cell) has weight 1.
+    * BOTTOM bit (rows ~44-46 of the cell) has weight 2.
+  Cell value = (top?1:0) + (bottom?2:0)  -> a number in {0,1,2,3}.
+- Clicking inside a bit's box TOGGLES that one bit (ON<->OFF). A click only
+  toggles the single bit whose box contains (x,y); clicks elsewhere in the cell
+  do nothing. So to set cell k to value v: set its top bit to (v&1) and its
+  bottom bit to (v&2).
+- Bit-toggle clicks change ONLY the editor display (the lit segments) and the
+  stored program; they do not move the robot and do not advance the level.
+- The bottom click rows for a cell at sprite-x = cx are about (cx+2, 42) for the
+  top bit and (cx+2, 45) for the bottom bit. (Level 1 cell tops: x=21,26,31,36,41.)
+
+INSTRUCTION SET (cell value -> robot action when RUN)
+- 0 : MARK / no-move (a "stay" placeholder).
+- 1 : move LEFT   (dx = -4, dy = 0).
+- 2 : move RIGHT  (dx = +4, dy = 0).
+- 3 : move DOWN   (dx = 0, dy = +4).
+  (The engine maps many more opcodes — 33=UP, 5/6/7/16=rotate, 8/9=scale,
+  10-13=double-step, 14/15/63=recolor — but in a 2-bit cell only 0..3 are
+  reachable, so Level 1 only exposes MARK/LEFT/RIGHT/DOWN. Wider cells in later
+  levels expose the larger opcodes.)
+- One board cell = 4 display pixels (the move step constant is 4). Collisions
+  with walls block a move; some board features can capture/hide the robot.
+
+RUN (clicking the blue circle)
+- Executes the current program left-to-right, one instruction per internal tick
+  (animated), moving the robot accordingly. A single ACTION6 on the RUN button
+  plays the whole program to completion within that one step.
+- If after the last instruction the robot matches the target (position AND
+  rotation AND scale AND color), the level is solved (reward +0.1, advance to the
+  next level).
+- If it does NOT match, the robot is RESET back to its start state (Level 1
+  Reset=True), so a failed RUN leaves the board looking identical to before the
+  run (only the timer ticked down). Robot movement is therefore visible in the
+  settled frame ONLY on a winning run (and then the level immediately changes).
+
+LEVEL 1 SOLUTION (verified)
+- Robot starts at (30,13); the matched target is reached at robot (30,33), i.e.
+  straight DOWN by 20 px = 5 DOWN moves. With five cells that forces the UNIQUE
+  winning program [3,3,3,3,3] (every cell = DOWN); any LEFT/RIGHT/MARK would
+  break dx=0 or reduce the down-distance.
+- Initial editor state in Level 1 is [3,0,3,0,0] (cells 0 and 2 already = DOWN).
+  So solving requires turning the remaining three cells (1,3,4) to DOWN — set
+  both bits ON in each — then clicking RUN.
+
+LEVELS 2..7 (structure, from source)
+- win_levels = 7. The game has 7 Level definitions. Later levels add:
+    * TWO side-by-side panels: a left REFERENCE/locked panel (read-only, its
+      editor cannot be toggled) and a right EDITABLE panel that you program.
+    * A row of PROGRAM-SELECTOR buttons (the "tozzsf" sys_click squares at the
+      bottom-left). Each level carries `Programs` (preset opcode lists),
+      `Positions`, `Rotations`, `scvkkws` (scales) and `Reset` flags; clicking a
+      selector loads that preset config into the reference panel.
+    * Wider editor cells (3+ bits) that unlock UP / rotate / scale / recolor
+      opcodes, plus walls/obstacles on the board.
+  The win check is still "editable-panel robot matches its target after RUN".
+  These later levels were not solved here (the train/test data stops at the
+  first level transition, per the clean-data process).
+
+WIN / LOSE / REWARD
+- Per-level solve: reward +0.1 and the engine advances to the next level
+  (term stays False until the final level is solved). avail stays ['ACTION6'].
+- Lose: timer bar fully recedes (function of number of actions taken) -> game
+  over. No win on a level gives 0 reward.
+- There is no passive clock other than the per-action timer; nothing changes
+  unless you click.
+</content>

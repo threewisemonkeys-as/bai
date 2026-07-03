@@ -1,0 +1,43 @@
+N2NTD — Game Dynamics
+
+Grid: 12x12, white background. Frame rate 7 (passive rules tick every step, regardless of which action is taken).
+
+Coordinates: observations are reported as grid[row][col] with row 0 at the top and row 11 at the bottom. The SEXP uses (x, y) = (col, row).
+
+Objects (initial state):
+- Mario: single red cell, starts at row 11, col 6 (bottom row). Carries a "bullets" (ammo) counter starting at 0.
+- Steps: 3 horizontal platforms of darkorange, each 3 cells wide. Under seed 0 they sit at FIXED positions:
+    * row 10, cols 0–2
+    * row 8,  cols 4–6
+    * row 6,  cols 8–10
+  Each Step carries a movingLeft flag, but it has NO observable effect (see below).
+- Coins: 3 gold cells at row 9/col 1, row 4/col 7, row 5/col 9. Static (never move on their own).
+- Enemy: blue 3x2 block (3 wide, 2 tall), starts at rows 0–1, cols 4–6. Carries movingLeft=true and lives=1.
+- Bullets: list, initially empty. Each bullet is a single mediumpurple cell.
+- enemyLives: a number, init 1 (an independent counter, separate from the enemy object's own lives field).
+
+Player actions:
+- left: Mario moves left one cell (blocked by the grid edge; coins do not block him).
+- right: symmetric to left, moving right.
+- up: a JUMP — Mario moves straight up 4 cells (dy -4), ignoring collisions. It ONLY triggers when Mario is resting on the floor, i.e. when he cannot fall any further (he must be on the bottom row, row 11). If Mario is mid-air (above row 11), up does nothing.
+- click ROW COL: if Mario's ammo > 0, spawns a Bullet at Mario's own position, decrements ammo by 1, and nudges Mario down one cell. The click LOCATION is IGNORED — the bullet always spawns at Mario's current cell, not at the clicked coordinates. If ammo == 0, click is a complete no-op.
+- down: no handler — no-op (the passive clock still ticks).
+- noop: no-op (the passive clock still ticks).
+
+Passive / clock dynamics (every step):
+- Gravity on Mario: each frame Mario falls down one cell until he reaches the bottom row (row 11), which is the only thing that stops him. He falls straight THROUGH steps and through coins — platforms do not support him; only the bottom grid edge halts the fall. (When the cell directly below is a coin he still moves down, collecting it; see collisions.)
+- Steps do NOT move. They are static platforms under seed 0 — they do not slide horizontally, do not act as a conveyor, and do not bounce between columns. (The SEXP contains step-movement and direction-flip rules, but under seed 0 they produce no observable motion; treat the platforms as fixed at the rows/cols listed above.)
+- Enemy moves horizontally one cell every frame (left if movingLeft, else right), independent of the player's action. Direction flips at the patrol ends: when the enemy's left edge reaches col 0 (origin x==1) it flips to moving right; when its right edge reaches col 11 (origin x==10) it flips to moving left. So the enemy patrols back and forth across the top, spanning cols 0–2 at the left extreme and cols 9–11 at the right extreme.
+- Bullets move up one cell each frame. EXCEPTION: if a bullet's next-up cell would intersect a Step, the bullet does NOT move and is NOT removed — it FREEZES in place, one cell directly below the step, and PERSISTS there indefinitely. (A frozen bullet is a permanent mediumpurple cell just under the platform; it never resumes rising and never disappears on its own.) A bullet whose path is clear keeps rising until it leaves the top of the grid.
+
+Collisions / interactions:
+- Coin pickup: when Mario intersects a coin, that coin is removed and Mario's ammo increases by 1 (collect coins -> gain ammo to fire). Coins reachable from the floor are limited by jump height (a jump reaches row 7), e.g. the coin at row 9/col 1 can be collected while falling through it.
+- Bullet hits Enemy: when the enemy intersects any bullet, that bullet is removed; if enemyLives == 1 the enemy is removed (killed), otherwise the enemy keeps moving and enemyLives decrements by 1. With the initial values (enemyLives 1) a single hit destroys the enemy.
+
+Color changes: none (objects keep fixed colors; only positions/existence change).
+
+Spawning / despawning:
+- Bullets spawn on click (only when ammo > 0). A bullet despawns ONLY when it hits the Enemy. It does NOT despawn when it hits a Step — it freezes below the step and remains forever. A bullet with a clear path simply travels off the top of the grid.
+- Coins despawn when collected. Enemy despawns when killed by a bullet.
+
+Win / termination / reward: none defined. There is no win condition, score output, or terminal state rule in the SEXP (reward stays 0.0, done stays False).

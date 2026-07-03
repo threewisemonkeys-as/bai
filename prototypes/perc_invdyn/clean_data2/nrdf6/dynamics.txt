@@ -1,0 +1,60 @@
+NRDF6 — Game Dynamics
+
+GRID: 7x7. Object cell positions in the SEXP are offsets relative to an
+object's origin. The crate's origin starts near the top-center (Position 3,1).
+The Rock object is a single-cell template; NO rocks exist at the start (the
+rocks list is initialized empty) — rocks only ever appear via clicks.
+
+OBJECTS:
+- Crate (brown): a U-shaped / bowl-shaped cluster of brown cells. Origin starts
+  at Position (3,1). Has a numeric field addWeight (starts at 0). The brown cells
+  form the two side walls (columns at origin.x-2 and origin.x+2, rows -1..1) plus
+  a bottom row across the middle (row +1). It forms an open-top container.
+- Rock (silver): a single silver cell. None exist at start; rocks are created by
+  clicking (see below). Rocks fall under gravity.
+- Water (blue): a body of water filling the lower region. Initialized as a blue
+  rectangle covering columns 0..GRID_SIZE over rows 3..GRID_SIZE (the bottom of
+  the grid). Behaves as a liquid each step.
+
+PLAYER ACTIONS:
+- left / right / up / down: NO HANDLERS. There are no `on left/right/up/down`
+  rules, so the arrow/move actions are no-ops.
+- noop: no-op (does nothing).
+- click: THE ONLY meaningful action, and CLICK LOCATION MATTERS. On click, if the
+  clicked cell is a free position (isFreePos), a new silver Rock is spawned at the
+  clicked (x,y). If the position is not free, nothing happens.
+
+PASSIVE / CLOCK DYNAMICS (every step):
+- Gravity on rocks (nextRock): each rock tries to move down one cell. It moves
+  only if the cell below is within bounds AND not occupied by another rock or by
+  the crate's wall/floor cells. Otherwise it stays. So rocks fall and settle on
+  top of the crate floor, other rocks, or the grid bottom.
+- Water (nextLiquid): the water updates as a liquid each step. If a water cell's
+  position coincides with a rock's position, that water cell moves up (displaced);
+  otherwise it follows normal liquid flow (nextLiquid). Rocks displace water.
+
+CRATE WEIGHT / SINKING (nextCrate):
+- Each step, count rocks currently inside the crate region (inCrate): a rock is
+  "in" if its x is within [origin.x-2, origin.x+2] and its y is within [0,
+  origin.y] (the crate's interior column/row span).
+- If the crate's current addWeight < (number of rocks inside) AND that count < 5,
+  then addWeight increments by 1 and the whole crate moves down one cell
+  (moveDown). Otherwise the crate is unchanged.
+- Effect: dropping rocks into the crate makes it progressively sink one row per
+  added rock. moveDown has no lower-bound check, but the rule freezes once the
+  count of rocks inside reaches 5 (the weight < 5 gate). So the crate sinks at
+  most 4 rows — coming to rest with its floor on the bottom grid row (row 6) —
+  and then never moves again. (Verified in the recorded run: the crate settles
+  at rows 4-6 with its floor on row 6 and stays put for the rest of the episode.)
+
+COLLISIONS / INTERACTIONS:
+- Rocks block each other and rest on the crate floor/walls.
+- Rocks displace water cells upward.
+- Rocks inside the crate add weight and sink it.
+
+COLOR CHANGES: none — objects keep their fixed colors (brown crate, silver rocks,
+blue water).
+
+WIN / TERMINATION / REWARD: none defined. There is no win condition, goal object,
+or reward rule in the SEXP. The game is a free-running sandbox: drop rocks into
+the crate (via clicks) and watch it sink while water reacts.

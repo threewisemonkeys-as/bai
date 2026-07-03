@@ -1,0 +1,123 @@
+lf52 (lf52-271a04aa) — game mechanics
+
+SUMMARY
+- This is PEG SOLITAIRE. The board holds a set of green pegs on a tray of gray
+  cells. You select a peg and jump it two cells over an orthogonally-adjacent
+  peg into an empty cell; the jumped-over peg is removed. The goal of each level
+  is to reduce the board to a single remaining peg. There are 10 levels of
+  increasing board complexity; clearing a level advances to the next.
+
+GRID & LAYERS
+- The engine emits ONE 64x64 grid layer per observation (the rendered frame).
+- The logical board is a tile map (tile_size 6x6 px) drawn near the top-left at
+  pixel offset ~(10,5). A logical board cell (col, row) maps to a pixel
+  rectangle whose CENTER is approximately:
+      x = 10 + col*6 + 3        (x = COLUMN)
+      y = 5  + row*6 + 3        (y = ROW)
+  This offset is exact enough to hit cells reliably (verified by probes:
+  e.g. cell (col=5,row=4) center = (43,32)).
+- Coordinate convention for clicks: click_X_Y on the CLI -> ACTION6 x=X y=Y,
+  with x = COLUMN (pixels), y = ROW (pixels).
+
+PALETTE / OBJECTS (level 1, the level reached at reset)
+- Background: light blue (color 9). Board border: black. Tray cells: light gray.
+- Peg ("fozwvlovdui"): a green clover/cross sprite occupying one cell. These are
+  the pieces you play with. Later levels also have "fozwvlovdui_red" and
+  "fozwvlovdui_blue" pegs and "dgxfozncuiz" ("p") pegs that count as jumpable.
+- Track/wall glyphs in the source maps ("-","|","L","3","<",">","T","t", etc.)
+  are "kraubslpehi" walls that shape the board outline. Level 1's board is an
+  L-shape: a 7-wide x 3-tall top band joined to a 3-wide vertical leg on the
+  right.
+- "hupkpseyuim2" (map glyph ",") are MOVABLE BLOCKS used by the move actions in
+  later levels. LEVEL 1 HAS NO MOVABLE BLOCKS, so ACTION1-4 are effectively
+  no-ops in level 1.
+
+LEVEL 1 LAYOUT (col,row)
+- Floor cells: top band rows 1-3, cols 0..6; vertical leg rows 4..7, cols 4..6.
+- Initial pegs (5 total): (1,2), (2,2), (4,2), (5,3), (5,5).
+
+PLAYER ACTIONS
+- Available actions are constant in level 1:
+  [ACTION1, ACTION2, ACTION3, ACTION4, ACTION6, ACTION7].
+- ACTION1 / ACTION2 / ACTION3 / ACTION4 = move all MOVABLE BLOCKS
+  (hupkpseyuim2) by up / down / left / right respectively. In levels with
+  blocks these slide gates along tracks (and can shove the board); in level 1
+  there are no movable blocks so these do nothing visible. (ACTION5 = a special
+  "commit" action exists in code but is NOT in the available set.)
+- ACTION6 (click x,y) is the core peg-solitaire action. Its meaning depends on
+  what is under the clicked pixel:
+    * Click a PEG -> SELECT it. The selected peg gets a dark ring and faint
+      landing-markers appear at each currently-legal jump destination (a cell 2
+      away in a direction that has an adjacent peg to jump over and an empty
+      floor cell to land on).
+    * Click a legal landing-marker cell (2 cells from the selected peg, in a
+      cardinal direction over an adjacent peg) -> EXECUTE THE JUMP: the selected
+      peg moves 2 cells in that direction and the peg it jumped over is removed.
+    * Click empty floor / an illegal cell -> nothing happens (a tiny wiggle).
+  Jump legality (from source): the +1 (adjacent) cell must contain a peg
+  (fozwvlovdui or dgxfozncuiz) AND the +2 (landing) cell must be empty floor.
+- ACTION7 = UNDO. Pops the last state off the undo stack (STORES_UNDO=True),
+  reverting the most recent action (e.g. un-doing a jump restores the removed
+  peg). Verified: jump then ACTION7 returns to the pre-jump board.
+- RESET restores the level's initial state.
+
+CLICK SEQUENCE PER JUMP
+- One jump = TWO clicks: first ACTION6 on the peg (select), then ACTION6 on the
+  destination cell (2 away). E.g. to jump the peg at (1,2) rightward to (3,2):
+  click_19_20 (select), then click_31_20 (land).
+
+LEVEL / GOAL STRUCTURE
+- 10 levels, each its own peg-solitaire board. Solving a level = reducing it to
+  exactly 1 peg (levels 6 and 7: down to 2 pegs). On the solving jump the engine
+  plays a "win" banner (the board redraws with peg marks, an orange progress
+  button appears, and a small 2x2 next-board icon is shown), and then advances
+  to the next level.
+
+WIN / SCORE / REWARD
+- Each solved level yields reward = 0.1 (observed on the final solving jump of
+  level 1 via both routes below). Levels are scored independently; clearing all
+  10 wins the game.
+- LOSE (move budget): asqvqzpfdi counts actions taken in the level. Level 1
+  loses if it reaches 64 actions before solving; levels 2-5 budget = 320;
+  levels 6-10 budget = 640. Also an explicit loss flag can be set by level
+  logic. Both solutions below finish in well under the budget.
+- term stays False through the per-level win banner in these short trajectories;
+  the reward=0.1 is the reliable level-complete signal.
+
+LEVEL 1 SOLUTION (used for the clean data)
+The 5 pegs form a forced chain; the only real branch is the final jump
+direction. TRAIN and TEST take genuinely different routes:
+
+TRAIN (8 clicks, pure solve, all four jumps then win):
+  click_19_20  select peg (1,2)
+  click_31_20  jump RIGHT -> land (3,2), removes (2,2)      [4 pegs]
+  click_31_20  select peg (3,2)
+  click_43_20  jump RIGHT -> land (5,2), removes (4,2)      [3 pegs]
+  click_43_20  select peg (5,2)
+  click_43_32  jump DOWN  -> land (5,4), removes (5,3)      [2 pegs]
+  click_43_32  select peg (5,4)
+  click_43_44  jump DOWN  -> land (5,6), removes (5,5)  WIN [1 peg, reward 0.1]
+
+TEST (11 clicks, distinct: includes an UNDO and the alternative final jump UP):
+  click_19_20  select peg (1,2)
+  click_31_20  jump RIGHT -> land (3,2), removes (2,2)
+  ACTION7      UNDO -> restores the board to the initial 5-peg state
+  click_19_20  select peg (1,2)
+  click_31_20  jump RIGHT -> land (3,2)
+  click_31_20  select peg (3,2)
+  click_43_20  jump RIGHT -> land (5,2)
+  click_43_20  select peg (5,2)
+  click_43_32  jump DOWN  -> land (5,4), removes (5,3)      [2 pegs: (5,4),(5,5)]
+  click_43_38  select peg (5,5)
+  click_43_26  jump UP    -> land (5,3), removes (5,4)  WIN [1 peg, reward 0.1]
+
+CAVEATS
+- The first three jumps of level 1 are forced (only one legal adjacent pair
+  exists at each step); only the final jump can go DOWN (train) or UP (test).
+  The two trajectories are still framewise distinct because TEST inserts a
+  select+jump+undo round-trip at the start and finishes from the opposite
+  direction.
+- ACTION1-4 (block moves) cannot be demonstrated in level 1 (no movable blocks);
+  they become meaningful from level 2 onward. ACTION7 (undo) and ACTION6
+  (select + jump, plus illegal/empty clicks) cover the level-1 mechanics.
+</content>

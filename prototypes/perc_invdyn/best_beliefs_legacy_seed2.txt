@@ -1,0 +1,5 @@
+- The grid uses a coordinate system where the first index is the row (vertical position) and the second index is the column (horizontal position).
+- Increasing the row index corresponds to moving down; decreasing the row index corresponds to moving up.
+- Increasing the column index corresponds to moving right; decreasing the column index corresponds to moving left.
+- The agent is the darkgreen object (the only moving entity in the grid).
+- Gray positions are static obstacles that do not move between states.

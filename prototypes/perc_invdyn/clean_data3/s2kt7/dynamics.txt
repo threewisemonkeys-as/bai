@@ -1,0 +1,57 @@
+S2KT7 - Ant foraging simulation (16x16 grid)
+
+Coordinates below are (row, col), matching what the perception/observation reports.
+
+GRID
+- 16x16 cell grid. Empty cells are black.
+
+OBJECTS
+- Ant: gray cell. Exactly two ants exist at start, at (row, col) = (5,5) and (14,1).
+  (These come from the program's Position(x,y) values (5,5) and (1,14); written as
+  (row, col) the second ant is at (14,1).)
+- Food: red cell. None exist at start; created only by clicking (see below).
+
+PLAYER ACTIONS
+- click ROW COL: spawns food. IMPORTANT: the food always appears at the SAME FIXED cell
+  (0,0) (top-left corner), regardless of which ROW/COL you click. The click LOCATION is
+  irrelevant - only the fact that a click occurred matters.
+  Why: the program adds food via `randomPositions`, which is seed-deterministic. Under
+  seed 0 the spawned position(s) resolve to (0,0), so food deterministically materializes
+  at (0,0) on every click. (The program nominally requests 2 random positions, but under
+  seed 0 they coincide at (0,0) and render as a single red cell.)
+  - Clicking while a food already exists at (0,0) produces no visible change (still one red
+    cell at (0,0)).
+  - If an ant is already sitting on (0,0) when you click, the new food is consumed almost
+    immediately (the ant on that cell eats it within one tick), so it may never appear as a
+    free red cell.
+- left, right, up, down: NO handler. These are no-ops (no rule responds to directional input).
+- noop: no-op (no handler).
+Note: the only player action with any effect on world state is click; movement keys do nothing.
+
+PASSIVE / CLOCK DYNAMICS (run every step via `on true`)
+- Ant movement: every tick, each ant moves one cell toward its nearest food (the closest
+  food to that ant), using the unit vector from the ant to that food. Both ants share the
+  same global food set; each heads toward whichever food is nearest to it.
+- Food removal (eating): a food is removed once an ant occupies its cell. In the rendering,
+  the food cell shows red on the tick an ant arrives onto it, and the food disappears on the
+  following tick (the filter removes food that intersected the ant's previous position).
+- If no food exists, ants have no target and stay put (idle). After a food is eaten, both
+  ants remain stationary at wherever they ended up until a new food is spawned by a click.
+
+SPAWNING / DESPAWNING
+- Spawn: Food spawns only on click, always at the fixed cell (0,0). It does not spawn over
+  time or at random visible locations.
+- Despawn: Food despawns when an ant reaches/overlaps its cell (eaten).
+- Ants are never created or destroyed after init; always exactly two ants.
+
+COLOR CHANGES
+- None. Ants stay gray, food stays red throughout.
+
+COLLISIONS / INTERACTIONS
+- Ant-on-Food overlap removes the food (the only interaction in the game).
+- No ant-ant collision handling; ants can share a cell freely.
+
+WIN / TERMINATION / REWARD
+- None. There is no goal, win condition, termination rule, or reward in the program.
+  It is an open-ended simulation: click anywhere to drop a food at (0,0), and the two ants
+  converge on (0,0) and consume it.

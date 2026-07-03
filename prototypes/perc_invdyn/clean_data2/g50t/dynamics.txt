@@ -1,0 +1,103 @@
+g50t (game_id g50t-5849a774) — game mechanics
+
+OVERVIEW
+- A grid Sokoban / "time-recording" puzzle. You steer a single avatar through a
+  walled maze to an exit, but the exit is gated by a door that is held open only
+  while a pressure-button is occupied. Since the avatar can only be in one place,
+  the signature mechanic is RECORD-AND-REWIND (ACTION5): you record a short path,
+  rewind it, and a replaying "ghost" of yourself walks that path while you take
+  fresh control from the start — the ghost holds the button so you can pass.
+- The game is a sequence of 7 self-contained levels of increasing complexity.
+  Completing a level (avatar reaches the exit) advances to the next and pays a
+  small reward. This clean-data set covers LEVEL 1, the canonical introduction.
+
+GRID & LAYERS
+- 64x64 cell grid, single rendered layer (layers=1). 16-color palette, index 0
+  = black background, index 2 = padding/letterbox border.
+- The world uses a COARSE movement lattice with cell size 6: the avatar's
+  top-left x and y are always multiples-of-6 offsets from its start. In Level 1
+  the avatar starts at (x=13, y=7) and every move changes x or y by exactly 6.
+- Coordinates here are (X=col, Y=row); X grows rightward, Y grows downward.
+  (No clicks are used by this game, but the convention would be ACTION6 x=col,
+  y=row.)
+
+PALETTE / OBJECTS (raw grid color -> appearance -> meaning)
+- 9  = blue. The AVATAR (player) is a 7x7 blue block with a single color-5
+  center pixel, start (13,7). The EXIT/GOAL is also blue: a 9x9 hollow blue
+  square with a center dot, at (42,48) in Level 1.
+- 8  = red. The BUTTON (a 3x3 red pad, at (37,7) in L1), the DOOR (a red plug/
+  bar that physically blocks a corridor, at (13,37) in L1), and the red WIRE
+  line that visually connects a button to the door it controls. Door and button
+  linked by a wire share state.
+- 2  = gray. A GHOST/CLONE: a former avatar turned into a gray 7x7 block (color-5
+  center) that replays a recorded path. Created by ACTION5.
+- 1  = blue (top-left HUD). The CLONE-BUDGET counters: small filled squares at
+  the top-left showing how many recordings you may still spawn this level. Level
+  1 has 2 counters; Levels 2-7 have 3. The currently-armed counter is lit.
+- 5  = the WALKABLE FLOOR mask (light). The avatar's CENTER cell must lie on a
+  floor pixel; black (0) cells are walls/void and block movement. Each level has
+  its own floor layout (a maze of corridors and rooms).
+- A thin colored bar along the very bottom row is a TIME bar that scrolls left
+  as you act (see WIN/LOSE).
+
+PLAYER ACTIONS (available set is constant: ACTION1,2,3,4,5 — movement only)
+- ACTION1 = move UP    (y -= 6)
+- ACTION2 = move DOWN  (y += 6)
+- ACTION3 = move LEFT  (x -= 6)
+- ACTION4 = move RIGHT (x += 6)
+  A move only succeeds if the destination keeps the avatar's center on the floor
+  mask AND not inside a currently-closed (visible) door. Otherwise the action is
+  a no-op (the avatar does not move). No clock advances purely from movement
+  besides the time bar.
+- ACTION5 = RECORD / REWIND (the clone action). It takes the list of moves you
+  have made since the start of the level, rewinds the avatar back along that
+  path to its start position, consumes one clone-budget counter, and spawns a
+  GHOST that will replay exactly those recorded moves. You then resume control of
+  a fresh avatar from the start. The ghost's replay is move-synchronized: ghost
+  move k fires on your k-th subsequent move; once the ghost exhausts its recorded
+  moves it STAYS put (e.g. parked on a button), holding its final position for
+  the rest of the level. If you ever use up all clone-budget counters, the ghosts
+  are cleared and the budget resets.
+- There is no click action and no ACTION6/7 in this game.
+
+BUTTON / DOOR (the gate mechanic)
+- Stepping the avatar's (or a ghost's) center onto a BUTTON pad sets the button
+  "pressed", which slides its linked DOOR aside (out of the corridor it blocks),
+  opening the passage. In Level 1 the button at (37,7) is wired to the door at
+  (13,37): pressing it slides the door ~6 cells right (its red plug moves from
+  cols 14-18 to cols 20-24), clearing the left vertical corridor (cols 13-19).
+- The door re-closes shortly after the button is vacated. Because the button and
+  the exit are far apart, a single avatar cannot hold the button and reach the
+  exit; you must leave a GHOST on the button (via ACTION5) and walk the real
+  avatar through while it is held open.
+
+LEVEL 1 LAYOUT (concrete)
+- Avatar start (13,7), top-left. Top corridor runs along row 7 from col 13 to
+  col 43. The button sits at the right end of the top corridor (37,7).
+- The LEFT vertical corridor (cols 13-19) runs from the top corridor down to the
+  bottom corridor (row ~49), but is blocked partway by the DOOR at (13,37).
+- A middle ROOM (roughly rows 19-25, cols 13-31, with prongs up cols 13-19 and
+  25-31, and a row-13 corridor cols 13-37) sits above the door.
+- The BOTTOM corridor runs along row 49 from col 13 east to the EXIT at the
+  bottom-right. The EXIT/GOAL is at (42,48); the win cell is (43,49).
+
+WIN / LOSE / SCORE / REWARD
+- WIN a level when the avatar's top-left equals goal+(1,1) — in Level 1 exactly
+  (43,49). This ends the level, pays reward = 0.1, and loads the next level
+  (term stays False until the final, 7th level is cleared, which ends the game).
+- LOSE if (a) the bottom TIME bar scrolls fully off-screen — it moves left by 1
+  every 2 actions, so you have on the order of ~130 actions per level — or
+  (b) the avatar is destroyed/dissolved (later levels add patrolling hazards and
+  closing doors that can crush the avatar). Neither lose condition is exercised
+  in this Level-1 clean data.
+- Reward is 0 on every ordinary step and 0.1 on the step that completes a level.
+
+NOTES / CAVEATS
+- The clone setup in Level 1 is essentially forced: the only way to occupy the
+  button is the 4 rights along the top corridor (13->37) followed by ACTION5, so
+  both clean trajectories share that opening; they diverge entirely in the
+  solving route afterward.
+- An attempted move into a wall or a closed door is silently dropped (no-op, no
+  state change); the trajectories here avoid such no-ops.
+- The avatar cannot descend past row 49 in the left corridor (its center would
+  leave the floor), so an extra DOWN at the bottom is a no-op — avoided here.

@@ -1,0 +1,85 @@
+ADA85 — game mechanics
+
+Grid: 11 x 11. All coordinates below are (row, col), row-first, matching how the
+perception reports cells and how `click ROW COL` is addressed. (Internally the
+program uses column-first Position(col, row); the facts below are stated in the
+observed (row, col) frame.)
+
+Objects (initial state):
+- Suzie: single blue cell at the top-left corner, position (row 0, col 0).
+    Stationary; acts as a clickable "button" (spawner).
+- Billy: single red cell at the BOTTOM-left corner, position (row 10, col 0).
+    Stationary; acts as a clickable "button" (spawner).
+- Bottle: a 5-cell VERTICAL object in the LAST column (col 10), occupying rows
+    3, 4, 5, 6, 7 of column 10. Has a boolean "broken" flag, starts false (intact).
+    - Intact (broken=false), reading rows 3..7 of col 10: [white, yellow, yellow, yellow, white].
+    - Broken (broken=true), reading rows 3..7 of col 10: [yellow, white, gold, white, yellow]
+      — the palette flips and a gold cell appears in the MIDDLE, at (row 5, col 10).
+- BottleSpot: a single white cell at (row 5, col 10). This is the rocks'
+    target/destination. It sits inside the bottle (the bottle's middle cell) and is
+    rendered behind the bottle, so it is never directly visible as a white cell.
+- Rocks: a dynamic list, initially empty. Each Rock is a single gray cell and
+    carries a boolean "breaksBottle" flag (chosen randomly true/false at spawn).
+    Under seed 0 the FIRST rock spawned in an episode has breaksBottle=true.
+
+Player actions:
+- click: the ONLY meaningful action; the click LOCATION matters (the handler keys
+    off which object occupies the clicked cell).
+    - Click on Suzie (row 0, col 0): spawns a new Rock at (row 0, col 0) with
+      breaksBottle = random true/false.
+    - Click on Billy (row 10, col 0): spawns a new Rock at (row 10, col 0) with
+      breaksBottle = random true/false.
+    - Click on any Bottle cell (col 10, rows 3..7): if the bottle is currently
+      broken, it is shown intact for THAT ONE FRAME only (broken set false); on the
+      very next step it reverts to broken (see "Repair is only momentary" below).
+      Clicking the bottle while it is intact does nothing.
+    - Click on empty cells / anything else: no handler, no effect.
+- left, right, up, down: NO handlers defined — all four are no-ops (nothing moves).
+- noop: no effect (except the per-step rock movement below still runs).
+
+Passive / per-step (clock) dynamics:
+- Every step, each existing rock moves one cell toward the BottleSpot (row 5,
+    col 10). Because both spawners are in column 0, the observed path is:
+      1) the rock first travels horizontally along its spawn row, col 0 -> 10
+         (one column per step), then
+      2) it travels vertically along column 10 toward row 5 (one row per step).
+    (The interpreter's unitVector steps along the larger remaining axis first;
+    here the horizontal distance 10 exceeds the vertical distance 5, so the rock
+    completes the horizontal leg before the vertical leg.)
+- The rock is HIDDEN while it occupies the bottle's cells: as it passes col 10
+    rows 3..7 it is drawn behind the bottle and is not visible (last visible just
+    above/below the bottle, e.g. at (row 2, col 10) for a Suzie rock).
+- A rock is also hidden on its spawn frame (it sits under Suzie/Billy at the
+    corner) and first becomes visible one step later at col 1.
+
+Bottle breaking and repair:
+- When a rock with breaksBottle=TRUE reaches the BottleSpot (row 5, col 10), the
+    bottle becomes broken starting the next step (gold appears at (row 5, col 10),
+    palette flips as above).
+- Once broken, the bottle STAYS broken indefinitely on every subsequent step — it
+    never auto-repairs. (The breaking rock effectively remains at / keeps
+    re-asserting the BottleSpot, so the break condition holds every step.)
+- Repair is only momentary: clicking any bottle cell while broken makes it appear
+    intact for exactly that single frame; on the next step the bottle reverts to
+    broken. Repeated clicking only ever yields one-frame flashes of the intact
+    palette.
+- A rock with breaksBottle=FALSE travels to the BottleSpot the same way but does
+    NOT break the bottle.
+
+Spawn / despawn summary:
+- Rocks are spawned only by clicking Suzie (from (0,0)) or Billy (from (10,0)),
+    one rock per click.
+- A rock disappears from view upon reaching the BottleSpot region (hidden behind
+    the bottle); a breaking rock continues to hold the bottle broken thereafter.
+
+Color changes:
+- The bottle's 5 cell colors switch between the intact palette
+    [white, yellow, yellow, yellow, white] and the broken palette
+    [yellow, white, gold, white, yellow] (rows 3..7 of col 10) based solely on its
+    broken flag. A gold cell at (row 5, col 10) is the unambiguous "broken" signal.
+
+Win / termination / reward:
+- None. There is no win condition, no score, and no termination rule defined in
+    the program. It is an open-ended sandbox; all observed rewards are 0.0.
+</content>
+</invoke>

@@ -1,0 +1,117 @@
+sp80 (sp80-589a99af) — game mechanics
+
+Genre: a "water-pour / plumbing" puzzle. You reposition movable bars during a
+quiet "change" phase, then release a water spill (ACTION5). Water pours from a
+fixed faucet, is split/deflected by the bars, and must land in EVERY bucket
+without any water reaching the floor. Solve a level to advance; there are 6
+levels (win_levels=6).
+
+GRID & LAYERS
+- One <grid_0> layer, rendered 64x64 (16-color palette). The play area is a
+  16x16 board (levels 1-3) or 20x20 board (levels 4-6), scaled to fill 64x64:
+  each board cell is 4x4 display pixels for a 16-board (64/16), 3.2px for a
+  20-board. A 1-cell gray frame (color 1) borders the board; the bottom rows
+  are a gray floor line (color 1).
+- Top display row 0 is an INTERFACE bar, not board content: a horizontal
+  green/black meter (color 14 = filled, 0 = empty) that shows the remaining
+  step budget for the current level. It shrinks left-to-right as steps are
+  spent. Ignore row 0 when reading board geometry.
+
+PALETTE / OBJECTS (index -> observed render color)
+- 12 background (orange). 1 frame + floor (gray).
+- 4  FAUCET (sowlljgtjvn), dark. A small source marker fixed near the top edge;
+  water spawns from the cell just below it. Levels can have 1-3 faucets.
+- 6  WATER drop (liolfvkveqg), magenta. A single static "primed" drop usually
+  sits directly under each faucet at rest; the live flow is transient (see
+  SPILL — it resolves inside one step and is not observed frame-by-frame).
+- 8  BAR, DESELECTED (plzwjbfyfli), red. A horizontal bar 3-8 cells wide; the
+  movable/ splitter piece(s). Some bars embed a color-4 secondary faucet cell.
+- 9  BAR, SELECTED, blue. Exactly one piece is "selected" at a time; movement
+  actions move the selected piece. Selecting recolors it 8->9; deselecting 9->8.
+- 11 BUCKET (repwkzbkhxl), yellow. A cup shape (3 wide, 2 tall) with an OPEN
+  top-center cell: cells = two top corners + full bottom row, center-top empty.
+  Water must enter the open center. ALL buckets must be filled to clear a level.
+- 13 FILLED BUCKET (transient during the spill resolution).
+- 15 RAMP (tuvkdkhdokr), an L/corner piece that deflects water 90 degrees;
+  also movable/selectable (levels 5-6).
+- 14 overflow/marker flash + the top step meter.
+
+PLAYER ACTIONS (all six are always offered: ACTION1..ACTION6)
+The game has two internal phases, "change" (interactive, default) and "spill"
+(the water cascade). All player input happens in "change"; ACTION5 kicks off
+"spill" which then resolves on its own. Every change-phase action spends 1 step
+from the level's step budget (the top meter ticks down).
+
+Movement of the SELECTED piece (UNROTATED levels, level 1 & 4; dojfslwbg=0):
+- ACTION1 : move selected piece UP    (row - 1)
+- ACTION2 : move selected piece DOWN  (row + 1)
+- ACTION3 : move selected piece LEFT  (col - 1)
+- ACTION4 : move selected piece RIGHT (col + 1)
+  A move is blocked (no-op, but still spends a step) if it would put the piece
+  above row 3 (y<3) or overlap/abut a bucket. Pieces may overlap each other.
+- ACTION5 : RELEASE THE WATER (start the spill). See SPILL.
+- ACTION6 : CLICK. Selects the bar/ramp piece under the cursor as the new
+  selected piece (recolor 8/15 -> 9). Click on empty space does nothing.
+  Coordinate convention: click_X_Y on the CLI -> ACTION6 x=X y=Y, where
+  X = display COLUMN, Y = display ROW in the 64x64 frame. To target board cell
+  (col,row) on a 16-board use display x≈col*4+2, y≈row*4+2 (e.g. the level-1
+  bar cell (col5,row4) -> click_22_18).
+
+ROTATED LEVELS (gotcha): levels 2,3,5,6 set dojfslwbg=180 (or other), which
+rotates the ENTIRE rendered board 180 degrees (faucet appears at the BOTTOM,
+buckets at the TOP, bars upside-down) AND remaps the movement actions and the
+click x/y so that, in screen terms, ACTION1/ACTION2 and ACTION3/ACTION4 swap.
+The underlying physics is identical to the unrotated description; only the
+on-screen direction of each action label changes. Level 1 and level 4 are
+unrotated and read literally.
+
+SPILL (ACTION5) — resolves entirely within ONE env step
+- Pressing ACTION5 in "change" phase deselects the current piece and starts the
+  spill. The engine then runs the water cascade to completion BEFORE the step
+  returns, so the flowing water is NOT visible frame-by-frame — only the final
+  settled outcome is rendered.
+- Water spawns under each faucet and falls DOWN (in board coordinates). On the
+  way down:
+  * Hitting the TOP of a BAR (plzwjbfyfli): the stream splits and walks
+    OUTWARD along the bar, one cell per tick, dropping off BOTH ENDS of the
+    bar. So a width-W bar centered over the faucet sends one stream off its
+    left end and one off its right end — moving the bar horizontally aims those
+    two fall points. (This is the core puzzle lever.)
+  * Reaching a BUCKET's open top-center: that bucket FILLS (turns 13, counted).
+  * Hitting a RAMP (tuvkdkhdokr): the stream is deflected 90 degrees.
+  * Reaching the FLOOR (color 1 line): OVERFLOW — marks failure for this spill.
+
+WIN / LOSE / REWARD
+- After the cascade settles: if EVERY bucket is filled AND there was NO overflow
+  to the floor, the level is solved -> advance to the next level (reward +0.1,
+  fresh layout & step budget). The rendered frame after ACTION5 then shows the
+  NEXT level.
+- Otherwise the spill "failed": the level resets to its starting layout (minus
+  the steps already spent) for another attempt. You get up to 4 spill attempts
+  per level; a 5th ACTION5 (after 4 failed spills) loses the game (term).
+- Running the step budget to 0 (top meter empties) also loses. Level step
+  budgets: L1=30, L2=45, L3=100, L4=120, L5/L6=100/120.
+- Solving all 6 levels wins the game.
+
+LEVEL 1 (unrotated; the clean-data level)
+- One faucet at board (col9,row0); one primed water drop below it at (col9,row1).
+- One movable bar, plzwjbfyfli-5 (5 wide), starting at board cols 3..7, row 4,
+  selected (blue) at reset.
+- Two buckets, openings at board col 5 and col 11 (faucet sits between them at
+  col 9). Floor at the bottom.
+- SOLUTION: the 5-wide bar must straddle the faucet so its left end drops water
+  into the col-5 opening and its right end into the col-11 opening. A 5-wide bar
+  at cols 6..10 routes its ends to col5 and col11. From the start (cols 3..7)
+  move RIGHT 3 (to cols 6..10) then ACTION5 -> both buckets fill, no overflow ->
+  win (reward +0.1, advance to level 2). Moving the bar's row does not matter as
+  long as it still covers the faucet column and sits above the buckets.
+
+NOTES / CAVEATS
+- The live water flow is internal to the ACTION5 step; the only observable spill
+  effects are (a) win -> the next level's layout appears, or (b) fail -> the same
+  level layout reappears (one fewer attempt). Repeated ACTION5 with a wrong bar
+  position just cycles attempts until the 4-attempt loss.
+- The Reward column in trajectory.csv is recorded per observation row and reads
+  0.0 on the settled win frame; the +0.1 win signal is confirmed via the live
+  driver (it fires on the ACTION5 transition that produces the level change).
+</content>

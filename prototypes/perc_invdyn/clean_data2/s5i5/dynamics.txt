@@ -1,0 +1,125 @@
+s5i5 (game_id s5i5-18d95033) — game mechanics
+
+OVERVIEW
+- An 8-level click-only puzzle. Each level is a board of colored "rods"
+  (extendable/rotatable bars), each rod carrying a red endpoint "head", plus a
+  set of red diamond "targets". You solve a level by extending / retracting /
+  flipping the rods so that every target ends up covered by a rod's head.
+  Covering all targets advances to the next level. There is a per-level step
+  budget; running out of steps loses the game.
+- The ONLY action ever available is ACTION6 (a click). `avail` is always
+  ['ACTION6'] in every state. ACTION6 carries x,y (the clicked pixel).
+
+GRID & LAYERS
+- One 64x64 grid layer (`<grid_0>`) per observation, 16-color palette.
+- Coordinate convention here matches the CLI: `click_X_Y` -> ACTION6 x=X y=Y,
+  where X = column, Y = row. (x grows rightward, y grows downward.)
+- Color 5 is the background. Color 3 is letterbox/padding and is also used for:
+  the thin divider inside each slider widget, the "base" edge of a rod, and the
+  bottom-row step-budget bar.
+- The very bottom grid row (row 63) is a STEP-BUDGET BAR drawn by the engine:
+  the left portion is color 3 (steps remaining) and the right portion is color
+  4 (steps used). It shrinks left as you spend clicks. It is HUD, not a game
+  object.
+
+OBJECTS / PALETTE
+- ROD (a.k.a. bar): a solid rectangular bar of one color, occupying a full
+  N x 3 (or 3 x N) block. Rod body colors seen across levels include 11
+  (yellow), 14 (green), 10, 12, and 15 (white/purple-rendered). One edge of the
+  rod (its "base", a line of color 3) is fixed; the opposite end is the growing
+  tip. Tag: 0001qwdmnlybkb.
+- HEAD: a 3x3 sprite that is transparent except a single red (color 13) dot in
+  the center. A head is "attached" to a rod (it overlaps the rod's tip at reset)
+  and moves WITH the rod when the rod is extended/retracted/flipped. The head is
+  the thing that must reach a target. Tag: 0064ocqkuqacti (sprite 0063...).
+- TARGET: a 3x3 hollow red (color 13) DIAMOND outline (four dots, transparent
+  center). Tag: 0087vvmblxkzdi (sprites 0085, 0086). A target is satisfied when
+  some head sits at exactly the same (x,y) position as the target.
+- SLIDER widget (length control): a gray (border 2, fill 4) box split down the
+  middle by a color-3 divider, with a small colored "minus"/"plus" glyph in each
+  half. The glyph color identifies WHICH rod(s) the slider controls (a slider
+  controls every rod whose body color appears in the slider's pixels). A slider
+  is HORIZONTAL if wider than tall, VERTICAL if taller than wide. Tag:
+  0066ghlkyvdbgg (sprites 0065..0082). These widgets sit off to the side / along
+  the bottom and are the click targets, NOT the rods themselves.
+- FLIP-HANDLE widget: a gray box with a small colored diamond/plus glyph (color
+  identifies the rod). Clicking it FLIPS the matching rod 180 degrees about its
+  base. Tag: 0089rvqdprjwpz (sprites 0088, 0090..0096). Present only in later
+  levels (6,7,8).
+
+CLICK SEMANTICS (the single mechanic, ACTION6 x=col y=row)
+On each click the engine spends one step, converts (x,y) to a grid cell, and:
+1. If the cell is on a FLIP-HANDLE (0089...): read the handle's glyph color;
+   every rod whose body color matches is flipped 180 degrees about its base
+   (the head swings to the opposite side of the base). [later levels only]
+2. Else if the cell is on a SLIDER (0066...): determine the click's offset along
+   the slider's long axis relative to the slider midpoint (midpoint = long-axis
+   length // 2, measured from the slider's top-left origin):
+     - offset > midpoint  -> EXTEND the controlled rod(s) by one unit (+3 cells
+       of length) in the rod's facing direction; the attached head moves +3 with
+       the tip.
+     - offset < midpoint  -> RETRACT by one unit (-3 cells), but only while the
+       rod is longer than 1 unit (cannot shrink past the minimum); head moves
+       back with the tip.
+   In short: click the FAR half of the slider to grow the rod, the NEAR half to
+   shrink it. For a HORIZONTAL slider near/far is left/right; for a VERTICAL
+   slider near/far is top/bottom.
+3. Else (empty cell, or a click that lands on a rod/head/target rather than a
+   widget): nothing happens.
+A move is computed, then VALIDATED: if applying it makes any rod overlap any
+other rod, the move is rolled back (the next step restores the pre-move state),
+so illegal extensions/flips are effectively no-ops. Targets, heads and HUD do not
+count as blocking collisions.
+
+DIRECTION OF GROWTH
+- A rod grows away from its fixed base toward its tip. Whether a slider's
+  "extend" half grows the rod up/down/left/right depends on the rod's current
+  facing (its base edge). Empirically in Level 1: the green rod's horizontal
+  slider extends it RIGHTWARD, and the yellow rod's vertical slider extends it
+  DOWNWARD. Each extend/retract is exactly 3 cells (= one head-step).
+
+COMPOSITE RODS ("Children")
+- A level's `Children` data and head/rod collisions link some rods/heads into
+  parent->child chains stored per rod. When a parent rod is moved/extended/
+  flipped, its children are moved/flipped in lockstep (recursively). This lets a
+  single slider/handle drive a multi-segment articulated arm. (Level 1 has no
+  Children chains; later levels do.)
+
+AVAILABLE-ACTION TRANSITIONS
+- Always exactly ['ACTION6']. The set never changes; targeting is done purely
+  through the click's (x,y). Clicks that miss every widget are wasted steps.
+
+LEVEL / GOAL STRUCTURE
+- 8 levels (win_levels=8). Each Level supplies its own rods, heads, targets,
+  sliders/handles, and a `StepCounter` budget (Level 1: 50, others 100-200).
+- WIN A LEVEL: when EVERY target sprite has some head sprite at its exact (x,y).
+  This is checked after each click; satisfying it calls next_level(): the board
+  is replaced by the next level and reward jumps by +0.1 (1/8 per level). After
+  Level 8 the game is won.
+- GAME OVER: if the step budget reaches 0 before the level's targets are all
+  covered, the game is lost (term).
+- REWARD: +0.1 on each level transition (0 otherwise); no shaping within a level.
+
+LEVEL 1 (the trajectories here)
+- StepCounter = 50. Two rods, two heads, two targets, two sliders.
+  * GREEN rod, horizontal, body color 14, head (red dot) initially near col~30,
+    row~9-11. Controlled by the GREEN horizontal slider at x=36,y=18 (width 13,
+    midpoint offset 6): click col>42 (e.g. click_45_21) extends it RIGHT; click
+    col<42 (e.g. click_38_21) retracts it. 7 extends move the green head onto the
+    TOP-RIGHT diamond target (~col51,row9).
+  * YELLOW rod, vertical, body color 11, head initially at col~9-11, row~34.
+    Controlled by the YELLOW vertical slider at x=21,y=35 (height 13, midpoint
+    offset 6): click row>41 (e.g. click_23_45) extends it DOWN; click row<41
+    retracts. 6 extends move the yellow head onto the BOTTOM-LEFT diamond target
+    (~col9,row51).
+  * Covering both targets (green=7 right-extends, yellow=6 down-extends, 13
+    clicks total) wins Level 1 and loads Level 2 (a multi-rod board with a bottom
+    bank of four colored sliders).
+
+CAVEATS
+- The flip-handle mechanic and the Children (articulated) mechanic are real (in
+  the source) but only appear from Level 6+, which is unreachable without first
+  solving Levels 1-5; the two trajectories here (both Level 1) demonstrate the
+  core EXTEND and RETRACT slider mechanic and a level WIN, but not FLIP.
+- A click on a slider's exact midpoint (offset == midpoint) does nothing.
+- Moves that would cause rod-rod overlap silently roll back on the next step.

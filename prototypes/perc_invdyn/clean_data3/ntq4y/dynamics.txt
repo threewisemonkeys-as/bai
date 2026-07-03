@@ -1,0 +1,77 @@
+NTQ4Y — game mechanics
+
+Grid: 16 x 16.
+
+Coordinates below are written (col, row) = (x, y), origin top-left, y increasing
+downward. NOTE the action/observation interface uses the OPPOSITE order: actions
+are "click ROW COL" and the observation is indexed obs[row][col]. So e.g. the
+vesselButton written below as (col 2, row 0) is selected by the action "click 0 2"
+and appears at obs[0][2].
+
+This is a "sandbox painter" with a water/liquid simulation. The player selects a
+particle type from a top toolbar, then clicks empty cells to place that particle.
+There is no goal or win condition.
+
+Objects / colors / initial positions:
+- Toolbar buttons (row y=0), each a single colored cell, fixed in place:
+  - vesselButton: purple, at (col 2, row 0)  -> selects "vessel" particle
+  - plugButton:   orange, at (col 5, row 0)  -> selects "plug" particle
+  - waterButton:  blue,   at (col 8, row 0)  -> selects "water" particle
+  - removeButton: gray,   at (col 11, row 0) -> removes ALL plugs
+  - clearButton:  red,    at (col 14, row 0) -> clears ALL vessels, plugs, and water
+- Vessel particles: purple cells. 12 placed initially, forming the left and right
+  walls of an open-top funnel/V-shaped container (narrow at the bottom, flaring
+  outward toward the top):
+    left wall  (col,row): (6,15)(6,14)(6,13)(5,12)(4,11)(3,10)
+    right wall (col,row): (9,15)(9,14)(9,13)(10,12)(11,11)(12,10)
+  These act as immovable barrier walls.
+- Plug particles: orange cells. 6 placed initially in a 2x3 block at the bottom
+  center: (7,15)(8,15)(7,14)(8,14)(7,13)(8,13) — they seal the gap (cols 7,8)
+  between the two vessel walls, so the container holds water until the plugs are
+  removed.
+- Water particles: blue cells. None placed initially; the player creates them.
+- currentParticle: a string state, initial value "vessel". Determines what a
+  free-cell click places.
+
+Player actions:
+- click: behavior depends on what was clicked.
+  - Clicking a toolbar button cell triggers that button's handler (select a
+    particle type, or remove all plugs, or clear everything). Click LOCATION
+    matters (which button). The button cell is occupied, so a button click never
+    also places a particle.
+  - Clicking an empty/free cell (isFreePos) places ONE particle of the currently
+    selected type (vessel / plug / water) at the clicked coordinates. Click
+    location matters — the particle appears exactly where clicked.
+  - Clicking an already-occupied, non-button cell does nothing (the isFreePos
+    guard fails).
+- left, right, up, down, noop: no action handlers exist — they cause no
+  player-driven change. (The passive water simulation below still runs on these
+  steps, since it fires every step.)
+
+Passive / clock dynamics (on true, every step):
+- Water flows every step via nextLiquid, applied to each water particle:
+  - If the cell directly below the water is free (and the water is not already on
+    the bottom row), the water moves straight down one cell.
+  - Otherwise it looks at the row immediately below for the nearest reachable
+    "hole" (a free cell with a free cell above it) and moves one step toward it
+    (down/diagonally). If no such hole exists, it stays put.
+  This produces gravity + sideways spreading: water falls and piles up, settling
+  on top of and confined by the vessel walls and plugs. Removing the plugs opens
+  the bottom of the container so any held water drains down to the floor.
+- Vessels, plugs, and buttons never move and are unaffected by the simulation.
+
+Spawning / despawning:
+- Spawn: clicking a free cell adds one particle of the currently selected type.
+- Despawn: removeButton deletes ALL plugs; clearButton deletes ALL vessels, plugs,
+  and water. No automatic/periodic spawning or despawning.
+
+Color changes: none — each object keeps its fixed color (vessels purple, plugs
+orange, water blue; buttons purple/orange/blue/gray/red).
+
+Collisions / interactions: a cell is occupied (not free) if it holds a vessel,
+plug, water, or button. Water is confined by vessel cells, plug cells, other water,
+and the row-0 buttons via the nextLiquid simulation; particle placement is blocked
+on any occupied cell (isFreePos check).
+
+Win / termination / reward: none. Open-ended sandbox; no score, goal, or end
+state. Reward is always 0.

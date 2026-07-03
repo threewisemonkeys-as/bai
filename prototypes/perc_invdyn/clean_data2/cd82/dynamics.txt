@@ -1,0 +1,123 @@
+cd82 (game_id cd82-fb555c5d) — game mechanics
+
+OVERVIEW
+- A "paint the canvas to match the target" puzzle. A 10x10 TARGET picture is shown
+  top-left; a blank 10x10 CANVAS sits in the center. You drive a "basket / paint
+  applicator" around 8 positions on a ring surrounding the canvas, pick a color
+  from a palette at the top, and STAMP that color onto the canvas from the side
+  the basket currently occupies. When the canvas matches the target (ignoring the
+  two main diagonals) the level is solved and you advance to the next level.
+- 6 levels (info win_levels=6). Solving a level yields reward +0.1 and loads the
+  next level. Running out of the action budget (100 actions) loses the game.
+
+GRID & LAYERS
+- One 64x64 grid layer per observation (the engine renders only the final settled
+  frame after any multi-tick stamp/preview animation; <grid_0> only).
+- Coordinates are (x=col, y=row); x grows rightward, y grows downward.
+- camera scale = 1, offset = 0, so DISPLAY coords == GRID coords: a click
+  `click_X_Y` (-> ACTION6 x=X y=Y) targets grid column X, row Y directly.
+
+PALETTE (confirmed indices)
+- 0  = white   (canvas default fill; a selectable swatch color)
+- 2  = light gray (basket / applicator outline)
+- 3  = gray    (decorative background frame `gkyfnkvrty`, the top bar)
+- 4  = dark gray (letterbox padding, swatch borders, the step-budget bar at row 63)
+- 5  = black   (camera background)
+- 12 = orange  (target/swatch color, appears from level 2)
+- 15 = purple  (default selected color; a swatch color)
+- 8, 9, 11, 14 = additional swatch/target colors used in levels 3-6 (not visually
+  named here, but they are palette indices remapped into the swatches at level 3+).
+
+ON-SCREEN OBJECTS (level 1)
+- TARGET picture: 10x10 sprite `eoqnvkspoa-pqwme<level>-1` at grid (col 3, row 3),
+  i.e. occupying cols 3..12, rows 3..12, behind a gray frame. Level 1 target =
+  top 5 rows white (0), bottom 5 rows purple (15). This is the goal image.
+- CANVAS: 10x10 sprite `xytrjjbyib` at (col 27, row 34), cols 27..36, rows 34..43.
+  Starts entirely white (0). This is what you paint and what is compared to the
+  target.
+- BASKET / applicator: sprite "ActiveBasket" (a `oaoosfneq-*` shape, light-gray
+  outline color 2, interior filled with the CURRENTLY SELECTED color). It sits at
+  one of 8 ring positions around the canvas and shows which color you will stamp.
+- PALETTE swatches: `pqkenviek` sprites, 5x5 squares (dark-gray border color 4,
+  3x3 colored center) in a row near the top. Level 1 has 2 swatches: white (center
+  color 0) at (col 35, row 2) and purple (center 15) at (col 41, row 2). The center
+  cell of a swatch is the color it selects.
+- SELECTION MARKER: `ydiwkzjkgl`, a 1x5 underline placed just below the currently
+  selected swatch (starts under the purple swatch -> selected color = 15 at reset).
+
+THE 8-POSITION SELECTOR RING
+- The basket lives at one of 8 ring positions, indexed 0..7, laid out as the 8
+  outer cells of a 3x3 grid (the center (1,1) is unused/blocked):
+        idx7 (0,0)   idx0 (0,1)   idx1 (0,2)
+        idx6 (1,0)    center      idx2 (1,2)
+        idx5 (2,0)   idx4 (2,1)   idx3 (2,2)
+  where the pair is (grid-row, grid-col) within the 3x3 selector, NOT screen cells.
+  Reset starts at idx0 (top-middle, basket above the canvas).
+- Screen placement of each idx (basket center, col,row) and the canvas region it
+  stamps (see STAMP below):
+    idx0 top         (25,24)  -> canvas TOP half     (rows 0..4)
+    idx1 top-right   (33,21)  -> upper-right triangle (row i: cols i..9)
+    idx2 right       (38,32)  -> canvas RIGHT half    (cols 5..9)
+    idx3 bottom-right(33,40)  -> lower-right triangle (row i: cols 9-i..9)
+    idx4 bottom      (25,45)  -> canvas BOTTOM half   (rows 5..9)
+    idx5 bottom-left (14,40)  -> lower-left triangle  (row i: cols 0..i)
+    idx6 left        (17,32)  -> canvas LEFT half     (cols 0..4)
+    idx7 top-left    (14,21)  -> upper-left triangle  (row i: cols 0..9-i)
+
+PLAYER ACTIONS (available_actions is constant [ACTION1..ACTION6] in every state)
+- ACTION1 = move selector UP    (selector grid-row - 1)
+- ACTION2 = move selector DOWN  (selector grid-row + 1)
+- ACTION3 = move selector LEFT  (selector grid-col - 1)
+- ACTION4 = move selector RIGHT (selector grid-col + 1)
+  Movement is within the 3x3 selector and clamped to [0,2]. A move is REJECTED
+  (basket stays put, frame unchanged) if it would land on the blocked center (1,1)
+  or off the edge. Consequence: from idx0 (top-middle) you cannot go straight up or
+  down — you must step sideways first (e.g. ACTION4 -> idx1, then ACTION2 -> idx2).
+  Each accepted move teleports the basket to the new ring position and refills its
+  interior with the selected color.
+- ACTION5 = STAMP. Plays a dip animation: the basket lunges into the canvas from
+  its current side and at the apex paints the SELECTED COLOR over the canvas region
+  for the current ring position (the TOP/BOTTOM/LEFT/RIGHT half for cardinal
+  positions, or a corner TRIANGLE for diagonal positions; see ring table), then
+  retracts. Only the final painted canvas is rendered. This is the core paint tool.
+- ACTION6 = CLICK at (x=col, y=row). Two distinct targets:
+    (a) Click a palette swatch (`pqkenviek`): sets the selected color to that
+        swatch's center color, moves the underline marker beneath it, and refills
+        the basket interior with the new color. Click the swatch CENTER, e.g. the
+        level-1 white swatch center is (col 37, row 4) -> `click_37_4`, the purple
+        swatch center is (col 43, row 4) -> `click_43_4`.
+    (b) Click a hint ARROW (`ctwspzkygu`, present only in levels 3-6 and only when
+        the basket is at a cardinal position idx 0/2/4/6): plays a nudge animation
+        and paints a SMALL central edge STRIP (a 3x4 / 4x3 block on that side:
+        top=rows0-2/cols3-6, bottom=rows7-9/cols3-6, left=cols0-2/rows3-6,
+        right=cols7-9/rows3-6) with the selected color — a finer paint than the
+        full-half ACTION5 stamp. Not exercised in this dataset's level-1 trajectories.
+  Clicking empty space or a non-interactive cell does nothing.
+
+CLICK / COORDINATE CONVENTION
+- `click_X_Y` on the CLI -> ACTION6 x=X y=Y, with X = column, Y = row (display ==
+  grid here). To select a swatch, click its center cell. To click an arrow, click
+  on the arrow sprite's cells.
+
+WIN / LEVEL / SCORE
+- After every ACTION5 stamp (and after an arrow-strip paint) the canvas is compared
+  to the target. The comparison IGNORES the two main diagonals of the 10x10 (cells
+  (i,i) and (i,9-i) are "don't care"); all other cells must match exactly. On a
+  match the level is solved: reward +0.1 and the next level loads (basket reset to
+  idx0, selected color reset to 15/purple, fresh white canvas, new target).
+- Level 1 solution: the canvas already starts white (matching the target's white
+  top half), and the default selected color is purple, so simply move the basket to
+  the BOTTOM (idx4) and ACTION5 to stamp the bottom half purple -> match -> advance.
+- Levels 2-6 use multi-region targets (diagonal splits, multiple colors, the orange
+  12 and other indices) requiring several color-select + stamp combinations and, in
+  levels 3-6, the arrow strip tool; they are not solved in this dataset.
+- LOSE: a fixed budget of 100 actions (the bar along grid row 63 shrinks each
+  action: filled portion = dark gray 4, remaining = black 5); exhausting it ends
+  the episode as a loss. No other termination.
+
+NOTES / CAVEATS
+- available_actions never changes (always all six), even mid-animation; the engine
+  runs each stamp/preview animation to completion inside a single env.step, so each
+  emitted action maps to exactly one rendered observation.
+- A rejected move (into the center, off-edge, or a redundant re-select click) is a
+  legal no-op: the frame is unchanged but the action is consumed from the budget.

@@ -1,0 +1,105 @@
+WA30 (wa30-ee6fef47) — game mechanics
+
+OVERVIEW
+- A Sokoban-style "grab-and-drag" puzzle. You drive a single player avatar that
+  can grab a box it is facing and then drag that box rigidly around the board.
+  A level is solved when EVERY box is sitting on a goal cell (and no box is
+  currently being held). Solving a level advances to the next; there are 9
+  levels. A per-level step budget counts down — running it out loses.
+
+GRID & LAYERS
+- The rendered frame is 64x64 (one ARC grid layer). Everything is laid out on a
+  coarse 16x16 lattice: every sprite is 4x4 pixels and every position is a
+  multiple of 4. "One cell" = 4 pixels = one move step (celomdfhbh = 4).
+- Throughout this file a CELL coordinate (col,row) = (pixel_x/4, pixel_y/4),
+  col grows rightward (+x), row grows downward (+y). The engine stores raw
+  pixel positions; the avatar/boxes always move in 4-pixel (1-cell) increments.
+- Background is color 1 (light gray). Letterbox/padding is color 0.
+- Row 63 (the bottom pixel row) is NOT part of the puzzle: it is a step-budget
+  meter. It is filled with color 7 (magenta) from the left in proportion to the
+  remaining steps and color 4 (dark) for the spent portion. It shrinks left as
+  you act. Ignore it for object reasoning.
+
+PALETTE / OBJECTS  (color index -> meaning)
+- 1  = background.
+- Player avatar (4x4): body color 14 (green) with a one-row "nose" of color 0
+  (white) on the leading edge that points in the avatar's current facing
+  direction. The nose row rotates: top=facing up, bottom=down, left/right edges
+  for left/right. Only ONE avatar exists per level. It is the only object the
+  agent's actions directly control.
+- Box (4x4): the pushable goal object. Center color 9 (blue). Its 1-pixel BORDER
+  is a state indicator:
+    * 4 (dark)  = idle box, not interacting with the player.
+    * 3 (green) = box is directly IN FRONT of the player (i.e. grabbable right
+                  now with ACTION5). This is the "you can grab me" highlight.
+    * 0 (white) = box is currently GRABBED by the player.
+    * 5 (gray)  = box grabbed by a non-player auto-agent (only in levels with
+                  color-12 robots; never in level 1).
+  Level 1 has exactly 3 boxes.
+- Goal zone (collidable=False, color 9 border / color 2 gray fill): a region of
+  the board where boxes must end up. A box counts as "on goal" when its top-left
+  cell lies inside the goal region. Goal cells are walkable (not solid) — they
+  are pure targets, not obstacles. In level 1 there is one 3-cell-wide goal bar.
+- (Later levels only, not exercised by these trajectories:)
+    * color 5 blocks (uasmnkbzmm) and color-2 "X" tiles (pmargquscu) = solid
+      walls / non-walkable obstacles.
+    * color 12 sprites (byigobxzpg) = autonomous "robot" agents that each step
+      grab a box and drag it toward a goal on their own.
+    * color 15 sprites (jqzhxgbmtz) = autonomous movers toward color-2 zones;
+      can be destroyed if the player faces one and presses ACTION5.
+
+LEVEL 1 LAYOUT (the level these trajectories use)
+- Goal bar: 3 cells wide at cells (7,7),(8,7),(9,7) (pixels x=28..39, y=28..31).
+- Box A: cell (11,6).   Box B: cell (4,7).   Box C: cell (8,9).
+- Player: starts at cell (8,12), facing UP.
+- Step budget: 200 (huge; not a constraint for a direct solve).
+
+PLAYER ACTIONS (available actions are always exactly [ACTION1..ACTION5];
+no ACTION6/click in this game)
+- ACTION1 = move UP    (dy = -1 cell).
+- ACTION2 = move DOWN  (dy = +1 cell).
+- ACTION3 = move LEFT  (dx = -1 cell).
+- ACTION4 = move RIGHT (dx = +1 cell).
+- ACTION5 = GRAB / RELEASE toggle (no movement of its own).
+
+MOVEMENT RULES
+- When NOT holding a box: the move first ROTATES the avatar to face the chosen
+  direction, then moves one cell IF the target cell is free (not a box, not a
+  wall, not an obstacle, and inside the board). If the target is blocked, the
+  avatar still turns to face that way but stays put. This "bump to turn" is the
+  normal way to aim at a box before grabbing it.
+- When HOLDING a box: the avatar does NOT rotate. It moves one cell in the chosen
+  direction and the held box moves the same delta, keeping its relative offset
+  rigid (you drag the box around as a unit). The move only succeeds if BOTH the
+  avatar's and the box's destination cells are free (each may move into the
+  cell the other is vacating). If either is blocked, neither moves.
+- There is no passive clock: state changes ONLY on an action. Each action spends
+  one step from the budget.
+
+GRAB / RELEASE (ACTION5)
+- If the avatar is already holding a box, ACTION5 RELEASES it (drops it in place).
+- Otherwise ACTION5 grabs the box that is directly in front of the avatar (the
+  cell one step in the facing direction). That box's border turns white while
+  held. If no box is in front, ACTION5 does nothing (in level 1; in later levels
+  it can instead destroy a faced color-15 sprite).
+- Typical loop: face a box (move into it to turn / approach), ACTION5 to grab,
+  move to drag the box onto a goal cell, ACTION5 to release.
+
+WIN / LEVEL / SCORE / REWARD
+- A level is solved the moment ALL boxes are on goal cells AND none is being
+  held. So the final placement must end with a RELEASE — a box dropped onto the
+  last goal slot triggers the level transition on that release step.
+- Solving a level emits reward +0.1 and loads the next level (new layout, new
+  step budget; in level 1 this is observed as the frame jumping to the level-2
+  arrangement, with color-12 robots appearing). The episode terminates (term)
+  only after the final (9th) level is solved, or it is LOST if the step budget
+  reaches 0 before the level is solved.
+- No reward is given for individual box placements or moves; only +0.1 per level.
+
+NOTES / CAVEATS
+- The "in front" green-border highlight (color 3) is purely cosmetic feedback
+  that a grab would succeed; it appears/disappears as the avatar turns or moves
+  next to a box.
+- Boxes never move on their own in level 1 (no auto-agents present), so the
+  level is a deterministic pure-player puzzle.
+</content>

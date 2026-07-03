@@ -1,0 +1,45 @@
+F5W3N — Space Invaders style shooter
+
+GRID: 16 x 16. Coordinates are (x, y) with y increasing downward (hero starts at y=15, the bottom row).
+
+OBJECTS:
+- Hero: one cell, gray when alive, black when dead. Has a boolean `alive` field. Starts at position (8, 15), bottom-center.
+- Enemy (enemies1): blue cells. Initially placed on row y=1 at every x where x % 3 == 1 (x = 1,4,7,10,13).
+- Enemy (enemies2): blue cells. Initially placed on row y=3 at every x where x % 3 == 2 (x = 2,5,8,11,14).
+- Bullet: red cells. Hero's shots. None at start.
+- EnemyBullet: orange cells. Enemy shots. None at start.
+
+PLAYER ACTIONS:
+- left:  moves hero one cell left (blocked at grid edge — moveLeftNoCollision).
+- right: moves hero one cell right (blocked at grid edge).
+- up:    fires a bullet from the hero's current position, but only if the hero is alive. The new bullet spawns at the hero's cell.
+- down:  NO handler — no-op.
+- click: NO handler — no-op. Click location does not matter.
+- noop:  does nothing (clock dynamics still advance).
+
+CLOCK / PASSIVE DYNAMICS (run every step via `on true` and time-based rules):
+- `time` increments by 1 each step (starts at 0).
+- Every step: all hero bullets move up (y decreases); all enemy bullets move down (y increases).
+- Enemy formation marches in a cycle keyed on time:
+  - when time % 10 == 5: enemies1 move LEFT, enemies2 move RIGHT.
+  - when time % 10 == 0: enemies1 move RIGHT, enemies2 move LEFT.
+  (Each enemy moves exactly twice per 10-step cycle — once right at %10==0 and once left at %10==5, 5 steps apart — so each row just oscillates by ±1 around its starting columns and the formation never drifts. enemies1 (row y=1) and enemies2 (row y=3) always move in opposite directions, using plain moveLeft/moveRight with no edge collision.)
+- Enemy firing: when time % 15 == 3, if any enemies remain, one new enemy bullet spawns at the current cell of a uniformly random remaining enemy (drawn from enemies1 and enemies2 combined). If no enemies remain, nothing spawns. (In the Autumn SEXP this position is the enemy's `origin` field, which tracks the enemy's current/moved position, not its initial spawn cell.)
+
+COLLISIONS / INTERACTIONS:
+- Hero bullet ∩ enemy (either group): both the bullet and the hit enemy are removed (enemies are destroyed by being shot).
+- Hero ∩ enemy bullet: hero's `alive` becomes false (hero turns black, can no longer fire). The enemy bullet is NOT consumed/removed by this collision — the kill rule only flips `alive`, so the orange bullet keeps travelling down.
+- Hero bullet ∩ enemy bullet: both bullets are removed (red shot and orange shot cancel each other out).
+
+COLOR CHANGES:
+- Hero is gray while alive and turns black when killed by an enemy bullet. No other color thresholds. Note: a dead (black) hero is indistinguishable from an empty (black) background cell, so the hero effectively becomes invisible once killed.
+
+SPAWN / DESPAWN:
+- Red (hero) bullets spawn on `up`, one per fire, at the hero's current cell (only while alive). Orange (enemy) bullets spawn on the timed enemy-fire rule, one per fire, at a remaining enemy's current cell.
+- Red (hero) bullets despawn when they hit an enemy (either group) or an enemy bullet.
+- Orange (enemy) bullets despawn ONLY when they hit a red hero bullet. They are NOT removed when they strike/kill the hero (see collisions above).
+- Bullets that fly off-grid keep moving as objects (no explicit off-grid cleanup in the SEXP); they simply stop rendering once their cell leaves the 16x16 grid.
+- Enemies only despawn when shot; they are never respawned.
+
+WIN / TERMINATION / REWARD:
+- No explicit win, loss, termination, or reward condition is defined in the SEXP. Reward is 0.0 every step. The only terminal-like state is the hero dying (alive=false), which merely disables firing; the simulation keeps running. A dead hero can still be moved left/right (the move rules have no `alive` guard) — only firing requires being alive.

@@ -1,0 +1,53 @@
+NOTE: This directory is the CLICK-MOVE variant of DQ8GC. The game is identical to
+DQ8GC; only the control style differs (trajectories here use clicks to switch/drive
+which particle is controlled rather than relying mainly on arrow keys).
+
+GRID
+- 16 x 16 cell grid (GRID_SIZE = 16).
+
+OBJECTS
+- All objects are "Particle". A particle has a boolean "health" field and is drawn as a
+  single cell: "gray" when health = true, "darkgreen" when health = false.
+- One ACTIVE particle (the player-controlled one): starts at (2,2) with health = false
+  (darkgreen).
+- Four INACTIVE particles: start at (7,5), (4,3), (6,6), (3,5), all with health = true
+  (gray) initially.
+
+PLAYER ACTIONS
+- left  : move the active particle by (-1, 0).
+- right : move the active particle by (+1, 0).
+- up    : move the active particle by (0, -1).
+- down  : move the active particle by (0, +1).
+- click : LOCATION MATTERS. Clicking ON an inactive particle swaps control to it:
+          the clicked particle becomes the new active particle, and the previously
+          active particle is added into the inactive-particle set. Clicking empty
+          space (no particle hit) does nothing.
+- noop  : no handler; no effect.
+
+PASSIVE / PER-STEP (CLOCK) DYNAMICS
+- Every step, all inactive particles have their health forced to false (so gray
+  inactive particles turn darkgreen over time).
+- Every step, each inactive particle moves 1 step toward the nearest "unhealthy"
+  (health = false) particle, considering the active particle and the other inactive
+  particles (adj / move-toward-target behavior). They effectively chase darkgreen
+  particles.
+- The active particle does not move on its own; it persists in place unless moved by
+  an arrow action.
+
+COLOR CHANGES
+- health true  -> "gray"; health false -> "darkgreen".
+- Inactive particles: flipped to false (darkgreen) every step by the clock rule above.
+- Active particle: starts false (darkgreen). If any particle within distance 1 of the
+  active particle is unhealthy, the active particle's health is (re)set to false.
+
+SPAWNING / DESPAWNING
+- No particles are created or destroyed. Click only re-labels which particle is active
+  vs inactive (the total set is conserved).
+
+COLLISIONS / INTERACTIONS
+- Inactive particles seek/converge on the nearest darkgreen particle each step; the
+  active particle's color is influenced by unhealthy neighbors within distance 1.
+- No explicit collision/destruction or blocking is defined.
+
+WIN / TERMINATION / REWARD
+- None. There is no win condition, no terminal state, and no reward defined in the SEXP.

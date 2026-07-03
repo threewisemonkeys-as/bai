@@ -1,0 +1,31 @@
+Step,Action,Reasoning,Observation,Auxiliary_Observation,Reward,Done
+107,click 4 3,manual,"Task: interactive
+Step: 107
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""pink"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""]]",,0.0,False
+108,noop,manual,"Task: interactive
+Step: 108
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""pink"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""orange"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""]]",,0.0,False

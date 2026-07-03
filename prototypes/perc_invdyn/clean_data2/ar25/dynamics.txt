@@ -1,0 +1,129 @@
+ar25 (game_id ar25-0c556536) — game mechanics
+
+OVERVIEW
+- A mirror-reflection placement puzzle. You control one movable polyomino
+  ("piece"). A mirror axis splits the board and casts a reflected copy of the
+  piece onto the far side. The board also contains a set of fixed TARGET cells.
+  You win a level by positioning the piece so that the piece and/or its
+  reflection cover EVERY target cell. Solving a level advances to the next.
+- There are 8 levels (reset reports win_levels=8). The trajectories here
+  demonstrate level 1.
+
+GRID & LAYERS
+- The engine renders ONE 64x64 grid layer per observation (1 <grid_*> block).
+- Internally each level is a 21x21 logical grid drawn into the 64x64 frame at
+  scale 3 with a small offset: logical cell (col, row) -> frame pixel
+  (x = col*3 + 3, y = row*3 + 3). Sprites are filled, so a logical piece
+  appears as a contiguous block in the frame. You only ever see/act on the
+  64x64 frame; click coordinates are in 64x64 frame space (see CLICK).
+
+PALETTE (16-color ARC indices seen in the frame)
+- 9  = background (bright blue), fills the playfield.
+- 0  = the SELECTED / active piece (renders black). The piece you currently
+       control is drawn in color 0. (Small lighter dots inside it are a
+       rendering artifact of the sprite's native pixels; ignore them.)
+- 4  = the piece's REFLECTION across the mirror (renders dark gray). This is a
+       computed copy, NOT a separately controllable object.
+- 10 = the MIRROR axis line (renders light blue). Vertical mirror = a full-
+       height column of 10s (level 1 has one at the board center). A horizontal
+       mirror is a full-width row of 10s (appears in later levels).
+- 11 = TARGET cells (render yellow) AND the energy bar. Targets form a small
+       fixed shape on the board; the energy bar is the single vertical strip in
+       the right-most frame column (x=63).
+- 5  = PADDING/letterbox (renders dark; e.g. the bottom frame row).
+- An UNSELECTED movable object (when more than one exists) is drawn in color 9
+  (same as background) and is effectively invisible until selected — you find
+  it by clicking/cycling. (Only relevant in levels 2+; level 1 has one piece.)
+
+OBJECTS
+- Piece (movable polyomino, internal tag 0006lxjtqggkmi): one is the agent-
+  controlled active object. Level 1's piece is an "L"/corner shape.
+- Mirror axis (internal tag 0003uqrdzdofso): "vertical" mirror reflects the
+  scene horizontally about its column; "horizontal" mirror reflects vertically
+  about its row. In level 1 the mirror is fixed (not selectable). In later
+  levels the mirror itself is a selectable object you can slide.
+- Targets (internal tag 0001sruqbuvukh, color 11): fixed goal cells.
+- Energy bar: a budget meter (StepCounter) drawn in the right edge column.
+
+PLAYER ACTIONS (act on the currently SELECTED object)
+- ACTION1 : move selected up    (row - 1).
+- ACTION2 : move selected down  (row + 1).
+- ACTION3 : move selected left  (col - 1).
+- ACTION4 : move selected right (col + 1).
+  Moving the piece moves its reflection in the MIRRORED direction: across a
+  vertical mirror, piece-left makes the reflection go right (and vice-versa);
+  piece-up/down move the reflection up/down the same way. Across a horizontal
+  mirror, vertical moves are the mirrored ones. The reflected copy is a
+  horizontally- (or vertically-) flipped image of the piece.
+  Moves are blocked at the board edges (the move is rejected, no state change).
+  Each successful move consumes 1 unit of energy.
+  If the SELECTED object is a mirror line, its motion is constrained to its
+  perpendicular axis (a vertical mirror only moves left/right; a horizontal
+  mirror only moves up/down), letting you reposition where the reflection lands.
+- ACTION5 : cycle selection to the NEXT selectable object (round-robin over
+  pieces and movable mirrors). Consumes 1 unit of energy. With only one
+  selectable object (e.g. level 1) it re-selects the same object (no visible
+  change but still costs energy).
+- ACTION6 (click x,y) : select the object under the clicked frame pixel. If the
+  click lands on a selectable piece/mirror it becomes the active object;
+  clicking empty space, the reflection, or a non-selectable (level-1) mirror
+  does nothing. A click does NOT consume energy.
+- ACTION7 : UNDO the most recent move — pops the last saved piece position and
+  restores it. Only directional moves (ACTION1-4 that actually displaced the
+  object) push undo states; click and cycle do not. Undo does not consume
+  energy. With nothing to undo it is a no-op.
+
+CLICK semantics & coordinate convention
+- On the CLI, click_X_Y -> ACTION6 x=X y=Y, with x = COLUMN, y = ROW in the
+  64x64 FRAME (not the 21x21 logical grid). The engine maps the frame pixel
+  back to a logical cell and selects whatever selectable object covers it.
+
+AVAILABLE ACTIONS
+- All of ACTION1..ACTION7 are offered at reset and remain available throughout
+  level 1 (verified every step). Availability is stable here; only emit listed
+  actions.
+
+LEVEL / GOAL structure
+- Each level seeds: one (or more) pieces, one mirror axis (vertical or
+  horizontal), and a set of target cells. Energy budget (StepCounter) per level
+  from the source: L1=64, L2=64, L3=128, L4=128, L5=128, L6=320, L7=320,
+  L8=320. The budget is shown as the right-edge bar and decremented by each
+  move / cycle.
+- LEVEL 1 (the trajectories): piece is an L at logical (col 6-8, rows 5-7);
+  vertical mirror at logical column 10 (frame cols ~30-32); 5 target cells form
+  an L at logical rows 15-17, cols 17-19 (frame: yellow block lower-right). The
+  reflection of the piece appears on the right of the mirror. Solution: slide
+  the piece so its reflection's flipped L lands exactly on the target L — net
+  displacement DOWN 10 and LEFT 5 from the start (order is free).
+
+WIN / LOSE / REWARD
+- WIN a level: when every target cell is covered by the piece or its reflection
+  (checked after each move). This immediately advances to the next level and
+  yields a positive reward (observed reward = 0.1 on solving level 1). The
+  observation after the winning move already shows the NEXT level's layout.
+  Completing the final level finishes the game.
+- LOSE: if the energy budget (StepCounter) reaches 0 on a move/cycle, the level
+  is lost.
+- Reward is 0.0 on every non-winning step; the only positive signal observed is
+  the per-level solve reward.
+
+ADVANCED MECHANICS (present in source, surface in later levels; NOT exercised
+by the level-1 trajectories here)
+- Selectable / movable mirrors (levels 2+): the mirror line is itself an
+  object you can select (ACTION5 / click) and slide along its perpendicular
+  axis to retarget the reflection.
+- Rotating pieces: certain pieces (internal tags 0038pnuzypawco /
+  0040bwgtiqvhtu / 0044qlxgcpzowy) rotate 90 degrees (np.rot90) when a move
+  changes their distance-parity to the relevant mirror.
+- Level-2 has a brief blink animation on the piece when energy is low (a few
+  no-op sub-frames); cosmetic.
+
+CAVEATS
+- "Reflection" (color 4) is a rendered copy, not a clickable/selectable object;
+  clicks on it do nothing.
+- Unselected movable objects render in the background color (9) and are
+  invisible until selected — only a factor in multi-object levels (2+).
+- Level 1 has a single selectable object, so ACTION5 (cycle) and ACTION6
+  (click) there are effectively no-ops (they keep the same selection); they are
+  included in the trajectories to exercise the action space, but their
+  multi-object behavior only manifests from level 2 onward.

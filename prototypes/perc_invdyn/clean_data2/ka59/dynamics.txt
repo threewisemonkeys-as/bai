@@ -1,0 +1,136 @@
+KA59 (ka59-38d34dbb) — game mechanics
+
+This is a grid "sokoban / park-the-block" puzzle. You drive one selectable block
+at a time and must seat every block into its matching target frame. Reverse-
+engineered from environment_files/ka59/38d34dbb/ka59.py and confirmed by
+offline play with arc_drive.py. The game has 7 levels (win_levels=7); reset
+always loads level 0, which is described in detail below.
+
+GRID & RENDERING
+- The engine renders a single 64x64 frame (one <grid_0> layer). Each level has
+  its own logical grid_size (level 0 = 45x45) that the camera letter-boxes into
+  the 64x64 view.
+- Color 2 (PADDING) fills the letter-box / out-of-room area. Color 1
+  (BACKGROUND) fills the open, walkable floor of the room.
+- DISPLAY vs GRID offset (level 0): display_col = grid_x + 9,
+  display_row = grid_y + 9. So a sprite at logical grid (x,y) is drawn at
+  display (col=x+9, row=y+9). All click coordinates below are DISPLAY
+  coordinates (the 64x64 frame you see), because ACTION6 passes x,y straight
+  into camera.display_to_grid().
+- Bottom row (display row 63) is a STEP-BUDGET BAR: a strip of color-4 cells
+  whose length = round(64 * steps_left / StepCounter). It shrinks by a little
+  every action. When it reaches 0 the level is lost (see WIN/LOSE).
+
+OBJECTS / PALETTE (level 0)
+- PLAYER BLOCK (movable, selectable). Tag 0022vrxelxosfy ("sys_click"). Drawn as
+  a 3x3 cell with a border of color 14 (E) and a 1-cell center:
+    * center = color 0 (renders as '.') when this block is the ACTIVE block,
+    * center = color 5 for an as-yet-unselected block (its native pixel),
+    * center = color 4 once it has been selected and then DESELECTED.
+  Level 0 has two player blocks, both 3x3:
+    * Block A: logical (9,21) -> display center (col 19, row 31). ACTIVE at reset.
+    * Block B: logical (18,21) -> display center (col 28, row 31).
+  (Other levels also use 3x6 / 6x3 / 6x6 player blocks — same tag.)
+- TARGET PAD (goal frame for a player block). Tag 0010xzmuziohuf. A hollow box,
+  border color 4, that is exactly 2 cells larger than its block in each
+  dimension; the block is "seated" when it sits centered inside (block.x =
+  pad.x+1, block.y = pad.y+1, block 2 smaller each way). Level 0 has two 5x5
+  pads (for 3x3 blocks):
+    * Pad 1: logical (2,23) -> display box cols 11-15, rows 32-36; a 3x3 block
+      seats at display cols 12-14, rows 33-35.
+    * Pad 2: logical (35,17) -> display box cols 44-48, rows 26-30.
+- INTERIOR WALL. Tag 0015qniapgwsvb. Solid, blocks movement. Level 0 has wall
+  0014 (6 wide x 21 tall, color 15 = 'F') at logical (24,29 x 12,32), i.e.
+  display cols 33-38, rows 21-41 (full room height).
+- ROOM BOUNDARY. Tag 0029ifoxxfvvvs. The big frame sprite 0028 at logical
+  (-3,-3) that draws the outer walls AND an internal vertical divider. In
+  level 0 the divider sits at logical x 15-23 (display cols 24-32) and is solid
+  EXCEPT for a 3-row gap at logical y 21-23 (display rows 30-32). This gap is
+  the only passage between the left chamber and the middle/right.
+- (Later levels add: tag 0001uqqokjrptk = pushable goal-blocks with tag
+  0027jbgxilrocf target frames; tag 0003umnkyodpjp = "fill/battery" sprites with
+  an explode/displacement cascade; tag "Enemy" = chasers that call lose() on
+  contact. None of these appear in level 0.)
+
+PLAYER ACTIONS  (available_actions at reset = [1,2,3,4,6]; same list every step
+of level 0)
+- ACTION1 = move active block UP    by 3 cells (dy = -3).
+- ACTION2 = move active block DOWN  by 3 cells (dy = +3).
+- ACTION3 = move active block LEFT   by 3 cells (dx = -3).
+- ACTION4 = move active block RIGHT  by 3 cells (dx = +3).
+  Every move is in steps of 3 display cells. A move is BLOCKED (the block stays
+  put, but the action is still consumed and the step-bar still ticks down) if
+  the destination would overlap an interior wall (0015) or the room boundary
+  (0029). Confirmed empirically: ACTION4 into wall 0014, and ACTION1 into the
+  boundary above the gap, both leave the frame unchanged.
+- ACTION6 = CLICK. Carried as x,y = DISPLAY column,row. If the clicked cell lies
+  on a player block (tag 0022), that block becomes the new ACTIVE block:
+  the previously-active block's center is set to color 4 (deselected) and the
+  clicked block's center is set to color 0 (active). Clicking empty floor, a
+  wall, or a target pad does nothing.
+  Coordinate convention: click_X_Y on the CLI -> ACTION6 x=X y=Y, X=col, Y=row.
+  E.g. click_28_31 selects Block B (its display center); click_19_31 selects A.
+
+PUSHING (not exercised in the clean trajectories, but it is the mechanic behind
+movement collisions with OTHER movable sprites)
+- If a move would make the active block overlap another MOVABLE sprite (another
+  0022 block, a 0001 goal-block, or a 0003 fill sprite) rather than a wall, the
+  engine starts a multi-step push/displacement animation (the active block snaps
+  back and the touched sprite(s) are shifted over the next few ticks via a
+  recursive chain). The clean trajectories deliberately stop short of block-on-
+  block contact so every transition is a simple, legible single move.
+
+AVAILABLE-ACTION TRANSITIONS
+- Level 0 always offers exactly [ACTION1, ACTION2, ACTION3, ACTION4, ACTION6];
+  the set does not change while the level is in progress. (It can change in
+  levels that gate actions, but that is not seen here.)
+
+LEVEL 0 GEOMETRY / REACHABILITY (important caveat)
+- The room is split by the boundary divider (display cols 24-32) and by the full-
+  height interior wall 0014 (display cols 33-38). The only opening in the divider
+  is the 3-row gap at display rows 30-32, and immediately east of that gap stands
+  wall 0014. Both player blocks start WEST of wall 0014 (left chamber + gap), and
+  Pad 2 sits EAST of wall 0014 (right chamber).
+- Consequence: a block confined to the gap row band (like Block B) can only slide
+  horizontally (left into the left chamber, or right one step into the dead-end
+  pocket against wall 0014); it cannot go up/down there because the divider is
+  solid above and below the gap. Block A in the left chamber has full vertical
+  freedom (logical y ~12..32) and reaches Pad 1 easily.
+- Pad 2 (right chamber) is NOT reachable from the starting configuration: nothing
+  can cross wall 0014. Therefore the level-0 WIN condition cannot be satisfied as
+  loaded, and these trajectories demonstrate the mechanics WITHOUT a level
+  transition. (This appears to be a property of this particular loaded level, not
+  a tooling error — verified from the boundary/wall pixel layout in the source.)
+
+WIN / LOSE / SCORE / REWARD
+- WIN (next_level): dbmlcqbquh() returns True only when EVERY target pad (0010)
+  contains a seated player block (0022) AND every 0001 goal-frame (0027) contains
+  a seated 0001 block. On success the engine advances to the next level; clearing
+  all 7 wins the game.
+- LOSE: if the step budget (StepCounter, =100 for level 0) is exhausted
+  (step bar empties) the level is lost; also touching an Enemy loses (no enemies
+  in level 0).
+- REWARD: every step in these trajectories returns reward 0.0 and term=False
+  (no win/lose reached). There is no per-step shaping reward; signal comes only
+  from level transitions.
+
+TRAJECTORIES IN THIS DATASET (level 0, no win reached by design — see caveat)
+- TRAIN (9 actions): ACTION1, ACTION3, ACTION2, ACTION3, ACTION2, click_28_31,
+  ACTION4, ACTION4, ACTION3.
+    Steps 1-5 walk Block A up/left/down/left/down from (9,21) to (3,24), SEATING
+    it inside Pad 1 (its center sits in the 4-bordered box). Step 6 clicks Block
+    B to take control (A's center turns 4, B's turns 0). Step 7 moves B right
+    into the dead-end pocket against wall 0014. Step 8 is ACTION4 again — BLOCKED
+    by the wall (frame unchanged), demonstrating wall collision. Step 9 moves B
+    back left. Shows: all four move directions, click-select, seating a block on
+    a pad, and a wall collision.
+- TEST (11 actions): click_28_31, ACTION4, ACTION4, ACTION3, ACTION3, ACTION3,
+  ACTION1, click_19_31, ACTION2, ACTION3, ACTION3.
+    Distinct route. Step 1 selects Block B first. Step 2 moves B right into the
+    pocket; step 3 ACTION4 is BLOCKED by wall 0014 (wall collision, different
+    starting state than train). Steps 4-6 slide B left across the gap corridor
+    into the left chamber; step 7 moves B UP (clean vertical move, only possible
+    once B is in the left chamber). Step 8 clicks at a DIFFERENT location
+    (click_19_31) to re-select Block A. Steps 9-11 drive A down/left/left to SEAT
+    it in Pad 1 via a different approach than train. Shows the same mechanics from
+    different states/positions and a second, distinct click location.

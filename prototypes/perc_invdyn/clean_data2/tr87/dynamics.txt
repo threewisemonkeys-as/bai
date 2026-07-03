@@ -1,0 +1,120 @@
+tr87 (tr87-cd924810) — game mechanics
+
+OVERVIEW
+- This is a glyph string-rewriting / "apply the rules" puzzle. The screen is
+  split into a RULE region (top) and a WORK region (bottom). The player edits a
+  string of glyphs at the bottom so that it becomes the correct rewrite of a
+  fixed reference string, according to the displayed rules. Solving the string
+  clears the level; clear all 6 levels to win the game (win_levels = 6).
+- No clicking. Available actions are ACTION1..ACTION4 only, and the set never
+  changes (it stays [ACTION1, ACTION2, ACTION3, ACTION4] in every state).
+
+GRID & LAYERS
+- 64 x 64 grid. A single settled layer is rendered per step (<grid_0>). Some
+  actions trigger a short internal color-cascade animation on a win, but only
+  the final settled frame is returned (the next level's board).
+- Coordinates are (x = col, y = row); x grows right, y grows down. (Irrelevant
+  to play here since there is no click action.)
+
+PALETTE / WHAT YOU SEE (color indices)
+- 2  = light-gray : background of the TOP (rule) half.
+- 3  = gray       : padding/letterbox, the BOTTOM-half background, AND the short
+                    horizontal "arrow" separator drawn between a rule's left and
+                    right tile (sprite iqrduxrukrk, an 11-wide line of color 3).
+- 5  = black      : the pixels that make up every glyph shape (5x5 patterns).
+- 10 = light-blue : a 7x7 glyph tile background (used for LHS / source tiles in
+                    some levels, e.g. Level 1).
+- 7  = pink       : a 7x7 glyph tile background (RHS / working tiles in Level 1;
+                    LHS / source tiles in Level 2).
+- 11 = yellow     : a 7x7 glyph tile background (RHS / working tiles in Level 2).
+  (Which of 10/7/11 marks LHS-vs-RHS and source-vs-working varies per level, but
+   within a level the SOURCE row tile-color matches the rules' LEFT tile color,
+   and the WORKING row tile-color matches the rules' RIGHT tile color.)
+- 0  = white      : the two cursor bracket marks (see CURSOR).
+- 1  = off-white  and 4 = dark-gray : the move-budget bar on the bottom row.
+
+LAYOUT
+- TOP HALF (above a full-width gray band ~row 34): the RULES. Each rule is a
+  pair of 7x7 glyph tiles — a LEFT tile and a RIGHT tile — joined by a short gray
+  separator (the "->"). Level 1 shows 6 rules laid out in a 2-column x 3-row
+  grid. A rule means "this left glyph rewrites to this right glyph".
+- BOTTOM HALF (below the gray band): two horizontal strings of 7x7 glyph tiles.
+  - SOURCE string (the upper of the two rows): a fixed, read-only sequence of
+    glyphs of the LEFT/LHS type. This is what must be rewritten.
+  - WORKING string (the lower row): the editable sequence of glyphs of the
+    RIGHT/RHS type. The player changes these to solve the puzzle.
+
+GLYPHS
+- Every glyph is one of three letter-families A / B / C (sprite tag nxkictbbvzt),
+  each family having 7 numbered variants (e.g. A1..A7, B1..B7, C1..C7) — 7
+  different 5x5 black-pixel shapes. A glyph also has a fixed rotation (0/90/180/
+  270) chosen at level load.
+- A working glyph's FAMILY and ROTATION are fixed for the whole level. The only
+  thing the player can change is its NUMBER (1..7), by cycling through the 7
+  variants of its family.
+
+CURSOR (selection)
+- A cursor selects exactly one glyph in the WORKING string. It is drawn as two
+  white (color 0) bracket marks: one just above and one just below the selected
+  working tile. It starts on the first (leftmost) working glyph (index 0).
+
+ACTIONS (all four cost 1 move from the budget)
+- ACTION3 : move the cursor to the PREVIOUS working glyph (index - 1, wraps
+            around: from the first glyph it jumps to the last).
+- ACTION4 : move the cursor to the NEXT working glyph (index + 1, wraps).
+- ACTION1 : cycle the SELECTED working glyph's number BACKWARD by one
+            (number -> number-1, wrapping 1 -> 7). The glyph's shape changes;
+            family and rotation stay the same.
+- ACTION2 : cycle the SELECTED working glyph's number FORWARD by one
+            (number -> number+1, wrapping 7 -> 1).
+  (ACTION3/ACTION4 only move the cursor; ACTION1/ACTION2 only change the
+   currently-selected glyph. There is no click / ACTION6.)
+
+MOVE BUDGET (bottom-row bar)
+- There is a move budget (128 moves on levels 1-5, 256 on level 6). EVERY action
+  (move OR edit) spends 1. It is shown as the bottom row of the grid: a stretch
+  of off-white (1) on the left whose length is proportional to budget remaining,
+  with dark-gray (4) filling the spent remainder. The bar shrinks from the right
+  as the budget is used up.
+- If the budget reaches 0 before the level is solved, you LOSE (game over).
+
+GOAL / WIN CHECK
+- After every edit (ACTION1/ACTION2), the game checks whether the WORKING string
+  is the correct rewrite of the SOURCE string under the rules: it scans the
+  source string left to right, matching each source glyph to the rule whose LEFT
+  side it equals, and requires the working string to equal the concatenation of
+  those rules' RIGHT sides (glyph identities compared by family+number; rotation
+  is not part of the match).
+- Concretely for a level of single-glyph rules: read off the source row, look up
+  each glyph's rule, and set each corresponding working glyph to the rule's
+  right-hand glyph number.
+- When the working string matches, a brief color-cascade animation plays and the
+  game advances to the NEXT level (budget resets). A small reward (~0.1) is
+  emitted on the step that completes a level. Completing all 6 levels ends the
+  episode with a WIN (terminated).
+
+LEVEL 1 (the level demonstrated in train/test)
+- Rules (left -> right, by family+number): A4->B3, A2->B2, A3->B6, A5->B5,
+  A1->B1, A7->B7  (six rules; six left tiles light-blue, six right tiles pink).
+- SOURCE row (read-only, light-blue tiles): A4, A2, A3, A5, A1.
+- WORKING row (editable, pink tiles), initial: B1, B7, B2, B4, B6.
+- Solution: apply the rules to the source row -> the working row must become
+  B3, B2, B6, B5, B1 (only the numbers change; the B family and each tile's
+  rotation are fixed). Per position, the needed number change is:
+  pos0 B1->B3, pos1 B7->B2, pos2 B2->B6, pos3 B4->B5, pos4 B6->B1.
+
+LEVELS 2-6 (not fully demonstrated; same core controls)
+- Same controls and win idea, but bigger strings / more rules, and later levels
+  add rule-COMPOSITION variants (Level 4 "double_translation": a source glyph is
+  rewritten through two chained rules; Level 5 "alter_rules": the editable unit
+  becomes a whole connected set translated together rather than a single glyph;
+  Level 6 "tree_translation" combines these). Level 6 doubles the budget to 256.
+
+CAVEATS / NOTES
+- Available actions are ALWAYS exactly ACTION1..ACTION4; there is never a click
+  (ACTION6) or any state where the action set shrinks.
+- The cursor index wraps both directions, so ACTION3 from the first glyph
+  selects the last glyph (useful for editing right-to-left).
+- The win animation and level advance happen inside the single step that
+  completes the puzzle: the frame returned by that step is already the NEXT
+  level's freshly-loaded board (the budget bar is full again).

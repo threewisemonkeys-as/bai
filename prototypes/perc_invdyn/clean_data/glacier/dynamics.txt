@@ -1,0 +1,55 @@
+GLACIER — game mechanics
+
+Grid: 16 x 16 cells (GRID_SIZE = 16), coordinates 0..15 on each axis.
+
+Objects:
+- Skater: a single 1-cell object. Starts at the center (8, 8).
+  Hidden state: velocity (vx, vy), bounce counter, frozen flag.
+  Initial state: velocity = (1, 0) (sliding right), bounces = 0, frozen = false.
+  Color:
+    - gray when frozen.
+    - otherwise blue when (bounces % 6) < 3, red when (bounces % 6) >= 3.
+      So color cycles every 3 bounces: blue for bounces 0-2, red for 3-5,
+      blue for 6-8, red for 9-11, and so on.
+  There are no other objects on the grid.
+
+Core idea: the skater is ALWAYS sliding. It is not a step-by-step avatar.
+
+Passive / clock dynamics (every tick, via initnext on the skater):
+- Each tick the skater advances one cell in its current velocity direction
+  (stepSkater). With no player input it keeps sliding in the same direction.
+- Wall bounce: if the next position would leave the grid on the X axis, vx is
+  negated; same for vy independently. Each tick that hits a wall on either
+  axis increments the bounce counter by exactly 1 (a single +1 even if it
+  would hit on both axes in the same tick). The skater then moves using the
+  (possibly reversed) velocity, so it reflects off walls and never exits.
+- While frozen, stepSkater is a no-op: the skater does not move and bounces
+  do not change.
+
+Player actions:
+- left:  sets velocity to (-1, 0), then immediately takes one slide step.
+- right: sets velocity to ( 1, 0), then immediately takes one slide step.
+- up:    sets velocity to (0, -1), then immediately takes one slide step.
+- down:  sets velocity to (0,  1), then immediately takes one slide step.
+  Arrow keys only redirect momentum; they do not freeze-step. After the key,
+  the skater continues sliding in the new direction on subsequent ticks.
+  (Note: arrow handlers call stepSkater directly and do not check frozen, so
+  a frozen skater would also move and unfreeze its motion implicitly via the
+  step — but it stays frozen=true; effectively arrows always cause a step.)
+- click: if the click lands ON the skater (clicked skater), it toggles the
+  frozen flag (pauses/resumes motion; cell turns gray when frozen).
+  Click LOCATION matters — only a click on the skater's cell has any effect;
+  clicks elsewhere do nothing.
+- noop: no handler; the skater still slides one cell via the per-tick clock
+  dynamics (noop is not a true no-op for the world — passive physics runs).
+
+Spawning / despawning: none. The single skater persists for the whole game.
+
+Color changes: driven solely by the frozen flag (gray) and the bounce counter
+modulo 6 (blue/red), as described above. No other triggers.
+
+Collisions / interactions: only skater-vs-wall (bounce). No object-object
+interactions (there is only one object).
+
+Win / termination / reward: none. There is no goal object, no win condition,
+no termination rule, and no reward defined in the program.

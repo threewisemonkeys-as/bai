@@ -1,0 +1,97 @@
+re86 (re86-8af5384d) — game mechanics
+
+OVERVIEW
+- A "crosshair alignment" puzzle. The board holds one or more movable, single-
+  colored PLUS ("+") shaped crosses whose arms span (nearly) the whole grid.
+  Scattered around are small colored TARGET dots, one set of dots per cross
+  color. You drive the crosses so that, for each color, that cross's two arms
+  (one full row + one full column) pass through ALL of that color's target dots
+  simultaneously. When every target is covered the level is solved.
+- There are 8 levels of increasing complexity. The clean-data trajectories here
+  cover Level 1 (the simplest: two crosses, no walls, no recolor boxes).
+
+GRID & LAYERS
+- 64 x 64 grid, 16-color palette (indices 0..15). One grid layer per frame.
+- BACKGROUND_COLOR = 5 (the empty board; rendered dark).
+- PADDING_COLOR = 3 (camera letterbox).
+- ROW 63 is a STEP-COUNTER progress bar, NOT part of the puzzle: cells set to
+  color 15 = steps remaining, color 1 = steps spent. The bar shrinks left-to-
+  right by one notch's worth of fraction as the budget is consumed, and refills
+  when a new level loads.
+- Coordinates here are (x = col, y = row), x grows right, y grows down. NOTE:
+  the ASCII probe's rendered columns can sit ~1 col off from the source's
+  internal sprite coordinates (a camera offset); the internal coords are what
+  the win check uses. There is NO click action, so the click x/y convention
+  does not apply to this game.
+
+OBJECTS / PALETTE
+- Movable CROSS (sprite tag "0031cppcuvqlbi"): a "+"-shaped sprite of a single
+  color, made of one full vertical bar and one full horizontal bar crossing at
+  the sprite's center. Level 1 has two: a color-11 cross (rendered yellow) and a
+  color-9 cross (rendered blue).
+  * The ACTIVE (currently-controlled) cross has its CENTER cell painted color 0
+    (rendered as a small dark dot at the intersection). An INACTIVE cross shows
+    its own color at the center. Exactly one cross is active at a time. This dot
+    is the reliable "which cross am I driving" indicator.
+- TARGET dots (goal sprite, tag "0054xnsuqceejm"): a full-grid overlay drawn as
+  several small 3x3 boxes — a border of color 4 around a single center cell
+  whose color is a target color (9 or 11 in Level 1). Only the colored CENTER
+  cell matters to the win check; the color-4 border and the surrounding -1 are
+  ignored. Visually, each target is a colored dot inside a faint square. When a
+  cross arm slides over a target, the arm's color overwrites the dot, so a
+  covered target visually "disappears" under the arm — a handy progress cue.
+- (Levels >= 4, seen but not exercised here) WALLS (tag "0003dlchiwseii"):
+  ring/diamond obstacle sprites that block cross movement. COLOR BOXES (tag
+  "0007dtbisvazhv"): 6x6 squares (color-2 border, colored interior) that
+  RECOLOR a cross which collides with them via a multi-step flood-fill cascade
+  (driven by the game's per-step step() handler over several frames). Some
+  higher levels also start crosses rotated 90/180 deg. None of this occurs in
+  Level 1.
+
+ACTIONS (available_actions = [1,2,3,4,5]; there is NO ACTION6 / click, ever)
+- Movement step size is 3 pixels. Each action below also decrements the step
+  budget by 1.
+- ACTION1 = move the ACTIVE cross UP    by 3  (dy = -3).
+- ACTION2 = move the ACTIVE cross DOWN  by 3  (dy = +3).
+- ACTION3 = move the ACTIVE cross LEFT  by 3  (dx = -3).
+- ACTION4 = move the ACTIVE cross RIGHT by 3  (dx = +3).
+  * A move is rejected (no-op) if it would carry the active cross's CENTER out
+    of the 64x64 camera, and (higher levels) if it would collide with a wall.
+    In Level 1 there are no walls, so movement is free within bounds.
+- ACTION5 = CYCLE which cross is active: advance to the next movable sprite in
+  level order (wrapping from the last back to the first). The previously active
+  cross's center reverts to its own color; the newly active cross's center is
+  set to color 0. With two crosses, ACTION5 simply toggles between them.
+
+AVAILABLE-ACTION TRANSITIONS
+- The available action set is the constant {ACTION1, ACTION2, ACTION3, ACTION4,
+  ACTION5} on every step of every level (confirmed empirically). Availability
+  does not change with state. Only emit actions from this set.
+
+WIN / LEVEL / SCORE / GAME-OVER
+- After every action the game composites all movable crosses onto a blank canvas
+  and checks the goal overlay: for each goal center cell (the colored dots), the
+  composited canvas color at that cell must equal the goal color. If ALL goal
+  centers match -> next_level() fires.
+- Geometry of a solve: a single "+" covers exactly one full row and one full
+  column. To cover 4 same-colored dots, two of them must lie on the cross's
+  chosen column and the other two on its chosen row; the cross center then goes
+  to that unique (row, col) intersection. In Level 1:
+    * Yellow (color 11) cross: targets at internal (col,row) (15,3),(6,9),
+      (24,9),(15,17)  ->  center must reach (col 15, row 9).
+      It starts at center (col 21, row 27); solve = 2x LEFT + 6x UP.
+    * Blue (color 9) cross: targets at (48,16),(40,24),(54,24),(48,35)  ->
+      center must reach (col 48, row 24).
+      It starts at center (col 36, row 45); solve = 4x RIGHT + 7x UP.
+  Both deltas are multiples of the 3px step, so exact alignment is reachable.
+- Completing a level yields reward +0.1 and loads the next level, whose step
+  counter is reset to that level's budget: L1=100, L2=100, L3=200, L4=200,
+  L5=250, L6=200, L7=300, L8=400. The episode is an 8-level sequence
+  (win_levels=8); solving Level 1 keeps term=False (more levels remain).
+- GAME OVER: if the step-counter budget reaches 0 before the level is solved,
+  the game calls lose() (game over). No other termination/penalty.
+
+SEED-0 / LEVEL-1 START STATE
+- Two crosses: blue (color 9) is ACTIVE at reset (center dot at internal
+  col 36,row 45); yellow (color 11) is inactive (center col 21,row 27).
+- ACTION1-4 drive whichever cross is active; ACTION5 toggles active blue<->yellow.

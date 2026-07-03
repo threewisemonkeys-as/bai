@@ -1,0 +1,78 @@
+BT3GB - Weather / day-night water simulation
+
+GRID
+- 16 x 16 grid.
+
+OBJECTS
+- CelestialBody (sun/moon): a 2x2 block occupying cells (0,0),(0,1),(1,0),(1,1),
+  anchored at origin (0,0). It has a Bool field `day`. When day=true the 2x2 is
+  "gold" (sun); when day=false it is "gray" (moon/night). Starts as day=true (gold).
+- Cloud: a 3-cell horizontal bar of "gray" cells at relative offsets (-1,0),(0,0),(1,0).
+  Spawned at origin (4,0), so it occupies columns 3,4,5 on the top row.
+- Water: a list of single-cell droplets, each with a Bool field `liquid`.
+  liquid=true renders "blue", liquid=false renders "lightblue". Starts empty.
+
+PLAYER ACTIONS
+- left:  moves the Cloud one cell left (Position -1 0), only if the moved cloud stays
+  within grid bounds (isWithinBounds); otherwise the cloud stays put (clamped). The
+  3-cell bar therefore clamps with its origin (middle cell) at column 1 on the left,
+  i.e. occupying columns 0,1,2.
+- right: moves the Cloud one cell right (Position 1 0), with the same bounds clamp;
+  on the right it clamps with its origin at column 14, occupying columns 13,14,15.
+  (Verified: origin starts at column 4 / columns 3,4,5.)
+- down: spawns ("rains") one new Water droplet just below the cloud's ORIGIN (the
+  middle cell of the 3-cell bar), at the cloud origin position moved down by one
+  (Position 0 1) -> row 1, cloud-origin column. The new droplet's `liquid` field is
+  set equal to the CelestialBody's current `day` value (so it spawns as liquid/blue
+  during day, solid/lightblue at night).
+- up: NO HANDLER - up is a no-op.
+- noop: no effect.
+- click: GLOBAL toggle; click LOCATION does not matter (no `clicked obj` test, just
+  `on clicked`). HOWEVER a coordinate IS required to fire the event: `click ROW COL`
+  toggles; a bare `click` with no coordinate is a no-op (no `clicked` event). Each
+  firing click flips the CelestialBody `day` field (gold <-> gray) AND flips the
+  `liquid` field of EVERY existing Water droplet (blue <-> lightblue) - so every
+  droplet on screen changes color (and falling behavior) on the same click.
+
+PASSIVE / CLOCK DYNAMICS (every step, via the water update on `next`)
+- Every Water droplet falls one cell per tick and updates based on its `liquid` field:
+  - liquid=true droplets behave like liquid (nextLiquid): move straight down if the
+    cell below is free, otherwise (blocked by floor/another droplet) slide sideways
+    toward the nearest open cell in the row below. Net effect: liquids spread out
+    along the floor instead of piling vertically (verified: three droplets dropped in
+    the same column settle side-by-side as a flat row).
+  - liquid=false droplets behave like a solid (nextSolid): fall straight down and
+    STOP on the floor or on top of whatever droplet is directly below, stacking into
+    a vertical column (verified: three droplets stack in one column). It does NOT
+    fall through other objects.
+- The CelestialBody and Cloud have no passive motion; they only move via player input.
+
+SPAWNING / DESPAWNING
+- Water droplets are only created by the `down` action. Note: each `down` always adds
+  a droplet at the spawn cell (row 1, cloud-origin column), but if a droplet is still
+  sitting on that exact cell, the new one overlaps it and they render/move as a single
+  cell - so rapid repeated `down` presses (before the previous droplet has fallen past
+  row 1) do NOT produce visibly separate droplets. To get distinct droplets, let the
+  spawn cell clear (wait a tick, or move the cloud) between presses.
+- Droplets are never explicitly removed; they accumulate and settle at the bottom.
+
+COLOR CHANGES
+- CelestialBody: gold (day) <-> gray (night), toggled only by click.
+- Water droplet: blue (liquid) <-> lightblue (solid), set at spawn from current day
+  state, and globally flipped on every click. The liquid/solid flip also changes that
+  droplet's falling behavior on subsequent steps.
+- Cloud is always gray.
+
+COLLISIONS / INTERACTIONS
+- Water falling uses collision-aware movement (droplets stack: solids fall until
+  blocked; liquids fall then seek the nearest hole sideways), so droplets pile up
+  against the floor and each other.
+- Cloud movement is bounds-clamped but does not collide with water or the celestial
+  body. Note: the cloud sits on row 0 (same row as the top of the celestial body); if
+  the cloud is moved far left so its cells overlap the celestial body, the gray cloud
+  cells RENDER OVER (occlude) the gold/gray celestial body cells in that row (verified
+  when the cloud is pushed to columns 0,1,2).
+
+WIN / TERMINATION / REWARD
+- None. There is no goal, score, win, or termination condition defined - this is an
+  open-ended sandbox simulation.

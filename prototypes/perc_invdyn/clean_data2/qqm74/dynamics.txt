@@ -1,0 +1,56 @@
+QQM74 — Dynamics Description
+
+GRID
+- 21 x 21 grid (GRID_SIZE = 21), indices 0..20.
+- Background is black.
+
+OBJECTS
+- Blob: a single-cell object rendered "blue" (Cell 0 0 "blue").
+  - One Blob spawns at init at the grid center: Position (10, 10) (= GRID_SIZE/2 with integer division).
+  - "blobs" is a List of Blob; more can be added at runtime (see click).
+- Button: an object type defined in the SEXP (Cell 0 0 with a color param) but it is never instantiated. No Button ever appears on the grid.
+
+STATE VARIABLES
+- xVel (Number), init 0: COLUMN velocity (changed by left/right), applied to all blobs each step.
+- yVel (Number), init 0: ROW velocity (changed by up/down), applied to all blobs each step.
+  - Observations are reported as (row, col). Each step a blob's col += prev xVel and row += prev yVel.
+
+PLAYER ACTIONS
+- left:  decrement xVel by 1, but ONLY if prev xVel != -1. So xVel bottoms out at -1 and is NEVER
+         pushed below -1 (the guard blocks exactly the -1 -> -2 step). Moves blobs toward smaller col.
+- right: increment xVel by 1, but ONLY if prev xVel != 1. So xVel tops out at +1 and is NEVER pushed
+         above +1 (guard blocks the +1 -> +2 step). Moves blobs toward larger col.
+- up:    decrement yVel by 1, but ONLY if prev yVel != -1. yVel bottoms out at -1. Smaller row.
+- down:  increment yVel by 1, but ONLY if prev yVel != 1. yVel tops out at +1. Larger row.
+  (Net effect, starting from 0: each velocity component stays clamped to {-1, 0, +1}. left/up drive a
+   component negative, right/down drive it positive; the matching key can never push a component past
+   ±1, and there is no way to reach |velocity| > 1.)
+- click ROW COL: LOCATION MATTERS. If the clicked cell is currently free (isFreePos), a new blue Blob is
+         added there; clicking an OCCUPIED cell does nothing. NOTE: the newly added blob is also moved by
+         the current velocity on the SAME tick it spawns, so with nonzero velocity it renders offset from
+         the clicked cell by one velocity step, i.e. at (ROW + yVel, COL + xVel). With velocity 0 it
+         renders exactly at the clicked cell.
+- noop: no handler — no effect.
+
+PASSIVE / CLOCK DYNAMICS (on true, every step)
+- Every blob moves by (prev xVel, prev yVel) each step via move/updateObj (col += prev xVel,
+  row += prev yVel). Movement uses the velocity from the PREVIOUS tick, so a velocity change takes
+  effect on the following step (one-step delay).
+- With xVel=0 and yVel=0 (the initial state) blobs are stationary.
+- Velocities persist (inertia): blobs keep drifting at the current xVel/yVel until changed by an action,
+  and ALL blobs share the same xVel/yVel (the velocity is global, not per-blob).
+
+SPAWNING / DESPAWNING
+- Spawning: only via click on a free cell (adds a Blob there; see the same-tick move note above).
+- Despawning: none. Blobs are never removed. They can drift off-grid via velocity with no wraparound or
+  clamping (the SEXP has none). An off-grid blob is simply not rendered, but it persists and will
+  re-enter the visible grid if the velocity later carries it back (confirmed in the trajectories).
+
+COLOR CHANGES
+- None. All blobs are always blue.
+
+COLLISIONS / INTERACTIONS
+- No collision handling. Blobs can overlap (the only check is isFreePos at spawn time on click).
+
+WIN / TERMINATION / REWARD
+- None defined. There is no goal, score, win, or termination condition in the program.

@@ -1,0 +1,88 @@
+DQ8GC — game mechanics
+
+GRID
+- 16 x 16 grid of cells. Each Particle renders as a single Cell.
+- Coordinates: positions are (X=col, Y=row). X grows rightward, Y grows
+  downward, so left = -X (col-1), right = +X (col+1), up = -Y (row-1),
+  down = +Y (row+1). The perception reports cells as (row, col).
+
+OBJECTS
+- Particle: has one Bool property `health`. Rendered "gray" when health=true,
+  "darkgreen" when health=false. Each Particle occupies one cell.
+- inactiveParticles: a list of 4 Particles, all initially health=true (gray),
+  at (col,row) = (7,5), (4,3), (6,6), (3,5).
+- activeParticle: a single Particle, initially health=false (darkgreen), at
+  (col,row) = (2,2). This is the agent-controlled object and is "patient zero"
+  for the infection (see PASSIVE DYNAMICS).
+
+PLAYER ACTIONS
+- left  : set activeParticle position by (-1, 0) (col-1).
+- right : set activeParticle position by (+1, 0) (col+1).
+- up    : set activeParticle position by (0, -1) (row-1).
+- down  : set activeParticle position by (0, +1) (row+1).
+  The move is UNCONDITIONAL. There is no collision / free-cell check: the
+  activeParticle always moves, even onto a cell already occupied by an
+  inactiveParticle. When it overlaps an inactive, both particles share the
+  cell and only one Cell color is rendered there (in practice both have
+  ended up darkgreen, so the overlap shows as a single darkgreen cell).
+  Inactive particles never move on their own — only the active particle moves.
+- click ROW COL : if the clicked cell holds one of the inactiveParticles, the
+  CLICK-SWAP handler fires (see below). Click LOCATION matters — a click on an
+  empty cell or on the active particle does nothing.
+- noop  : no handler; does nothing (passive dynamics still advance the clock).
+
+CLICK-SWAP (clicking an inactive particle)
+- The clicked inactive particle becomes the new activeParticle.
+- The old activeParticle is appended into the inactiveParticles list.
+- The clicked particle is removed from the inactive list as part of the swap.
+- Net particle count is unchanged; this is purely a "select / take control of
+  the clicked particle, release the current one" swap. The released particle
+  keeps its current health and thereafter follows the inactive dynamics.
+
+PASSIVE / PER-STEP (clock) DYNAMICS — INFECTION / CONTAGION
+- Runs every tick (including on noop/move/click ticks), computed from the
+  PREVIOUS state, so it has a 1-step lag (a newly created adjacency only takes
+  effect on the following observation).
+- For each inactiveParticle: if it is orthogonally adjacent (4-neighbour,
+  unitSize 1: up/down/left/right, NOT diagonal) to ANY unhealthy
+  (health=false / darkgreen) particle drawn from the set
+  {activeParticle} ∪ {inactiveParticles} (previous state), then its health is
+  set to false (it turns darkgreen).
+- This is a one-directional, monotone infection: health is only ever set
+  false, never back to true. Once an inactive particle turns darkgreen it
+  STAYS darkgreen forever, even after the infecting particle moves away.
+- The infection therefore spreads outward one cell per tick along chains of
+  orthogonally-touching particles, seeded by the initially-darkgreen active
+  particle. (The underlying rule's "if true then ... else obj" branch is
+  always-true, so the gating is purely the adjacency-to-unhealthy condition.)
+
+ACTIVE-PARTICLE HEALTH RULE
+- If any object orthogonally adjacent (unitSize 1) to the activeParticle is
+  unhealthy (darkgreen), the activeParticle's health is set to false
+  (darkgreen). This is the active-particle counterpart of the contagion rule.
+- In seed-0 trajectories the active particle starts darkgreen, so this
+  transition (gray active -> darkgreen) is not directly observed there, but it
+  is a real rule and would fire for a gray active that became adjacent to an
+  infected particle (e.g. after a click-swap that makes a gray inactive the
+  new active next to a darkgreen one).
+
+COLOR CHANGES
+- Color is purely a function of `health`: gray = healthy (true),
+  darkgreen = unhealthy (false). There is no counter or threshold; the only
+  driver is the per-step orthogonal adjacency-to-unhealthy rules above.
+
+SPAWNING / DESPAWNING
+- No particles are created or destroyed during play. The click-swap only moves
+  a particle between the inactive list and the active slot (no net change in
+  particle count).
+
+COLLISIONS / OVERLAP
+- There is NO collision blocking. The "move only happens if the target cell is
+  free" behavior described in older notes never actually fires — movement is
+  unconditional and particles may overlap (verified empirically).
+- "Adjacency" for all health/contagion rules is the orthogonal 4-neighbourhood
+  (unitSize 1), not the 8-neighbourhood.
+
+WIN / TERMINATION / REWARD
+- The program defines no win condition, no termination rule, and no reward.
+  It is an open-ended dynamics sandbox (interactive phase only).

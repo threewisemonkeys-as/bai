@@ -1,0 +1,4 @@
+- The environment is a grid where locations are specified by (row, column) coordinates.
+- Agents are entities that can be moved or created.
+- Gray cells are a type of entity that can be removed.
+- 'click X Y' action: If an agent is present at (X, Y), the state of agents and gray cells remains unchanged. If a gray cell is present at (X, Y), that gray cell is removed.

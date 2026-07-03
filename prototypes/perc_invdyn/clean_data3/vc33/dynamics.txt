@@ -1,0 +1,142 @@
+vc33 (vc33-5430563c) — game mechanics
+
+OVERVIEW
+- A click-only gravity / sliding puzzle. The agent never has any movement or
+  shoot actions: the only available action is ACTION6 (a click that carries an
+  x,y), in EVERY state of EVERY level (the game declares available_actions=[6]).
+- Goal of each level: slide every coloured "ball" so that it lines up with the
+  matching-coloured "goal" marker. When all balls are aligned the level is
+  solved and the game advances to the next level. There are 7 levels
+  (win_levels=7). Solving all 7 wins the game.
+- A per-level STEP BUDGET (a countdown bar along the very top row) limits how
+  many clicks you may spend. Run out before solving the current level and you
+  LOSE (episode terminates).
+
+GRID & LAYERS
+- One grid layer per observation, always rendered as 64x64 (shape 64x64).
+- Each Level has its own logical grid_size, scaled to fill the 64x64 display:
+    Level 1: 32x32   Level 2: 32x32   Level 3: 52x52
+    Levels 4-7: 64x64
+  For a 32x32 level the display is exactly 2x the logical grid (display_col =
+  2*grid_col). The click handler converts the clicked DISPLAY coordinate back to
+  the logical grid internally, so you always click in DISPLAY (64x64) coords.
+- COORDINATE CONVENTION: `click_X_Y` -> ACTION6 with x=X (COLUMN), y=Y (ROW), in
+  the 64x64 display frame. (col first, then row.)
+
+PALETTE (colour index -> what it is / how it renders here)
+- 0  : interior of a "container" region (the open chambers). Renders white.
+- 3  : background / empty space (Camera background). Renders gray. Most common.
+- 4  : the ball's "cap" pixel, the little direction arrows drawn over clickable
+       bridge blocks, and the screen letter-box padding. Renders dark gray.
+- 5  : solid WALLS / floors. Renders black.
+- 7  : the STEP-BUDGET bar drawn across the top row (row 0). Renders pink.
+- 9  : clickable BUTTONS. Renders blue.
+- 11 : a ball+goal colour (yellow).            } a ball only counts as solved
+- 14 : a ball+goal colour (green).             } when it reaches a goal marker
+- 15 : a ball+goal colour (third colour).      } of the SAME colour.
+- 1  : default colour of the clickable bridge blocks in later levels (see
+       SECOND MECHANIC). 12 is the recoloured "settled/valid" bridge colour.
+
+OBJECTS (by tag)
+- BALL   (tag 0016uciqlhjlom): the piece you move. A small sprite whose body is
+  colour 11/14/15 with a colour-4 cap. Its body colour must be matched to a
+  same-colour goal. Levels can have one or several balls.
+- GOAL   (tag 0010gnulkywfpz): a small colour-11/14/15 marker mounted on a wall.
+  It is the target slot for the same-coloured ball. Goals never move.
+- BUTTON (tag 0022jvmlspyigc, also sys_click): a small colour-9 (blue) square,
+  2x2 or 3x3. Clicking it slides a ball one step (see BUTTON MECHANIC). Buttons
+  sit at the edges of the chambers; several may be present per level.
+- WALL   (tag 0025yfyiswdvoh): colour-5 black walls / floors that partition the
+  board into chambers and that goals are mounted on.
+- CONTAINER (tag 0043nzrtobajqi): colour-0 open chambers. A ball "rests on" the
+  container under it; clicking a button resizes the two containers a ball is
+  passing between (this is the visible chamber-to-chamber transfer).
+- BRIDGE BLOCK (tag 0004sttgkofqwb, also sys_click) + ARROW indicators
+  (tag 0007gyluczquhi): the colour-1 clickable blocks used only in the later
+  levels (see SECOND MECHANIC).
+
+STEP BUDGET (top bar)
+- Each level sets a StepCounter (L1=50, L2=50, L3=75, L4=50, L5=200, L6=50,
+  L7=200). The top row (row 0) is filled with colour 7 proportional to budget
+  remaining and shrinks left-to-right as the budget is spent.
+- EVERY ACTION6 click costs exactly 1 step, whether or not it lands on anything
+  useful (clicking empty space, a wall, or an inactive button still burns a
+  step). Verified empirically: each click decremented the bar by one.
+- Exception: clicks made WHILE a bridge animation is playing (later levels) are
+  swallowed and do not advance the puzzle (they just let the animation finish).
+- The budget is refilled to the new level's StepCounter on every level
+  transition.
+
+BUTTON MECHANIC (the core mechanic, levels 1-3 are built entirely on it)
+- Every level carries a fixed GRAVITY vector (a direction + magnitude):
+    L1 [2,0] right    L2 [-2,0] left   L3 [0,2] down    L4 [0,3] down
+    L5 [3,0] right    L6 [-3,0] left   L7 [0,-2] up
+  Movement is always ALONG this axis; the magnitude is how far a ball jumps per
+  click (2 in L1-L3, 3 in L4-L6, 2 in L7).
+- Each BUTTON is paired (at level setup) with a "door" between two adjacent
+  chambers. Clicking that button slides the ball that is sitting in one of those
+  chambers by exactly the gravity magnitude, through the door into the adjacent
+  chamber, and resizes the two chambers accordingly. Different buttons drive the
+  ball in opposite directions along the gravity axis.
+  Example (Level 1, gravity right, ball starts at grid x=23):
+    * clicking the TOP button (display 60,25) moves the ball +2 in x (to the
+      right, with gravity): 23 -> 25.
+    * clicking the BOTTOM button (display 60,33) moves the ball -2 in x (left):
+      23 -> 21.
+- ONLY a button whose door is adjacent to the ball's CURRENT chamber does
+  anything; clicking a button for a chamber the ball is not in is a no-op (but
+  still costs a step). As the ball advances through the chambers, the set of
+  "active" buttons changes. This is what makes the multi-chamber levels a maze.
+- A ball can only travel along the gravity axis and can be blocked by a wall at
+  the end of a chamber's floor (it then just oscillates between the last two
+  reachable positions until you take a different door). In Level 2, for example,
+  the ball slides x = 4 -> 6 -> 8 -> 10 and then stalls at 10, blocked short of
+  its goal column (14) until a different door is used.
+
+WIN CHECK (when does a level complete)
+- After every action the game runs the solve test. A level is solved when, for
+  EVERY ball, there exists a goal such that:
+    (a) the ball's body colour appears in that goal (colour match), AND
+    (b) the ball's coordinate ALONG the gravity axis equals the goal's (i.e. for
+        horizontal gravity, ball.x == goal.x; for vertical gravity,
+        ball.y == goal.y), AND
+    (c) the wall the goal is mounted on is adjacent to the ball's chamber.
+  Verified in Level 1: the level completed the instant the ball reached x=17,
+  the goal's column. (The off-axis coordinate need not match exactly.)
+- On solve, next_level() fires: the board switches to the next level and the
+  step budget refills. A small positive reward (+0.1) is delivered on the
+  transition (reward is 0.0 on all other clicks). The episode does NOT terminate
+  on a level transition; it terminates only on the final win or on a loss.
+
+SECOND MECHANIC — BRIDGE BLOCKS (levels 4-7 only; from source, not exercised
+in these trajectories)
+- Later levels add clickable colour-1 BRIDGE BLOCKS (tag 0004sttgkofqwb) with
+  colour-4 ARROW indicators drawn on the ones that are currently actionable.
+- Clicking a bridge block that is "valid" (it spans between two chambers — the
+  ezbubuphlm test) starts a multi-step ANIMATION: the block swings/repositions
+  and carries any balls resting on it across to the adjacent chamber, settling
+  over several ticks. While the animation plays, further clicks are ignored
+  (and do not cost budget) until it finishes; arrow indicators are hidden during
+  the swing and recomputed (recoloured to 12) when it settles. This is the
+  alternate way of transferring a ball between chambers in the harder levels,
+  layered on top of the button mechanic.
+
+LOSE / TERMINATION / REWARD
+- LOSE: if the step budget reaches 0 without the current level being solved, the
+  game calls lose() and the episode terminates.
+- WIN: solving level 7 (the last level) ends the game as a win.
+- REWARD: 0.0 on ordinary clicks; +0.1 on each level transition. No other
+  reward signal.
+- There is no passive clock: state only changes on a click (and on the
+  intermediate ticks of a bridge-block animation). No noop padding is possible
+  or meaningful.
+
+CAVEATS
+- Levels 2+ are genuine multi-chamber mazes; reaching a goal requires choosing
+  the correct door (button) sequence, and some buttons are decoys / only become
+  active once the ball is in the right chamber. The trajectories here fully
+  solve Level 1 and demonstrate the Level-2 chamber-transfer mechanic (the ball
+  was deliberately not driven to the Level-2 goal — see test trajectory notes).
+- The SECOND MECHANIC (bridge blocks) is described from the source only; it is
+  not reachable without first solving levels 1-3, so it is not shown in the
+  train/test frames.

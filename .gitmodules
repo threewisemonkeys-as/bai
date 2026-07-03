@@ -8,3 +8,6 @@
 [submodule "Autumn.cpp"]
 	path = Autumn.cpp
 	url = https://github.com/BasisResearch/Autumn.cpp.git
+[submodule "RGB-Agent"]
+	path = RGB-Agent
+	url = git@github.com:threewisemonkeys-as/RGB-Agent.git

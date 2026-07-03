@@ -1,0 +1,125 @@
+sk48 (game_id sk48-d8078629) — game mechanics
+
+This is a "pipe / extendable-snake on rails" Sokoban-style color-matching
+puzzle. You control a fixed anchor ("head") from which a pipe extrudes. You
+extend / retract / slide the pipe to push colored blocks around and arrange the
+sequence of colors the pipe lies over to MATCH a fixed reference pattern shown
+at the bottom of the screen. Matching the reference clears the level. There are
+8 levels (win_levels=8).
+
+GRID & LAYERS
+- One 64x64 grid layer is emitted per observation (1 <grid_*> layer).
+- Coordinates here are (X=col, Y=row), X right, Y down. CLI clicks are
+  click_X_Y -> ACTION6 x=X (col), y=Y (row).
+- The world is rendered at a 6x scale: every logical move steps the head by 6
+  grid cells, and every object (head, pipe segment, goal block) is a 6x6 tile.
+  So "one move" = a 6-cell jump on the rendered grid.
+
+PALETTE / WHAT YOU SEE (color index -> appearance)
+- 5  = background (dark gray) [BACKGROUND_COLOR].
+- 4  = the play-area floor: a large dark-gray square (the bordered box) the
+       pipe operates inside. (Bottom panel floor also renders as 4.)
+- 3  = padding / letterbox border (also the bottom info strip top row, row 53).
+- 2  = the progress / move-budget bar fill drawn on row 53 (see MOVE BUDGET).
+- 1,2 (the "121121 / 211211" striped pattern) = an ACTIVE pipe's body
+       segments. Each pipe segment is a 6x6 tile; the body renders as a
+       chain of these striped tiles trailing from the head.
+- 6  = the head/anchor tile border. The currently-controlled (active) head
+       renders as a bright PINK/MAGENTA square with a white center; inactive
+       selectable heads render dimmer.
+- Goal blocks (solid colored 4x4 squares): 8 = RED, 9 = BLUE, 14 = GREEN.
+  (These are the three index values used by level 1's blocks.)
+
+OBJECTS
+- HEAD / ANCHOR (sprite "epdquznwmq"-tagged; some also "sys_click"): a fixed
+  square from which the pipe extrudes. In level 1 there is ONE controllable
+  head in the play area at (col,row)=(11,36), facing RIGHT (rotation 0).
+- PIPE BODY: a chain of striped 6x6 segments extending from the active head in
+  its facing direction. Length is changed by the player (extend/retract).
+- GOAL BLOCKS (sprite "elmjchdqcn"): solid colored squares the pipe can push /
+  pull around the play area. In level 1 they start stacked on the RIGHT inner
+  wall: RED at (col 42, rows 19-22), BLUE at (col 42, rows 25-28),
+  GREEN at (col 42, rows 31-34).
+- VERTICAL RAIL (sprite "irkeobngyh"): a striped track the head slides along
+  when moving perpendicular to the pipe. In level 1 it is a vertical rail just
+  left of the play area (around col 13, rows ~14-39). The head can slide UP/DOWN
+  along it; it cannot move perpendicular where there is no rail.
+- REFERENCE / TARGET (bottom panel, below the row-53 strip): a fixed copy of a
+  head followed by a fixed sequence of goal blocks — in level 1: RED, GREEN,
+  BLUE (left to right). This is the target color order you must reproduce, and
+  each of its blocks shows a small WHITE match-indicator that lights up when the
+  in-play pipe's covered-color sequence matches that prefix of the target.
+
+PLAYER ACTIONS (all 6 are available throughout level 1; availability is
+state-dependent in general and you must only emit currently-available actions)
+- ACTION1 = UP    (move head by (0,-1) i.e. -6 rows)
+- ACTION2 = DOWN  (move head by (0,+1) i.e. +6 rows)
+- ACTION3 = LEFT  (move head by (-1,0) i.e. -6 cols)
+- ACTION4 = RIGHT (move head by (+1,0) i.e. +6 cols)
+- ACTION6 = CLICK (x,y): select a different controllable head (see CLICK).
+- ACTION7 = UNDO: revert the most recent move (state history pop).
+
+The effect of a directional action depends on its relation to the head's
+FACING direction (level 1: facing = RIGHT):
+- MOVE IN FACING DIRECTION (level 1: ACTION4/right) = EXTEND: a new pipe segment
+  is added and the pipe grows one tile in the facing direction. If the tip runs
+  into a goal block, the block is PUSHED ahead (Sokoban-style); if it cannot be
+  pushed (against the outer wall) the extension is blocked / stops at it.
+- MOVE OPPOSITE FACING (level 1: ACTION3/left) = RETRACT: the pipe shrinks by
+  one tile (front segment removed). A goal block currently in contact with the
+  tip is DRAGGED back along with the tip (pulled) as the pipe retracts.
+- MOVE PERPENDICULAR (level 1: ACTION1/up, ACTION2/down) = SLIDE: the whole
+  head+pipe assembly translates one tile along the rail, keeping the pipe's
+  orientation. Only allowed where a rail (irkeobngyh) is present at the target;
+  otherwise the move is rejected (no-op). The pipe stays a straight horizontal
+  line in level 1; sliding up/down just repositions which row it extends along.
+
+So in level 1 the practical control loop is: ACTION1/ACTION2 to pick a row
+(slide along the left rail), ACTION4 to extend the pipe rightward into the play
+area / into a goal block, ACTION3 to retract (and drag a contacted block back).
+
+CLICK (ACTION6 x,y)
+- Clicking a tile that holds a "sys_click" head sprite selects/takes control of
+  that head (the clicked head becomes active; the previously active head is
+  released). This only does something in levels that have a SECOND controllable
+  in-play head — clicking the already-active head, or the fixed reference head,
+  is a NO-OP. In level 1 there is only one controllable head, so ACTION6 is
+  effectively a no-op (verified): state and available actions are unchanged.
+- Coordinate convention is click_X_Y -> ACTION6 x=X (col), y=Y (row).
+
+GOAL BLOCK PUSH / PULL (Sokoban dynamics) — verified empirically
+- Extending the pipe into a free goal block pushes that block one tile in the
+  move direction.
+- A goal block against the outer wall cannot be pushed; the pipe tip stops at
+  it (extension blocked there).
+- Retracting the pipe while its tip is in contact with a block drags/pulls that
+  block back with the tip. (e.g. extend right to the RED block, then retract
+  left -> RED is pulled left, off the wall, into the play area.)
+
+WIN / MATCH / LEVEL PROGRESSION
+- The game tracks, for the active head, the ordered sequence of goal-block
+  COLORS the pipe's body currently lies over (tip-to-tail order). It compares
+  this to the reference head's fixed covered-color sequence (the bottom panel:
+  RED, GREEN, BLUE in level 1). Each reference block lights a white indicator
+  when the in-play sequence matches that position.
+- When the ENTIRE sequence matches the reference, a flashing win animation plays
+  and the game advances to the next level (next_level). After level 8 the game
+  is won (win_levels=8).
+- Reward observed during normal play is 0.0 per step; progression is by level
+  transition, not per-step reward.
+
+MOVE BUDGET / LOSE
+- There is a per-level move budget (starts at 196). Every directional move
+  (ACTION1-4) decrements it; CLICK and UNDO do not. The budget is drawn as a bar
+  on row 53 (index 2 fill over index 3): it shrinks left-to-right as you move.
+- If the budget reaches 0 the level is lost (lose()).
+
+CAVEATS
+- The right-edge goal blocks in level 1 are stacked RED(top)/BLUE(mid)/GREEN(bot)
+  but the required order is RED,GREEN,BLUE, so winning requires non-trivial
+  Sokoban rearrangement of the blocks — not just a straight extension. The
+  trajectories below demonstrate the mechanics (slide, extend, retract,
+  push/pull a block, match-indicator, undo, click) but do NOT solve the level
+  (no win/level transition is triggered).
+- A directional move with no rail / blocked path is silently rejected (frame
+  unchanged); avoid relying on such moves.

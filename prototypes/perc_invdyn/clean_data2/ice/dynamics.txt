@@ -1,0 +1,55 @@
+ICE — game mechanics
+
+Grid: 16 x 16.
+
+OBJECTS
+- CelestialBody ("sun"): a 2x2 block at the top-left corner, cells (0,0),(0,1),(1,0),(1,1).
+  Has a Bool field `day`. Colored "gold" when day=true, "gray" when day=false.
+  Starts as day=true (gold). Position is fixed; it never moves.
+- Cloud: a horizontal 3-cell gray bar. Internally spans relative cells (-1,0),(0,0),(1,0)
+  with origin initialized at (4,0), so it occupies columns 3,4,5 on row 0 at the start.
+- Water: a list, initially empty. Each Water drop is a single cell with a Bool field `liquid`.
+  Colored "blue" when liquid=true, "lightblue" when liquid=false (frozen / ice).
+
+PLAYER ACTIONS
+- left:  moves the cloud one cell left,  if the moved cloud stays within bounds (else no change).
+- right: moves the cloud one cell right, if the moved cloud stays within bounds (else no change).
+  The cloud clamps at the edges: leftmost occupies columns 0-2, rightmost columns 13-15.
+- down: spawns one new Water drop just below the cloud's origin, at (cloud_origin_x, 1).
+  The new drop's `liquid` flag is set to the sun's current `day` value:
+  day (gold sun) -> blue liquid drop; night (gray sun) -> lightblue solid drop.
+- click ROW COL: a click WITH a coordinate toggles global day/night state — flips the sun's
+  `day` (gold<->gray) AND flips the `liquid` flag of every existing water drop
+  (blue<->lightblue, both directions, melt/freeze all at once).
+  The click LOCATION does not matter; a click on ANY cell has the same global effect.
+  A coordinate is REQUIRED: a bare `click` with no ROW/COL is rejected by the action parser
+  and does NOTHING (no-op — the sun and drops are unchanged).
+- up: NO handler — no-op (does nothing).
+- noop: does nothing.
+
+PASSIVE / PER-STEP DYNAMICS (every tick)
+- The sun and the cloud do NOT move on their own; they only move via the actions above.
+- Every water drop updates each tick based on its own `liquid` flag:
+  - Solid (lightblue) drops: fall straight down one cell if the cell directly below is free
+    and within bounds; otherwise they stay put. They do not move sideways.
+  - Liquid (blue) drops: fall straight down one cell if the cell below is free; if blocked,
+    they scan the entire next row down for open "holes" (a free cell whose cell above is also
+    free), pick the nearest one, and step ONE cell per tick toward it (water-like settling /
+    sideways spreading along the floor), stopping when no valid move exists or at the bottom row.
+- With no water present, a plain step leaves the board unchanged.
+
+SPAWN / DESPAWN
+- Water is only created by the `down` action (one drop per press). Drops are never removed;
+  they accumulate and pile up.
+
+COLOR CHANGES
+- Sun: gold (day) <-> gray (night), toggled only by click.
+- Water: blue (liquid) <-> lightblue (solid), set at spawn by current day flag and flipped
+  for all drops by click. No automatic/threshold-based color changes.
+
+COLLISIONS / INTERACTIONS
+- Falling water cannot enter occupied cells; drops stack and pile on each other and at the
+  floor. The cloud passes through nothing (it lives on row 0); spawned water appears below it.
+
+WIN / TERMINATION / REWARD
+- None. There is no goal cell, no score, no win/lose or termination condition in the program.

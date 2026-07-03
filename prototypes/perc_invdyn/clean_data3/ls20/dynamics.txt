@@ -1,0 +1,132 @@
+ls20 (ls20-9607627b) — game mechanics
+
+OVERVIEW
+- A "carry-a-shape through a maze" puzzle. You drive a 5x5 player block around a
+  walled maze. You are carrying ONE abstract token that has three attributes:
+  a SHAPE (1 of 6), a COLOR (1 of 4), and a ROTATION (1 of 4: 0/90/180/270 deg).
+  Scattered on the floor are modifier tiles that, when you step on them, cycle
+  one attribute of the carried token. Each level has one or more GOAL PADS, each
+  stamped with a required (shape, color, rotation). To clear a goal pad you must
+  arrive on it with your carried token's three attributes all matching that pad.
+  Clear every goal pad in a level -> advance to the next level (reward +0.1).
+  There are 7 levels (win_levels=7).
+
+GRID & LAYERS
+- 64x64 grid, single rendered layer (1 <grid_N> layer per observation).
+- The play field is a walled maze. Everything is laid out on a 5-pixel lattice:
+  the player block is 5x5 and every move translates it by exactly 5 px, so the
+  world is effectively a ~12x12 logical grid of 5x5 cells.
+- Coordinates: (X=col, Y=row), X right, Y down. A sprite's "position" is its
+  top-left pixel (x,y). The CLI click convention click_X_Y -> ACTION6 x=X y=Y is
+  irrelevant here: this game NEVER offers ACTION6 (see AVAILABLE ACTIONS).
+
+PALETTE (by index, as seen in the ASCII/PNG dumps)
+- 4  = WALL (dark gray). Blocks movement.
+- 3  = FLOOR / background (open, walkable). Also the camera background/padding.
+- 5  = structural border color: maze outer padding, the box/frame drawn around a
+       goal pad, and the bottom UI frame. A goal pad's body renders as 5.
+- Player block (sprite "sfqyzhzkij", 5x5): top 2 rows color 12, bottom 3 rows
+  color 9 -> renders as an orange-topped / blue-bottomed block. This is YOU.
+- The 4 possible token COLORS are palette indices [12, 9, 14, 8] (internal color
+  index 0..3). The 6 token SHAPES are small 3x3 masks. ROTATION is 0/90/180/270.
+- 11 = a "step-refill" pickup tile (bright yellow), and also the color of the
+       step-counter bar in the bottom UI. (No refill pickups appear in level 1.)
+- 8  = the "lives" pips color in the bottom-right UI.
+
+ON-SCREEN UI (bottom rows of the 64x64 frame)
+- Bottom-left: a small framed box showing a scale-2 preview of your CURRENTLY
+  carried token (its current shape+color+rotation). Watch this to see attribute
+  changes after stepping on a modifier.
+- Bottom strip (~row 61-62): a horizontal bar of color-11 pixels = remaining
+  step budget; it shrinks left-to-right as steps are spent.
+- Bottom-right: 3 small color-8 pips = remaining lives (3 at start).
+- Each goal pad is drawn inside a color-5 box and stamped with the required
+  shape, rendered in the required color and rotation (the "target" indicator).
+
+PLAYER ACTIONS (movement only; each moves the 5x5 player by one 5-px cell)
+- ACTION1 = UP    (y -= 5)
+- ACTION2 = DOWN  (y += 5)
+- ACTION3 = LEFT  (x -= 5)
+- ACTION4 = RIGHT (x += 5)
+  A move is attempted to the adjacent cell. The destination footprint is tested:
+  * if it contains a WALL (color-4 tile) -> move is BLOCKED, player stays put
+    (a no-op frame).
+  * if it contains an UNMATCHED goal pad -> move is BLOCKED and a short "wrong"
+    flash plays (the field border briefly recolors); the goal is not cleared.
+  * otherwise the player moves onto the cell, and any modifier/pad/pickup
+    occupying that cell fires (see below).
+- There is no ACTION5/ACTION6 in this game.
+
+MODIFIER TILES (fire when the player STEPS ONTO the tile; each landing = +1 cycle)
+- ROTATION modifier: cklxociuu = (cklxociuu + 1) % 4. Cycles the carried token's
+  rotation 0 -> 90 -> 180 -> 270 -> 0. (This is the ONLY modifier present in
+  level 1; it renders as a tiny arrow-like glyph, e.g. at (col=19,row=30).)
+- COLOR modifier: color index = (i + 1) % 4, cycling through [12,9,14,8].
+- SHAPE modifier: shape index = (i + 1) % 6, cycling through the 6 shapes.
+  (Color/shape modifiers appear in later levels, not level 1.)
+- STEP-REFILL pickup (color-11 tile): refills the step budget to full and is
+  consumed (removed from the maze). Appears in later levels.
+- Re-stepping a modifier cycles it again, so landing on it N times applies N
+  increments (mod the cycle length). To set a specific value, land on the tile
+  the right number of times.
+
+GOAL PADS / CLEARING A LEVEL
+- A goal pad clears only if, on the move that lands the player exactly on the
+  pad, the carried token's (shape, color, rotation) all equal the pad's required
+  triple. On success the pad and its target indicator disappear and that goal is
+  marked done.
+- Landing on a goal pad whose triple does NOT match is rejected (blocked + a
+  brief wrong-flash); you stay off the pad and nothing is cleared.
+- When ALL goal pads in the level are cleared, the game advances to the next
+  level (observed reward +0.1, step budget and maze reset to the new level).
+
+LIVES / STEP BUDGET / GAME OVER
+- Step budget starts at 42 and decrements by StepsDecrement each move (=1 in
+  level 1). Running the budget below zero costs ONE life: the player respawns at
+  the level's start cell, the carried token resets to the level's start triple,
+  and the budget refills (a brief respawn animation plays).
+- Lives start at 3. Losing the last life ends the game (loss).
+- Clearing the final (7th) level is the win.
+
+AVAILABLE ACTIONS
+- Always exactly [ACTION1, ACTION2, ACTION3, ACTION4] in every state observed.
+  The set does not change; only emit these four. ACTION5/ACTION6 are never
+  offered (no click, no select).
+
+LEVEL 1 SPECIFICS (used by the train/test trajectories here)
+- Player starts at cell (x=34, y=45). Carried token starts as shape #5, color 9,
+  rotation 270. The single goal pad is at (x=34, y=10) and requires shape #5,
+  color 9, rotation 0. Shape and color already match; only the rotation is wrong
+  (270 vs 0).
+- There is exactly ONE modifier tile, a ROTATION modifier at (x=19, y=30).
+  Stepping on it once cycles rotation 270 -> 0, making the token match the goal.
+- So the level-1 solution is: reach the rotation tile and land on it an odd
+  number of times (once), then walk onto the goal pad at (34,10).
+- WARNING: walking straight up column 34 to the goal (7x UP) reaches the pad WITH
+  the wrong rotation and is rejected — you must visit the rotation tile first.
+- Maze connectivity (5x5 cells): a bottom corridor along row y=45 links cols
+  x=19..34; a top corridor along row y=25 links cols x=14..49; vertical
+  corridors run up col x=19 (y=25..45), col x=34 (y=10..45, straight to the
+  goal), and cols x=39/44/49 on the right. The rotation tile sits on col x=19.
+
+TRAJECTORIES IN THIS DATASET (both clear level 1 -> reward +0.1)
+- train (13 moves): LEFT,LEFT,LEFT, UP,UP,UP,UP, RIGHT,RIGHT,RIGHT, UP,UP,UP.
+  Goes left along the bottom corridor to col 19, climbs col 19 PASSING UP through
+  the rotation tile from BELOW (one landing -> rotation 270->0), continues to the
+  top corridor, returns to col 34, then up to the goal pad. Demonstrates: 4-way
+  movement, the rotation modifier flipping the carried token, and the goal-pad
+  match -> level transition.
+- test (15 moves): UP,UP,UP,UP, LEFT,LEFT,LEFT, DOWN, UP, RIGHT,RIGHT,RIGHT,
+  UP,UP,UP. Climbs col 34 first, crosses the TOP corridor to col 19, then steps
+  DOWN onto the rotation tile from ABOVE (one landing -> rotation 270->0), steps
+  back up, returns to col 34, and up to the goal pad. Same mechanics shown via a
+  different route and a different approach onto the modifier tile, so it is
+  framewise distinct from train while clearing the same level.
+
+CAVEATS / ANOMALIES
+- The single rendered layer always shows the settled state; the wrong-flash and
+  respawn are brief multi-step animations that resolve before the next action is
+  consumed.
+- "Wrong-match" and "out-of-steps" are the only failure modes; neither is
+  triggered in the clean train/test trajectories (both are direct, all-effective
+  solves with no wall bumps and no wasted steps).

@@ -1,0 +1,109 @@
+tu93 (tu93-0768757b) — game mechanics
+
+OVERVIEW
+- A Pac-Man / maze-navigation game. You steer a single player token through a
+  fixed maze to reach the exit before a step-counter runs out. There are 9
+  levels of increasing difficulty; clearing the exit advances to the next level.
+  Later levels add charging "block" hazards and patrolling enemies.
+- This file is reverse-engineered from environment_files/tu93/0768757b/tu93.py
+  and confirmed empirically (offline). Level 1 has NO enemies and is fully
+  verified frame-by-frame; the enemy rules (levels 2-9) are read from source.
+
+GRID & LAYERS
+- Rendered frame is 64x64, 16-color palette. A single grid layer is emitted.
+- The level's logical board is smaller (grid_size 39..51 per level) and is
+  centered in the 64x64 frame; the surround is letter-box padding.
+- The bottom-most frame row (row 63) is a STATUS BAR, not part of the maze.
+
+PALETTE (as actually rendered)
+- 5  = black  : maze walls / background / letter-box padding (non-traversable).
+- 2  = white  : corridor cell (traversable path).
+- 0  = gray   : corridor cell (traversable path). Corridors render as an
+                alternating white(2)/gray(0) checkerboard of 3x3 squares; both
+                colors are floor the player slides over.
+- 9  = blue   : the PLAYER token (a 3x3 square; its top-center pixel is a
+                darker notch, color 4).
+- 14 = green  : the EXIT cell (a solid 3x3 square). Reaching it clears the level.
+- 6  = magenta: the STEP-COUNTER bar drawn along frame row 63 (see STATUS BAR).
+- 8 / 12 / 13 : enemy/hazard body colors (levels 2-9; see ENEMIES). When a
+                hazard "arms", its top-center pixel turns red (color 11);
+                otherwise it is white (15).
+
+UNITS / GEOMETRY
+- Everything is built from 3-pixel blocks. A logical maze CELL is 6 pixels
+  (the player rests on positions that are multiples of 6 relative to the board).
+- The player occupies one 3x3 square but moves a full 6-pixel cell per action.
+- A move from a cell to the neighbor cell is allowed only if the 3-pixel
+  "bridge" block between them is white (board pixel == 2). If there is no
+  bridge (black wall), the action is a NO-OP: the player does not move.
+
+ACTIONS (available_actions = [1,2,3,4] in EVERY state)
+- ACTION1 = move UP    (toward smaller row).
+- ACTION2 = move DOWN  (toward larger row).
+- ACTION3 = move LEFT  (toward smaller column).
+- ACTION4 = move RIGHT (toward larger column).
+  The chosen direction sets the player's facing/rotation and slides it one cell
+  if a path exists; otherwise nothing moves. The four actions are ALWAYS in the
+  `avail` list (state-independent) — blocked directions are simply no-ops.
+- There is no ACTION5/6/7; this game has NO click action.
+
+CLICK semantics
+- Not applicable. ACTION6 is never offered. (Convention reminder for the
+  dataset: click_X_Y -> ACTION6 x=X y=Y, x=col,y=row — unused here.)
+
+STATUS BAR / STEP COUNTER
+- Each level starts with a StepCounter budget (Level 1=50, others 20..60).
+- EVERY action consumes exactly one step, whether or not the player actually
+  moved (a blocked no-op still costs a step).
+- The magenta bar on row 63 shrinks proportionally to steps_remaining/budget;
+  it visibly loses a chunk from the right as the counter decrements, and refills
+  to full when a new level loads.
+- If the counter hits 0 the player LOSES (episode ends, term=True, reward 0).
+
+LEVEL / GOAL STRUCTURE
+- Win condition for a level: get the player token onto the green exit cell
+  (player x,y == exit x,y). This triggers next_level().
+- Clearing a level gives reward = +0.1 (1/9 of the game) and loads the next
+  maze; term stays False until the last level. Clearing all 9 levels wins the
+  episode. Empirically: Level-1 exit fires reward=0.1, term=False, and the
+  level-2 maze loads on the next frame.
+- LOSE (term=True, reward 0) if the step counter reaches 0, or if the player
+  token is destroyed by a hazard (see ENEMIES).
+
+LEVEL 1 (verified, enemy-free)
+- 6x6 cell maze. Player starts top-left cell; green exit is bottom-right.
+- Pure navigation: thread the corridors to the exit within 50 steps. At the
+  start only RIGHT (ACTION4) is unblocked; the maze branches and has dead-ends
+  further in, but the approach to the exit funnels through forced bottlenecks.
+
+ENEMIES / HAZARDS (levels 2-9; from source, not needed for Level 1)
+- Three hazard families, each a 3x3 token sitting on a corridor cell with a
+  fixed initial facing (rotation):
+  * "block" hazards  (tag 0001haidilggfh, body color 8; also the blue 0000):
+    DORMANT until the player lines up with the block along the block's facing
+    direction at range 2 cells. Then it ARMS (top-center pixel turns red=11)
+    and CHARGES one cell per tick in its facing direction. A charging block
+    that reaches the player's cell DESTROYS the player -> you LOSE. (Empirically
+    on Level 2: walking straight down the player's row into block 0018 armed it,
+    it charged left into the player, and the episode terminated as a loss.)
+  * "patroller" enemies (tag 0020npxxteirsg, body color 12): move continuously
+    through the maze, bouncing/reversing at walls; contact destroys the player.
+  * "armed-walker" enemies (tag 0023otenflmryc, body color 13): once armed they
+    walk and, when aligned with the player, destroy it.
+- All hazards kill on contact via the same "consume the player token" path
+  (the player sprite is removed -> no player remains -> lose()). They are slow,
+  one-cell-per-tick movers; the intended play is to bait/dodge their lines of
+  motion. A clean script for levels 2-9 must avoid stepping into a hazard's
+  charge/patrol line.
+
+COORDINATE CONVENTION (this dataset)
+- Movement only; positions are cell-based. left=ACTION3 (-col), right=ACTION4
+  (+col), up=ACTION1 (-row), down=ACTION2 (+row).
+
+CAVEATS
+- `avail` is constant [ACTION1..ACTION4]; do not infer walls from it. Blocked
+  moves are silent no-ops that still cost a step.
+- A single action plays out as a short multi-tick slide animation internally;
+  only the settled frame is rendered (expected).
+- Reward is sparse: 0 every step except +0.1 on each level clear.
+</content>

@@ -1,0 +1,53 @@
+E3V6M - Dynamics Description
+
+GRID
+- 16x16 grid (GRID_SIZE = 16).
+
+OBJECTS
+- A single object "Lights": a line/beam of 5 cells.
+  - The 5 cells are drawn at offsets i = -2,-1,0,1,2 along a direction
+    determined by `dir` (0-7), rotated around the object's anchor position.
+    For each i, the cell offset is (i*dx, i*dy) where (dx,dy) depends on dir:
+      dir 0: (+1, 0)   dir 1: (+1,+1)  dir 2: (0,+1)   dir 3: (-1,+1)
+      dir 4: (-1, 0)   dir 5: (-1,-1)  dir 6: (0,-1)   dir 7: (+1,-1)
+    So `dir` selects one of 8 compass orientations for the beam.
+  - State fields: turnedOn (Bool), dir (Number).
+  - Color: "yellow" when turnedOn is true, "white" when turnedOn is false.
+  - Initial state: turnedOn=false, dir=1 (diagonal down-right beam),
+    anchor at Position (7,7). So it starts WHITE, oriented dir=1.
+
+PLAYER ACTIONS
+- click ROW COL: toggles turnedOn (white<->yellow). A coordinate is REQUIRED
+  to trigger the toggle, but WHICH coordinate does NOT matter -- the
+  `on clicked` rule fires regardless of where the click lands (e.g. both
+  `click 7 7` and `click 3 10` toggle the beam). A bare `click` with no
+  coordinate is a no-op and does nothing.
+- up / down / left / right behave differently depending on turnedOn:
+    When turnedOff (white): the object TRANSLATES (moves) one cell:
+      up=moveUp, down=moveDown, left=moveLeft, right=moveRight.
+    When turnedOn (yellow): the object ROTATES (changes dir, no translation):
+      up    -> dir = (dir + 1) % 8   (rotate one step)
+      down  -> dir = (dir + 7) % 8   (rotate one step opposite)
+      left  -> dir = (dir + 2) % 8   (rotate two steps)
+      right -> dir = (dir + 6) % 8   (rotate two steps opposite)
+- noop: no handler; does nothing.
+
+PASSIVE / CLOCK DYNAMICS
+- None. There is no `on true` rule. State only changes in response to
+  player actions; `lights` otherwise persists (initnext -> prev lights).
+
+SPAWNING / DESPAWNING
+- None. The single Lights object exists from the start and is never
+  created or destroyed.
+
+COLOR CHANGES
+- Only the white<->yellow toggle, driven solely by click (via turnedOn).
+  No thresholds or counters.
+
+COLLISIONS / INTERACTIONS
+- None. No object-object or boundary collision logic. Movement and
+  rotation are unconstrained (no grid clamping in the rules).
+
+WIN / TERMINATION / REWARD
+- None. There is no goal, win condition, termination rule, or reward
+  defined in the SEXP.

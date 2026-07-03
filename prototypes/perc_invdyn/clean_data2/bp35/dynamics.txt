@@ -1,0 +1,144 @@
+bp35 (bp35-0a0ad940) — game mechanics
+
+OVERVIEW
+- A side-view GRAVITY PLATFORMER / falling-block puzzle. You control a small
+  player sprite that can only move horizontally (left / right); a constant
+  downward gravity makes it fall whenever it steps off a ledge. The goal of each
+  level is to reach the GEM. You shape the path down by CLICKING removable
+  green blocks (delete them so the player can drop through). ACTION7 UNDOes the
+  last move. There are 9 levels; clearing a level loads the next and resets the
+  per-level move budget.
+
+GRID & LAYERS / CAMERA
+- The emitted observation is a single 64x64, 16-color layer (one <grid_N>).
+- The actual playfield is an 11-cell-wide level laid out vertically (level 1 is
+  ~36 cells tall). Each game cell is rendered as a 6x6 pixel block, so only a
+  vertical slice of the level is visible at a time. A CAMERA scrolls vertically
+  to follow the player (camera y = player_grid_y*6 - 36 at level start, then it
+  pans with each fall). Because of this scroll the same world cell appears at
+  different screen rows over time — this matters for clicks (see CLICK).
+- The very bottom screen row (pixel row 63) is a MOVE-BUDGET / progress bar, not
+  part of the playfield. It fills left-to-right as you spend actions.
+
+COORDINATES
+- World cells are (gx = col, gy = row). gx grows rightward. gy grows UPWARD in
+  world space, BUT gravity pulls toward DECREASING gy, i.e. "down on screen" =
+  -gy. So the player falls from high gy toward low gy; the gem sits below
+  (lower gy than) the start.
+- On screen, larger pixel-y is lower. The renderer flips world gy to screen so
+  that falling looks like moving downward.
+
+PALETTE (16-color indices actually used)
+-  0 = black: player eye accent / spike accent.
+-  3 = dark (PADDING_COLOR): small highlight dots inside walls and on blocks.
+-  5 = light cyan: WALL / solid terrain (xcjjwqfzjfe). This is the floor/ceiling
+       you stand on and cannot pass.
+-  7 = pink: the GEM (fjlzdjxhant) — the level goal.
+-  9 = blue: PLAYER body. (sprite "player_right"/"player_left"; the facing eye
+       accent uses color 11, so the player reads as a blue blob with a yellow
+       eye that points in the last-moved direction.)
+- 10 = background (BACKGROUND_COLOR): the dotted dark empty space (air).
+- 11 = player eye / spike body.
+- 14 = green: CLICKABLE REMOVABLE BLOCK (qclfkhjnaac) — the main puzzle element
+       in levels 1-2. Clicking one deletes it.
+- 15 = the move-budget bar fill, and the body of spikes / spawn blocks.
+- Later levels add other clickable types (see CLICKABLE TYPES) that render in
+  other colors (8 = gravity-flip block, 12 = toggle block, 15 = spawn block).
+
+OBJECTS (by internal name)
+- player_right / player_left  : the agent. One per level. Faces the last
+  horizontal move direction.
+- xcjjwqfzjfe  : solid WALL. Blocks movement; you stand/land on it. Not clickable.
+- fjlzdjxhant  : GEM (goal). Moving into it, or falling onto it, WINS the level.
+- qclfkhjnaac  : green REMOVABLE block. Solid (you stand on it / it blocks you)
+  until you CLICK it, which deletes it. The only clickable in levels 1-2.
+- ubhhgljbnpu / hzusueifitk : SPIKES. Falling onto / landing on one LOSES the
+  level. (Present in level 2+; level 1 has no spikes.)
+- aknlbboysnc / jcyhkseuorf : a "crusher" / moving hazard pair used in early
+  levels; in levels <=3 it advances on a 2-step cadence and a lethal alignment
+  with the player loses. (Not encountered on the level-1 paths below.)
+
+PLAYER ACTIONS (only ACTION3, ACTION4, ACTION6, ACTION7 are ever offered)
+- ACTION3 = MOVE LEFT  (dx = -1).
+- ACTION4 = MOVE RIGHT (dx = +1).
+  Horizontal move semantics (one cell):
+    * If the destination cell is the GEM  -> move onto it and WIN.
+    * If the destination cell is empty/air -> move there, then apply GRAVITY:
+      keep falling (gy toward the gravity direction) until the next cell is
+      solid. Land on the last air cell. If the cell that stopped the fall is a
+      GEM -> WIN; if it is a SPIKE -> LOSE.
+    * If the destination cell is SOLID (wall or an un-removed green block) ->
+      the move is BLOCKED: the player does a small bump animation and stays put.
+    * Moving left past column 0 is blocked (left edge acts as a wall).
+  There is no separate "fall" action — gravity is resolved as part of each move.
+- ACTION6 = CLICK (carries x,y screen-pixel coords) — see CLICK semantics.
+- ACTION7 = UNDO. Restores the state saved before the previous move (player
+  position AND any block removals are reverted one step). Undo itself counts as
+  an action against the move budget. Repeated ACTION7 walks back multiple steps.
+- (ACTION1 up, ACTION2 down, ACTION5 exist in the code but are NOT in the
+  available-actions set, so they are never selectable and do nothing if sent.)
+
+CLICK semantics (ACTION6, the `click_X_Y` CLI form -> ACTION6 x=X y=Y)
+- Coordinate convention: X = screen COLUMN pixel, Y = screen ROW pixel, both in
+  0..63 of the rendered frame. The engine converts a click to a world cell with
+    world_gx = X // 6
+    world_gy = (Y + camera_y) // 6
+  i.e. you must account for the current vertical camera scroll. For a target
+  world cell (gx,gy), a click at screen (X = gx*6 + 3, Y = gy*6 + 3 - camera_y)
+  lands on it. (camera_y is the current camera row offset; it changes as the
+  player falls.)
+- Clicking a GREEN qclfkhjnaac block DELETES that block. Then, if the deleted
+  block was the cell DIRECTLY BELOW the player in the gravity direction, the
+  player immediately falls (and may land on a gem -> win, or a spike -> lose).
+  If the deleted block was NOT directly under the player, it is simply removed
+  (opening a gap the player can later walk/fall into) and the player does not
+  move.
+- Clicking empty space, a wall, or the player does nothing (still counts as an
+  action toward the move budget).
+
+CLICKABLE TYPES (full set across the 9 levels; only green appears in lvls 1-2)
+- green  (qclfkhjnaac)  : delete the block.
+- blue-8 (lrpkmzabbfa)  : FLIP GRAVITY (toggles fall direction) then resettle.
+- cyan-12 toggle pair (yuuqpmlxorv <-> oonshderxef): clicking swaps a block to
+  its counterpart (solid <-> passable marker), changing collision.
+- white-15 (etlsaqqtjvn) : SPAWN — fills empty orthogonal neighbors with new
+  blocks.
+
+AVAILABLE-ACTION TRANSITIONS
+- In level 1 the available set is constant: [ACTION3, ACTION4, ACTION6, ACTION7]
+  on every step (move left/right, click, undo). It does not change with state.
+
+LEVEL / GOAL STRUCTURE
+- 9 levels. Each level is its own vertical map with one player and one gem.
+- Level 1 (the map used by the trajectories below): player starts at world cell
+  (gx=3, gy=23) on a top ledge; the gem is at (gx=3, gy=7) in a bottom chamber.
+  The top floor (gy=22) has a single gap at gx=7. The bottom chamber (the gem's
+  room, gy=7..8, floored by wall at gy=6) is sealed above by wall except for a
+  3-wide span of GREEN blocks at gy=9, gx=5,6,7 — so the ONLY way into the gem
+  room is to remove one of those green blocks and drop through. Reaching it
+  requires descending a green-block maze by deleting blocks.
+- Clearing a level: on WIN the game advances to the next level (`next_level`),
+  loads a fresh map, and RESETS the per-level move counter to 0. The episode
+  does not terminate on a single level win (more levels remain); the win shows
+  up as a +0.1 reward and a brand-new level layout in the next observation.
+
+WIN / LOSE / SCORE / REWARD
+- WIN a level: move into the gem cell, or fall and land on the gem. Grants a
+  small reward (observed reward = +0.1 on the transition) and advances to the
+  next level. Winning all 9 levels finishes the game.
+- LOSE a level: fall onto / land on a SPIKE; be caught by the crusher in early
+  levels; OR run out of the MOVE BUDGET. The budget is the bottom progress bar:
+  on levels 1-6 you lose at 64 actions; on later levels the cap is larger
+  (the bar wraps, ~128 on the mid block, up to ~192 on the final level).
+- Score/reward is otherwise 0 per step; only level completion pays out.
+
+EMPIRICAL NOTES / CAVEATS
+- All movement and gravity are resolved instantly per action (no passive clock,
+  no noop needed). One action -> one settled observation.
+- Falls animate the camera; only the final settled frame is emitted, so a long
+  fall still produces exactly one observation.
+- Because clicks are specified in SCREEN pixels but resolve against a SCROLLING
+  camera, the same world block has different click coordinates at different
+  points in a trajectory. The exact click_X_Y strings used below were computed
+  from the live camera_y at each step.
+</content>

@@ -1,0 +1,129 @@
+ft09 (game_id ft09-0d8bbf25) — game mechanics
+
+OVERVIEW
+- A click-only constraint-satisfaction colouring puzzle ("clue" / mini-nonogram
+  style). Each level shows one or more 3x3 "clue" sprites surrounded by a lattice
+  of clickable colour tiles. Clicking a tile cycles its colour; a level is solved
+  when every clue's neighbour-colour constraints are simultaneously satisfied.
+- 6 levels total (win_levels = 6). Levels in order: THR, hxv, Fmh, oea, INW, DFx.
+
+GRID & LAYERS
+- Rendered observation is a single 64x64 grid layer (1 `<grid_N>` layer).
+- Internally each level is a 32x32 sprite grid viewed by Camera(0,0,16,16,4,4);
+  the camera renders it 2 display-pixels per sprite-grid-unit, so display = 2*grid.
+- Background fill is colour 5 (level 0) or colour 4 (later levels) / 4 padding.
+- Row 63 (bottom display row) is a HEALTH/BUDGET BAR rendered by a UI display:
+  a green (12) segment whose length = remaining_budget/max_budget of the row,
+  the rest orange/amber (11). It shrinks left-to-right as the budget is spent.
+
+PALETTE (16-color ARC indices; only a few used per level)
+- Tile/colour values come from each level's `cwU` palette list:
+    THR: [9, 8]        (9 = blue, 8 = red)
+    hxv: [9, 12]       (9 = blue, 12 = orange)
+    Fmh: [8, 12]       (red, orange)
+    oea: [9, 8, 12]    (THREE colours — cycles through all three)
+    INW: [14, 15]
+    DFx: [11, 14]
+- Clickable tiles start at palette[0]. A click advances the tile to the NEXT
+  colour in the palette, wrapping around (e.g. THR: 9->8->9->8...; oea:
+  9->8->12->9...). So with a 2-colour palette a click is a toggle; with a
+  3-colour palette it is a 3-way cycle.
+
+OBJECTS / SPRITES
+- TILE (tag "Hkx"): a 3x3 solid block, all pixels palette[0] at reset. This is
+  the player-clickable colour cell. Its colour = pixels[1][1] (the whole block is
+  one colour). Many per level, laid out on a 4-grid-unit lattice (tiles are 4
+  grid-units = 8 display-px apart).
+- SPECIAL TILE (tag "NTi"): a 3x3 tile with a coloured centre (10) and some
+  pixels marked 6. Also clickable and also has a cyclable centre colour, BUT
+  clicking it cycles not just itself — it cycles the colour of every neighbour
+  in the direction(s) where its sprite has a 6 pixel (a directional/area effect).
+  Appears only from level INW (index 4) onward.
+- CLUE (tag "bsT"): a 3x3 sprite that is NOT clickable (clicking it does nothing).
+  Its CENTRE pixel pixels[1][1] is the clue's TARGET colour. Its 8 BORDER pixels
+  encode, for each of the 8 orthogonal/diagonal neighbour tiles, a constraint:
+    border == 0  -> that neighbour tile must EQUAL the clue's target colour
+    border != 0  -> that neighbour tile must DIFFER from the clue's target colour
+                    (the non-zero values 2 and 3 are just wall-render colours;
+                     only zero vs non-zero matters)
+  A neighbour cell with no tile present imposes no constraint.
+- DECORATION: each level also contains non-interactive reference/legend sprites
+  (e.g. TOK/wCl/vxk 11x11 patterns and small plain 3x3 blocks) drawn in the
+  other quadrants, plus a small status sprite in the top-right corner. These are
+  collidable=False or untagged and ignore clicks.
+- FRAME (tag "Ycb", level 0 only): the dark bordered square (UEq) drawn around
+  the active puzzle cluster; purely cosmetic (also used for the click-flash, see
+  ACTIONS).
+
+ACTIONS / AVAILABLE-ACTION TRANSITIONS
+- Only ACTION6 (click) is ever available — at reset and in every state
+  avail = ['ACTION6']. There are no movement/rotate/select keys.
+- ACTION0 (noop), if ever issued, just completes the step with no effect.
+
+CLICK (ACTION6) SEMANTICS
+- Coordinate convention: CLI `click_X_Y` -> ACTION6 with x=X (display COLUMN),
+  y=Y (display ROW). The engine maps display->sprite-grid (grid = display // 2).
+- To click the tile whose sprite top-left sits at sprite-grid (col,row), aim at
+  display x = 2*col + 2, y = 2*row + 2 (the tile centre). Empirically a click
+  anywhere on the tile's 3x3 footprint (display 2*col .. 2*col+5) hits it.
+- Resolution order on a click:
+  1. If the clicked cell holds an "Hkx" tile (or, failing that, an "NTi" tile),
+     that tile is selected and its colour-cycle effect fires:
+       - plain Hkx: only its own centre colour advances one palette step.
+       - NTi: the centre colours of the neighbours marked by its 6-pixels each
+         advance one palette step (area effect).
+  2. Else if the cell holds a "bsT" clue: no-op (nothing changes).
+  3. Else (empty cell) AND level_index == 0: a 4-step cosmetic flash of the level-0
+     frame plays out (the frame border blinks) and the click otherwise does
+     nothing. (Avoid clicking empty cells on level 0 to keep trajectories clean;
+     the clean train/test sequences here only ever click real tiles or the clue.)
+  4. Else (empty cell, later levels): no-op.
+- After any non-flash click the engine re-checks the win condition (all clues
+  satisfied -> advance level) and decrements the move budget.
+
+LEVEL 0 (THR) CONCRETE LAYOUT  (the only one fully exercised here)
+- Active cluster = the dark-framed 3x3 in the BOTTOM-RIGHT of the frame. 8 blue
+  Hkx tiles around a central clue `wmW`. Tile sprite-grid positions (col,row):
+      TL(18,18)  T(22,18)  TR(26,18)
+      L (18,22)  [clue 22,22]  R(26,22)
+      BL(18,26)  B(22,26)  BR(26,26)
+  Display click centres (x=2col+2, y=2row+2):
+      TL 38,38   T 46,38   TR 54,38
+      L  38,46   clue 46,46   R 54,46
+      BL 38,54   B 46,54   BR 54,54
+- Clue wmW: centre colour 8 (red); border = [[0,2,2],[0,8,0],[0,2,2]].
+  => TL,L,R,BL must be RED(8); T,TR,B,BR must DIFFER (stay BLUE(9)).
+  All tiles start blue, so the solution is exactly: toggle TL,L,R,BL to red
+  (4 clicks, in any order). Doing so advances to level 1 (reward +0.1).
+- The other three 3x3 grids visible at reset (top-left, top-right, bottom-left)
+  are non-interactive decoration/legend.
+
+LEVEL 1 (hxv) — used to demonstrate a multi-clue level
+- Palette [9,12] (blue/orange). TWO clues: jGI@(14,11) and EQX@(14,19), both
+  target orange(12). 13 blue tiles. Solution = toggle these 7 tiles to orange
+  (sprite-grid col,row -> display): (10,7)->22,16  (10,11)->22,24
+  (18,11)->38,24  (10,15)->22,32  (18,15)->38,32  (10,23)->22,48  (14,23)->30,48.
+  The remaining 6 tiles stay blue. Solving advances to level 2 (reward +0.1).
+
+WIN / LEVEL-TRANSITION / SCORE / REWARD
+- After every click the engine runs cgj(): for every clue (bsT) it checks all of
+  its border constraints against the current neighbour tile colours. If ALL clues
+  in the level are satisfied, it calls next_level().
+- Advancing a level yields reward +0.1 (1/10 per level; 6 levels). reward is 0.0
+  on all non-solving clicks. term stays False on intra-game level advances; the
+  episode terminates only after the final (6th) level is cleared.
+- LOSE: each non-flash click spends one unit of the per-level move budget
+  (`kCv`: THR 32, hxv 32, Fmh 96, oea 96, INW 128, DFx 128). If the budget hits
+  zero before the level is solved, the game calls lose() (game over). The budget
+  resets on each new level. The clean trajectories here solve well within budget.
+
+CAVEATS / NOTES
+- Coordinate order is display (x=col, y=row); internal sprite-grid = display//2.
+  Tiles sit on a 4-grid-unit (8-px) lattice, so adjacent tiles' click centres are
+  8 display-px apart.
+- A solving click and its predecessors all render as single settled layers; there
+  is no passive clock — state only changes on a click.
+- NTi area-effect tiles and 3-colour cycling exist (levels oea/INW onward) but are
+  not reached by these two trajectories, which focus on levels 0–1.
+</content>
+</invoke>

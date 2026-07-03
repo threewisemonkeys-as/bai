@@ -1,0 +1,120 @@
+dc22 (dc22-fdcac232) — game mechanics
+
+OVERVIEW
+- A 6-level "phase-shift maze". You steer a small avatar across a floor made of
+  colored tiles to a goal cell. Tiles come in colored GROUPS; clicking a
+  colored button toggles every tile in that group between two shapes/states
+  (wall<->floor, or one floor-shape<->another). The puzzle is to retoggle the
+  groups so a continuous floor path opens from the avatar to the goal before the
+  per-level step budget runs out. Reaching the goal completes the level and
+  advances to the next; clearing all 6 wins the game.
+
+GRID & LAYERS
+- One 64x64 grid layer is emitted per step (the engine renders the level into a
+  64x64 camera frame). The playable level is smaller (level 0 is 64x44) and is
+  letter-boxed/centered inside the 64x64 frame: a top/bottom band of PADDING
+  (color 3) and a vertical play area. For level 0 the level->frame offset is
+  +10 in y, 0 in x (i.e. a level cell (lx,ly) appears at frame (lx, ly+10)).
+- The frame is split visually: the LEFT region (background color 4) is the maze;
+  the RIGHT region (background color 5, appears black) is a control panel that
+  holds the clickable BUTTONS. A dashed/checkered vertical divider separates them.
+- Coordinates below are in LEVEL space (the engine's sprite x,y). x = column
+  (grows right), y = row (grows down). Click coordinates are in FRAME space (see
+  CLICK).
+
+PALETTE / OBJECTS (level 0)
+- Avatar "plflho1" (tag jfva): a 2x2 block, color 14 (renders as a green square,
+  sometimes shown framed by a gray house tile). Starts at (10,30). This is the
+  thing you move. Its top-left corner is its reported (x,y).
+- Goal "goknoi" (tag goknoi): a 2x2 block, color 11 (blue). At (24,10).
+- Floor tiles ("...plelvb" sprites, tag tovemc): the walkable surface. They are
+  INTANGIBLE (you may stand on them) and grouped by a one-letter color tag:
+    group "a" — the big "refgps-plelvb" tile (10x10, colors 8/13, red+yellow),
+                at (12,14). Toggled by the RED button.
+    group "b" — the "tovemc-plelvb" tiles (4x4, color 9, blue): one at (8,24),
+                one at (18,10). Toggled by the BLUE button.
+  Plain tiles "tacugo-plelvb" (4x4, color 2 red) at (8,20) and "merged-sprite-2"
+  (6x6, color 2) at (8,28) and (22,8) are ungrouped, always-floor.
+- Buttons "buezna-*" (tag buezna, sys_click): on the right panel. The RED button
+  "buezna-refgps" (color 8, tag a) at (42,7); the BLUE button "buezna-blrmbx"
+  (color 9, tag b) at (42,24). They render as 5x13 "hat" shapes. Clicking one
+  toggles its color group's tiles.
+- Background color 4 (left) and color 5 (right) are NOT floor; the avatar cannot
+  stand on them.
+
+PLAYER ACTIONS (avatar movement)
+- ACTION1 = move UP    (dy = -2)
+- ACTION2 = move DOWN  (dy = +2)
+- ACTION3 = move LEFT  (dx = -2)
+- ACTION4 = move RIGHT (dx = +2)
+  Each move shifts the avatar by exactly 2 pixels (NOT one full tile). Because
+  the start is on even coordinates, the avatar is locked to an even (x,y) lattice
+  for the whole level — odd-aligned floor cells are unreachable.
+- A move SUCCEEDS only if (a) the destination does not collide with a TANGIBLE
+  collidable sprite (a "wall") AND (b) the avatar's new top-left corner lands on
+  a floor pixel (some INTANGIBLE tile). Otherwise the avatar is reverted to its
+  previous position (the action is consumed but the avatar does not move).
+- ACTION5 exists in code but is never offered (not in the available set).
+
+CLICK (ACTION6) — toggling a color group
+- ACTION6 carries x,y in FRAME coordinates. Convention: click_X_Y on the CLI ->
+  ACTION6 x=X y=Y, with x=COLUMN, y=ROW. For level 0 the RED button is hit by
+  any frame cell in x≈42..54, y≈17..21 (e.g. click_48_19); the BLUE button by
+  x≈42..54, y≈34..38 (e.g. click_48_36). Clicking anywhere on a button's body
+  works (it is 13 wide), so click locations can vary.
+- Effect: every tile in the clicked button's color group is swapped to its OTHER
+  variant in place. Concretely:
+    BLUE button (group b): the tile at (8,24) flips wall<->floor, and the tile
+      at (18,10) flips between a sparse CHECKERBOARD shape and a SOLID 4x4 shape.
+    RED button (group a): the big refgps tile flips between a HORIZONTAL BAND
+      (occupying the row band y20..23, cols ~8..21) and a VERTICAL STRIP
+      (occupying cols ~18..21, y14..23). This is the "phase-shift platform".
+  A click costs 2 steps from the budget (a move costs 1).
+- After a click, if the avatar is left standing on a cell that is no longer floor
+  in the new state, a CRUSH animation fires (the avatar dissolves to background)
+  — see WIN/LOSE. So you may only toggle a group while the avatar's own cell is
+  floor in BOTH states of that group.
+- ACTION6 also drives, in later levels, button-cells that select/cycle other
+  objects (sys_click "up/dowlja/lersnf/riidpd/grawwq" arrow pads that move a
+  crane "crzsjq", and "tewfut" color-cycling tiles with a "piyqze" teleport that
+  warps the avatar between matching tiles). None of these appear in level 0.
+
+AVAILABLE-ACTION TRANSITIONS
+- The available set is constant: [ACTION1, ACTION2, ACTION3, ACTION4, ACTION6]
+  at every step (verified across level 0 and into level 1). Unavailable actions
+  are never emitted; emitting an out-of-set action would no-op.
+
+LEVEL / GOAL STRUCTURE
+- 6 levels (win_levels = 6). Each level supplies its own maze and a per-level
+  step budget "StepCounter": L0=128, L1=192, L2=192, L3=192, L4=512, L5=1024.
+- Level 0 (used for this clean data) is forced: the avatar starts boxed in the
+  bottom floor pocket, separated from the upper maze by a BLUE wall at (8,24).
+  Solution shape: (1) click BLUE to open that wall; (2) climb the left column to
+  the y20 band; (3) walk right along the band; (4) click RED to phase-shift the
+  refgps tile into the vertical strip; (5) climb the strip up to y14; (6) click
+  BLUE again to make the (18,10) tile SOLID, bridging the strip to the goal
+  platform; (7) walk up onto, then right across, the platform to the goal.
+
+WIN / LOSE / SCORE / REWARD
+- WIN a level when the avatar's (x,y) exactly equals the goal's (x,y). This emits
+  reward +0.1 and advances to the next level (the avatar/goal/budget reset to the
+  new level's layout; the episode does NOT terminate on a per-level win, term
+  stays False). Clearing level 5 ends the game.
+- LOSE / step budget: nearly every action decrements the budget (move -1,
+  click -2; a no-op-but-consumed move still spends the step). When the budget
+  hits 0 the episode terminates as a loss.
+- CRUSH: if a move/toggle leaves the avatar off-floor, a ~14-frame crush
+  animation plays; it then UNDOES back to the last good state at a cost of ~20
+  steps (or terminates as a loss if fewer than ~20 steps remain). It is a
+  recoverable penalty, not an instant game-over, except near the budget end.
+
+NOTES / CAVEATS
+- Sprite names are obfuscated in the source; the readable invariants are the
+  tags: jfva=avatar, goknoi=goal, buezna=button, tovemc=floor tile, single-char
+  tags (a,b,...) = color group, omvz on a tile => it is INTANGIBLE (walkable).
+- The 2-pixel/even-lattice movement is the key subtlety: a topologically present
+  floor path can still be impassable if its connecting cells are odd-aligned, so
+  the intended route threads only even cells (and uses the SOLID variant of the
+  (18,10) tile, whose even cells bridge the strip to the goal platform).
+- "sprite-12" (tag aybe) decorations are teleported far off-grid (x=500) on the
+  first click; harmless.

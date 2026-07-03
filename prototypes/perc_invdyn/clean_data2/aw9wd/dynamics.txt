@@ -1,0 +1,77 @@
+AW9WD — Cracking eggshell / liquid-fall dynamics
+
+GRID
+- 16 x 16 grid. Positions are (x, y); y grows downward, so row 15 is the bottom.
+
+OBJECTS
+- Eggshell: "tan" colored cell, has a boolean field `broken` (starts false).
+  37 eggshells are placed at init, arranged as an egg/oval shape occupying
+  roughly rows 9-15 (e.g. (7,15),(8,15),(9,15) up through (7,9),(8,9),(9,9)).
+  Together they form a solid tan egg.
+- Feather: a cell with a boolean `hidden` (all start true) and a color (mix of
+  "orange" and "yellow"). Exactly 18 feathers are placed at init underneath the
+  egg, forming a chick shape (rows 10-15). Every feather sits at a position that
+  also has an eggshell, so at init each feather is occluded by the tan eggshell
+  rendered on top of it (eggshells are declared after feathers, so they draw
+  over them). Feathers ARE visible objects rendered in their own color — they
+  show up as orange/yellow cells as soon as the eggshell covering them is gone.
+  They never move. The `hidden` field is never toggled by any rule and has no
+  effect on rendering: rendering is purely occlusion (top object wins), so a
+  feather appears the moment the eggshell at its cell is removed, even though
+  `hidden` is still true.
+
+PLAYER ACTIONS
+- click: the ONLY meaningful action. Clicking on an eggshell cell sets that
+  eggshell's `broken` field to true. Click LOCATION matters — only the
+  eggshell at the clicked cell is affected (clicked eggshell -> broken=true).
+  Clicking empty space or a feather does nothing.
+- left, right, up, down: NO-OPS. There are no movement handlers for any
+  arrow/direction action; nothing in the program responds to them.
+- noop: nothing happens.
+
+PASSIVE / CLOCK DYNAMICS (every step, via nextEggshells -> nextLiquid)
+- feathers are static: feathers(next) = feathers(prev). They never change.
+- eggshells each step are split into:
+    * unbroken eggshells (broken=false): stay exactly in place.
+    * broken eggshells (broken=true): they "fall" like a liquid via nextLiquid:
+        - if it is not on the bottom row and the cell directly below is free,
+          the eggshell moves down one cell.
+        - otherwise it takes one step toward the nearest reachable "hole" — a
+          free cell in the row below whose cell above is also free (liquid
+          spreading sideways/diagonally); if no hole is reachable, it stays.
+  Occupied cells (unbroken eggshells, other broken eggshells) block the fall, so
+  a broken eggshell drains downward/sideways and piles up at the bottom of the
+  grid, settling on the floor (row 15) or on top of other already-settled
+  eggshells. NOTE: broken eggshells do NOT come to rest on feather cells — they
+  are despawned the step they overlap a feather (see SPAWN/DESPAWN).
+
+SPAWN / DESPAWN
+- No spawning. Feathers are fixed and never removed. Eggshells: unbroken ones
+  stay put; broken ones relocate (fall) AND can be despawned.
+- DESPAWN of eggshells (this is the key mechanic): in nextEggshells the broken
+  eggshells are first filtered by `(! (intersects es feathers))`, i.e. any
+  broken eggshell occupying a feather cell is dropped before nextLiquid runs.
+  This happens in two ways:
+    * Clicking an eggshell that sits directly on a feather (all 18 feather
+      cells have an eggshell on top at init): it breaks, then is removed next
+      step, immediately uncovering that feather.
+    * A broken eggshell that drains down/sideways onto a feather cell: it is
+      removed the step it lands there.
+  Either way the eggshell vanishes and the feather underneath becomes visible.
+
+COLOR CHANGES
+- None. Eggshells stay "tan"; feathers keep their fixed colors. Breaking an
+  eggshell changes its `broken` flag and its behavior (it starts falling) but
+  not its rendered color.
+
+COLLISIONS / INTERACTIONS
+- Falling broken eggshells collide with grid bounds, the floor, and other
+  eggshells (occupied cells block the liquid free-cell checks). Feathers are NOT
+  a resting surface: an eggshell reaching a feather cell is despawned, not
+  stacked. Eggshell-vs-feather (despawn/uncover) and eggshell-vs-eggshell
+  (liquid blocking) are the only object-object interactions.
+
+WIN / TERMINATION / REWARD
+- None. There is no goal, win condition, termination rule, or reward defined.
+  The game is purely a sandbox: click to break the tan egg shell and watch the
+  broken pieces drain away, gradually uncovering the chick-shaped region below.

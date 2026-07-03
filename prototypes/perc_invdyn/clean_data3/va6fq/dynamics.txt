@@ -1,0 +1,48 @@
+VA6FQ — Falling-sand / liquid cellular automaton
+
+GRID
+- 10 x 10 grid (GRID_SIZE = 10). Coordinates are (x, y); y increases downward.
+
+OBJECTS
+- Button (1x1 cell): two fixed buttons used as a "brush selector". (Position is (x, y) = (col, row) in the rendered grid.)
+  - sandButton:  color "red",   at Position (2, 0)  -> observation row 0, col 2. Persistent (never moves/despawns/changes color).
+  - waterButton: color "green", at Position (7, 0)  -> observation row 0, col 7. Persistent.
+- Sand (1x1 cell): has a Bool field `liquid`.
+  - Color "tan" when liquid=false (solid sand), "sandybrown" when liquid=true (wet/flowing sand).
+  - Initial layout: a block of solid sand cells. Rows y=9,8,7 are full across x=2..7; rows y=6,5 have sand only at x=2,4,5,7 (gaps at x=3,6). All start liquid=false.
+- Water (1x1 cell): color "skyblue". No instances at start (water list begins empty).
+
+CLICK-TYPE / BRUSH STATE
+- clickType is a string, initialized to "sand".
+- Clicking sandButton sets clickType = "sand". Clicking waterButton sets clickType = "water".
+- clickType selects what a free-space click paints.
+
+PLAYER ACTIONS
+- left, right, up, down: no handlers exist in the SEXP -> these are no-ops (no rules fire on directional input).
+- noop: no-op.
+- click: LOCATION matters.
+  - If the click lands on sandButton or waterButton -> sets the brush (clickType) as above.
+  - If the click is on a free (empty) cell (isFreePos): spawns one new object AT the clicked cell:
+      clickType == "sand"  -> add a Sand(liquid=false) at the clicked position.
+      clickType == "water" -> add a Water at the clicked position.
+  - A click on an occupied non-button cell does nothing (not free, not a button).
+
+PASSIVE / CLOCK DYNAMICS (on true, every step)
+- Every Sand cell checks its 4-neighbors (up/down/left/right) for Water:
+    - If any orthogonally adjacent Water exists, that Sand becomes liquid=true (turns "sandybrown"). This wetting is permanent once set.
+- Movement each step (falling-sand physics via nextLiquid / nextSolid):
+    - Solid (dry) sand uses nextSolid (= moveDownNoCollision): it moves straight DOWN by exactly one cell when the cell directly below is in-bounds and empty, otherwise it stays put. It NEVER moves diagonally or sideways, so dropped grains stack straight up into vertical columns rather than spreading into a triangular pile.
+    - Liquid (wet) sand AND water use nextLiquid: move straight down if the cell below is empty; otherwise look at the row directly below and, if there is a reachable "hole" (an empty cell whose own cell above is also empty), move one step DIAGONALLY down toward the nearest such hole. If neither down nor a diagonal-down hole is available, it stays put. (So liquids do NOT crawl sideways across a flat, fully-supported surface — they only slip down-and-over into gaps.)
+- Water updates every step via its own nextLiquid rule (always flowing/falling). Sand updates every step via the (on true) rule above (wet-check, then move). Water flows over/around the solid sand surface; each step any dry sand orthogonally adjacent to water turns liquid, and as that wet sand then flows away it opens holes the water descends into, so introduced water gradually spreads "wetness" deeper through the pile.
+
+COLOR CHANGES
+- Sand: "tan" -> "sandybrown" the step after becoming adjacent to water (liquid flag flips true).
+- Buttons keep fixed colors (red / green); Water always "skyblue".
+
+COLLISIONS / INTERACTIONS
+- Movement is collision-aware (moveDownNoCollision / nextLiquid check isFreePos and in-bounds): nothing moves into an occupied or out-of-bounds cell, so cells stack on the floor (bottom row, y=9) and on top of other cells.
+- Solid sand only stacks straight down; liquids (water + wet sand) additionally slip one step diagonally-down into the nearest open hole in the row below.
+- The only object-object interaction effect is water wetting orthogonally-adjacent sand (solid tan -> liquid sandybrown). Wet sand does NOT itself wet further sand; wetness propagates only via actual Water cells.
+
+WIN / TERMINATION / REWARD
+- No win condition, goal, score, or termination rule is defined in the SEXP. The game is an open-ended sandbox: paint sand/water and watch the cellular-automaton physics evolve.

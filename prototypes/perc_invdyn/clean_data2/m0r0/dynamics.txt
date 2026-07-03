@@ -1,0 +1,109 @@
+m0r0 (game_id m0r0-492f87ba) — game mechanics
+
+OVERVIEW
+- A "mirror maze" puzzle. The level holds a horizontally-mirrored PAIR of
+  cursors. The four direction actions move both cursors at once, but the second
+  cursor's LEFT/RIGHT is mirrored. Steer the pair through the maze until both
+  cursors land on the SAME cell; they merge and the level is solved. Solving all
+  6 levels wins the game.
+
+GRID & RENDER
+- The agent observation is a single 64x64, 16-color grid (one <grid_..> layer).
+- The logical play area is a small grid that is centered and scaled up to fill
+  64x64. grid_size is per level: L1=(11,11), L2=(13,13), L3=(13,13), L4=(11,11),
+  L5=(15,15), L6=(13,13). scale = 64 // grid_w; x_offset = (64 - grid_w*scale)//2
+  (e.g. L1: scale 5, offset 4). So a logical cell (gx,gy) occupies the display
+  block rows [gy*scale+y_off .. +scale), cols [gx*scale+x_off .. +scale).
+- Coordinates here are (X=col, Y=row), X right, Y down (logical grid coords).
+- Background split: every cell that the engine leaves at color 0 is repainted
+  with the level's two "psqw" colors — left half = psqw[0], right half = psqw[1]
+  (a vertical 2-color split; e.g. L1 yellow/orange = [11,12], L2 pink/purple =
+  [6,15]). (A 4-quadrant split exists in code but only triggers when all four
+  cursor sprites are present, which never happens in these 6 levels.)
+
+WHAT YOU SEE (palette)
+- Maze WALLS render in the two solid split colors (the bright yellow/orange on
+  L1, pink/purple on L2 ...). They fill the drawn cells of the level's "wahtyt"
+  maze sprite.
+- Open CORRIDORS / background render dark (color 5).
+- CURSORS render as small cyan (color 10) squares — the objects you control.
+- HAZARD tiles ("spswjz") render as a red/orange checkerboard (color 8).
+- GATES ("gayktr") are 3-tall colored bars (colors 14/12/15); their matching
+  BUTTONS ("unobxw") are single cells of the same color.
+- Movable BLOCKERS ("mosdlc") render as a hollow square outline (color 9).
+
+OBJECTS
+- Cursors (sprite family "pikgci"): every level uses exactly TWO — a normal one
+  ("toljda-leklkn") and a horizontally-mirrored one ("toljda-rivmdg"). They are
+  a left/right mirror pair. (Vertical-mirror "boweok" variants exist in code but
+  are unused by these levels.)
+- Maze ("wahtyt-LevelN"): static walls; cursors cannot enter a wall cell.
+- mosdlc: movable obstacle that also blocks cursors; selectable via click (see
+  CLICK). Present in L3, L4, L6.
+- spswjz: hazard tiles. Present in L2, L4, L6.
+- gayktr / unobxw: colored gate / button pairs. Present in L5, L6.
+
+PLAYER ACTIONS (available_actions = [1,2,3,4,5,6], all six are offered in EVERY
+state — availability does NOT change here)
+Default mode (no mosdlc selected) — the four directions move BOTH cursors:
+- ACTION1 = UP    : leklkn (0,-1), rivmdg (0,-1)
+- ACTION2 = DOWN  : leklkn (0,+1), rivmdg (0,+1)
+- ACTION3 = LEFT  : leklkn (-1,0), rivmdg (+1,0)   <- mirrored on X
+- ACTION4 = RIGHT : leklkn (+1,0), rivmdg (-1,0)   <- mirrored on X
+  i.e. the two cursors share the SAME vertical motion but OPPOSITE horizontal
+  motion. UP/DOWN keep them in lockstep; LEFT/RIGHT move them toward or away
+  from each other (mirror axis = grid center column).
+- ACTION5 : no-op (no handler; state unchanged).
+- ACTION6 : click (carries x,y) — see CLICK.
+- Each cursor move is gated independently: a cursor that would move into a wall
+  (wahtyt), a mosdlc, or a closed/collidable gate (gayktr) stays put while the
+  other still moves (so a wall on one side breaks the mirror symmetry — this is
+  how you steer them to a common cell). Out-of-bounds is also blocked.
+
+MERGE / WIN-PER-LEVEL
+- After a move, if the two cursors occupy the SAME cell they are "collected"
+  (set intangible / removed from play). A direct cross-over of an adjacent pair
+  also merges them at the midpoint.
+- When NO live cursor remains, next_level() fires and a reward of +0.1 is
+  emitted (observed at the level-1 -> level-2 transition). Clearing level 6 wins
+  the whole game (win_levels = 6).
+
+CLICK semantics (ACTION6, only meaningful where mosdlc exist — L3/L4/L6)
+- CLI `click_X_Y` -> `ACTION6 x=X y=Y`, where X = display COLUMN, Y = display
+  ROW (display coords are mapped back to a logical cell via the scale/offset
+  above). To click logical cell (gx,gy) use a display point inside its block,
+  e.g. X = gx*scale + x_off + scale//2, Y = gy*scale + y_off + scale//2.
+- Clicking a mosdlc cell SELECTS/"picks up" that blocker: the game enters a
+  blocker-move mode (cursors are tinted color 1 and are frozen) in which the
+  four direction actions move the SELECTED mosdlc instead of the cursors.
+- Clicking anything that is not a mosdlc (empty cell, etc.) DESELECTS and
+  returns to the default cursor-control mode.
+- In the L1/L2 levels used for the train/test data there are no mosdlc, so a
+  click is a no-op there (left out of the trajectories to avoid padding).
+
+HAZARD (spswjz)
+- If a cursor lands on a spswjz tile, a brief flash animation plays and then ALL
+  cursors (and clickable sprites) are RESET to their level-start positions —
+  i.e. the level is reset. Avoid the red-checkerboard tiles.
+
+GATES / BUTTONS (gayktr / unobxw)
+- A gate (gayktr, 3-tall colored bar) blocks cursors while TANGIBLE. If a cursor
+  stands on the matching same-color button (unobxw), the gate of that color is
+  REMOVED (made passable); when no cursor is on the button the gate becomes
+  solid again. Colors pair by family: grwjuk(14)/orfrpe(12)/puvdux(15).
+
+TIME LIMIT / GAME OVER
+- 150 actions per level budget. The thin marker rows at the very top and bottom
+  of the 64x64 frame act as a shrinking progress bar (it tracks 150 - action
+  count). If the action count exceeds 150 the level is LOST.
+
+REWARD
+- 0.0 on ordinary steps; +0.1 when a level is completed (cursors merged ->
+  next_level). No negative reward observed for ordinary moves.
+
+LEVEL 1 (the level demonstrated by the train/test trajectories)
+- grid 11x11, maze = "wahtyt-Level6" rotated 180. psqw = [11,12] (yellow/orange).
+- Two cursors start at (X=3,Y=9) (leklkn) and (X=7,Y=9) (rivmdg), mirror-
+  symmetric about column 5. The ONLY corridor cell on the center column that is
+  open is (5,1) at the top, so the pair must be driven up to (5,1), where they
+  coincide and merge. UP/DOWN move both together; LEFT/RIGHT close/open the gap.

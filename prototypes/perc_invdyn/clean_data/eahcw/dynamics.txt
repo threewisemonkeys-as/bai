@@ -1,0 +1,45 @@
+EAHCW — game dynamics
+
+Grid: 16 x 16.
+
+Objects:
+- Particle: a single colored cell (Cell 0 0 color). Each particle is placed at an
+  arbitrary grid position when created. Its color is a string set at creation time.
+  There are no particles at the start (the particle list begins empty).
+
+State variables:
+- particles: list of Particle objects, initially empty. Grows only by clicking.
+- currColor: current "paint" color, initially "red".
+- active_arrow: which arrow direction is currently armed, initially "none".
+
+Player actions:
+- click: spawns a new Particle at the clicked grid cell. CLICK LOCATION MATTERS —
+  the particle appears at (click.x, click.y). The particle's color depends on
+  active_arrow: if active_arrow == "none" the particle is "red", otherwise it is
+  the current value of currColor.
+- up:    sets currColor = "gold",   active_arrow = "up".
+- down:  sets currColor = "purple", active_arrow = "down".
+- left:  sets currColor = "green",  active_arrow = "left".
+- right: sets currColor = "blue",   active_arrow = "right".
+- Opposite-arrow cancel: pressing the OPPOSITE of the currently active arrow
+  resets active_arrow = "none" and currColor = "red" (down cancels up, up cancels
+  down, left cancels right, right cancels left). The opposite-press handler runs in
+  addition to the normal direction handler, so net effect is a reset to none/red.
+- noop: no handler; does nothing.
+
+Color logic summary:
+- Each direction key arms its arrow and selects that direction's paint color.
+- Pressing a direction's opposite un-arms it back to none/red.
+- Clicked particles take currColor (or red when no arrow is armed).
+
+Passive / clock dynamics: none. There is no `on true` rule. Nothing moves, falls,
+spawns automatically, or changes over time. State only changes in response to
+player input.
+
+Spawning: only via click. Despawning: never — particles persist once created.
+
+Collisions / interactions: none. Particles do not interact with each other or move.
+
+Win / termination / reward: none defined in the SEXP. There is no goal, score, or
+terminal condition; the program is a free-form paint canvas where color is chosen
+by arrow keys and dabbed onto the grid by clicking.

@@ -1,0 +1,55 @@
+DGG2C — Game Dynamics
+
+GRID
+- 17 x 17 cell grid (GRID_SIZE = 17).
+
+OBJECTS
+- Cloud: a static band of gray cells. The SEXP builds it from the rectangle
+  (Position 0 0)..(Position 17 2), which renders as the top TWO rows only —
+  rows y=0 and y=1, spanning all 17 columns (x=0..16). Row y=2 is NOT gray
+  (it is the empty/black row where water spawns). The cloud is created once at
+  init and never moves or changes ("gray").
+- Water: lightblue cells. The water list starts empty at init. Water cells are
+  spawned periodically (see SPAWNING) and fall under gravity (see CLOCK).
+
+STATE VARIABLES
+- wind: integer, starts at 0. Clamped to the range [-1, 1].
+- time: integer, starts at 0, increments by 1 every step (on true).
+
+PLAYER ACTIONS
+- left:  decreases wind by 1, but not below -1 (wind = max(wind-1, -1)).
+- right: increases wind by 1, but not above 1 (wind = min(wind+1, 1)).
+- up:    no handler — no-op.
+- down:  no handler — no-op.
+- click: no handler — no-op. Click LOCATION is irrelevant (no click rule).
+- noop:  no effect.
+
+CLOCK / PASSIVE DYNAMICS (per step)
+- Gravity + wind drift on every step, driven by current wind value:
+  - wind == 0:  every water cell moves down one row.
+  - wind == 1:  every water cell moves down and right one cell (diagonal).
+  - wind == -1: every water cell moves down and left one cell (diagonal).
+- Water that moves outside the grid bounds is removed (filtered by
+  isWithinBounds each step), so off-grid water despawns.
+
+SPAWNING
+- Whenever (time % 5) == 2 (i.e. periodically every 5 steps), four new water
+  cells are added at row y=2 at columns x = 2, 6, 10, 14.
+- This is the only spawn source; there is no despawn other than the
+  out-of-bounds filter above.
+
+COLOR CHANGES
+- None. Cloud is always gray; water is always lightblue. No thresholds or
+  color-change rules exist.
+
+COLLISIONS / INTERACTIONS
+- None. Water cells do not collide with the cloud, each other, or boundaries;
+  they simply fall and are removed when off-grid. The cloud is purely visual.
+
+WIN / TERMINATION / REWARD
+- None defined. There is no goal object, no win condition, no termination rule,
+  and no reward in the SEXP. The simulation runs indefinitely.
+
+SUMMARY
+- Water "rain" spawns from a fixed row every 5 steps and falls; the player's
+  only influence is steering the fall direction left/right/straight via wind.

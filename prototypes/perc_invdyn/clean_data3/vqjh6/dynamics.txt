@@ -1,0 +1,60 @@
+VQJH6 — Gravity / blob-sandbox game
+
+GRID
+- 17 x 17 cells.
+
+OBJECTS
+- Four single-cell "Button" objects, fixed in place at the midpoints of the grid edges.
+  Positions below are given as SEXP Position(x,y) and, in parentheses, as the
+  observation/click (row, col) location the agent actually sees and clicks:
+  - leftButton:  red,        Position(0, 8)   -> (row 8,  col 0)   left edge, middle row.
+  - rightButton: darkorange, Position(16, 8)  -> (row 8,  col 16)  right edge, middle row.
+  - upButton:    gold,       Position(8, 0)   -> (row 0,  col 8)   top edge, middle column.
+  - downButton:  green,      Position(8, 16)  -> (row 16, col 8)   bottom edge, middle column.
+- "Blob" objects: a 2x2 cluster of blue cells. SEXP relative offsets are (x,y) =
+  (0,-1),(0,0),(1,-1),(1,0). In (row, col) terms, a blob anchored at click (R, C)
+  occupies rows {R-1, R} x cols {C, C+1}.
+  Initially there are NO blobs (the blobs list starts empty).
+- gravity: a string state variable, initialized to "down". It persists each step.
+
+PLAYER ACTIONS
+- The action interface is purely click-based; there is no keyboard movement handler.
+- left / right / up / down arrow actions: NO handlers exist -> these are no-ops.
+- noop: no-op.
+- click: behavior depends on WHERE you click (location matters):
+  - Clicking on leftButton  -> sets gravity = "left".
+  - Clicking on rightButton -> sets gravity = "right".
+  - Clicking on upButton    -> sets gravity = "up".
+  - Clicking on downButton  -> sets gravity = "down".
+  - Clicking on any free (unoccupied) cell -> spawns a new Blob anchored at the clicked position.
+    The blob first appears on the NEXT observation, at its anchor cells (it does NOT move on
+    its spawn tick); from the following tick onward it moves with gravity like any other blob.
+  - Clicking on an occupied non-button cell -> no effect (spawn only fires on free cells).
+
+PASSIVE / CLOCK DYNAMICS (every step, via current gravity)
+- On each step, all existing blobs move one cell in the current gravity direction:
+  gravity "down" -> moveDown, "up" -> moveUp, "left" -> moveLeft, "right" -> moveRight.
+- Default gravity is "down", so absent any button click, blobs continuously fall downward.
+- Gravity does not auto-change; it only changes when a direction button is clicked, and the
+  new direction persists until another button is clicked.
+- ONE-TICK LAG on a gravity change: the tick on which you click a direction button, the
+  blobs still move according to the PREVIOUS gravity (the move and the gravity assignment are
+  evaluated from the same start-of-tick state). The new direction takes effect from the very
+  next tick. (Confirmed: clicking a button while blobs fall down -> they move down once more on
+  the click tick, then move in the new direction afterward.)
+
+SPAWN / DESPAWN
+- Blobs are spawned only by clicking a free cell (see above).
+- There is no despawn / removal rule; blobs are not deleted (they may move off-grid edges
+  per the interpreter's move semantics but no explicit removal occurs).
+
+COLOR CHANGES
+- None. Blobs stay blue; buttons keep their fixed colors.
+
+COLLISIONS / INTERACTIONS
+- No collision, stacking, or merging rules between blobs or with buttons.
+- Buttons are static and only react to clicks.
+
+WIN / TERMINATION / REWARD
+- None. There is no goal, win condition, score, or termination rule. This is an open-ended
+  sandbox: click buttons to change gravity, click empty cells to drop blobs.

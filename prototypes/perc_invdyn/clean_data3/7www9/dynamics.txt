@@ -1,0 +1,57 @@
+GAME: 7WWW9 (Autumn DSL) — magnet attraction/repulsion puzzle
+
+GRID
+- 16 x 16 cells (GRID_SIZE = 16). SEXP positions are (x, y); x increases right, y increases down.
+  (The rendered observation grid is indexed [row][col] = [y][x], so red appears at rows 7-8, col 7.)
+
+OBJECTS
+- A Magnet is a 2-cell object: it occupies two vertically adjacent cells.
+  - posPole = head cell of the magnet (the "positive" pole).
+  - negPole = tail cell of the magnet (the "negative" pole).
+  - Defined shape: (Cell 0 0 color) and (Cell 0 1 color), so the two cells are stacked vertically (pos above neg, neg one cell below pos).
+- fixedMagnet: color "red", initial Position (7,7). It is never moved by any rule — it stays put for the whole game.
+- mobileMagnet: color "blue", initial Position (4,7). This is the only object the player controls.
+
+PLAYER ACTIONS
+- left:  move mobileMagnet by (-1, 0) via moveNoCollision.
+- right: move mobileMagnet by (+1, 0) via moveNoCollision.
+- up:    move mobileMagnet by (0, -1) via moveNoCollision.
+- down:  move mobileMagnet by (0, +1) via moveNoCollision.
+  moveNoCollision shifts the magnet but will not let it overlap/pass through other objects
+  or leave the grid; a blocked move leaves it in place.
+- click: NO HANDLER. Clicking (at any location) does nothing; click location is irrelevant.
+- noop:  NO HANDLER. Does nothing (only passive/clock rules below apply).
+
+PASSIVE / CLOCK DYNAMICS (evaluated every step, on top of any move)
+The fixed magnet exerts magnetic forces on the mobile magnet based on pole geometry:
+- REPULSION (like poles too close): if the mobileMagnet posPole is orthogonally adjacent to the
+  fixedMagnet posPole (adjacentElem == true, i.e. Manhattan distance EXACTLY 1 — diagonals and
+  overlap do NOT count; the literal "1" argument in the SEXP is ignored by the stdlib def), the
+  whole step is cancelled and mobileMagnet reverts to its previous position. Same for negPole
+  orthogonally adjacent to fixedMagnet negPole. Effect: you cannot push a like pole into the
+  red magnet — any move that would land a like pole one cell (up/down/left/right) from its red
+  counterpart is fully undone. Observed e.g.: blue on red's rows (7-8) pressing toward red, or
+  blue one column off red pressing into red's row, both leave blue in place.
+- ATTRACTION (opposite poles aligned, opposite of repulsion): attractVectors = {(0,2),(2,0),(-2,0),(0,-2)}
+  (in (x,y)). deltaElem(a,b) = b.pos - a.pos (vector FROM a TO b).
+  - If deltaElem(mobile posPole, fixed negPole) is one of attractVectors, the mobile magnet is
+    automatically pulled one cell (unitVectorSinglePos of that delta = per-axis sign) toward red.
+  - If deltaElem(mobile negPole, fixed posPole) is one of attractVectors, same auto-pull.
+  This produces a "snap" toward red whenever an opposite pole lines up exactly 2 cells away along a
+  single cardinal axis. Because attraction is a passive rule on the same step as the move, a move
+  that ends 2-away triggers the pull immediately, so the magnet visibly travels 2 cells in one step
+  (1 from the move + 1 from the snap), or sideways onto red's axis (the move is 1 cell, the snap adds
+  the perpendicular cell). After snapping to the 1-cell gap it is stable (no further pull, and the
+  opposite-pole pair is not a repulsion pair, so it just rests one cell from red).
+
+SPAWN / DESPAWN / COLOR
+- No objects are spawned or removed during play (both magnets persist).
+- Colors are fixed (red fixed, blue mobile); no color-change rules exist.
+
+COLLISIONS / INTERACTIONS
+- The only interactions are the magnetic repulsion (move-cancel) and attraction (auto-pull) above,
+  plus moveNoCollision preventing overlap and out-of-bounds movement.
+
+WIN / TERMINATION / REWARD
+- The SEXP defines NO win condition, NO termination rule, and NO reward/score. The program only
+  specifies dynamics; there is no explicit goal state encoded in the game.

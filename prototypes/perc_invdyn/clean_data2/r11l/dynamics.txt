@@ -1,0 +1,103 @@
+r11l (game_id r11l-495a7899) — game mechanics
+
+OVERVIEW
+- A click-only "drag the colored objects onto their matching colored targets"
+  puzzle. The agent never moves a player avatar directly; instead it SELECTS a
+  small handle and then MOVES that handle by clicking an empty cell. Each color
+  group has several handles; the group's "anchor" sits at the CENTROID of its
+  handles. A level is solved when every color group's anchor overlaps its
+  same-colored target zone. Solving a level advances to the next one (+0.1
+  reward). There are 6 levels (win_levels=6).
+
+GRID & LAYERS
+- 64 x 64 grid, single rendered grid layer per observation (layers=1).
+- 16-color palette. Background/letterbox color index = 5 (renders near-black).
+- Coordinate convention (CLI -> engine): click_X_Y  ->  ACTION6 x=X y=Y, with
+  x = COLUMN, y = ROW (origin top-left, x grows right, y grows down). Verified
+  empirically: clicking x=39 y=20 lands on the Level-1 target at col~39,row~20.
+
+ONLY ACTION: ACTION6 (click). available_actions is ALWAYS exactly ['ACTION6']
+  at reset and in every state (it never changes). x,y are quantized to a 16x16
+  lattice of clickable points (multiples of 4 in 0..63) by the engine's action
+  set, but any in-grid click is mapped to a grid cell.
+
+OBJECTS / SPRITE FAMILIES (decoded from source)
+- wakneh-*      : WALLS (collidable border / obstacles). Render gray. A move is
+                  BLOCKED if the selected handle would collide with a wall.
+- roefwulewcui-*: HANDLES — the clickable, draggable pieces. One color group has
+                  2-3 handles. Each handle is color-remapped (0->3); the
+                  CURRENTLY SELECTED handle is highlighted (remap 3->0, renders
+                  bright white). Thin connector lines are drawn from the group
+                  anchor to each of its handles (a rendered UI overlay).
+- roefwu-*      : ANCHOR — one per color group. It is auto-repositioned to the
+                  CENTROID of that group's handles after every move. This is the
+                  object that must reach the goal (filled colored blob).
+- flkdtg-*      : GOAL / target zone for the same-suffix color group (dashed
+                  colored square outline). The anchor must overlap this.
+- defgjl-*      : DANGER terrain (large cyan/light-blue region, pixel value 10).
+                  If a group anchor finishes a move overlapping defgjl it counts
+                  as a hit; 5 hits -> lose() (see WIN/LOSE). Levels 1 has none;
+                  Level 2+ have it.
+- puukul-* / hawffu- / flkdtg-dirwzt / "whkxtx" groups : extra mechanics that
+  only appear from Level 4+ (paint pickups that recolor "whkxtx" anchors, and
+  "dirwzt" decoy groups that are EXCLUDED from the win check). Not exercised by
+  the train/test trajectories here (which stay within Levels 1-2).
+
+CLICK SEMANTICS (the single action, two outcomes)
+The ACTION6 handler converts the click to a grid cell (col,row), then:
+  1) SELECT — if the clicked cell lies inside the bounding box of any handle
+     (roefwulewcui-*), that handle becomes the selected handle (bright-white
+     highlight; previous selection reverts to its group color). The action then
+     completes; NOTHING moves. NOTE: because select is checked first, clicking a
+     cell that is occupied by a handle can NEVER move a handle there — it just
+     (re)selects that handle. To move onto/near a goal you must click an EMPTY
+     cell.
+  2) MOVE — else, if there is a selected handle, the handle is moved so that its
+     CENTER lands on the clicked cell (target = click minus handle half-size),
+     PROVIDED the new position does not collide with a wall (wakneh). If it would
+     hit a wall the click is rejected (no move). On a successful move the group's
+     anchor is recomputed to the new handle centroid (a brief blink/flash sprite
+     plays when an anchor snaps onto its goal).
+  3) Otherwise the action is a no-op.
+
+AUTO-SELECTION AT LEVEL START
+- On entering a level, all handles are collected and sorted by distance from the
+  origin (x^2+y^2); the closest handle is pre-selected automatically. (E.g. in
+  Level 1 the top-left handle starts selected/white.)
+
+ANCHOR = CENTROID RULE (key mechanic)
+- A group's anchor is always placed at the average center of that group's
+  handles. With 2 handles you bracket the goal (put one handle on each side so
+  their midpoint is the goal); with 3 handles the anchor is their centroid.
+- Consequence (verified): you generally CANNOT solve a 2-handle group by stacking
+  both handles on the goal cell, because the second click would land on the first
+  handle and merely re-select it. Place the two handles at two DISTINCT cells
+  whose midpoint is the goal.
+
+LEVELS
+- Level 1: one color group ("pumlzd"), 2 handles, 1 goal, no danger terrain.
+  Anchor must overlap the single dashed goal square (~col 39, row 20).
+- Level 2: two color groups ("orrqlj" orange anchor top-left -> goal bottom;
+  "pumlzd" purple anchor center-right -> goal upper-right) PLUS a large cyan
+  defgjl danger region through the middle. Both anchors must reach their goals.
+- Levels 3-6 add more groups, walls, danger terrain, paint pickups, and decoy
+  ("dirwzt") groups. Not covered here.
+
+WIN / LOSE / SCORE / REWARD
+- LEVEL SOLVED: after a move settles, if EVERY non-"dirwzt" group's anchor
+  collides with its same-color goal, the engine calls next_level(); reward +0.1
+  is delivered on that step and play continues on the next level (term stays
+  False until the final level). Empirically Level 1 -> Level 2 gives reward=0.1.
+- LOSE: the action budget is 60 (_max_actions). When _action_count reaches 60
+  the game calls lose() and ends. Also, if a group anchor ends a move overlapping
+  the danger terrain (defgjl) 5 times (yledlprvvkb counter), the game calls
+  lose().
+- No per-step reward other than the +0.1 level-completion bonus.
+
+CAVEATS
+- Moves are essentially instantaneous (interpolation length havofgepjpl=1); only
+  the settled frame is observed.
+- The bright-white piece in any frame is the currently-selected handle, not a
+  special object.
+- defgjl danger triggers a loss only on the 5th overlapping settle, so a single
+  stray move near the cyan region does not end the game.

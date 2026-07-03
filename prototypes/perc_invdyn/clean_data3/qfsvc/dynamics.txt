@@ -1,0 +1,47 @@
+QFSVC — Game Mechanics
+
+Grid: 16 x 16.
+
+Objects:
+- Agent: a single red cell. Starts at position (7, 9).
+- Coin: gold cells. Spawned at init across the rectangle from (3,2) to (13,5),
+  keeping only positions where both x and y are even (a sparse lattice of gold
+  coins in the upper-middle band of the grid).
+- Bullet: mediumpurple cells. None at start; created only by player action (see click).
+- numBullets: an integer ammo counter, starts at 0 (not directly rendered; tracked in state).
+
+Player actions:
+- left:  move the agent one cell left.
+- right: move the agent one cell right.
+- up:    move the agent one cell up.
+- down:  move the agent one cell down.
+- click: if ammo (numBullets) > 0, spend one ammo and spawn a new bullet at the
+  agent's current position. The CLICK LOCATION DOES NOT MATTER — the bullet always
+  appears at the agent's origin, regardless of where the click occurs.
+- noop: no handler; does nothing on its own (passive clock rules still apply).
+
+Passive / clock dynamics (on true, every step):
+- All existing bullets move up by one cell each step (automatic, continuous).
+
+Collisions / interactions:
+- When the agent intersects a coin: ammo (numBullets) increases by 1, and that
+  coin is removed from the grid. Collecting coins is the only way to gain ammo.
+  Landing on a coin does NOT harm the agent — the agent persists and simply gains
+  ammo while the coin disappears.
+
+Rendering note:
+- When a bullet occupies the same cell as the agent (the tick it is spawned, and
+  before it moves up), the bullet (mediumpurple) is drawn over the agent, so the
+  red agent cell is not visible that step. The agent is not destroyed; it
+  reappears once the bullet moves off its cell.
+
+Spawning / despawning:
+- Coins: spawned once at init; despawn (removed) when the agent collects them.
+- Bullets: spawned by click when ammo is available; they keep moving up each step.
+  There is no explicit despawn/cleanup rule for bullets (they travel up off the grid).
+
+Color changes: none. Objects keep their fixed colors (red/gold/mediumpurple).
+
+Win / termination / reward: none defined. The program has no goal, score, or
+termination condition. The core gameplay loop is: move onto coins to gain ammo,
+then click to fire upward-traveling bullets.

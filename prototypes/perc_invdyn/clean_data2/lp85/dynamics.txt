@@ -1,0 +1,107 @@
+lp85 (game_id lp85-305b61c3) — game mechanics
+
+OVERVIEW
+- A cyclic-shift ("rotating ring/track") sliding puzzle. The play area holds a
+  closed LOOP (or line) of colored tiles. Pressing an arrow BUTTON rotates every
+  tile one step along that loop (clockwise or counter-clockwise). The goal is to
+  rotate the loop so that the special GOAL tile(s) come to rest inside their
+  matching GOAL FRAME(s). Solving a level (all goal frames filled) advances to
+  the next level. Each level has a limited number of button presses (a step/move
+  budget); running out loses the game.
+- The game is CLICK-ONLY. The only available action in every state is ACTION6
+  (a click at x,y). avail is always exactly ['ACTION6'].
+
+GRID & RENDERING
+- The emitted observation is a single 64x64 grid layer (16-color palette).
+- The underlying camera is 16x16 logical cells; each logical cell is rendered as
+  a 4x4 block, so the visible grid is 64x64. Level layouts are larger than the
+  camera (level grid_size ranges from 32x19 up to 57x57) and get letter-boxed:
+  the top/bottom bands are PADDING_COLOR=3 (dark gray) and the playfield uses
+  BACKGROUND_COLOR=4.
+- Far-LEFT column (display col 0) is a vertical STEP-BUDGET bar: it is color 14
+  (green) when full and fills with color 5 as moves are spent. Display row ~1
+  holds the LEVEL-PROGRESS indicator: a row of small bars (one per level, 8
+  levels total) that fill in as levels are completed.
+- Internally sprite positions are stored at 3x scale (a logical track cell P maps
+  to sprite coordinate P*3); the camera then maps sprite coords to the display.
+
+OBJECTS / PALETTE (the meaningful sprites)
+- Movable TILES (each a 2x2 colored block): there are several recolored tile
+  types — color 1 (blue), 2 (purple-ish), 9, 10 (light blue), 15 (gray), etc.
+  These are decorative filler that ride the loop; their color is irrelevant to
+  winning. Only the GOAL tiles matter.
+- GOAL tile "goal" (sprite odkpvwbihk): a 2x2 block of color 11 (renders yellow).
+  This is the tile you must deliver into the yellow goal frame.
+- GOAL FRAME "bghvgbtwcb": a 4x4 hollow frame with the four corner pixels color
+  11 (yellow). A level is solved (w.r.t. this frame) when a "goal" tile sits in
+  the frame's interior (specifically at the frame's position +1,+1).
+- GOAL-O tile "goal-o" (sprite hfikqtizdo): a 2x2 block of color 12. Appears in
+  later levels.
+- GOAL-O FRAME "fdgmtkfrxl": a 4x4 hollow frame with corner pixels color 12;
+  solved when a "goal-o" tile occupies its interior. Appears in later levels.
+- BUTTONS: arrow-shaped sprites along the edges of a track. Two visual families:
+  color 8 (red, the "L" buttons) and color 14 (green, the "R" buttons). Each
+  button carries a tag "button_<NAME>_<DIR>" where NAME identifies which track it
+  drives (A, B, C, ... and also numeric names) and DIR is L or R.
+
+CLICK / ACTION6 SEMANTICS
+- Coordinate convention: the CLI form click_X_Y -> ACTION6 x=X y=Y, where x is the
+  display COLUMN and y is the display ROW (0..63). The engine maps the clicked
+  display pixel to a grid cell and looks up the sprite(s) there.
+- A click only does something if it lands on a BUTTON sprite (tag starting with
+  "button"). Clicking empty background, a tile, or a frame is a no-op (the action
+  completes but nothing moves and NO move-budget is spent).
+- Pressing a button reads its tag: NAME selects the track, DIR selects rotation
+  direction. R = "increment" (advance each tile to the next-higher slot in the
+  track's numbering, wrapping max->1). L = "decrement" (advance each tile to the
+  next-lower slot, wrapping 1->max). Concretely on Level 1 the red left button is
+  button_A_L (counter-clockwise) and the green right button is button_A_R
+  (clockwise) — they are exact inverses of each other.
+- The TRACK is defined per level+button as a 2D map numbering the loop cells
+  1..max in order around the path. A press moves every tile currently sitting on
+  a numbered cell to the cell numbered one step away (in the press's direction).
+  The whole loop therefore rotates by one position per press. Tracks can be a
+  closed rectangular ring (Level 1: a 20-cell ring) or a straight line of cells
+  (used in later levels), and a level can expose several independent tracks
+  (buttons B, C, ...), each rotating only the tiles on its own path.
+
+AVAILABLE-ACTION TRANSITIONS
+- avail is constant: always ['ACTION6']. Direction/track choice is encoded purely
+  by WHICH on-screen button you click, not by a changing action set. Only buttons
+  present in the current level can be pressed (other clicks no-op).
+
+LEVEL / GOAL STRUCTURE
+- 8 levels total (win_levels=8). Level 1 ("kdrsqrvpwb") is the simple teaching
+  level: a single 20-cell rectangular ring, ONE goal tile (yellow) and ONE yellow
+  goal frame, driven by a single track A with both a red L button (left edge) and
+  a green R button (right edge). Later levels add more tracks/buttons (B, C, ...),
+  larger grids, and a second goal type (goal-o / color 12) with its own frame.
+- LEVEL-1 SOLUTION GEOMETRY (verified): the ring is numbered 1..20 going around
+  the rectangle; the goal FRAME sits over ring slot 1, and the yellow goal TILE
+  starts on ring slot 6. So you must shift the goal tile from slot 6 to slot 1.
+  - Red (A_L, decrement) is the short way: 6->5->4->3->2->1 = 5 presses.
+  - Green (A_R, increment) moves the other way (6->7->8...), the long way around.
+  - Net displacement must be -5 (mod 20); any L/R mix achieving that within the
+    move budget solves the level.
+
+WIN / LEVEL-ADVANCE / GAME-OVER / REWARD
+- After each button press the win check runs: for every goal frame the matching
+  goal tile must be in its interior. If ALL frames are satisfied, the level is
+  solved -> next_level() (advance), and a reward of +0.1 is emitted on that step.
+- IMPORTANT: the win check happens BEFORE the move-budget is decremented. So a
+  press that completes the puzzle on the very last allowed move still WINS.
+- Each level has a move/step budget (Level 1 = 13 presses). Only valid button
+  presses consume the budget (no-op clicks do not). If a valid press does NOT
+  solve the level and the budget reaches 0, the game is LOST (lose()).
+- Reward is 0.0 on ordinary moves and +0.1 on the press that completes a level.
+  term stays False across an in-episode level advance (the episode continues into
+  the next level).
+
+CAVEATS
+- Because only valid button presses cost budget, "wasted" clicks on background
+  cost nothing — but every press that lands on a button DOES count, including
+  presses that rotate the loop the wrong way. On Level 1 you have 13 presses, so
+  long detours are survivable but the all-green long-way solve (15 presses) is
+  NOT (it would run out before reaching slot 1).
+- Tile colors other than the goal/goal-o colors are irrelevant to the objective;
+  they just visualize the rotation.

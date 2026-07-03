@@ -1,0 +1,74 @@
+27VWC - "Cook the meat on the BBQ to feed the person"
+
+GRID: 7x7. Coordinates below are written (col row), origin top-left. NOTE the
+action/observation interface uses the OPPOSITE order: "click ROW COL" and the
+observation is indexed obs[row][col]. Each cell below also gives its obs[row][col]
+index to avoid ambiguity.
+
+OBJECTS (initial state):
+- Bbq: a multi-cell appliance with state fields (fire: Bool, gas: Number).
+  Its position is (col 2, row 3); its 9 cells are at (col,row) offsets
+  (0,1),(2,1),(1,1),(0,2),(0,3),(2,2),(2,3),(1,2),(1,3) relative to that position,
+  so the BBQ occupies the block spanning cols 2-4, rows 4-6 (a 3-wide x 3-tall
+  footprint in the lower-middle of the grid). Initial fire=true, gas=65.
+  Coloring (absolute (col,row) = obs[row][col]):
+    * the 6 outer body cells (2,4)(4,4)(2,5)(2,6)(4,5)(4,6) [obs[4][2],obs[4][4],
+      obs[5][2],obs[6][2],obs[5][4],obs[6][4]]: always "gray".
+    * burner cell (col 3, row 4) = obs[4][3]: "orange" if fire on, else "white"
+      (shows whether the grill is lit).
+    * upper gas-gauge cell (col 3, row 5) = obs[5][3]: "yellow" if gas>20 else "white".
+    * lower gas-gauge cell (col 3, row 6) = obs[6][3]: "yellow" if gas>0  else "white".
+  (So a full gauge = both yellow; gas in (0,20] = lower yellow only; gas==0 = both white.)
+  Clicking ANY of these 9 BBQ cells (e.g. "click 4 3" burner, or "click 4 2" a body
+  cell) targets the Bbq object and toggles fire (subject to the gas>0 rule below).
+- Meat: single cell at (col 3, row 3) = obs[3][3]. Field cooked (Number, starts 0).
+  Color encodes doneness:
+    cooked<10  -> "lightblue" (raw)
+    cooked<30  -> "pink" (rare)
+    cooked<60  -> "sandybrown" (cooked, good)
+    else       -> "brown" (burnt/overcooked).
+- Person: a health bar of cells along the top row (row 0), cols 0..6 (obs[0][0..6]).
+  Field health (starts 3). Cell i is "blue" if i<=health, else "black".
+  So health is shown as the count of blue cells from the left (health 3 = 4 blue cells).
+- FillBBQ button: single "yellow" cell at (col 0, row 6) = obs[6][0] (bottom-left
+  corner). Static (always yellow).
+
+PLAYER ACTIONS:
+- left / right / up / down: NO handlers exist. These are no-ops (nothing moves).
+- noop: no-op.
+- click ROW COL: only the CLICKED OBJECT matters (location selects which object);
+  there is no movement / nothing is placed. The interactive controls are:
+    * click on the Bbq (any of its 9 cells, e.g. "click 4 3" or "click 4 2"):
+      toggles fire on<->off, but ONLY if gas>0. If gas==0 the click does nothing
+      (the grill cannot be relit with an empty tank). (Verified: train s3/s7 toggle,
+      train s193 / test s71 at gas 0 = no change.)
+    * click on the FillBBQ button ("click 6 0"): adds +5 to bbq gas (refuel). Can be
+      clicked repeatedly to top up; this is the only way to add gas.
+    * click on the Meat ("click 3 3"): (a) changes person health by an amount that
+      depends on the meat's CURRENT cooked value, then (b) resets meat cooked back to 0
+      (meat returns to lightblue). Health change:
+         cooked<30          -> health -1 (raw/undercooked, makes person sicker)
+         cooked>60          -> health -2 (burnt, worse)
+         otherwise (30..60) -> health +1 (well cooked, feeds person)
+      (Verified: good/sandybrown +1 train s43, test s169; raw/lightblue -1 train s47,
+      test s181; burnt/brown -2 train s189, test s91.)
+      Health is clamped to [-1, 6] (min -1, max GRID_SIZE-1=6). If health is already
+      <0 the HEALTH update is skipped (person unchanged), but the meat cooked value is
+      still reset to 0 (the reset is an unconditional separate handler).
+  Clicking empty cells or the Person does nothing.
+
+PASSIVE / PER-STEP (clock) DYNAMICS (on true, every tick):
+- BBQ fuel burn: if gas==0, fire is forced off. Else if fire is on, gas decreases by 1 each step.
+  (Fire stays lit until gas runs out, then auto-extinguishes.)
+- Meat cooking: if bbq fire is on, meat cooked increases by 1 each step. If fire off, cooked unchanged.
+  (Cooking is purely a function of how many ticks the fire burns; overcooking past 60 turns it brown.)
+
+SPAWN/DESPAWN: none. All objects persist for the whole episode.
+
+COLLISIONS / INTERACTIONS: no spatial collisions; all interaction is via clicks
+and the fire->cook coupling described above.
+
+WIN / TERMINATION / REWARD: no explicit win or terminal condition or reward is defined
+in the SEXP. The implicit objective is to manage gas/fire timing so meat reaches the
+30-60 "well cooked" window, then feed the person to raise health (and avoid serving
+raw/burnt meat, which lowers it).

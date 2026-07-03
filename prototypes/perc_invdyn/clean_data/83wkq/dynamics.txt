@@ -1,0 +1,78 @@
+GAME: 83WKQ (Autumn DSL)
+
+GRID
+- 16x16 grid (GRID_SIZE = 16). Rows and cols are both indexed 0..15.
+
+OBJECTS
+- Particle: a single blue cell. The object is declared with a prototype
+  cell at (0,0) "blue", but no particle exists in the world initially.
+- particles: a list of Particle objects. It is initialized to the empty
+  list, so the grid starts completely empty (no particles on screen).
+
+PLAYER ACTIONS
+- click ROW COL: adds a NEW blue particle at the clicked grid cell. Click
+  LOCATION matters — the particle is created at exactly (ROW, COL) (the SEXP
+  uses Position(click.x, click.y); the new particle is rendered at that
+  cell). This is the ONLY way to introduce particles into the world.
+  The newly spawned particle first appears AT the click cell (it does not
+  move on its spawn frame); it begins random-walking on the next
+  non-click frame.
+- left, right, up, down: NO handlers exist for these. They do not move,
+  add, or remove anything themselves. They are no-ops for game state — but
+  the clock still ticks on these frames, so existing particles DO random-walk
+  on a left/right/up/down frame (see CLOCK DYNAMICS).
+- noop: same as the arrows — no handler of its own, but the clock still
+  ticks so existing particles random-walk on a noop frame.
+
+PASSIVE / CLOCK DYNAMICS
+- On every clock tick that is NOT a click frame (i.e. noop or any arrow),
+  EVERY existing particle moves to a uniformly random in-bounds orthogonally
+  ADJACENT cell: uniformChoice over adjPositions(current origin).
+- adjPositions returns only the IN-BOUNDS orthogonal neighbors (the 4
+  candidates {(x-1,y),(x+1,y),(x,y-1),(x,y+1)} filtered to those with both
+  coords in 0..15). So an interior particle has 4 choices, an edge particle
+  3, and a corner particle 2. The current cell is NEVER a candidate, so on a
+  non-click tick a particle ALWAYS moves — it can never stay in place.
+- This is an independent random walk: each particle picks its own random
+  step every non-click tick.
+
+CLICK-FRAME MOVEMENT SUPPRESSION (important)
+- On a tick where a click occurs, the `on clicked` handler reassigns the
+  whole particles list (addObj over prev particles). This reassignment
+  SUPERSEDES the next-update random walk for that frame, so on a click frame
+  the EXISTING particles do NOT move — they hold their positions while the
+  new particle is added at the click cell. Movement of existing particles
+  resumes on the next non-click tick.
+- Concretely: a particle moves on every noop/arrow frame and freezes on the
+  frame in which any click is issued. (Verified: with a particle at (5,3),
+  issuing a click leaves it at (5,3) that frame while a new particle appears
+  at the click location; it then resumes walking.)
+
+SPAWNING / DESPAWNING
+- Spawning: only via click (one particle per click, at the click cell).
+- Despawning: none. Particles are never removed; they persist and keep
+  wandering for the rest of the episode. Particle count is monotonically
+  non-decreasing and equals the number of clicks issued so far.
+
+COLOR CHANGES
+- None. Particles are always blue and never change color.
+
+COLLISIONS / INTERACTIONS
+- None. Particles do not interact with each other; multiple particles may
+  occupy or pass through the same cell freely (no collision, no blocking).
+  There are no walls and no object-to-object effects; the only boundary
+  effect is that out-of-bounds neighbors are excluded from a particle's
+  random-walk choices (see CLOCK DYNAMICS).
+
+RENDERING NOTE
+- The "blue(N)" legend count is the number of distinct blue CELLS, not the
+  true particle count. Because particles may overlap (no collision), if two
+  particles random-walk onto the same cell the legend count can read BELOW
+  the true particle count. The true count only ever increases (one per
+  click).
+
+WIN / TERMINATION / REWARD
+- None. There is no goal, no win/lose condition, and no reward rule defined.
+  The game is an open-ended sandbox: click to spawn blue particles, which
+  then random-walk indefinitely.
+</content>

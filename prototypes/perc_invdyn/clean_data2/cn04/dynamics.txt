@@ -1,0 +1,116 @@
+cn04 (cn04-2fe56bfb) — game mechanics
+
+OVERVIEW
+- A connector / pipe-alignment puzzle. Each level contains several rigid
+  sprites ("pieces"). Every piece carries one or more connector ENDPOINTS.
+  You translate and rotate ONE selected piece at a time so that its endpoints
+  land on the matching endpoints of other pieces. When every endpoint in the
+  level is paired with a same-type partner on the same cell, the level is
+  solved and the game advances to the next level. 6 levels total (win_levels=6).
+
+GRID & DISPLAY
+- The logical game grid is 20 x 20 cells (all 6 levels use grid_size=(20,20)).
+- It is rendered into the 64 x 64 observation frame at integer scale 3 with a
+  2-pixel letterbox: display = 2 + 3*grid, i.e. each logical cell is a 3x3
+  block of display pixels. Letterbox/background fills the 2-px border and the
+  rest of the 64x64 frame.
+- Display ROW 0 (cols 16..47) is a STEP GAUGE, not part of the board: a 32-cell
+  bar that depletes from color 4 (filled) to color 0 (empty) as the step budget
+  is spent. It is an interface overlay; ignore it when reading the board.
+- Coordinate convention (matches the CLI): positions are (x=col, y=row); x
+  grows rightward, y grows downward. ACTION1/2/3/4 = up/down/left/right.
+
+PALETTE / WHAT YOU SEE
+- Background is a per-level solid color (Level1=10 light-blue, L2/L3=12 orange,
+  L4/L6=9 blue, L5=15 purple). The 2-px letterbox uses the same color.
+- A piece's body is drawn in its own fill color when it is NOT selected
+  (e.g. Level1: the T-piece body=12 orange, the bar-piece body=14 green).
+- The SELECTED piece is recolored: its whole body is drawn as color 0 (renders
+  white), keeping only its endpoint cells colored. This white silhouette is the
+  reliable "which piece am I controlling" cue.
+- ENDPOINTS render as color 8 (red). Internally there are TWO endpoint TYPES,
+  "8" and "13", but the engine remaps 13->8 for display, so BOTH types look red
+  on screen. The type distinction is invisible but matters for solving (see
+  MATCHING).
+- A pair of endpoints that has been connected is drawn as color 3 (gray).
+
+OBJECTS (Level 1, the level the train/test trajectories cover)
+- Piece A "0000pusfglvcns": a T/anchor shape, starts at (col,row)=(3,3),
+  rotation 90. It has one type-8 endpoint and one type-13 endpoint.
+- Piece B "0001gqwehbicqu": a tall bar, starts at (12,9), rotation 0. Also one
+  type-8 endpoint and one type-13 endpoint, stacked vertically (T8 above T13).
+- On level start the engine auto-selects the piece nearest the origin
+  (min x^2+y^2). In Level 1 that is piece A.
+
+PLAYER ACTIONS (operate on the SELECTED piece only)
+- ACTION1 = move up    (y-1)
+- ACTION2 = move down  (y+1)
+- ACTION3 = move left  (x-1)
+- ACTION4 = move right (x+1)
+  Movement is one cell per press and is BOUNDS-CLAMPED: a move that would push
+  any part of the piece off the 20x20 grid is rejected (no move). There is no
+  piece-piece collision: pieces may freely overlap.
+- ACTION5 = ROTATE the selected piece by +90 degrees (in place; the piece's
+  top-left origin (x,y) stays fixed, the bitmap rotates, so the endpoint cells
+  move). Four presses cycle back to the original orientation.
+  (Special case: if the selected piece belongs to a STACK of pieces sharing the
+  same origin cell — only in the harder levels 5/6 — ACTION5 instead CYCLES
+  selection to the next piece in that stack rather than rotating.)
+- ACTION6 = CLICK at display (x,y) -> ACTION6 x=X y=Y. The click is mapped to a
+  grid cell via display_to_grid: grid_col=(X-2)//3, grid_row=(Y-2)//3. To click
+  logical cell (col,row) reliably, aim at its center: X = 3*col+3, Y = 3*row+3
+  (e.g. cell (13,10) -> click_42_33).
+  CLICK semantics:
+    * Clicking a different VISIBLE piece SELECTS it (it turns white) and
+      RELEASES the previously selected piece (it returns to its fill color).
+    * Clicking the already-selected piece (single-piece group) DESELECTS it
+      (nothing controlled; moves/rotates then do nothing until you click a
+      piece). In a multi-piece stack, clicking the selected piece cycles within
+      the stack instead.
+    * Clicking empty background / a transparent area does nothing.
+- ACTION7 is never offered. Available actions are [ACTION1..ACTION6] in every
+  state observed (availability does not change across the early levels).
+
+MATCHING / CONNECTION RULE (the core mechanic)
+- After every action the engine looks at every grid cell and counts endpoints
+  landing there:
+    * If exactly TWO endpoints of the SAME type (8+8, or 13+13) occupy one
+      cell, that pair is CONNECTED and counts toward solving; it is drawn gray
+      (color 3).
+    * If two endpoints of DIFFERENT type (8+13) overlap, they also turn gray
+      visually but DO NOT count toward solving. (So an 8-over-13 overlap is a
+      "false" connection: it looks gray but the level is not solved.)
+- The level is SOLVED when NO unconnected type-8 or type-13 endpoint remains
+  anywhere, i.e. every endpoint is paired same-type. Because the two endpoint
+  types look identical (both red), solving requires matching geometry/parity,
+  not just visually stacking reds.
+- Practical Level-1 solution geometry: A and B each have a T8 and a T13 endpoint
+  2 cells apart. You must rotate one piece so its endpoint pair has the same
+  orientation as the other's (both vertical with T8 above T13, or both
+  horizontal with T8 right of T13), then translate so T8-meets-T8 and
+  T13-meets-T13 simultaneously.
+
+LEVEL / WIN / LOSE / SCORE
+- Solving a level immediately advances to the next level within the same action
+  (score/levels_completed increments; a fresh board with a new background and
+  new pieces appears). The wrapper reports reward = +0.1 on the action that
+  completes a level. The episode is NOT terminal at a level transition; it ends
+  only after the final (6th) level is solved (win) — term stays False through
+  intermediate transitions.
+- Each level has a step budget (MaxSteps: L1=75, L2=100, L3=125, L4=125,
+  L5=150, L6=200). When the per-level action count reaches MaxSteps the level
+  is LOST (game over). The depleting top bar visualizes remaining budget.
+- GreyMasking levels (L3-L6, data flag "GreyMasking"): all NON-selected pieces
+  have both body and endpoints masked to the background color 4, so only the
+  currently selected (white) piece reveals its shape and endpoints. The solver
+  must remember/probe the hidden pieces by selecting them.
+
+CAVEATS
+- The two endpoint types are visually indistinguishable (display remaps 13->8
+  to red). The 8-vs-13 distinction is real and decides whether an overlap
+  actually solves; a red-on-red overlap can be a non-counting 8+13 stack.
+- No passive clock: state changes only on action. No noop padding is meaningful.
+- Levels 5 and 6 use stacks of pieces sharing one origin cell; there ACTION5
+  and clicking the selected piece cycle selection through the stack instead of
+  rotating. The train/test trajectories here stay within Level 1, which has no
+  stacks and no masking.

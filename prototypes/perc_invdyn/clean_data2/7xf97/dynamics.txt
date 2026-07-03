@@ -1,0 +1,44 @@
+GAME 7XF97 - Dynamics
+
+Grid: 16 x 16.
+
+OBJECTS (initial state):
+- Sun: a 3x3 block of gold cells. Has a boolean attribute movingLeft (starts false).
+  Initial origin (0,0), i.e. top-left corner.
+- Cloud: a 4x3 block of gray cells (4 wide, 3 tall). Initial origin (13,0), top-right area.
+- Leaves: 8 single green cells along the bottom row (y=15) at x = 1,3,5,7,9,11,13,15.
+- Water: blue cells. Starts empty; created during play.
+
+PLAYER ACTIONS:
+- left:  moves the Cloud one cell left.
+- right: moves the Cloud one cell right.
+- down:  spawns a new Water cell at the cloud's position shifted one cell down
+         (origin = one below cloud's origin). Acts like releasing a raindrop from the cloud.
+- click: LOCATION matters. Only a click on the Sun does anything; it moves the Sun
+         one cell left if movingLeft is true, else one cell right. Clicking elsewhere is a no-op.
+- up:    NO handler -> no-op.
+- noop:  no effect.
+
+PASSIVE / CLOCK DYNAMICS (every step):
+- Gravity on Water: each existing Water cell moves down one cell per step. Water that
+  would leave the grid bounds is removed (filtered by isWithinBounds).
+- Sun direction control (edge bounce): when the Sun's origin x == 0, movingLeft is set false;
+  when the Sun's origin x == GRID_SIZE-3 (=13, its right edge), movingLeft is set true.
+  Note: the Sun only actually MOVES when clicked; these rules just flip its intended direction.
+
+COLLISIONS / INTERACTIONS:
+- Water vs Leaf: if a Water cell's next-down position would intersect any Leaf, that Water
+  cell is removed (it does not pass through leaves).
+- Watering green leaves: when descending Water is about to land on a GREEN leaf AND the Sun is
+  NOT overlapping the Cloud, a new Leaf is grown one cell above the watered leaf. The new leaf's
+  color is mediumpurple if it grows into row y=12, otherwise green. (So repeated watering grows
+  a column of green leaves upward, turning purple at row 12.) If the Sun overlaps the Cloud,
+  watering does not grow leaves (the cloud is "blocked" by the sun).
+
+SPAWN / DESPAWN:
+- Spawn: Water spawns only via the down action.
+- Despawn: Water despawns when it falls out of bounds or hits a leaf.
+- Leaves are only added (grown upward by watering); none are removed.
+
+WIN / TERMINATION / REWARD:
+- No win, loss, score, or termination condition is defined in the program.

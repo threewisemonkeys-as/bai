@@ -1,0 +1,101 @@
+sb26 (sb26-7fbdac44) — game mechanics
+
+OVERVIEW
+- A color-ordering puzzle. Each level shows a TARGET color sequence in a row of
+  framed swatches across the top, a TRAY of empty slots in the play area, and a
+  PALETTE of colored tiles along the bottom. You move palette tiles into the tray
+  slots so the slot colors (left-to-right) match the target sequence, then press
+  ACTION5 to verify. A correct arrangement clears the level (+0.1 reward) and
+  loads the next; there are 8 levels total (win_levels=8).
+- Source: environment_files/sb26/7fbdac44/sb26.py (class Sb26).
+  available_actions = [5, 6, 7] -> ACTION5, ACTION6 (click), ACTION7 throughout.
+
+GRID & LAYERS
+- 64 x 64 grid, 16-color palette (index 0..15). One <grid_> layer is emitted.
+- Coordinates: (x = col, y = row), x grows rightward, y grows downward. A CLI
+  click `click_X_Y` maps to ACTION6 with x=X (col), y=Y (row).
+- BACKGROUND_COLOR = 4 (the large field). PADDING_COLOR = 3 (outer letterbox).
+
+OBJECTS / PALETTE (LEVEL 1, the level confirmed empirically)
+- Top TARGET frames (sprite "quhhhthrri", 6x6, hollow, colored border): four at
+  y=1, columns 18, 25, 32, 39, colored 9, 14, 11, 15 respectively. Read
+  left-to-right this is the goal order: [9, 14, 11, 15]. (Above them, color-5
+  blocks "uzxwqmkrmk" at y=0 are decorative headers.)
+- Middle TRAY (sprite "qdmvvkvhaz4", border color 8) at (x=18, y=25). Its NAME
+  ends in a digit = its capacity (here 4). It contains 4 evenly spaced SLOTS.
+  Slot i center is at (col = 22 + 6*i, row = 29): slot0 (22,29), slot1 (28,29),
+  slot2 (34,29), slot3 (40,29). An empty slot renders as a small 2x2 color-2
+  marker (sprite "susublrply", tag sys_click).
+- Bottom PALETTE tiles (sprite "lngftsryyw", 6x6 solid square, tag sys_click) at
+  y=56, columns 17, 25, 33, 41, colored 14, 15, 9, 11. Each tile's solid 4x4 body
+  spans the inner cols; click anywhere on it, e.g. centers (19,58),(27,58),
+  (35,58),(43,58).
+- ENERGY BAR: row 53, a full-width color-2 bar at level start
+  (initial energy = 64). Every energy-spending action removes one cell from the
+  RIGHT end (turns color 3). Reaching 0 energy triggers a loss.
+- Some levels also use special "vgszefyyyp" tiles (a hollow square, tag sys_click)
+  that act as POINTERS/links to sub-trays, plus larger tray sprites
+  (jvkvqzheok/nyqgqtujsa/pcrvmjfjzg/wbkmnqvtxh/zzssdzqbbr, names ending in their
+  capacity 1..7). These build the nested multi-tray structure of levels 2-8.
+
+ACTIONS
+- ACTION6 (click; carries x,y) — the only interaction with tiles/slots. It hits
+  whatever sys_click sprite is under (x,y). Behavior depends on selection state
+  (an internal "held" tile, shown by a cursor outline):
+    * Nothing held, click a PALETTE/play TILE  -> SELECT it (becomes held; a
+      cursor outline appears on it). Costs no energy.
+    * Click the SAME held tile again            -> DESELECT (cancel). No cost.
+    * Tile held, click an EMPTY SLOT (susublrply)-> PLACE the held tile into that
+      slot. The slot it vacated (its old palette cell) becomes an empty slot.
+      Costs 1 energy.
+    * Tile held, click ANOTHER TILE where at least one of the two is in the play
+      area (row <= 53) -> SWAP the two tiles' positions. Costs 1 energy.
+      (If BOTH the held and clicked tiles are in the bottom palette, row > 53,
+      it just moves the selection to the newly clicked tile, no swap, no cost.)
+    * Click on empty background / non-sys_click cell -> nothing happens.
+  CONFIRMED empirically: select tile -> click slot places it and consumes one
+  energy cell; selecting a placed tile then clicking a palette tile swaps them.
+- ACTION7 — UNDO. Restores the tile/slot layout to the state before the last
+  PLACE or SWAP (one step of history). With fewer than 2 recorded states it is a
+  no-op. (Selecting/deselecting does not record history, so undo skips over it.)
+  CONFIRMED: after a wrong placement, ACTION7 returns that slot to empty and the
+  tile to the palette.
+- ACTION5 — VERIFY / SUBMIT. Costs 1 energy, then runs an animated traversal that
+  walks the tray slots in order and compares each placed tile's color to the
+  corresponding target frame's color.
+    * If EVERY slot matches the target sequence -> level solved: reward +0.1, a
+      short transition animation, then the NEXT level loads (energy resets to 64).
+      After level 8 the game is won.
+    * If any slot is wrong/empty -> a red failure flash; no advance, the energy
+      already spent is lost.
+  CONFIRMED: a correct level-1 arrangement + ACTION5 yields reward=0.1 and loads
+  level 2.
+
+AVAILABLE-ACTION TRANSITIONS
+- ['ACTION5','ACTION6','ACTION7'] are offered at reset and remain available
+  throughout (confirmed across resets, placements, swaps, undo, and a level
+  transition). The game never restricts the action set mid-play; legality is
+  enforced inside the handlers (e.g. clicking empty space or undoing with no
+  history simply does nothing).
+
+LEVEL / GOAL STRUCTURE
+- 8 levels of increasing complexity. Level 1 is a single 4-slot tray fed by a
+  4-tile palette (the minimal "match the order" task). Later levels add more
+  target frames (up to ~7+), multiple trays, and "pointer" tiles (vgszefyyyp)
+  that chain trays into a nested order, but the atomic interactions are identical
+  (select tile, place into slot or swap, verify). Each cleared level gives +0.1.
+
+WIN / GAME-OVER / SCORE / REWARD
+- Reward is +0.1 per level cleared (granted on the verifying ACTION5). No reward
+  for placements/swaps/undo (0.0). term stays False between levels.
+- LOSS: energy (max 64 per level) is spent 1 per place, 1 per swap, 1 per ACTION5
+  verify (correct or not). If it hits 0 the level is lost (term). Undo/selection
+  are free. Energy resets to 64 at the start of every level.
+
+CAVEATS
+- Levels 2-8 dynamics (nested trays / pointer tiles) are read from the source but
+  only level 1 was driven end-to-end; the train and test trajectories both
+  demonstrate level 1, which exercises every atomic mechanic plus a real level
+  transition.
+- A "place" or "swap" click internally plays a multi-tick cursor/move animation;
+  the driver reports only the settled frame for that one CLI action (expected).
