@@ -1,0 +1,32 @@
+- The grid is 12x12 (rows 0-11, cols 0-11).  
+- Objects:  
+  - `R`: player (one, may be absent).  
+  - `Gd`: gold (collectible, multiple).  
+  - `DO`: indestructible obstacles (solid).  
+  - `Bl`: breakable blocks (destroyed by mines).  
+  - `MP`: mine (appears after certain clicks).  
+- Gravity is a state property (`gravity:none` or `gravity:down`).  
+- The bottom row (row 11) and any cell with a DO are solid (ground). A cell is “supported” if the cell directly below it (row+1, same column) is solid.
+
+**Action effects:**
+
+1. **noop**  
+   - If `gravity:down` and the player is present, the player falls one row downward (row+1) unless blocked by a solid cell; if the new cell is supported, gravity becomes `none`; otherwise remains `down`.  
+   - If `gravity:none`, nothing changes.  
+   - If a `MP` (mine) exists, it moves upward one row (row-1) unless the target cell is occupied by a DO or is outside the grid (row < 0); in that case it stops or disappears. When a mine moves, it destroys all Bl cells in the four cardinal directions (up, down, left, right) from its new location.
+
+2. **directional actions (left, right, up, down)**  
+   - **left/right**: player’s column changes by ±1 (if player present).  
+   - **up**: player’s row changes by –4 (to row 7) – consistent with jumping to a platform.  
+   - **down**: no observed; assumed to move player downward by 1 row (if player present).  
+   - After the move, gravity is set to `down` if the new cell is *not* supported (i.e., the cell below is empty and not solid), otherwise `none`.  
+   - If the player is absent, these actions have no effect (the only way to restore the player is a click).
+
+3. **click (click ROW COL)**  
+   - If the player is **absent** and the target cell contains a gold, the player appears at that cell and the gold is removed (collected).  
+   - If the player is **present** and the target cell is the player’s own cell, a mine (`MP`) appears at that cell, the player disappears, and on the next `noop` the mine moves up while the player reappears at the original cell.  
+   - Other click outcomes are not observed (e.g., clicking empty cells).
+
+**Additional dynamics:**
+- Mines move upward one row per `noop` (after the first noop following creation) unless blocked by a DO or the grid top. They destroy adjacent Bl in a cross when moving.
+- Gold tiles are collectible; once collected they vanish. The player can stand on empty cells; only DO and the bottom row provide solid ground.

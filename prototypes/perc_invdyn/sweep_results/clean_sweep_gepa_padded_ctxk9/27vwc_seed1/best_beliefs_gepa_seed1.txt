@@ -1,0 +1,9 @@
+world knowledge
+- Click cell (3,3) changes its color and adjusts the contiguous blue block in row 0 (starting at column 0):
+  - If (3,3) is brown: becomes lightblue; set blue block length to 2 (cells (0,0) and (0,1) blue, rest of row 0 white).
+  - If (3,3) is sandybrown: becomes lightblue; extend blue block right by one (add blue at the next column after the current block, increasing its length by 1).
+  - If (3,3) is lightblue: remains lightblue; remove the rightmost blue cell from the block (decrease block length by 1, leaving the rest of row 0 white).
+  - Otherwise (e.g., pink): no effect.
+- Click cell (4,3) toggles its color between white and orange, except when cell (4,3) is white AND cell (5,3) is white, in which case no change occurs.
+- Click cell (6,0) sets cell (5,3) to yellow if it is white; otherwise no effect.
+- All other clicks (any cell not listed above) and movement actions (up, down, left, right, noop) cause no change. Actions are valid even if they produce no effect.

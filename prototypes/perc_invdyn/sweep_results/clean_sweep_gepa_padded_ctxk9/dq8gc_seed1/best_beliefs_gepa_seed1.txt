@@ -1,0 +1,9 @@
+- 'noop' leaves the state unchanged.
+- Directional actions ('up', 'down', 'left', 'right') can produce one or more of the following effects, depending on the context (positions and types of objects):
+    - Move the agent one step in that direction.
+    - Move an object (any color) one step in that direction without moving the agent.
+    - Create a new darkgreen object in the cell immediately adjacent to the agent in the action's direction (even if that cell is empty).
+    - Remove an object (often darkgreen) from its current location, possibly because the agent steps onto it or because the action affects a distant object.
+  The exact effect is not solely determined by the cell directly in front of the agent; the agent may remain stationary while objects elsewhere are moved, created, or removed.
+- 'click' may have no visible effect or may occasionally alter objects (e.g., change color), but it is not the only mechanism for object interactions; directional actions also affect objects.
+- State changes are deterministic given the full configuration, but the rule set above captures the possible transformations observed.

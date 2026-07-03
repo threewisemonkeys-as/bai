@@ -1,0 +1,31 @@
+The environment is a 7x7 grid with blue background. Cell types: blue (empty), black (removable blocks), brown (fixed, non‑removable blocks), silver (mobile falling blocks).  
+The step number is provided in each state; it increments by 1 each timestep.
+
+**Action Effects**
+
+- **`noop` (no operation):**  
+  All silver cells attempt to fall one row. For each silver cell:  
+  – If the cell directly below is **blue**, it falls down one row.  
+  – If the cell directly below is **black**, the silver moves into that cell, the black is **removed**, and a new black cell appears at row 0 of the same column (the black “resets” to the top). The silver then occupies that cell.  
+  – If the cell directly below is **brown** or another **silver**, the silver stops (it remains in place).  
+  – If the cell is on the bottom row (row 6), it cannot fall.  
+  Multiple silver cells in the same column all fall together, maintaining their relative order.  
+
+  **Periodic brown shift:** On a noop step, if the step number satisfies `step % 4 == 1` (observed pattern), all brown cells shift downward by one row. Row 6 wraps to row 0 (same column). This shift occurs simultaneously with the silver falling described above.
+
+- **`click ROW COL`:**  
+  If the cell at (ROW, COL) is **black**, it is immediately replaced by a **silver** cell at that location. The new silver will begin falling on subsequent noop steps (or on the same noop step if the action is followed by a noop) according to the falling rules.  
+  If the cell is not black (blue, brown, or silver), the click has no effect (state does not change).
+
+**State Representation Details**
+
+- All coordinate lists (black, brown, silver) must be given in **row-major order**: sorted first by row index, then by column index.  
+- The state string always includes a `silver=N` field after the silver list, where N is the total number of silver cells.  
+- The silver count must be included even if it is zero.
+
+**Notes on Interactions**
+
+- Silver cells are created only by clicking a black cell. They never appear spontaneously.  
+- When a black cell is removed by a silver falling onto it, the reset black always appears at row 0 of the same column, regardless of what is currently at that location (if a silver or brown occupies row 0, the reset may be blocked? – in observed data, row 0 is always blue when a reset occurs, so it is safe).  
+- Brown cells never move except during the periodic shift. They are not affected by silver falling (silver stops on them).  
+- The behaviour is deterministic given the current state and action.

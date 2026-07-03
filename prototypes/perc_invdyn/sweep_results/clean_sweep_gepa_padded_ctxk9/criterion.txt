@@ -1,0 +1,17 @@
+In prototypes/perc_invdyn/clean_data2/ for each game, we have generated a dynamics.txt
+Launch a subagent for each result in the given results directory
+Each agent should:
+1. look at the dynamic.txt for the game
+2. look at the learned beliefs from the given run
+3. manually and qualitatively score the learned beliefs against the dynamics.txt with the following schema:
+
+1: completely incorrect beliefs, not even partially covers the ground truth dynamics
+2: covers some parts of the dynamics correctly but mostly incorrect or missing the core of the game
+3: covers the core of the game partially or has many plausible or close to correct inferences but also misses or has many incorrect dynanmics
+4: covers the core of the game but may have missed some dyanamics or have some incorrect interpreations
+5: fully covers the ground truth dyanamics with no incorrect understanding.
+
+Note that the language or terminology used in the learned beliefs maybe different from the one used in dynamics.txt. the evaluation should be done on the understanding of the dynamics only and not on the terminology used.
+
+Once all the runs have been scored, present a table of results in scores.txt in the run directory.
+after the table, also present for each game a short summary of the reason behind the given score.

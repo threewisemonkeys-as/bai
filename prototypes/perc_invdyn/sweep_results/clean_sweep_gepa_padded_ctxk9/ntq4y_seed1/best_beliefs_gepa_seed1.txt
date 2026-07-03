@@ -1,0 +1,17 @@
+- The board is a 16x15 grid (rows 0–15, columns 0–14) with a black background.
+- Five fixed colored cells are always present on row 0, never change, and are not affected by clicks: (0,2,purple), (0,5,orange), (0,8,blue), (0,11,gray), (0,14,red).
+- The active color determines the color of a cell created when clicking an empty cell. It is set by the most recent click on orange (0,5), blue (0,8), or purple (0,2). Default after a red reset is blue.
+- Clicking a top‑row cell (row 0) triggers one of the following immediate effects (in order: effect then possible creation if the click were on an empty cell, but top‑row clicks are never on empty cells):
+  * Purple (0,2): Shifts all blue cells down by one row (same shift rule as below) and sets the active color to purple.
+  * Orange (0,5): Shifts all blue cells down by one row and sets the active color to orange.
+  * Blue (0,8): Sets the active color to blue. No shift of blue cells.
+  * Gray (0,11): Removes all orange cells that are not on row 0 (i.e., every orange cell in rows 1‑15 is deleted). No shift of blue cells.
+  * Red (0,14): Deletes all cells except the five top‑row cells, resetting the board. The active color becomes blue.
+- Clicking an empty cell (a cell with no colored cell) creates a cell of the current active color at that location. This creation happens after any blue shift triggered by the same action (but top‑row clicks never cause creation).
+- Clicking a purple cell that is not on row 0 has no effect (the state remains unchanged).
+- Noop does not change the board unless there are no orange cells present in rows 1‑15. In that case, on a noop step, all blue cells shift down by one row (same as the shift caused by purple/orange clicks). This shift repeats each noop until blue cells reach row 15 or until an orange cell appears in rows 1‑15.
+- The blue shift (whether triggered by purple/orange click or by noop when no orange cells in rows 1‑15) moves every blue cell down exactly one row: each blue cell at (r,c) moves to (r+1,c) if r < 15; blue cells at row 15 remain at row 15. The original positions become empty.
+- When a blue shift occurs, all blue cells shift simultaneously; if multiple blue cells would occupy the same cell after the shift (e.g., one at row 15 stays and another shifts into row 15), they coexist (the cell becomes blue).
+- **IMPORTANT ORDER OF OPERATIONS FOR A SINGLE ACTION**: When the action is a click on purple (0,2) or orange (0,5), the blue shift happens *before* any cell creation from that same click (but top-row clicks never create cells). When the action is a click on an empty cell, creation happens after any blue shift that was triggered *by that click* (i.e., if clicking purple/orange triggers a shift, the shift finishes first, then the new cell is placed). However, if a blue shift was triggered by a *previous* action (e.g., a noop or a prior purple/orange click), that shift is already complete before the current action's effects begin.
+- **NOOP SHIFT CONDITION CLARIFICATION**: A noop only triggers a blue shift if there are **zero** orange cells anywhere in rows 1–15. If at least one orange cell exists in rows 1–15, noop does nothing.
+- **GRAY CLICK EFFECT**: Clicking gray (0,11) immediately deletes **every** orange cell in rows 1–15, regardless of any other effects. No blue shift occurs from this click.

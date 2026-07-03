@@ -1,0 +1,10 @@
+world knowledge
+- Grid: 17×17 rows 0–16, cols 0–16.
+- Four fixed rule cells: gold (0,8), red (8,0), darkorange (8,16), green (16,8); they never move or change.
+- Spawn: Clicking an empty cell creates a 2×2 blue block with the clicked cell as bottom‑left corner (occupies rows r‑1 & r, columns c & c+1). If the clicked cell is not empty (contains any block – blue or rule), no spawn occurs.
+- Rule clicks: Clicking a rule cell triggers a shift of every existing blue block by exactly 1 cell in the associated direction (gold→left, red→down, darkorange→up, green→right). No drift occurs on that step. Only the shift happens; no spawn.
+- Non‑rule clicks (including clicks on empty cells or on existing blue blocks): always trigger drift of every blue block that existed at the start of the action by 1 row down (row+1). Additionally, if the clicked cell was empty, spawn occurs before drift; the newly spawned block does NOT drift on that same step. If the clicked cell was blue (occupied), no spawn, only drift.
+- Drift also occurs after every noop action: all existing blue blocks (before the noop) move down by 1 row.
+- Blocks that move off the grid (row 17 or col -1 etc.) disappear; col boundaries never cause removal except for left shift on gold (col -1 disappears). Down drift: row 17 disappears. Up shift from darkorange: row -1 disappears? But only row 0 is top, so if row 0 shifts up, block disappears. (Clarify: any movement to negative row or col or row≥17 or col≥17 removes the block.)
+- The up/down/left/right actions have no observable effect; only noop and clicks are used.
+- Perception lists cells in ascending row, then ascending column order.

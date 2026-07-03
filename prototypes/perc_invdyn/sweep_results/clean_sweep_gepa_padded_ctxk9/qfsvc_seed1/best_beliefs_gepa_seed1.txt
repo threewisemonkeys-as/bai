@@ -1,0 +1,10 @@
+- Agent position (A) changes with movement actions: 'up' decreases row by 1, 'down' increases row by 1, 'left' decreases column by 1, 'right' increases column by 1. 'noop' leaves the agent unchanged.
+- Mediumpurple cells (identified by color 'mediumpurple') move upward exactly one row per time step, regardless of the action taken. If a mediumpurple cell is at row 0, it vanishes (is removed) in the next state.
+- Gold cells (color 'gold') are static and never change.
+- Click action 'click ROW COL':
+  - If the click coordinates match the agent's current position (i.e., the cell the agent occupies), then:
+    * The agent disappears (A becomes 'none') for that time step.
+    * A new mediumpurple cell appears at that same position.
+    * Any existing mediumpurple cells move upward as usual.
+  - If the click coordinates do NOT match the agent's position (i.e., clicking on an empty cell, a gold cell, or a moving purple cell), then the only change is the automatic upward movement of any existing mediumpurple cells. The agent remains in place and no new purple is spawned.
+- When the agent is absent (A:none), it reappears at its last known position one time step later (observed after a click on the agent's cell). This is a two-step effect; for one-step forward prediction the immediate next state has A:none.

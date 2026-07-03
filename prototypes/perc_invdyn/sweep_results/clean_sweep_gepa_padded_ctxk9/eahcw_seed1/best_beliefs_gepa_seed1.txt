@@ -1,0 +1,9 @@
+- Grid is 16x16. All cells not listed as "nonblack" are black (empty).
+- The step number increments by 1 after every action (including noop, click, and movements).
+- The agent's position is "unknown" initially. It becomes known only when a click action places a blue cell at that exact location; the agent never moves thereafter.
+- Actions:
+  - up, down, left, right: Have no effect on the grid (no cells added, removed, or changed) and no effect on agent position. The agent remains stationary.
+  - click ROW COL: Adds a new nonblack cell at the specified (ROW, COL) coordinates (0-indexed). Does not modify or replace any existing cell. The color of the added cell follows a repeating sequence: red, gold, purple, green, blue, red, ... The color is determined by the total number of click actions performed so far in the episode (click count modulo 5): 0→red, 1→gold, 2→purple, 3→green, 4→blue. The click count increments by 1 with each click action.
+  - noop: Leaves all state features unchanged (grid, agent position, click count). Step still increments.
+- Each episode contains exactly one occurrence of each movement direction (up, down, left, right). The hidden action in an inverse‑dynamics problem is the direction not yet observed among the visible movements in the trajectory.
+```

@@ -1,0 +1,11 @@
+- The blue vertical pair (two cells in the same column, consecutive rows) is mobile; the red vertical pair (two cells in the same column, consecutive rows) is stationary and never moves.
+- Directional actions (up, down, left, right) attempt to move **both** blue cells by exactly 1 row (for up/down) or 1 column (for left/right) in the specified direction.
+- A directional move **succeeds** only if, after moving, both blue cells are within the 16x16 grid bounds **and** neither new blue cell occupies a cell that currently contains a red cell. If either condition fails, the move is **blocked** and the state remains completely unchanged.
+- A blocked directional move is indistinguishable from **noop** in terms of state change: both leave all cell positions exactly as they were.
+- The **noop** action never changes the state.
+- After any successful directional move, the blue pair maintains its vertical structure (two cells in the same column, adjacent rows). The move shifts both cells in parallel:  
+  - **up**: row index of both blue cells decreases by 1  
+  - **down**: row index of both blue cells increases by 1  
+  - **left**: column index of both blue cells decreases by 1  
+  - **right**: column index of both blue cells increases by 1
+- If the state before and after the action is identical, the action could be either **noop** or a blocked directional move. The correct action cannot be determined solely from the state change—other context (e.g., surrounding actions, prior positions) is needed to disambiguate.

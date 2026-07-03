@@ -1,0 +1,16 @@
+Shapes are composed of 5 cells forming a line in one of four orientations: diagonal_inc (top-left to bottom-right, e.g. cells with constant (row - col)), diagonal_dec (top-right to bottom-left, e.g. constant (row + col)), vertical (same column), horizontal (same row). The centre/anchor cell of a shape is at (row=7, col=7) for all non-agent shapes; for agent shapes, the agent marker indicates the topmost cell (or leftmost for horizontal) and the shape cells shift accordingly.
+
+Actions on no_agent (yellow) shapes:
+- left/right toggle between diagonal_inc and diagonal_dec (mirror across the vertical axis, with centre cell (7,7) fixed).
+- up transforms diagonal_inc → vertical and diagonal_dec → horizontal.
+- down transforms diagonal_inc → horizontal and diagonal_dec → vertical.
+- up transforms vertical → diagonal_dec and horizontal → diagonal_inc.
+- down transforms vertical → diagonal_inc and horizontal → diagonal_dec.
+- click changes mode to agent, colour to white, and all cells become white; the agent is positioned at the topmost cell of the shape (or the leftmost for horizontal); shape orientation is preserved.
+
+Actions on agent (white) shapes:
+- left/right shift the agent and all shape cells by (0, -1) or (0, +1) respectively, preserving shape orientation.
+- up/down shift the agent and all shape cells by (-1, 0) or (+1, 0) respectively, preserving shape orientation.
+- click changes mode to no_agent, colour to yellow, and all cells become yellow; shape orientation is preserved.
+
+When an agent moves, every cell in the shape shifts by the same (dr, dc) as the agent displacement; relative positions between cells remain fixed.

@@ -1,0 +1,35 @@
+[
+  {
+    "raw": 0.3,
+    "gepa_acc": 0.4,
+    "gepa_cost": 1.3123,
+    "gepa_time": 7400.0,
+    "chance": 0.2,
+    "start_acc": 0.5,
+    "game": "dgg2c",
+    "seed": 1,
+    "rc": 0
+  },
+  {
+    "raw": 0.6,
+    "gepa_acc": 0.8,
+    "gepa_cost": 0.1975,
+    "gepa_time": 1194.0,
+    "chance": 0.2,
+    "start_acc": 0.5,
+    "game": "qqm74",
+    "seed": 1,
+    "rc": 0
+  },
+  {
+    "raw": 0.9,
+    "gepa_acc": 0.8,
+    "gepa_cost": 2.5303,
+    "gepa_time": 17196.0,
+    "chance": 0.2,
+    "start_acc": 0.2,
+    "game": "va6fq",
+    "seed": 1,
+    "rc": 0
+  }
+]

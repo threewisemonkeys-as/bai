@@ -1,0 +1,33 @@
+The environment is a 11x11 grid with black background. Two immutable blue cells at (0,0) and red at (10,0). Two spawn locations: Spawn(0,0) and Spawn(10,0). Each spawn has state "ready" or "active". Autonomous gray objects move stepwise in a cardinal direction. Patterns A and B alternate column 10 colors on a timer.
+
+Pattern A colors (col10): row3=white, row4=yellow, row5=yellow, row6=yellow, row7=white.
+Pattern B colors (col10): row3=yellow, row4=white, row5=gold, row6=white, row7=yellow.
+
+Pattern auto-change at a scheduled step (e.g. step 20, step 40, step 60) toggles pattern and updates column 10 colors accordingly.
+
+Autonomous objects move one cell per step in their current direction. When an autonomous object reaches the row0 or row10 boundary while moving north/south, or col0 or col10 boundary while moving east/west, it turns at the boundary:
+- Moving east and reaching col10 → turn north (dir=north), next cell is (row-1, col=10).
+- Moving west and reaching col0 → turn south (dir=south), next cell is (row+1, col=0).
+- Moving north and reaching row0 → turn east (dir=east), next cell is (row=0, col+1).
+- Moving south and reaching row10 → turn west (dir=west), next cell is (row=10, col-1).
+
+Autonomous objects move through, not over, column 10 colored cells; they occupy those cells and coexist with the pattern color.
+
+When an autonomous object moves off the grid or disappears (e.g. after entering column 10 and then moving north past row0? actually row0 is top boundary, row10 bottom; object disappears when it moves to the cell just after the last valid cell along its path based on boundary turning rules — but from examples, objects that enter col10 then move north from row0? not seen; objects continue until they reach bottom-left spawn area and vanish), the spawn that produced it returns to "ready" state, and no autonomous object remains.
+
+Clicking a spawn at (0,0) or (10,0) while it is "ready":
+- Activates that spawn (changes to "active") and spawns a new gray autonomous object at the spawn cell.
+- The autonomous object's initial direction and next cell:
+  - Spawn(0,0): object at (0,0) dir=east next=(0,1) [but note (0,0) is blue immutable; object appears adjacent at (0,1) dir=east? from examples: after clicking (0,0) when ready, next state shows spawn active and gray at (0,1) dir=east next=(0,2)].
+  - Spawn(10,0): object at (10,0) dir=east next=(10,1) [similarly, object at (10,1) dir=east].
+- Clicking a spawn that is "active" has no effect (remains active with the object already moving).
+
+Clicking on column 10 cells (pattern area) toggles pattern:
+- Clicking the gold cell (row5,col10) in pattern B toggles pattern to A and updates column 10 colors to pattern A's set.
+- Clicking any of pattern A's yellow or white cells at col10 toggles pattern to B and updates column 10 colors to pattern B's set.
+- Clicking elsewhere on col10 that is not the pattern's key cell triggers pattern toggle as well (based on pattern, not on exact cell).
+- After manual toggle via click, pattern auto-change step counter resets? (from examples: after manual toggle pattern at step 45→46, pattern auto-change at step 60 for the new pattern).
+
+noop action: all autonomous objects move one step in their direction (with boundary turning), pattern auto-change timer advances (if timer reaches scheduled step, pattern toggles automatically), spawn states remain unchanged (active spawns stay active, ready spawns stay ready). No other state changes.
+
+up/down/left/right actions have no effect on state (agent movement not relevant in this environment).

@@ -1,0 +1,10 @@
+- The environment cycles: three `noop` steps, then one non-noop action (up, down, left, right, or click), then repeat.
+- All objects share a hidden state determining their current movement vector (row change, column change) each step.
+- Under `noop`, objects move according to the current movement vector. The vector changes only after a non-noop action.
+- `down`: sets movement vector to (row+1, col+0).  
+- `up`: resets all objects to row 2; for each object, new column = column - (row - 2) (i.e., shift left by the number of rows they would have moved down from row 2). The movement vector becomes (row+1, col+0) for subsequent noops.  
+- `left`: applies the current movement vector (same as noop would), then flips the horizontal component to the opposite sign for future steps. The immediate effect is the same as noop (row+1, col+? depending on prior vector).  
+- `right`: applies the current movement vector, then sets the horizontal component to +1 for future steps. The immediate effect is the same as noop.  
+- `click` (any coordinates): behaves exactly like `down` (row+1, col+0; movement vector becomes (row+1, col+0)). Does not create or delete objects.
+- When a row would exceed 16, it wraps to 2, and the column is decreased by (previous row - 2) (the same adjustment as `up`). This wrap can happen during any action that would push a row past 16.
+- Objects never change type; type is a constant identifier (e.g., 8 for most, 5 only at the very start of a sequence).

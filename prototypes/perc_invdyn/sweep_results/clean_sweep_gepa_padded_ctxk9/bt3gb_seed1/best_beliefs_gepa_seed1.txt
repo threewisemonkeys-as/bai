@@ -1,0 +1,15 @@
+- The environment consists of a grid. Each cell has a fixed set of background colors (e.g., black, gray, and possibly blue). The fallback object is located at some cell and has its own color, which is either gold or lightblue. The colors list in the state is the union of the cell's background colors and the fallback object's color.
+- The fallback object moves automatically each time step, regardless of the action taken:
+  - If its current row < 15, row increases by 1 (column unchanged).
+  - If its current row == 15, column increases by 1 (row unchanged).
+- The only action that affects the fallback object's state is `click`:
+  - `click` toggles its color between gold and lightblue (gold ↔ lightblue).
+  - `click` does not alter the object's position; position is still determined by the automatic movement.
+- All other actions (up, down, left, right, noop) have no effect on the fallback object's position or color. They are indistinguishable from the object's perspective; the next state is exactly the automatic movement with no color change.
+- Therefore, given two consecutive states:
+  - If the colors list shows a change between gold and lightblue (i.e., the fallback color changed) and the position change is consistent with automatic movement alone, the action must be `click`.
+  - If no such color change occurs, the action is any non‑click action (up/down/left/right/noop); the specific choice is indeterminate from the state transition. Any observed pattern in the sequence of non‑click actions is coincidental and not part of the dynamics.
+- For forward prediction from current state and action:
+  - Next position = current position after applying the automatic movement rule.
+  - Next colors = (background colors of the cell at the next position) ∪ (toggled fallback color if action is `click`, else the current fallback color). The background colors of each cell are fixed and can be inferred from past observations of that cell.
+- The predictor cannot infer the specific non‑click action from the state change; all non‑click actions are equally likely and can only be guessed arbitrarily.

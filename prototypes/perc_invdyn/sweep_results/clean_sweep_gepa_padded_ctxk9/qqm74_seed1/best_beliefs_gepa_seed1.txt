@@ -1,0 +1,11 @@
+- There are one or two blue cells on a 21×21 grid (rows 0..20, cols 0..20). Each timestep, all cells move according to the current drift vector (dr, dc). Drift is initially (0,0) (stationary). Movement is applied simultaneously to all cells: each cell's position changes by (dr, dc). If a cell would leave the grid (row<0, row>20, col<0, col>20), it disappears; the remaining cells continue with the same drift.
+- Action effects on drift and movement:
+  - `noop`: Leaves drift unchanged. On that timestep, cells move one step in the current drift direction.
+  - `click`: Has no effect on drift or movement. Only works if exactly one blue cell exists; then a second blue cell appears at a fixed offset from the first (the offset is environment‑specific and consistent across all spawns). No movement on that timestep.
+  - Directional actions (`up`/`down`/`left`/`right`): They modify the drift **for the next timestep**. On the timestep when the directional action is taken, cells first move one step in the **previous** drift direction (the one active before the action). Then the drift is set to the new direction according to the following rules:
+    - If the new direction is the *same* as the previous drift (e.g., previous drift (0,-1) and action `left`), the drift persists unchanged (same effect as `noop` on drift).
+    - If the new direction is *opposite* to the previous drift (e.g., previous drift (1,0) and action `up`), the drift becomes (0,0) after the current timestep’s movement.
+    - If the previous drift was (0,0), cells do **not** move on the current timestep, and the drift becomes the new direction.
+    - Otherwise (different, non‑opposite direction), the drift becomes the new direction.
+- The bounding box (`bbox`) and `pos` list are derived automatically from the current positions of all blue cells; they are not affected by actions except through cell movement or spawning.
+- The `last_action_available` field in the perception is always the string `click ROW COL` and should never be changed.

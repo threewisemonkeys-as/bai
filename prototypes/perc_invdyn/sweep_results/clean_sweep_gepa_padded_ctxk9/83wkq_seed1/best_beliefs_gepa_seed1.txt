@@ -1,0 +1,6 @@
+- The grid is 16×16. All non‑black cells are blue.  
+- Action `click ROW COL` adds a new blue cell at (ROW, COL); existing blue cells are unchanged.  
+- Action `noop` moves every existing blue cell: if a cell’s column is 0, its new column becomes 1; otherwise its new column becomes (current column – 1).  
+- Actions `up`, `down`, `left`, `right` have no observed effect on blue cells and are presumed inert.  
+- When listing blue cells in a state, order them by row first, then column (ascending).  
+- Format each blue cell as `(ROW,COL):blue` (with a colon and no space before "blue").

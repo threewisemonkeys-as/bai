@@ -1,0 +1,6 @@
+world knowledge
+- The observed state is always "grid_not_found", meaning the predictor receives no visual information about the grid, head positions, or cell colors.
+- Consequently, the state features are identical before and after any action (noop or any click). There is no observable change in the state representation regardless of the action taken.
+- Therefore, inverse dynamics (inferring the action from the state transition) are fully ambiguous: any possible action (noop or any click) could have produced the same transition from any grid_not_found state to another grid_not_found state.
+- The predictor cannot use temporal patterns (e.g., rhythmic click intervals or coordinate sequences) to infer the masked action because those patterns are not grounded in any observable state change. Without visual feedback, the validity or effect of any click cannot be verified. Past action sequences are arbitrary and provide no reliable basis for predicting future actions.
+- The only way to determine the action is through external labels or prior knowledge about the agent's behavior policy; the state features alone provide no information. Since no such external knowledge is available, the predictor should treat all actions as equally plausible, and must avoid constructing patterns from the observed action history.

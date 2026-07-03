@@ -1,0 +1,31 @@
+world knowledge
+- The environment has two phases: gold and lightblue.
+
+- Gold phase:
+  * The agent automatically drifts downward by 1 row each step (row increases by 1), unless it occupies a static_gold cell. If on a static_gold cell, drift is suppressed – the agent’s row does not change.
+  * The actions `up` and `noop` are indistinguishable; both apply the drift rule and have no other effect.
+  * Horizontal actions (`left`, `right`) do **not** move the agent. Instead, they shift all moving_gray cells: `left` decreases each moving_gray cell’s column by 1; `right` increases it by 1.
+    - Static_gold cells are immovable (fixed positions), except that if a moving_gray cell shifts onto a static_gold cell, that static_gold cell is **removed**. The gold cell at (1,1) is never removed.
+    - If a shifted moving_gray cell would occupy the same cell as another moving_gray cell, the shifting cell is removed. If a shifted cell exits the grid (column < 0 or > max column), it is removed.
+    - Drift (row+1) **always** applies after a horizontal action, unless the agent is on a gold cell.
+  * The `down` action:
+    - If the agent’s current row (before drift) is one of the special rows {0, 4, 8, 12, 14, 15}, a teleport occurs: the agent jumps to row 1 and a deterministic column that depends only on the starting row. The observed mapping is:
+        row 0 → col 4
+        row 4 → col 4
+        row 8 → col 5
+        row 14 → col 4
+        row 15 → col 1
+      (The column for row 12 has not been observed yet; it remains to be inferred.)
+    - This teleport replaces the normal drift. If the destination cell is occupied by a static_gold cell, that gold cell is removed.
+    - Otherwise, `down` behaves exactly like `noop` (drift applies).
+  * The `click` action switches to the lightblue phase: agent teleports to (0,0); all static_gold cells become static_gray at the same positions; all moving_gray cells become static_gray at the same positions (no shift); a fixed set of moving_lightblue cells appears at (8,5), (14,3), (15,4), (15,5).
+
+- Lightblue phase:
+  * The agent is fixed at (0,0) and does not move.
+  * Every `noop` (and also `down`) causes each moving_lightblue cell to drift downward by 1 row (columns unchanged), except cells already at row 15 (bottom) which do not drift further.
+  * `down` additionally spawns a new moving_lightblue cell at (1,6). This spawned cell then drifts normally.
+  * Overlap among lightblue cells: if a drift would cause a lightblue cell to move into a cell already occupied by another lightblue cell, the moving cell is removed. Cells exiting the bottom (row 16) are removed.
+  * The `click` action reverts to the gold phase: all moving_lightblue cells are removed; static_gold cells reappear at their original positions (the set of static_gold before the switch); moving_gray cells are restored to the positions they had just before the previous gold‑phase click (i.e., the shift applied when entering lightblue is undone). The agent is placed at the position of the moving_lightblue cell with the **smallest row index** (closest to top). If multiple, the one with the smallest column index is used.
+
+- Throughout both phases, cells of the same type never overlap; the removal rules above ensure this.
+- When listing cells, output them in row‑major order (sorted by row, then column) to ensure consistent ordering.

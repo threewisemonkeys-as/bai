@@ -1,0 +1,11 @@
+world knowledge
+- The step number always increases by 1 after every action, regardless of any state changes.
+- Background is black; all other colors are objects.
+- Gold block: a static 3×3 contiguous block of gold cells. It moves only on a click action: every gold cell shifts one column to the right (col+1). When it moves, it overwrites (removes) any objects that occupy its new cells.
+- Gray block: a static 4×4 contiguous block of gray cells. It moves only on left/right actions: left shifts every gray cell one column left (col-1), right shifts one column right (col+1). Up/down do not move it. When it moves, it overwrites (removes) any objects that occupy its new cells.
+- Blue cells: individual cells that interact with the cell directly below them.
+  - On a noop action, each blue cell attempts to fall one row down (row+1): if the destination cell is black, it moves there; if the destination is non-black, the blue cell disappears.
+  - On any other action (up, down, left, right, click), blue cells do not move. However, regardless of the action, after all other movements are applied, any blue cell that has a non-black cell directly below it (row+1) is removed.
+- Green cells and the mediumpurple cell: static; they never change position or color on their own, but can be overwritten (removed) by moving blocks.
+- Actions up and down have no effect on any object (no movement, no falling). Consequently, if the state does not change, the action could be noop, up, or down; the correct action is determined by the agent’s intent, not the state change alone.
+- A click action without coordinates (i.e., just “click”) is treated as a generic click that moves the gold block right by one column.

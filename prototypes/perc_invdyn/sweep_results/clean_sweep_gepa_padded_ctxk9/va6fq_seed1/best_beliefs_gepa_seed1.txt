@@ -1,0 +1,7 @@
+### WORLD KNOWLEDGE
+- The state is always an empty grid; no perceptible changes occur after any action.
+- Only two action types occur: `noop` and `click`. Move actions (up/down/left/right) never appear.
+- Clicks occur strictly periodically: exactly three `noop` actions between consecutive clicks. (Every 4th action is a click.)
+- The clicks follow a repeating cycle of exactly five distinct coordinates. The cycle is defined by the sequence of click coordinates observed in the trajectory, in the order they appear over time. The cycle repeats indefinitely.
+- All observed clicks in the trajectory are part of this cycle; there is no "noise" – each click is a genuine element of the cycle at its temporal position.
+- Given a set of observed clicks (and their temporal positions), the next click is the successor in the cycle (wrapping around after the fifth). The hidden action at any time step is deterministic: it must be a click that maintains the periodic pattern (every 4th action) and corresponds to the next coordinate in the cycle, consistent with the observed clicks before and after it.
