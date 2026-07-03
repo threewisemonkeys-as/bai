@@ -20,6 +20,7 @@ const TABS = [
   ["overview", "Overview"],
   ["experiments", "Questions & Experiments"],
   ["theories", "Theories"],
+  ["frontier", "Frontier (B/P)"],
   ["agent_messages", "Agent Messages"],
   ["artifacts", "Artifacts"],
   ["feedback", "Feedback"],
@@ -36,7 +37,7 @@ const TABS = [
 // absent; see isEBRun / visibleTabs below.
 const EB_ONLY_TABS = new Set([
   "experiments", "artifacts", "feedback",
-  "qa_timeline", "experiment_timeline", "logs",
+  "qa_timeline", "experiment_timeline", "logs", "frontier",
 ]);
 
 function isEBRun() {
@@ -56,9 +57,18 @@ function hasTheoryData() {
   return DATA.steps.some((s) => s.has_theory_log);
 }
 
+// The Frontier tab is meaningful only for gepa_frontier runs, which learn a
+// set of competing {perception, world_knowledge} candidates and write a
+// non-empty frontier.json. Hidden otherwise.
+function hasFrontierData() {
+  if (!DATA || !Array.isArray(DATA.steps)) return false;
+  return DATA.steps.some((s) => s.has_frontier);
+}
+
 function visibleTabs() {
   let tabs = isEBRun() ? TABS : TABS.filter((t) => !EB_ONLY_TABS.has(t[0]));
   if (!hasTheoryData()) tabs = tabs.filter((t) => t[0] !== "theories");
+  if (!hasFrontierData()) tabs = tabs.filter((t) => t[0] !== "frontier");
   return tabs;
 }
 
@@ -932,6 +942,7 @@ function renderStep(idx) {
   else if (currentTab === "artifacts") loadStepDetailForTab(step.episode_idx, step.step, "artifacts");
   else if (currentTab === "experiments") loadStepDetailForTab(step.episode_idx, step.step, "experiments");
   else if (currentTab === "theories") loadStepDetailForTab(step.episode_idx, step.step, "theories");
+  else if (currentTab === "frontier") loadStepDetailForTab(step.episode_idx, step.step, "frontier");
   else if (currentTab === "feedback") loadStepDetailForTab(step.episode_idx, step.step, "feedback");
   else if (currentTab === "agent_messages") loadStepDetailForTab(step.episode_idx, step.step, "agent_messages");
   else if (currentTab === "trajectory") loadTrajectory(step.episode_idx, step.step);
@@ -958,6 +969,7 @@ async function loadStepDetailForTab(epIdx, stepIdx, tab, stepOverview) {
   else if (tab === "artifacts") renderArtifacts(data);
   else if (tab === "experiments") renderExperiments(data);
   else if (tab === "theories") renderTheories(data);
+  else if (tab === "frontier") renderFrontier(data);
   else if (tab === "feedback") renderFeedback(data);
   else if (tab === "agent_messages") renderAgentMessages(data);
   else if (tab === "logs") renderLogs(data);
@@ -2206,6 +2218,90 @@ function renderTheories(data) {
     html += collapsible("4. Theory Generation Prompt & Response",
       promptResponseBlock("Theory Generation", gen.prompt, gen.response), false);
   }
+
+  c.innerHTML = html;
+}
+
+function renderFrontier(data) {
+  const c = document.getElementById("frontier-container");
+  if (!c) return;
+  const fr = data.frontier || {};
+  const candidates = Array.isArray(fr.frontier) ? fr.frontier : [];
+  if (!candidates.length) {
+    c.innerHTML = '<div style="color:var(--text-muted);padding:20px">No frontier recorded for this step (only populated under <code>question_scoring_method=gepa_frontier</code> on relearn steps).</div>';
+    return;
+  }
+
+  const metric = fr.metric;
+  const relearn = fr.relearn;
+  const relearnObj = (relearn && typeof relearn === "object") ? relearn : null;
+  const didRelearn = relearnObj != null || relearn === true;
+  let html = "";
+
+  // Summary banner.
+  html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px">' +
+    '<strong style="color:var(--accent3)">GEPA/legacy frontier.</strong> ' +
+    candidates.length + ' competing {perception, world_knowledge} candidate(s) learned from the trajectory via an inverse-dynamics objective. ' +
+    'Relearned this step: <strong>' + (didRelearn ? "yes" : "no") + "</strong>. " +
+    (metric != null ? 'Best held-out metric (id_acc): <strong style="color:var(--accent2)">' + Number(metric).toFixed(3) + "</strong>." : "") +
+    "</div>";
+
+  // Relearn metadata table (gepa_frontier writes a rich relearn object).
+  if (relearnObj) {
+    const order = ["learner", "click_aware", "transitions", "n_verbs", "train", "val", "test", "candidates", "frontier_size", "metric_calls", "cost"];
+    const keys = order.filter((k) => relearnObj[k] != null).concat(
+      Object.keys(relearnObj).filter((k) => order.indexOf(k) < 0 && k !== "pool")
+    );
+    let rows = "";
+    keys.forEach((k) => {
+      let v = relearnObj[k];
+      if (k === "cost" && typeof v === "number") v = "$" + Number(v).toFixed(4);
+      else if (typeof v === "boolean") v = v ? "yes" : "no";
+      else if (typeof v === "object") v = JSON.stringify(v);
+      rows += '<tr><td style="padding:3px 10px;color:var(--text-muted);border-bottom:1px solid var(--border)">' + esc(k) + '</td><td style="padding:3px 10px;border-bottom:1px solid var(--border)"><b>' + esc(v) + "</b></td></tr>";
+    });
+    html += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">' +
+      '<table style="font-size:12px;border:1px solid var(--border);border-radius:4px;border-collapse:collapse;background:var(--surface)">' + rows + "</table>";
+    if (Array.isArray(relearnObj.pool) && relearnObj.pool.length) {
+      html += '<div style="flex:1;min-width:240px"><div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">action pool (inverse-dynamics targets)</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:4px">' +
+        relearnObj.pool.map((a) => '<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--surface2);border:1px solid var(--border)">' + esc(a) + "</span>").join("") +
+        "</div></div>";
+    }
+    html += "</div>";
+  }
+
+  // Best metric across candidates that carry their own val_acc.
+  const accs = candidates.map((cand) => cand.val_acc).filter((v) => v != null);
+  const bestAcc = accs.length ? Math.max.apply(null, accs) : null;
+
+  candidates.forEach((cand, i) => {
+    const perception = cand.perception || "";
+    const worldKnowledge = cand.world_knowledge || "";
+    const valAcc = cand.val_acc;
+    const isBest = valAcc != null && bestAcc != null && valAcc === bestAcc;
+    const accPill = valAcc != null
+      ? ' <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + (isBest ? "rgba(63,185,80,0.18)" : "rgba(139,148,158,0.14)") + ';color:' + (isBest ? "var(--accent2)" : "var(--text-muted)") + ';font-weight:700">val_acc ' + Number(valAcc).toFixed(3) + (isBest ? " (best)" : "") + "</span>"
+      : "";
+    const emptyP = !perception.trim();
+    const emptyB = !worldKnowledge.trim();
+
+    html += '<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:14px;background:var(--surface)">' +
+      '<div style="padding:8px 12px;border-bottom:1px solid var(--border);font-weight:600">Candidate ' + i + accPill + "</div>" +
+      '<div style="padding:12px">';
+    // world_knowledge (beliefs)
+    html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">world_knowledge (B)' + (emptyB ? ' — <em>empty (seed)</em>' : "") + "</div>";
+    if (!emptyB) {
+      html += '<pre style="white-space:pre-wrap;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:10px;margin:0 0 12px;font-size:12px;max-height:260px;overflow:auto">' + esc(worldKnowledge) + "</pre>";
+    }
+    // perception (code) — collapsible
+    html += '<details' + (emptyP ? "" : " open") + '><summary style="cursor:pointer;font-size:12px;color:var(--text-muted)">perception.py (P) — ' + (emptyP ? "empty (seed)" : (perception.split("\n").length + " lines")) + "</summary>";
+    if (!emptyP) {
+      html += '<pre style="white-space:pre;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:10px;margin:8px 0 0;font-size:12px;max-height:360px;overflow:auto">' + esc(perception) + "</pre>";
+    }
+    html += "</details>";
+    html += "</div></div>";
+  });
 
   c.innerHTML = html;
 }

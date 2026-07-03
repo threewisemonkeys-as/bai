@@ -8,8 +8,11 @@ import logging
 import os
 import re
 import random
+import signal
+import threading
 import typing
 from collections import defaultdict
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -109,6 +112,42 @@ def format_segment_outcome_header(
 # ---------------------------------------------------------------------------
 
 
+# LLM-written perceive() code can contain accidental infinite loops (e.g.
+# appending to a list while iterating it), which would otherwise spin the
+# pipeline forever. Every exec/call of perception code is wrapped in this
+# wall-clock deadline. Signal-based, so it only arms in the main thread;
+# pure-Python loops are interrupted between bytecodes.
+PERCEIVE_TIMEOUT_SECONDS = 10.0
+
+
+class PerceiveTimeout(Exception):
+    """perceive() exceeded its wall-clock execution deadline."""
+
+
+@contextmanager
+def perceive_deadline(seconds: float = PERCEIVE_TIMEOUT_SECONDS):
+    if (
+        seconds <= 0
+        or threading.current_thread() is not threading.main_thread()
+    ):
+        yield
+        return
+
+    def _on_timeout(signum, frame):
+        raise PerceiveTimeout(
+            f"perceive() exceeded the {seconds:g}s execution time limit "
+            f"(likely an infinite loop, e.g. mutating a list while iterating it)"
+        )
+
+    old_handler = signal.signal(signal.SIGALRM, _on_timeout)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, old_handler)
+
+
 def load_perception_fn(perception_code: str):
     """Compile perception code and return the perceive function, or None."""
     if not perception_code or not perception_code.strip():
@@ -120,7 +159,8 @@ def load_perception_fn(perception_code: str):
         return None
     try:
         ns = {}
-        exec(perception_code, ns)
+        with perceive_deadline():
+            exec(perception_code, ns)
         if "perceive" in ns:
             return ns["perceive"]
         logging.warning("Perception code has no 'perceive' function")
@@ -135,7 +175,8 @@ def apply_perception(obs: dict, perception_fn) -> None:
         return
     long_term_text = obs["text"]["long_term_context"]
     try:
-        perception_output = perception_fn(long_term_text)
+        with perceive_deadline():
+            perception_output = perception_fn(long_term_text)
     except Exception as e:
         perception_output = f"Perception code failed with error -\n{e}"
         logging.warning(f"Perception module failed: {e}")
@@ -196,11 +237,14 @@ def apply_perception_with_history(
         history = [obs["text"]["long_term_context"]]
     mode = _perceive_signature_mode(perception_fn)
     try:
-        if mode == "history":
-            windowed = history[-window:] if window and window > 0 else list(history)
-            perception_output = perception_fn(windowed)
-        else:
-            perception_output = perception_fn(history[-1])
+        with perceive_deadline():
+            if mode == "history":
+                windowed = (
+                    history[-window:] if window and window > 0 else list(history)
+                )
+                perception_output = perception_fn(windowed)
+            else:
+                perception_output = perception_fn(history[-1])
     except Exception as e:
         perception_output = f"Perception code failed with error -\n{e}"
         logging.warning(f"Perception module failed: {e}")

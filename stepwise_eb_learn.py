@@ -13,9 +13,19 @@ import logging
 import os
 import random
 import re
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+
+# The GEPA/legacy experience-learning pipeline lives under prototypes/perc_invdyn
+# and its modules import one another by bare name (run via uv from repo root), so
+# that directory must be on sys.path. We add it here but import gepa_optimize /
+# validate lazily inside _relearn_frontier_eb so a missing `gepa` install only
+# fails runs that actually use question_scoring_method == "gepa_frontier".
+_PERC_INVDYN_DIR = str((Path(__file__).resolve().parent / "prototypes" / "perc_invdyn"))
+if _PERC_INVDYN_DIR not in sys.path:
+    sys.path.insert(0, _PERC_INVDYN_DIR)
 
 import hydra
 import numpy as np
@@ -39,7 +49,7 @@ from b_learn_improve import (
     serialize_qa_feedback_results,
 )
 from explore import evolve_logger, get_default_knowledge
-from goal_prompts import append_agent_goal, resolve_agent_goal
+from goal_prompts import append_agent_goal, is_goal_aware, resolve_agent_goal
 from llm_utils import extract_xml_key, extract_xml_kv
 from mixed_improve import (
     QAPair,
@@ -72,6 +82,8 @@ from stepwise_b_learn import (
     _inject_beliefs,
     _refresh_buffer_with_perception,
     _sample_observations_from_buffer,
+    collect_perception_runtime_errors,
+    format_perception_runtime_errors,
     format_steps_context,
 )
 from stepwise_b_learn_improve import (
@@ -161,6 +173,7 @@ def _eb_perception_instructions(include_policy: bool = True) -> str:
 - Ensure the output does not exceed 2000 characters. Remove features that the agent does not use for decision-making.
 - The output should be consistent with the current {belief_ref} and should not make any additional or contradictory assumptions to them.
 - Ensure that the perception module is working correctly — that it is correctly extracting the intended information from the raw environment state and presenting it clearly.
+- perceive() must work on EVERY observation the environment produces, including the first observation of an episode (which may include introductory text around the grid) and single-frame histories. It must never raise an exception and must never return a blank/empty string — if parsing fails, degrade gracefully and still return a useful non-empty description.
 """
 
 
@@ -405,6 +418,38 @@ class StepwiseEBLearnConfig:
     autumn_eval_max_steps: int = 501
     autumn_eval_render_mode: str = "text"
     frozen_eval_autumn_planning_goal: str | None = None
+    # --- GEPA/legacy frontier mode (question_scoring_method == "gepa_frontier") ---
+    # Maintain a frontier (set of competing {perception, world_knowledge}
+    # candidates) learned from the collected trajectory via an inverse-dynamics
+    # objective, and use the candidates' disagreement to formulate experiments.
+    frontier_learner: str = "gepa"  # "gepa" (pareto) | "legacy" (greedy P/B) | "legacy_pop" (pop)
+    # Coordinate-aware inverse dynamics: keep click coordinates as distinct
+    # learnable targets (ARC ACTION6 x y / autumn click row col) and build
+    # hard-negative click choice sets. No-ops on move-only action sets.
+    frontier_click_aware: bool = True
+    frontier_size: int = 3
+    frontier_relearn_interval: int = 10  # env steps between relearns
+    frontier_min_buffer: int = 12  # skip relearn below this many usable transitions
+    frontier_max_metric_calls: int = 80  # GEPA budget
+    frontier_legacy_rounds: int = 6  # legacy greedy P/B alternations
+    frontier_pop_size: int = 4  # legacy_pop: population / frontier size
+    frontier_pop_rounds: int = 6  # legacy_pop: mutate+select rounds
+    # legacy_pop image mode: ARC obs are images with no text grid to parse, so
+    # learn B only via image inverse-dynamics (predictor sees the frames).
+    # "auto" = on when the buffer carries images; "on"/"off" force it.
+    frontier_image_mode: str = "auto"
+    frontier_image_max_transitions: int = 16  # cap image transitions (vision cost)
+    frontier_k_choices: int = 5
+    frontier_train_n: int = 14
+    frontier_val_n: int = 12
+    frontier_test_n: int = 10
+    frontier_fd_scorer: str = "none"  # "none" | "textdiff" | "judge"
+    frontier_fd_weight: float = 0.5
+    frontier_concurrency: int = 8
+    # Default to the deployed-agent model (GEPA's weak task LM) and the same
+    # model for reflection when unset; both resolve to config.client.model_id.
+    frontier_task_model: str | None = None
+    frontier_reflection_model: str | None = None
 
 
 def _format_prior_attempts(prior_attempts: list[dict]) -> str:
@@ -1043,6 +1088,7 @@ def _save_episode_artifacts_eb(
     trajectory_buffer: list[dict] | None = None,
     past_experiments: list[str] | None = None,
     theories: list[Theory] | None = None,
+    frontier: list[dict] | None = None,
 ):
     """Save all artifacts for a completed episode."""
     episode_dir.mkdir(parents=True, exist_ok=True)
@@ -1059,18 +1105,21 @@ def _save_episode_artifacts_eb(
     if theories is not None:
         with open(episode_dir / "theories.json", "w") as f:
             json.dump(serialize_theories(theories), f, indent=4)
+    if frontier is not None:
+        with open(episode_dir / "frontier.json", "w") as f:
+            json.dump(frontier, f, indent=2, default=str)
 
 
 def _find_last_completed_episode_eb(
     output_dir: str,
-) -> tuple[int, str, str, list[EBQAPair], list[Theory]]:
+) -> tuple[int, str, str, list[EBQAPair], list[Theory], list[dict]]:
     """Find the last completed episode directory and restore EB state.
 
-    Returns: (last_episode, beliefs, perception, qa_pairs, theories)
+    Returns: (last_episode, beliefs, perception, qa_pairs, theories, frontier)
     """
     output_path = Path(output_dir)
     if not output_path.exists():
-        return -1, "", "", [], []
+        return -1, "", "", [], [], []
 
     episode_dirs = []
     for item in output_path.iterdir():
@@ -1083,7 +1132,7 @@ def _find_last_completed_episode_eb(
                 continue
 
     if not episode_dirs:
-        return -1, "", "", [], []
+        return -1, "", "", [], [], []
 
     episode_dirs.sort(key=lambda x: x[0])
     last_ep, last_dir = episode_dirs[-1]
@@ -1111,8 +1160,16 @@ def _find_last_completed_episode_eb(
         except (json.JSONDecodeError, TypeError):
             pass
 
+    frontier: list[dict] = []
+    frontier_file = last_dir / "frontier.json"
+    if frontier_file.exists():
+        try:
+            frontier = json.loads(frontier_file.read_text())
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     evolve_logger.info(f"Resuming from episode {last_ep} in {last_dir}")
-    return last_ep, beliefs, perception, qa_pairs, theories
+    return last_ep, beliefs, perception, qa_pairs, theories, frontier
 
 
 # ---------------------------------------------------------------------------
@@ -1149,7 +1206,11 @@ def _run_improve_loop_eb(
     )
     max_qa_iters = _resolve_schedule(eb_config.max_qa_iterations, global_step)
 
-    include_policy = eb_config.include_policy
+    # Dynamics mode has no win condition: drop the <policy> section (its guidance
+    # is framed around "completing the objective") and any progress/objective
+    # wording from the belief-audit prompt.
+    goal_aware = is_goal_aware(config)
+    include_policy = eb_config.include_policy and goal_aware
     perception_enabled = eb_config.perception_enabled
     perception_instructions = (
         _eb_perception_instructions(include_policy) if perception_enabled else ""
@@ -1170,6 +1231,10 @@ def _run_improve_loop_eb(
         policy_task_phrase = (
             "world knowledge and policy" if include_policy else "world knowledge"
         )
+    safety_progress_line = (
+        "- Balance safety with progress toward the objective.\n"
+        if goal_aware else ""
+    )
 
     hist_window = eb_config.perception_history_window
     display_tail = eb_config.perception_input_tail
@@ -1248,6 +1313,32 @@ def _run_improve_loop_eb(
         f"{len(steps_context)} chars context"
     )
 
+    # Replay the current perception over the buffer and surface any runtime
+    # crashes to the improve prompts. These are the errors the agent silently
+    # hit during rollout (failed perceive() => no features for that step).
+    def _runtime_perception_errors(current_perception: str) -> list[dict]:
+        if not (perception_enabled and current_perception.strip()):
+            return []
+        return collect_perception_runtime_errors(
+            trajectory_buffer, current_perception, history_window=hist_window
+        )
+
+    runtime_perc_errors = _runtime_perception_errors(perception)
+    if runtime_perc_errors:
+        evolve_logger.info(
+            f"{tag} Perception runtime errors detected on "
+            f"{len(runtime_perc_errors)} buffered observation(s); feeding back "
+            f"into improve prompts"
+        )
+    runtime_errors_block = format_perception_runtime_errors(runtime_perc_errors)
+    runtime_errors_section = (
+        "\n=== RUNTIME PERCEPTION ERRORS ===\n"
+        f"{runtime_errors_block}\n"
+        "=== END RUNTIME PERCEPTION ERRORS ===\n"
+        if runtime_errors_block
+        else ""
+    )
+
     try:
         # ========================================
         # Track 1a: Steps-based beliefs improvement
@@ -1291,7 +1382,7 @@ Each ``<pre_state>`` (and ``<post_state>``, when present) is annotated with an `
 === SEQUENCE OF STEPS ===
 {steps_context}
 === END SEQUENCE OF STEPS ===
-
+{runtime_errors_section}
 Your task is to:
 1. Analyze the step sequence.
 2. Update our beliefs about the environment based on confirmed knowledge from the steps.
@@ -1369,12 +1460,46 @@ Provide analysis highlighting:
                     display_tail=display_tail,
                     post_image_only=use_post_images,
                 )
-                prior_block = _format_prior_attempts(prior_attempts_1b)
-                combined_analysis = (
-                    (prior_block + "\n\n" + perception_analysis).strip()
-                    if prior_block
-                    else perception_analysis
+                # Recompute runtime errors against the current perception each
+                # turn so the LLM sees whether its previous fix resolved them.
+                turn_runtime_errors = _runtime_perception_errors(perception)
+                turn_errors_block = format_perception_runtime_errors(
+                    turn_runtime_errors
                 )
+                prior_block = _format_prior_attempts(prior_attempts_1b)
+                analysis_parts = [
+                    part
+                    for part in (
+                        prior_block,
+                        turn_errors_block,
+                        perception_analysis,
+                    )
+                    if part and part.strip()
+                ]
+                combined_analysis = "\n\n".join(analysis_parts).strip()
+
+                # Validate any accepted change against the inputs that crashed
+                # at runtime (one representative per unique error), in addition
+                # to the regular samples — otherwise a "fix" can pass validation
+                # while still failing on the exact observation that broke it.
+                val_sample_obs = list(track1b_sample_obs)
+                val_sample_hists = list(track1b_sample_obs_histories)
+                if turn_runtime_errors:
+                    failing_reps: list[dict] = []
+                    seen_errors: set[str] = set()
+                    for err_entry in turn_runtime_errors:
+                        if err_entry["error"] in seen_errors:
+                            continue
+                        seen_errors.add(err_entry["error"])
+                        failing_reps.append(err_entry)
+                        if len(failing_reps) >= 2:
+                            break
+                    val_sample_obs = [
+                        (e["raw_obs"], e["step"]) for e in failing_reps
+                    ] + val_sample_obs
+                    val_sample_hists = [
+                        e["history"] for e in failing_reps
+                    ] + val_sample_hists
 
                 message = build_perception_with_analysis_prompt(
                     beliefs=beliefs,
@@ -1402,9 +1527,9 @@ Provide analysis highlighting:
                         perception=perception,
                         conversation_history=[],
                         user_message=message,
-                        sample_observations=track1b_sample_obs,
+                        sample_observations=val_sample_obs,
                         images=track1b_sample_obs_images,
-                        sample_histories=track1b_sample_obs_histories,
+                        sample_histories=val_sample_hists,
                         history_window=hist_window,
                         extraction_mode="diff",
                     )
@@ -1621,8 +1746,7 @@ For INCORRECT predictions specifically, analyze:
 
 Guidelines:
 - Keep each beliefs section to at most 8 concise bullet points. Merge redundant points.
-- Balance safety with progress toward the objective.
-- Prefer replacing a belief over qualifying it: a hedge that preserves a wrong frame ("X is the goal, but only sometimes / needs more") is worse than restating the claim correctly or admitting the mechanism is unknown.
+{safety_progress_line}- Prefer replacing a belief over qualifying it: a hedge that preserves a wrong frame ("X is the goal, but only sometimes / needs more") is worse than restating the claim correctly or admitting the mechanism is unknown.
 - Remove beliefs that are contradicted by the QA evidence.
 - If, after auditing every belief against the evidence, nothing needs to change, leave the beliefs unchanged and SUBMIT.
 
@@ -1857,6 +1981,11 @@ async def select_tied_b_diff_question(
 === END DEFAULT KNOWLEDGE ===
 """
     n_tied = len(tied_source_indices)
+    selection_criterion = (
+        "help achieve the overall objective for the environment"
+        if is_goal_aware(config)
+        else "deepen understanding of how the environment works"
+    )
     prompt = f"""You are selecting the next question target for learning about how a game works.
 
 {default_knowledge_section}
@@ -1870,7 +1999,7 @@ async def select_tied_b_diff_question(
 === AVAILABLE QUESTIONS ===
 
 Select questions that will
-1. That will help achieve the overall objective for the environment
+1. That will {selection_criterion}
 2. Cover distinct aspects of the environment
 
 Use each question's Q number in the <q n="..."> attribute. Format your response as:
@@ -2047,6 +2176,399 @@ Use <critical>yes</critical> or <critical>no</critical>."""
     return is_critical, reason, cost, prompt, text
 
 
+# ---------------------------------------------------------------------------
+# GEPA/legacy frontier relearn (question_scoring_method == "gepa_frontier").
+# Learns a frontier (set of competing {perception, world_knowledge} candidates)
+# from the collected trajectory via an inverse-dynamics objective, mirroring
+# prototypes/perc_invdyn/explore_loop.py::relearn(). The frontier is then the
+# "set of possible Bs": its top candidate feeds the agent (B + P) and the
+# candidates' disagreement drives experiment formulation.
+# ---------------------------------------------------------------------------
+def _clean_frontier_perception(text: str) -> str:
+    """Strip markdown fences / prose from a GEPA candidate's perception code."""
+    import gepa_optimize as G  # lazy: only needed in frontier mode
+
+    return G._clean_component("perception", text or "")
+
+
+def _normalize_action(raw: str) -> str:
+    """Canonical action label for the inverse-dynamics target.
+
+    Single-token (move) actions collapse to the verb. Parametric actions
+    (e.g. ARC ``ACTION6 x=10 y=20`` or autumn ``click 3 4``) keep their
+    coordinates as ``"<verb> <n1> <n2> ..."`` so clicks at different cells are
+    distinct learnable targets. Integers are read from the ARGS only (so the
+    digit in a verb like ``ACTION6`` is never mistaken for a coordinate), and an
+    uninstantiated template (``click ROW COL``) with no concrete numbers
+    collapses back to the verb.
+    """
+    parts = str(raw).split()
+    if not parts:
+        return ""
+    verb = parts[0]
+    nums = re.findall(r"-?\d+", " ".join(parts[1:]))
+    if not nums:
+        return verb
+    return verb + " " + " ".join(nums)
+
+
+def _is_parametric_action(canonical: str) -> bool:
+    """True for a coordinate-bearing (click) action in canonical form."""
+    return len(canonical.split()) > 1
+
+
+def _bake_choices_clickaware(transitions, pool, k, rng):
+    """Choice sets for inverse dynamics with coordinate-aware HARD NEGATIVES.
+
+    For a click transition the distractors are preferentially *other observed
+    click locations* (same verb first, then any other click), so the MCQ cannot
+    be solved by verb alone and the learner is forced to localize the click.
+    Move transitions fall back to generic distractors (identical to the shared
+    ``make_choices`` behavior). Emits the same ``{tr, choices}`` baked dicts the
+    GEPA adapter / ``eval_on`` consume."""
+    click_actions = [a for a in pool if _is_parametric_action(a)]
+    noncl = [a for a in pool if not _is_parametric_action(a)]
+    baked = []
+    for tr in transitions:
+        true = tr.action
+        if _is_parametric_action(true):
+            verb = true.split()[0]
+            same = [a for a in click_actions if a != true and a.split()[0] == verb]
+            other = [a for a in click_actions if a != true and a.split()[0] != verb]
+            rng.shuffle(same)
+            rng.shuffle(other)
+            spare = [a for a in noncl]
+            rng.shuffle(spare)
+            distractors = same + other + spare
+        else:
+            distractors = [a for a in pool if a != true]
+            rng.shuffle(distractors)
+        choices = [true] + distractors[: max(0, k - 1)]
+        rng.shuffle(choices)
+        baked.append({"tr": tr, "choices": choices})
+    return baked
+
+
+def _balanced_split_by_verb(transitions, holdout_n, rng):
+    """Like validate_beliefs.balanced_split but balances by VERB, not by exact
+    action — so a held-out split stays representative when many click
+    coordinates are singletons. Returns (rest, holdout)."""
+    by_verb = defaultdict(list)
+    for t in transitions:
+        by_verb[t.action.split()[0]].append(t)
+    for v in by_verb.values():
+        rng.shuffle(v)
+    verbs = list(by_verb)
+    holdout = []
+    i = 0
+    while len(holdout) < holdout_n and any(by_verb[v] for v in verbs):
+        v = verbs[i % len(verbs)]
+        if by_verb[v]:
+            holdout.append(by_verb[v].pop())
+        i += 1
+    rest = [t for v in verbs for t in by_verb[v]]
+    rng.shuffle(rest)
+    return rest, holdout
+
+
+def _transitions_from_buffer(trajectory_buffer: list[dict], click_aware: bool = True):
+    """Build inverse-dynamics Transitions (X_t, action, X_{t+1}) from the rollout
+    buffer. Each acted entry already carries pre- and post-action raw
+    observations, so no consecutive-entry pairing is needed (episode boundaries
+    have action=None and are skipped).
+
+    ``click_aware`` keeps coordinates on parametric actions (see
+    ``_normalize_action``); when False, every action collapses to its verb."""
+    from validate import Transition  # lazy: only needed in frontier mode
+
+    transitions = []
+    for e in trajectory_buffer:
+        if e.get("episode_boundary") or not e.get("action"):
+            continue
+        x_t = (e.get("raw_long_term_context") or "").strip()
+        x_t1 = (e.get("result_raw_long_term_context") or "").strip()
+        if not x_t or not x_t1:
+            continue
+        raw = str(e["action"])
+        label = _normalize_action(raw) if click_aware else raw.split()[0]
+        if not label:
+            continue
+        transitions.append(Transition(x_t, x_t1, label))
+    return transitions
+
+
+def _img_transitions_from_buffer(trajectory_buffer: list[dict], click_aware: bool = True):
+    """Build IMAGE inverse-dynamics transitions (frame_t, action, frame_{t+1})
+    from the buffer's pre/post-action PIL images. For image-native envs (ARC)
+    whose text obs has no grid. Entries lacking either image are skipped."""
+    from legacy_pop import ImgTransition  # lazy: only in frontier image mode
+
+    transitions = []
+    for e in trajectory_buffer:
+        if e.get("episode_boundary") or not e.get("action"):
+            continue
+        img_t = e.get("image")
+        img_t1 = e.get("result_image")
+        if img_t is None or img_t1 is None:
+            continue
+        raw = str(e["action"])
+        label = _normalize_action(raw) if click_aware else raw.split()[0]
+        if not label:
+            continue
+        transitions.append(ImgTransition(label, img_t, img_t1))
+    return transitions
+
+
+def _relearn_frontier_eb(
+    config: DictConfig,
+    eb_config: StepwiseEBLearnConfig,
+    trajectory_buffer: list[dict],
+    env_name: str,
+    current_frontier: list[dict],
+    rng: random.Random,
+):
+    """Run GEPA (or legacy greedy) on the buffer; return (frontier, metric, info, cost).
+
+    frontier = up to ``frontier_size`` distinct top-val candidates (best first).
+    metric   = best candidate's inverse-dynamics accuracy on a held-out test
+               split that neither optimization nor selection ever touched.
+    On any skip (too little data) the current frontier is returned unchanged.
+    """
+    if eb_config.mock_mode:
+        # Mock mode short-circuits LLM calls at the mixed_improve / BALROG client
+        # layers, but the GEPA/validate pipeline uses its own client that is NOT
+        # gated. Synthesize a small frontier instead of issuing real API calls so
+        # the branch plumbing (re-inject + experiment + persistence) is exercised.
+        synth = [
+            {"perception": "", "world_knowledge": f"mock world knowledge (candidate {i + 1})"}
+            for i in range(max(2, eb_config.frontier_size))
+        ]
+        return synth, 0.0, {"mock": True, "frontier_size": len(synth)}, 0.0
+
+    import gepa  # lazy: only needed in frontier mode
+    import gepa_optimize as G
+    from validate import make_config
+
+    click_aware = eb_config.frontier_click_aware
+
+    # --- Image-native B learner (ARC: obs is an image with no text grid) ---
+    has_images = any(
+        e.get("image") is not None and e.get("result_image") is not None
+        for e in trajectory_buffer
+    )
+    image_mode = (eb_config.frontier_learner == "legacy_pop") and (
+        eb_config.frontier_image_mode == "on"
+        or (eb_config.frontier_image_mode == "auto" and has_images)
+    )
+    if image_mode:
+        from legacy_pop import run_legacy_pop_img
+
+        img_trans = _img_transitions_from_buffer(
+            trajectory_buffer, click_aware=click_aware
+        )
+        cap = eb_config.frontier_image_max_transitions
+        if len(img_trans) > cap:  # bound vision cost: keep the most recent
+            img_trans = img_trans[-cap:]
+        img_pool = sorted({t.action for t in img_trans})
+        if len(img_pool) < 2 or len(img_trans) < eb_config.frontier_min_buffer:
+            return (
+                current_frontier, None,
+                {"skipped": f"image transitions={len(img_trans)} "
+                            f"distinct_actions={len(img_pool)}"},
+                0.0,
+            )
+        k = eb_config.frontier_k_choices
+        _bake_img = _bake_choices_clickaware if click_aware else (
+            lambda tr, p, kk, r: G.bake_choices(tr, p, kk, r)
+        )
+        baked = _bake_img(img_trans, img_pool, k, rng)  # val == train (tied)
+        task_cfg = make_config(
+            eb_config.frontier_task_model or config.client.model_id,
+            config.client.client_name,
+        )
+        sem = asyncio.Semaphore(eb_config.frontier_concurrency)
+        pop_frontier, pcost = asyncio.run(
+            run_legacy_pop_img(
+                task_cfg, baked, sem, seed=0,
+                rounds=eb_config.frontier_pop_rounds,
+                pop_size=eb_config.frontier_pop_size,
+            )
+        )
+        frontier = pop_frontier[: eb_config.frontier_size]
+        top = frontier[0]
+        info = {
+            "learner": "legacy_pop", "image_mode": True, "click_aware": click_aware,
+            "transitions": len(img_trans), "pool": img_pool,
+            "train": len(baked), "val": len(baked),
+            "pop_size": eb_config.frontier_pop_size,
+            "distinct_B": len({c["world_knowledge"].strip() for c in frontier}),
+            "val_accs": [round(c.get("val_acc", 0.0), 3) for c in frontier],
+            "cost": round(pcost, 4), "frontier_size": len(frontier),
+        }
+        return frontier, top.get("val_acc"), info, pcost
+
+    transitions = _transitions_from_buffer(trajectory_buffer, click_aware=click_aware)
+    pool = sorted({t.action for t in transitions})
+    # Need >=2 distinct actions to form a non-trivial inverse-dynamics choice
+    # set. In click-aware mode distinct *coordinates* count (a pure-click game
+    # like ft09 has one verb but many discriminable click targets), so gate on
+    # the number of distinct full actions, not verbs.
+    n_verbs = len({a.split()[0] for a in pool})
+    if len(pool) < 2 or len(transitions) < eb_config.frontier_min_buffer:
+        return (
+            current_frontier,
+            None,
+            {
+                "skipped": f"transitions={len(transitions)} "
+                f"distinct_actions={len(pool)} verbs={n_verbs}"
+            },
+            0.0,
+        )
+
+    # Coordinate-aware mode balances the split by verb (clicks are mostly
+    # singletons) and bakes HARD-NEGATIVE click choice sets; otherwise use the
+    # shared verb-only split/baker.
+    _split = _balanced_split_by_verb if click_aware else (
+        lambda d, n, r: G.balanced_split(d, n, 10**9, r)
+    )
+    _bake = _bake_choices_clickaware if click_aware else (
+        lambda tr, p, kk, r: G.bake_choices(tr, p, kk, r)
+    )
+
+    data = list(transitions)
+    rng.shuffle(data)
+    k = eb_config.frontier_k_choices
+    # Low-data regime: val = train = the FULL experience so far, no held-out test
+    # split and no separate test eval. This matches the legacy_pop prototype that
+    # validated this approach; carving disjoint val/test starves the tiny buffer
+    # and makes pareto-by-example selection meaningless (val too small).
+    train_tr = val_tr = test_tr = data
+    if not train_tr:
+        return current_frontier, None, {"skipped": "empty split"}, 0.0
+
+    client_name = config.client.client_name
+    task_cfg = make_config(
+        eb_config.frontier_task_model or config.client.model_id, client_name
+    )
+    refl_cfg = make_config(
+        eb_config.frontier_reflection_model or config.client.model_id, client_name
+    )
+
+    test = _bake(test_tr, pool, k, rng)
+    cost = 0.0
+
+    if eb_config.frontier_learner == "legacy":
+        # Greedy P/B loop -> a single best candidate (frontier of size 1). Uses
+        # val for selection; metric is measured on the untouched test split.
+        # NOTE: run_legacy_loop bakes its own choice sets via the shared
+        # make_choices (generic distractors), so it does not get the
+        # coordinate-aware hard negatives that the GEPA branch / test split do.
+        sem = asyncio.Semaphore(eb_config.frontier_concurrency)
+        best_code, best_beliefs, lcost = asyncio.run(
+            G.run_legacy_loop(
+                task_cfg, train_tr, val_tr, pool, k, sem, rng,
+                eb_config.frontier_legacy_rounds, start_code="",
+            )
+        )
+        cost += lcost
+        frontier = [{"perception": best_code, "world_knowledge": best_beliefs}]
+        metric, _ = asyncio.run(G.eval_on(task_cfg, best_code, best_beliefs, test))
+        info = {
+            "learner": "legacy", "click_aware": click_aware,
+            "transitions": len(transitions), "pool": pool, "n_verbs": n_verbs,
+            "train": len(train_tr), "val": len(val_tr), "test": len(test),
+            "cost": round(cost, 4), "frontier_size": len(frontier),
+        }
+        return frontier, metric, info, cost
+
+    if eb_config.frontier_learner == "legacy_pop":
+        # Population of {P,B} candidates, each mutated by legacy's G1 failure-
+        # directed update, selected by pareto-by-example on a fixed-choice val
+        # set -> a DIVERSE frontier (the disagreement that drives experiments)
+        # at lower cost than GEPA's reflective search. (prototype: legacy_pop.py)
+        from legacy_pop import run_legacy_pop
+
+        val = _bake(val_tr, pool, k, rng)
+        sem = asyncio.Semaphore(eb_config.frontier_concurrency)
+        pop_frontier, pcost = asyncio.run(
+            run_legacy_pop(
+                task_cfg, train_tr, val, pool, k, sem, seed=0,
+                rounds=eb_config.frontier_pop_rounds,
+                pop_size=eb_config.frontier_pop_size, start_code="",
+            )
+        )
+        cost += pcost
+        # run_legacy_pop returns dicts already shaped {perception, world_knowledge, val_acc}
+        frontier = pop_frontier[: eb_config.frontier_size]
+        top = frontier[0]
+        # No held-out test eval: metric = top candidate's (in-sample) val accuracy.
+        metric = top.get("val_acc")
+        info = {
+            "learner": "legacy_pop", "click_aware": click_aware,
+            "transitions": len(transitions), "pool": pool, "n_verbs": n_verbs,
+            "train": len(train_tr), "val": len(val),
+            "pop_size": eb_config.frontier_pop_size,
+            "distinct_B": len({c["world_knowledge"].strip() for c in frontier}),
+            "distinct_P": len({c["perception"].strip() for c in frontier}),
+            "val_accs": [round(c.get("val_acc", 0.0), 3) for c in frontier],
+            "cost": round(cost, 4), "frontier_size": len(frontier),
+        }
+        return frontier, metric, info, cost
+
+    # GEPA (pareto) branch -- mirrors explore_loop.relearn.
+    train = _bake(train_tr, pool, k, rng)
+    val = _bake(val_tr, pool, k, rng)
+    adapter = G.InvDynAdapter(
+        task_cfg, pool, concurrency=eb_config.frontier_concurrency,
+        fd_scorer=eb_config.frontier_fd_scorer, fd_weight=eb_config.frontier_fd_weight,
+    )
+    seed_candidate = {"perception": "", "world_knowledge": ""}
+    result = gepa.optimize(
+        seed_candidate=seed_candidate, trainset=train, valset=val, adapter=adapter,
+        reflection_lm=G.make_reflection_lm(refl_cfg),
+        reflection_prompt_template=G.build_reflection_templates(env_name),
+        candidate_selection_strategy="pareto", module_selector="round_robin",
+        reflection_minibatch_size=min(len(train), 12),
+        max_metric_calls=eb_config.frontier_max_metric_calls,
+        display_progress_bar=False, seed=0, cache_evaluation=True,
+        raise_on_exception=False, track_best_outputs=True,
+    )
+    cost += adapter.total_cost
+    # frontier = distinct candidates ranked by val aggregate score (best first).
+    order = sorted(
+        range(len(result.candidates)),
+        key=lambda i: result.val_aggregate_scores[i], reverse=True,
+    )
+    frontier, seen = [], set()
+    for i in order:
+        c = result.candidates[i]
+        key = (c.get("perception", ""), c.get("world_knowledge", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        frontier.append(c)
+        if len(frontier) >= eb_config.frontier_size:
+            break
+
+    metric, _ = asyncio.run(
+        G.eval_on(
+            task_cfg,
+            G._clean_component("perception", result.best_candidate.get("perception", "")),
+            result.best_candidate.get("world_knowledge", ""),
+            test,
+        )
+    )
+    info = {
+        "learner": "gepa", "click_aware": click_aware,
+        "transitions": len(transitions), "pool": pool, "n_verbs": n_verbs,
+        "train": len(train), "val": len(val), "test": len(test),
+        "candidates": result.num_candidates,
+        "metric_calls": result.total_metric_calls,
+        "cost": round(cost, 4), "frontier_size": len(frontier),
+    }
+    return frontier, metric, info, cost
+
+
 def run_stepwise_eb_learn_episode(
     config: DictConfig,
     eb_config: StepwiseEBLearnConfig,
@@ -2065,6 +2587,7 @@ def run_stepwise_eb_learn_episode(
     agent_history_events: list[dict] | None = None,
     cumulative_cost_offset: float = 0.0,
     theories: list[Theory] | None = None,
+    frontier: list[dict] | None = None,
 ) -> tuple[
     str,
     str,
@@ -2077,13 +2600,17 @@ def run_stepwise_eb_learn_episode(
     list[str],
     list[dict],
     list[Theory],
+    list[dict],
 ]:
     """Run a single episode with per-step EB-learning.
 
     Returns:
         (beliefs, perception, qa_pairs, current_experiment,
          current_experiment_question, episode_stats, steps_taken, trajectory_buffer,
-         past_experiments, agent_history_events, theories)
+         past_experiments, agent_history_events, theories, frontier)
+
+    ``frontier`` carries the GEPA/legacy "set of possible Bs" (only used when
+    ``question_scoring_method == "gepa_frontier"``; otherwise empty).
 
     ``theories`` carries the Plan A persistent theory ensemble (only used when
     ``question_scoring_method == "theory_disagreement"``; otherwise empty).
@@ -2133,6 +2660,9 @@ def run_stepwise_eb_learn_episode(
 
     # Setup instruction prompt with beliefs
     agent_goal = resolve_agent_goal(config)
+    # Dynamics mode has no win condition: theory generation and action selection
+    # must not inject any progress/win framing, and exploit is disabled.
+    goal_aware = is_goal_aware(config)
 
     # ARC-AGI exposes a game-specific (and sometimes mid-episode-changing) action
     # set. The run-level default_knowledge was built with the generic full action
@@ -2235,6 +2765,14 @@ def run_stepwise_eb_learn_episode(
     # acts toward the goal under the MAP theory instead of running experiments.
     model_stable_streak = 0
     exploit_mode = False
+
+    # --- GEPA/legacy frontier mode (gepa_frontier) persistent state ---
+    # ``frontier`` is the carried "set of possible Bs": a ranked list of
+    # competing {perception, world_knowledge} candidates learned from experience.
+    # Re-fit on a cadence; the top candidate feeds the agent's B + P.
+    frontier_mode = eb_config.question_scoring_method == "gepa_frontier"
+    frontier = frontier if frontier is not None else []
+    frontier_metric: float | None = None
 
     # CSV logging
     ep_dir = Path(output_dir)
@@ -2365,6 +2903,7 @@ def run_stepwise_eb_learn_episode(
                     map_t = theories[0] if theories else None
                     can_exploit = (
                         eb_config.exploit_enabled
+                        and goal_aware
                         and map_t is not None
                         and len(theories) >= eb_config.exploit_min_theories
                     )
@@ -2386,6 +2925,7 @@ def run_stepwise_eb_learn_episode(
                                 beliefs=beliefs,
                                 default_knowledge=default_knowledge,
                                 goal=agent_goal,
+                                goal_aware=goal_aware,
                                 steps_context=pa_steps_context,
                                 current_observation=_pre_action_raw_long,
                                 current_image=_pre_action_image,
@@ -2413,6 +2953,7 @@ def run_stepwise_eb_learn_episode(
                                     current_image=_pre_action_image,
                                     steps_context_images=pa_steps_context_images,
                                     goal=agent_goal,
+                                    goal_aware=goal_aware,
                                 )
                             )
                             step_experiment_cost += t_cost
@@ -2432,6 +2973,7 @@ def run_stepwise_eb_learn_episode(
                                     steps_context_images=pa_steps_context_images,
                                     falsifications=falsification_memory,
                                     goal=agent_goal,
+                                    goal_aware=goal_aware,
                                 )
                             )
                             step_experiment_cost += t_cost
@@ -2450,6 +2992,7 @@ def run_stepwise_eb_learn_episode(
                                 steps_context_images=pa_steps_context_images,
                                 num_candidate_actions=eb_config.num_candidate_actions,
                                 goal=agent_goal,
+                                goal_aware=goal_aware,
                             )
                         )
                         step_experiment_cost += sel_cost
@@ -2512,6 +3055,147 @@ def run_stepwise_eb_learn_episode(
                     json.dump(step_experiment_log, f, indent=4, default=str)
                 evolve_logger.info(
                     f"[g{global_step}] Plan A experiment set — "
+                    f"cost: ${step_experiment_cost:.6f}"
+                )
+
+            elif frontier_mode:
+                # --- GEPA/legacy frontier: learn a set of possible Bs from the
+                # collected trajectory, then formulate a discriminating
+                # experiment from their disagreement. RELEARN runs on a cadence
+                # (it is expensive); the EXPERIMENT is reformulated each step
+                # from the current frontier. ---
+                fr_steps_context = format_steps_context(
+                    trajectory_buffer,
+                    perception,
+                    eb_config.max_steps_context_chars,
+                    history_window=eb_config.perception_history_window,
+                    hide_raw_obs_when_image=eb_config.hide_obs_when_image,
+                    include_trailing_state=False,
+                )
+                fr_steps_context, fr_steps_context_images = _images_for_steps_context(
+                    trajectory_buffer,
+                    fr_steps_context,
+                    max_images=eb_config.max_images_context,
+                )
+                relearn_info: dict | None = None
+                with improve_logging(step_dir):
+                    # RELEARN (cadence) -- refit the frontier on the buffer.
+                    if step % eb_config.frontier_relearn_interval == 0:
+                        evolve_logger.info(
+                            f"[g{global_step}] Frontier relearn "
+                            f"({eb_config.frontier_learner}) on buffer..."
+                        )
+                        relearn_rng = random.Random(seed + global_step)
+                        new_frontier, frontier_metric, relearn_info, fr_cost = (
+                            _relearn_frontier_eb(
+                                config=config,
+                                eb_config=eb_config,
+                                trajectory_buffer=trajectory_buffer,
+                                env_name=env_name,
+                                current_frontier=frontier,
+                                rng=relearn_rng,
+                            )
+                        )
+                        step_experiment_cost += fr_cost
+                        total_learn_cost += fr_cost
+                        if new_frontier and not relearn_info.get("skipped"):
+                            frontier = new_frontier
+                            # Top candidate feeds the agent's B + P; re-inject
+                            # into the live agent (mid-episode update).
+                            top = frontier[0]
+                            beliefs = top.get("world_knowledge", "") or beliefs
+                            if eb_config.perception_enabled:
+                                new_perc = _clean_frontier_perception(
+                                    top.get("perception", "")
+                                )
+                                if new_perc.strip():
+                                    perception = new_perc
+                                    perception_fn = load_perception_fn(perception)
+                            _inject_beliefs(
+                                config, agent, env, env_name, task, beliefs,
+                                agent_goal=agent_goal,
+                            )
+                            evolve_logger.info(
+                                f"[g{global_step}] Frontier updated: "
+                                f"{len(frontier)} candidates, id_acc={frontier_metric} "
+                                f"| {relearn_info}"
+                            )
+                        else:
+                            evolve_logger.info(
+                                f"[g{global_step}] Frontier relearn skipped: "
+                                f"{relearn_info.get('skipped')}"
+                            )
+
+                    # EXPERIMENT -- formulate a discriminating experiment from the
+                    # competing Bs (wrapped as theories). Falls back to keeping the
+                    # current experiment when <2 distinct candidates exist.
+                    fr_theories = [
+                        Theory(world_knowledge=c.get("world_knowledge", ""), rank=i + 1)
+                        for i, c in enumerate(frontier)
+                        if (c.get("world_knowledge", "") or "").strip()
+                    ]
+                    action_obj = None
+                    sel_log = None
+                    if len(fr_theories) >= 2:
+                        action_obj, sel_cost, sel_log = asyncio.run(
+                            select_discriminating_action(
+                                config=config,
+                                theories=fr_theories,
+                                beliefs=beliefs,
+                                default_knowledge=default_knowledge,
+                                steps_context=fr_steps_context,
+                                current_observation=_pre_action_raw_long,
+                                current_image=_pre_action_image,
+                                steps_context_images=fr_steps_context_images,
+                                num_candidate_actions=eb_config.num_candidate_actions,
+                                goal=agent_goal,
+                                goal_aware=goal_aware,
+                            )
+                        )
+                        step_experiment_cost += sel_cost
+                        total_learn_cost += sel_cost
+
+                if action_obj is not None:
+                    if current_experiment and current_experiment not in past_experiments:
+                        past_experiments.append(current_experiment)
+                    current_experiment = action_obj.plan
+                    current_experiment_question = "discriminating experiment (frontier)"
+                    did_formulate_experiment = True
+                    evolve_logger.info(
+                        f"[g{global_step}] Frontier experiment: {action_obj.plan[:110]}"
+                    )
+
+                agent.experiment_goal = current_experiment
+                with open(step_dir / "frontier.json", "w") as f:
+                    json.dump(
+                        {
+                            "frontier": frontier,
+                            "metric": frontier_metric,
+                            "relearn": relearn_info,
+                        },
+                        f, indent=2, default=str,
+                    )
+                step_experiment_log = {
+                    "mode": "gepa_frontier",
+                    "active_experiment": current_experiment,
+                    "active_experiment_question": current_experiment_question,
+                    "frontier_size": len(frontier),
+                    "frontier_metric": frontier_metric,
+                    "selected_action": (
+                        {
+                            "plan": action_obj.plan,
+                            "rationale": action_obj.rationale,
+                            "predictions": action_obj.predictions,
+                            "candidate_actions": action_obj.candidate_actions,
+                        }
+                        if action_obj is not None
+                        else None
+                    ),
+                }
+                with open(step_dir / "experiment_log.json", "w") as f:
+                    json.dump(step_experiment_log, f, indent=4, default=str)
+                evolve_logger.info(
+                    f"[g{global_step}] Frontier experiment set — "
                     f"cost: ${step_experiment_cost:.6f}"
                 )
 
@@ -2593,6 +3277,7 @@ def run_stepwise_eb_learn_episode(
                                 ),
                                 num_theories=eb_config.num_theories,
                                 decay=eb_config.theory_weight_decay,
+                                goal_aware=goal_aware,
                                 seed_questions=seed_questions,
                             )
 
@@ -2894,7 +3579,7 @@ def run_stepwise_eb_learn_episode(
                                     beliefs=beliefs,
                                     qa_pairs=qa_pairs,
                                     method=method_suffix,
-                                    include_policy=eb_config.include_policy,
+                                    include_policy=eb_config.include_policy and goal_aware,
                                     max_concurrent=eb_config.question_scoring_max_concurrent,
                                     candidate_indices=candidate_indices,
                                     default_knowledge=default_knowledge,
@@ -3910,6 +4595,15 @@ def run_stepwise_eb_learn_episode(
                 ) or done
                 should_improve = (steps_in % eb_config.improve_interval == 0) or done
 
+            # In gepa_frontier mode the frontier relearn IS the B/P learner. The
+            # legacy QA/improve loop would redundantly RE-learn and overwrite the
+            # frontier's beliefs/perception each step (it runs later in the step),
+            # so the frontier's learned B/P would be discarded and the agent would
+            # act on QA-loop beliefs instead. Disable it so legacy_pop/GEPA owns B/P.
+            if frontier_mode:
+                should_improve = False
+                should_update_artifacts = False
+
             # --- Artifact update (update Q from trajectory) ---
             if should_update_artifacts and len(trajectory_buffer) > 0:
                 evolve_logger.info(
@@ -4234,6 +4928,7 @@ def run_stepwise_eb_learn_episode(
         past_experiments,
         agent_history_events,
         theories,
+        frontier,
     )
 
 
@@ -4769,8 +5464,8 @@ def stepwise_eb_learn(
     set_meta_temperature(eb_config.explore_temp)
 
     # Check for resume
-    last_ep, beliefs, perception, qa_pairs, theories = _find_last_completed_episode_eb(
-        output_dir
+    last_ep, beliefs, perception, qa_pairs, theories, frontier = (
+        _find_last_completed_episode_eb(output_dir)
     )
     start_episode = last_ep + 1
 
@@ -4929,6 +5624,7 @@ def stepwise_eb_learn(
             past_experiments,
             agent_history_events,
             theories,
+            frontier,
         ) = run_stepwise_eb_learn_episode(
             config=config,
             eb_config=eb_config,
@@ -4947,6 +5643,7 @@ def stepwise_eb_learn(
             agent_history_events=agent_history_events,
             cumulative_cost_offset=cumulative_cost,
             theories=theories,
+            frontier=frontier,
         )
 
         global_steps_used += steps_taken
@@ -4960,6 +5657,7 @@ def stepwise_eb_learn(
             trajectory_buffer=trajectory_buffer,
             past_experiments=past_experiments,
             theories=theories,
+            frontier=frontier,
         )
 
         episode_cost = episode_log.get("total_cost", 0.0) + episode_log.get(
@@ -5112,6 +5810,28 @@ def build_stepwise_eb_config(config: DictConfig) -> StepwiseEBLearnConfig:
             "frozen_eval_autumn_planning_goal",
             StepwiseEBLearnConfig.frozen_eval_autumn_planning_goal,
         ),
+        frontier_learner=evolve_cfg.get("frontier_learner", "gepa"),
+        frontier_click_aware=evolve_cfg.get("frontier_click_aware", True),
+        frontier_size=evolve_cfg.get("frontier_size", 3),
+        frontier_relearn_interval=evolve_cfg.get("frontier_relearn_interval", 10),
+        frontier_min_buffer=evolve_cfg.get("frontier_min_buffer", 12),
+        frontier_max_metric_calls=evolve_cfg.get("frontier_max_metric_calls", 80),
+        frontier_legacy_rounds=evolve_cfg.get("frontier_legacy_rounds", 6),
+        frontier_pop_size=evolve_cfg.get("frontier_pop_size", 4),
+        frontier_pop_rounds=evolve_cfg.get("frontier_pop_rounds", 6),
+        frontier_image_mode=evolve_cfg.get("frontier_image_mode", "auto"),
+        frontier_image_max_transitions=evolve_cfg.get(
+            "frontier_image_max_transitions", 16
+        ),
+        frontier_k_choices=evolve_cfg.get("frontier_k_choices", 5),
+        frontier_train_n=evolve_cfg.get("frontier_train_n", 14),
+        frontier_val_n=evolve_cfg.get("frontier_val_n", 12),
+        frontier_test_n=evolve_cfg.get("frontier_test_n", 10),
+        frontier_fd_scorer=evolve_cfg.get("frontier_fd_scorer", "none"),
+        frontier_fd_weight=evolve_cfg.get("frontier_fd_weight", 0.5),
+        frontier_concurrency=evolve_cfg.get("frontier_concurrency", 8),
+        frontier_task_model=evolve_cfg.get("frontier_task_model", None),
+        frontier_reflection_model=evolve_cfg.get("frontier_reflection_model", None),
     )
 
 

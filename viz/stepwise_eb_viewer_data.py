@@ -285,6 +285,15 @@ def load_log_dir(log_dir):
             s_path = os.path.join(ep_path, s_name)
             step_log = read_json(os.path.join(s_path, "step_log.json")) or {}
             critical_id_log = read_json(os.path.join(s_path, "critical_id_log.json")) or {}
+            frontier_raw = read_json(os.path.join(s_path, "frontier.json"))
+            if isinstance(frontier_raw, dict):
+                fr_list = frontier_raw.get("frontier") or []
+                fr_metric = frontier_raw.get("metric")
+                fr_relearn = frontier_raw.get("relearn")
+            elif isinstance(frontier_raw, list):
+                fr_list, fr_metric, fr_relearn = frontier_raw, None, None
+            else:
+                fr_list, fr_metric, fr_relearn = [], None, None
             all_steps.append({
                 "episode_idx": ep_idx,
                 "step": s_idx,
@@ -311,6 +320,10 @@ def load_log_dir(log_dir):
                 "has_critical_id_log": os.path.exists(os.path.join(s_path, "critical_id_log.json")),
                 "has_agent_messages": os.path.exists(os.path.join(s_path, "agent_messages.json")),
                 "has_theory_log": os.path.exists(os.path.join(s_path, "theory_log.json")),
+                "has_frontier": bool(fr_list),
+                "frontier_metric": fr_metric,
+                "frontier_relearn": fr_relearn,
+                "frontier_size": len(fr_list),
                 "has_obs_before": os.path.exists(os.path.join(s_path, "obs_before.png")),
                 "has_obs_after": os.path.exists(os.path.join(s_path, "obs_after.png")),
                 "env_info": step_log.get("env_info"),
@@ -497,6 +510,23 @@ def load_step_detail(log_dir, episode_idx, step_idx):
             artifact.setdefault("maintained_bank_preserved", selection_source_log.get("maintained_bank_preserved"))
         if "tie_break" not in artifact and isinstance(scoring, dict):
             artifact["tie_break"] = scoring.get("tie_break")
+    # GEPA/legacy frontier (question_scoring_method == "gepa_frontier"): a set of
+    # competing {perception, world_knowledge} candidates learned from the
+    # collected trajectory via an inverse-dynamics objective. Step-level
+    # frontier.json is {frontier:[...], metric, relearn}; episode-level is a bare
+    # list of candidates. Normalize both to a dict.
+    frontier_raw = read_json(os.path.join(step_path, "frontier.json"))
+    if isinstance(frontier_raw, dict):
+        frontier_detail = {
+            "frontier": frontier_raw.get("frontier") or [],
+            "metric": frontier_raw.get("metric"),
+            "relearn": frontier_raw.get("relearn"),
+        }
+    elif isinstance(frontier_raw, list):
+        frontier_detail = {"frontier": frontier_raw, "metric": None, "relearn": None}
+    else:
+        frontier_detail = {"frontier": [], "metric": None, "relearn": None}
+
     qa_pairs = read_json(os.path.join(step_path, "qa_pairs.json")) or []
     experiment_log = read_json(os.path.join(step_path, "experiment_log.json")) or {}
     experiment_scoring_log = (
@@ -530,6 +560,7 @@ def load_step_detail(log_dir, episode_idx, step_idx):
         "question_scoring": {
             key: value for key, value in question_scoring.items() if value is not None
         },
+        "frontier": frontier_detail,
     }
     # Include image availability flags
     detail["has_obs_before"] = os.path.exists(os.path.join(step_path, "obs_before.png"))

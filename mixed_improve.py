@@ -626,6 +626,8 @@ async def _llm_call(
         "input": input_data,
         "num_retries": 5,
     }
+    if model_name.startswith("openrouter/"):  # have OpenRouter report real cost in usage.cost
+        api_kwargs["extra_body"] = {"usage": {"include": True}}
     if _META_TEMPERATURE is not None:
         api_kwargs["temperature"] = _META_TEMPERATURE
     response = await asyncio.to_thread(litellm.responses, **api_kwargs)
@@ -670,6 +672,8 @@ async def _llm_call_conversational(
         "input": input_data,
         "num_retries": 5,
     }
+    if model_name.startswith("openrouter/"):  # have OpenRouter report real cost in usage.cost
+        api_kwargs["extra_body"] = {"usage": {"include": True}}
     if _META_TEMPERATURE is not None:
         api_kwargs["temperature"] = _META_TEMPERATURE
     response = await asyncio.to_thread(litellm.responses, **api_kwargs)
@@ -825,22 +829,87 @@ def extract_perception_input(observation: str) -> str:
     return observation[content_start:line_start].strip()
 
 
+def _run_perception_on_observation_with_error(
+    perception: str, raw_observation: str
+) -> tuple[str, str | None]:
+    """Run the perception module on a raw observation.
+
+    Returns (output, error). On success error is None; on failure output is ""
+    and error is a short "ExcType: message" string suitable for prompt feedback.
+    An empty/absent perception module is not an error: returns ("", None).
+    """
+    from stepwise_explore import perceive_deadline
+
+    if not perception or not perception.strip() or not raw_observation:
+        return "", None
+    try:
+        namespace = {}
+        with perceive_deadline():
+            exec(perception, namespace)
+            if "perceive" in namespace and callable(namespace["perceive"]):
+                result = namespace["perceive"](raw_observation)
+            else:
+                return (
+                    "",
+                    "no callable 'perceive' function found in perception module",
+                )
+        if isinstance(result, str):
+            return result, None
+        return "", f"perceive() returned {type(result).__name__}, expected str"
+    except Exception as e:
+        logging.warning(f"Perception execution failed: {e}")
+        return "", f"{type(e).__name__}: {e}"
+
+
 def _run_perception_on_observation(perception: str, raw_observation: str) -> str:
     """Run the perception module on a raw observation and return its output.
 
     Returns empty string if perception is empty or execution fails.
     """
-    if not perception or not perception.strip() or not raw_observation:
-        return ""
+    return _run_perception_on_observation_with_error(perception, raw_observation)[0]
+
+
+def _run_perception_on_history_with_error(
+    perception: str,
+    history: list,
+    window: int,
+) -> tuple[str, str | None]:
+    """Run perception on an observation history, auto-detecting signature.
+
+    If perceive expects a list, passes the last `window` items. Legacy single-arg
+    perceive gets history[-1].
+
+    Returns (output, error). On success error is None; on failure output is ""
+    and error is a short "ExcType: message" string suitable for prompt feedback.
+    An empty perception module or empty history is not an error.
+    """
+    from stepwise_explore import _perceive_signature_mode, perceive_deadline
+    if not perception or not perception.strip() or not history:
+        return "", None
     try:
         namespace = {}
-        exec(perception, namespace)
-        if "perceive" in namespace and callable(namespace["perceive"]):
-            result = namespace["perceive"](raw_observation)
-            return result if isinstance(result, str) else ""
+        with perceive_deadline():
+            exec(perception, namespace)
+            fn = namespace.get("perceive")
+            if not callable(fn):
+                return (
+                    "",
+                    "no callable 'perceive' function found in perception module",
+                )
+            mode = _perceive_signature_mode(fn)
+            if mode == "history":
+                windowed = (
+                    history[-window:] if window and window > 0 else list(history)
+                )
+                result = fn(windowed)
+            else:
+                result = fn(history[-1])
+        if isinstance(result, str):
+            return result, None
+        return "", f"perceive() returned {type(result).__name__}, expected str"
     except Exception as e:
         logging.warning(f"Perception execution failed: {e}")
-    return ""
+        return "", f"{type(e).__name__}: {e}"
 
 
 def _run_perception_on_history(
@@ -853,25 +922,7 @@ def _run_perception_on_history(
     If perceive expects a list, passes the last `window` items. Legacy single-arg
     perceive gets history[-1]. Returns empty string on failure or empty history.
     """
-    from stepwise_explore import _perceive_signature_mode
-    if not perception or not perception.strip() or not history:
-        return ""
-    try:
-        namespace = {}
-        exec(perception, namespace)
-        fn = namespace.get("perceive")
-        if not callable(fn):
-            return ""
-        mode = _perceive_signature_mode(fn)
-        if mode == "history":
-            windowed = history[-window:] if window and window > 0 else list(history)
-            result = fn(windowed)
-        else:
-            result = fn(history[-1])
-        return result if isinstance(result, str) else ""
-    except Exception as e:
-        logging.warning(f"Perception execution failed: {e}")
-    return ""
+    return _run_perception_on_history_with_error(perception, history, window)[0]
 
 
 async def score_perception_on_moments(

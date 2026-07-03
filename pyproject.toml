@@ -41,6 +41,7 @@ dependencies = [
     "protobuf>=5.29.5",
     "tabulate>=0.10.0",
     "pyyaml>=6.0.3",
+    "gepa>=0.1.1",
 ]
 
 [tool.uv]

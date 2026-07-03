@@ -175,15 +175,19 @@ async def generate_theories(
     num_theories: int = 5,
     decay: float = 0.6,
     goal: str = "",
+    goal_aware: bool = True,
     seed_questions: list[str] | None = None,
 ) -> tuple[list[Theory], float, dict]:
     """Generate ``num_theories`` ranked theories of how the environment works.
 
-    When ``goal`` is provided, each theory is required to be goal-aware: it must
-    state a hypothesis about the win/progress condition AND the strategy (what to
-    do, and why) for achieving it — not just local mechanics. Returns
+    When ``goal`` is provided AND ``goal_aware`` is True, each theory is required
+    to be goal-aware: it must state a hypothesis about the win/progress condition
+    AND the strategy (what to do, and why) for achieving it — not just local
+    mechanics. With ``goal_aware=False`` (e.g. dynamics-only exploration) no
+    win/progress framing is emitted regardless of ``goal``. Returns
     (theories, cost, log). Theories carry normalized prior weights.
     """
+    _show_goal = bool(goal_aware and goal and goal.strip())
     images: list = []
     if steps_context_images:
         images.extend(steps_context_images)
@@ -201,7 +205,7 @@ async def generate_theories(
     )
     goal_section = (
         f"\n=== GOAL / WIN CONDITION ===\n{goal.strip()}\n=== END GOAL ===\n"
-        if goal and goal.strip() else ""
+        if _show_goal else ""
     )
     goal_requirement = (
         "\n\nEach theory MUST be GOAL-AWARE — not just a description of local mechanics. "
@@ -213,7 +217,7 @@ async def generate_theories(
         "  (c) the minimal mechanics the strategy relies on.\n"
         "The theories should DISAGREE about what advances the goal, so that acting on them and "
         "observing whether progress is made will tell you which strategy is right."
-        if goal and goal.strip() else ""
+        if _show_goal else ""
     )
     seed_section = ""
     seed_requirement = ""
@@ -230,11 +234,19 @@ async def generate_theories(
         seed_requirement = (
             "\n\nAt least one theory MUST take a hypothesized mechanism from the OPEN "
             "QUESTIONS as TRUE — assume that mechanism is real, and explain concretely how it "
-            "would change play / enable progress. Do NOT dismiss such a mechanism merely "
+            "would change how the game behaves. Do NOT dismiss such a mechanism merely "
             "because the current world knowledge does not mention it; the purpose is to give "
             "the ensemble a member that PREDICTS YES for that question, so that acting can "
             "test it."
         )
+
+    task_objective = (
+        "how this game works and what is required to make progress / complete levels. Each "
+        "theory must be a self-contained explanation about the game's mechanics and win condition"
+        if _show_goal else
+        "how this game works. Each theory must be a self-contained explanation about the game's "
+        "mechanics"
+    )
 
     prompt = f"""You are an agent trying to understand how a game works. Below is the fixed \
 information about the environment, everything you currently believe, and the current state.
@@ -244,12 +256,10 @@ information about the environment, everything you currently believe, and the cur
 === END CURRENT WORLD KNOWLEDGE ==={history_section}{obs_section}{seed_section}
 {image_note}
 
-Your task: propose exactly {num_theories} DISTINCT theories of how this game works and what \
-is required to make progress / complete levels. Each theory must be a self-contained \
-explanation about the game's mechanics and win condition. The theories should be genuinely \
-different hypotheses (not rephrasings of each other), each consistent with the default \
-knowledge and the current state, though they may go beyond or contradict the current world \
-knowledge where you think it may be wrong.{goal_requirement}{seed_requirement}
+Your task: propose exactly {num_theories} DISTINCT theories of {task_objective}. The theories \
+should be genuinely different hypotheses (not rephrasings of each other), each consistent with \
+the default knowledge and the current state, though they may go beyond or contradict the \
+current world knowledge where you think it may be wrong.{goal_requirement}{seed_requirement}
 
 Order the theories from MOST likely to LEAST likely.
 

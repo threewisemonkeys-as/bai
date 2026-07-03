@@ -62,6 +62,25 @@ def resolve_agent_goal(config: DictConfig) -> str:
         ) from exc
 
 
+def is_goal_aware(config: DictConfig) -> bool:
+    """Whether the run-level goal describes a win/progress condition.
+
+    ``dynamics`` mode ("understand how the environment works") is pure
+    mechanics exploration with no win condition, so theory generation and
+    action selection must NOT inject progress/win framing. Any explicit
+    ``eval.agent_goal_text`` is treated as a real goal. Every other mode
+    (``performance``, the ``*_eval`` modes) is goal-aware.
+    """
+    explicit = OmegaConf.select(config, "eval.agent_goal_text", default=None)
+    if explicit and str(explicit).strip():
+        return True
+    mode = str(
+        OmegaConf.select(config, "eval.agent_goal_mode", default="performance")
+        or "performance"
+    ).strip()
+    return mode != "dynamics"
+
+
 def format_agent_goal_block(agent_goal: str | None) -> str:
     goal = (agent_goal or "").strip()
     if not goal:

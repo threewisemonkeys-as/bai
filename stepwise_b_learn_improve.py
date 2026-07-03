@@ -22,7 +22,6 @@ from mixed_improve import (
     QAPair,
     _build_execution_report,
     _llm_call,
-    _run_perception_on_observation,
 )
 
 PERCEPTION_INSTRUCTIONS = """For the perception module:
@@ -391,7 +390,11 @@ def _build_obs_section(
     """
     if not sample_observations:
         return ""
-    from mixed_improve import _run_perception_on_history
+    from mixed_improve import (
+        _run_perception_on_history_with_error,
+        _run_perception_on_observation_with_error,
+    )
+    from stepwise_b_learn import _render_perception_output
 
     use_history = (
         sample_histories is not None
@@ -423,21 +426,26 @@ def _build_obs_section(
     for idx, (raw_obs, step_num) in enumerate(sample_observations):
         if use_history:
             history = sample_histories[idx]
-            perc_out = _run_perception_on_history(perception, history, history_window)
+            perc_out, perc_err = _run_perception_on_history_with_error(
+                perception, history, history_window
+            )
             if display_tail is not None:
                 input_block = _render_history_input(history, display_tail)
             else:
                 input_block = raw_obs
         else:
-            perc_out = _run_perception_on_observation(perception, raw_obs)
+            perc_out, perc_err = _run_perception_on_observation_with_error(
+                perception, raw_obs
+            )
             input_block = raw_obs
+        perc_out = _render_perception_output(perc_out, perc_err)
         if post_image_only:
             image_idx = idx + 1
             obs_blocks.append(
                 f'<perception_example step="{step_num}">\n'
                 f"<before_action>\n"
                 f"<perception_input>\n{input_block}\n</perception_input>\n"
-                f"<perception_output>\n{perc_out if perc_out else '(empty)'}\n</perception_output>\n"
+                f"<perception_output>\n{perc_out}\n</perception_output>\n"
                 f"</before_action>\n"
                 f"<after_action (image {image_idx})>(see attached image)</after_action>\n"
                 f"</perception_example>"
@@ -449,7 +457,7 @@ def _build_obs_section(
                 f'<perception_example step="{step_num}">\n'
                 f"<before_action (image {before_idx})>\n"
                 f"<perception_input>\n{input_block}\n</perception_input>\n"
-                f"<perception_output>\n{perc_out if perc_out else '(empty)'}\n</perception_output>\n"
+                f"<perception_output>\n{perc_out}\n</perception_output>\n"
                 f"</before_action>\n"
                 f"<after_action (image {after_idx})>(see attached image)</after_action>\n"
                 f"</perception_example>"
@@ -458,7 +466,7 @@ def _build_obs_section(
             obs_blocks.append(
                 f'<perception_example step="{step_num}">\n'
                 f"<perception_input>\n{input_block}\n</perception_input>\n"
-                f"<perception_output>\n{perc_out if perc_out else '(empty)'}\n</perception_output>\n"
+                f"<perception_output>\n{perc_out}\n</perception_output>\n"
                 f"</perception_example>"
             )
     return (
@@ -484,7 +492,11 @@ def _build_execution_report_section(
     """
     if not sample_observations:
         return ""
-    from mixed_improve import _run_perception_on_history, _run_perception_on_observation
+    from mixed_improve import (
+        _run_perception_on_history_with_error,
+        _run_perception_on_observation_with_error,
+    )
+    from stepwise_b_learn import _render_perception_output
 
     use_history = (
         sample_histories is not None
@@ -504,18 +516,23 @@ def _build_execution_report_section(
     for idx, (raw_obs, step_num) in enumerate(samples):
         if use_history:
             history = sample_histories[idx]
-            output = _run_perception_on_history(perception, history, history_window)
+            output, output_err = _run_perception_on_history_with_error(
+                perception, history, history_window
+            )
             if display_tail is not None:
                 input_block = _render_history_input(history, display_tail)
             else:
                 input_block = raw_obs
         else:
-            output = _run_perception_on_observation(perception, raw_obs)
+            output, output_err = _run_perception_on_observation_with_error(
+                perception, raw_obs
+            )
             input_block = raw_obs
+        output = _render_perception_output(output, output_err)
         blocks.append(
             f'<execution_sample step="{step_num}">\n'
             f"<input>\n{input_block}\n</input>\n"
-            f"<output>\n{output if output else '(empty — perception produced no output)'}\n</output>\n"
+            f"<output>\n{output}\n</output>\n"
             f"</execution_sample>"
         )
     exec_report = "\n".join(blocks)

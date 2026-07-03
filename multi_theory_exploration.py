@@ -262,6 +262,7 @@ async def select_discriminating_action(
     num_candidate_actions: int = 4,
     action_space_description: str = "",
     goal: str = "",
+    goal_aware: bool = True,
 ) -> tuple[DiscriminatingAction | None, float, dict]:
     """Choose the action whose predicted outcome most splits the top theories.
 
@@ -306,16 +307,17 @@ async def select_discriminating_action(
             "=== END AVAILABLE ACTIONS ===\n"
         )
     image_note = " The current game state is shown in the attached image(s)." if images else ""
+    _show_goal = bool(goal_aware and goal and goal.strip())
     goal_section = (
         f"\n=== GOAL / WIN CONDITION ===\n{goal.strip()}\n=== END GOAL ===\n"
-        if goal and goal.strip() else ""
+        if _show_goal else ""
     )
     goal_note = (
         " The theories disagree about what STRATEGY advances the goal, so prefer experiments "
         "that test those disagreements: when predicting each theory's outcome, include whether "
         "the action makes PROGRESS toward the goal (e.g. score/level/target change) under that "
         "theory, since that is the disagreement that matters most."
-        if goal and goal.strip() else ""
+        if _show_goal else ""
     )
 
     prompt = f"""You are an agent trying to figure out how a game works by running the most \
@@ -460,6 +462,7 @@ async def select_goal_action(
     beliefs: str,
     default_knowledge: str,
     goal: str = "",
+    goal_aware: bool = True,
     steps_context: str = "",
     current_observation: str | None = None,
     current_image=None,
@@ -490,7 +493,7 @@ async def select_goal_action(
     )
     goal_section = (
         f"\n=== GOAL / WIN CONDITION ===\n{goal.strip()}\n=== END GOAL ===\n"
-        if goal and goal.strip() else ""
+        if (goal_aware and goal and goal.strip()) else ""
     )
     image_note = " The current game state is shown in the attached image(s)." if images else ""
 
@@ -869,6 +872,7 @@ async def refill_theories(
     steps_context_images: list | None = None,
     falsifications: list[dict] | None = None,
     goal: str = "",
+    goal_aware: bool = True,
     new_theory_weight_fraction: float = 0.5,
 ) -> tuple[list[Theory], float, dict]:
     """Generate fresh theories that differ from the survivors and merge them in.
@@ -916,9 +920,10 @@ async def refill_theories(
         )
     image_note = " The current game state is shown in the attached image(s)." if images else ""
     falsified_section = _falsifications_section(falsifications)
+    _show_goal = bool(goal_aware and goal and goal.strip())
     goal_section = (
         f"\n=== GOAL / WIN CONDITION ===\n{goal.strip()}\n=== END GOAL ===\n"
-        if goal and goal.strip() else ""
+        if _show_goal else ""
     )
     goal_requirement = (
         " Each new theory MUST be GOAL-AWARE: state (a) what it hypothesizes is required to make "
@@ -926,14 +931,15 @@ async def refill_theories(
         "the goal under it, and why), and (c) the minimal mechanics that strategy relies on. The "
         "new theories should propose DIFFERENT strategies for reaching the goal than the existing "
         "and ruled-out ones."
-        if goal and goal.strip() else ""
+        if _show_goal else ""
     )
+    unknown_target = "unknown mechanics / win condition" if _show_goal else "unknown mechanics"
 
     prompt = f"""You are an agent trying to understand how a game works. Some theories about the \
 game have already been proposed (and some were ruled out by experiments). Propose {need} NEW, \
 DISTINCT theories that are genuinely different from the existing ones below — do not rephrase \
 them. Each must be consistent with the default knowledge and confirmed beliefs, and should offer \
-a different explanation of the unknown mechanics / win condition.{goal_requirement}
+a different explanation of the {unknown_target}.{goal_requirement}
 {_dk_section(default_knowledge)}{goal_section}
 === CONFIRMED BELIEFS (all theories must respect these) ===
 {beliefs.strip() if beliefs and beliefs.strip() else "(none yet)"}
@@ -1002,14 +1008,16 @@ async def init_theory_ensemble(
     current_image=None,
     steps_context_images: list | None = None,
     goal: str = "",
+    goal_aware: bool = True,
 ) -> tuple[list[Theory], float, dict]:
     """Generate a fresh weighted ensemble of ``num_theories`` theories.
 
     Thin wrapper over ``theory_exploration.generate_theories`` for the cold-start
     / full-regeneration case; weights come from the rank prior. Reindexes ranks
     by weight so rank 1 is the MAP theory, matching the rest of this module. When
-    ``goal`` is given, the generated theories are goal-aware (win condition +
-    strategy), not just mechanic descriptions.
+    ``goal`` is given AND ``goal_aware`` is True, the generated theories are
+    goal-aware (win condition + strategy); with ``goal_aware=False`` they are
+    pure mechanic descriptions with no win/progress framing.
     """
     from theory_exploration import generate_theories
 
@@ -1024,6 +1032,7 @@ async def init_theory_ensemble(
         num_theories=num_theories,
         decay=decay,
         goal=goal,
+        goal_aware=goal_aware,
     )
     reindex_ranks(theories)
     return theories, cost, log

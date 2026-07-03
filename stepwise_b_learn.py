@@ -40,7 +40,6 @@ from llm_utils import extract_xml_key
 from mixed_improve import (
     CriticalMoment,
     QAPair,
-    _run_perception_on_observation,
     consolidate_qa_and_moments,
     deserialize_moments,
     deserialize_qa_pairs,
@@ -104,6 +103,40 @@ class StepwiseBLearnConfig:
 # ---------------------------------------------------------------------------
 
 
+def _render_perception_error(error: str) -> str:
+    """Render a perception runtime failure for display in a prompt's
+    <perception_output> block, so the improve LLM sees the crash instead of
+    a silently empty output."""
+    return (
+        f"(PERCEPTION MODULE CRASHED on this input — the agent received no "
+        f"perception features for this step)\nError: {error}"
+    )
+
+
+BLANK_PERCEPTION_NOTE = (
+    "(PERCEPTION MODULE RETURNED BLANK OUTPUT on this input — it ran without "
+    "error but extracted nothing, so the agent received no perception features "
+    "for this step. This is undesirable: perceive() should always return a "
+    "non-empty summary of the observation.)"
+)
+
+# Error label used when blank output is reported via the runtime-errors block.
+BLANK_OUTPUT_ERROR = (
+    "BLANK OUTPUT: perceive() ran without error but returned an empty string "
+    "(no features extracted)"
+)
+
+
+def _render_perception_output(output: str, error: str | None) -> str:
+    """Render a perception result for a prompt's <perception_output> block:
+    the output itself, the crash, or the blank-output note."""
+    if error:
+        return _render_perception_error(error)
+    if not output.strip():
+        return BLANK_PERCEPTION_NOTE
+    return output
+
+
 def format_steps_context(
     trajectory_buffer: list[dict],
     perception_code: str,
@@ -144,7 +177,10 @@ def format_steps_context(
     if not trajectory_buffer:
         return ""
 
-    from mixed_improve import _run_perception_on_history as _run_perc_hist
+    from mixed_improve import (
+        _run_perception_on_history_with_error as _run_perc_hist_err,
+        _run_perception_on_observation_with_error as _run_perc_obs_err,
+    )
 
     # Rolling per-episode raw-obs history (reset on each episode_boundary)
     ep_history: list[str] = []
@@ -172,9 +208,12 @@ def format_steps_context(
             ep_history.append(raw_obs)
         if perception_code:
             if history_window is not None:
-                perc_out = _run_perc_hist(perception_code, ep_history, history_window)
+                perc_out, perc_err = _run_perc_hist_err(
+                    perception_code, ep_history, history_window
+                )
             else:
-                perc_out = _run_perception_on_observation(perception_code, raw_obs)
+                perc_out, perc_err = _run_perc_obs_err(perception_code, raw_obs)
+            perc_out = _render_perception_output(perc_out, perc_err)
         else:
             perc_out = ""
         reasoning = entry.get("reasoning", "")
@@ -185,7 +224,7 @@ def format_steps_context(
 
         block_prefix = f'<step n="{entry["step"]}">\n'
         perc_block = (
-            f"<perception_output>\n{perc_out if perc_out else '(no perception module)'}\n</perception_output>\n\n"
+            f"<perception_output>\n{perc_out}\n</perception_output>\n\n"
             if perception_code
             else ""
         )
@@ -224,17 +263,20 @@ def format_steps_context(
                 if perception_code:
                     if history_window is not None:
                         result_hist = ep_history + [result_raw]
-                        result_perc = _run_perc_hist(
+                        result_perc, result_perc_err = _run_perc_hist_err(
                             perception_code, result_hist, history_window
                         )
                     else:
-                        result_perc = _run_perception_on_observation(
+                        result_perc, result_perc_err = _run_perc_obs_err(
                             perception_code, result_raw
                         )
+                    result_perc = _render_perception_output(
+                        result_perc, result_perc_err
+                    )
                 else:
                     result_perc = ""
                 result_perc_block = (
-                    f"<perception_output>\n{result_perc if result_perc else '(no perception module)'}\n</perception_output>\n"
+                    f"<perception_output>\n{result_perc}\n</perception_output>\n"
                     if perception_code
                     else ""
                 )
@@ -312,17 +354,23 @@ def format_current_state(
     if not observation:
         return ""
 
-    current_perception = (
-        _run_perception_on_observation(perception_code, observation)
-        if perception_code
-        else ""
-    )
+    from mixed_improve import _run_perception_on_observation_with_error
+
+    if perception_code:
+        current_perception, current_perc_err = (
+            _run_perception_on_observation_with_error(perception_code, observation)
+        )
+        current_perception = _render_perception_output(
+            current_perception, current_perc_err
+        )
+    else:
+        current_perception = ""
     img_tag = f" (image {image_index})" if image_index is not None else ""
     raw_state_content = (
         "(raw pre-state observation hidden)" if hide_raw_obs else observation
     )
     perc_block = (
-        f"<perception_output>\n{current_perception if current_perception else '(no perception module)'}\n</perception_output>\n"
+        f"<perception_output>\n{current_perception}\n</perception_output>\n"
         if perception_code
         else ""
     )
@@ -385,6 +433,127 @@ def _refresh_buffer_with_perception(
             obs_like["text"]["short_term_context"],
             obs_like["text"]["long_term_context"],
         )
+
+
+def collect_perception_runtime_errors(
+    trajectory_buffer: list[dict],
+    perception_code: str,
+    history_window: int | None = None,
+    max_errors: int = 20,
+) -> list[dict]:
+    """Replay the perception module over the buffered raw observations and
+    collect runtime failures.
+
+    Perception is deterministic over the raw observation history, so replaying
+    the current module over the buffer reproduces exactly the failures the
+    agent hit (or would hit) at runtime. Iteration mirrors
+    ``format_steps_context``: a per-episode rolling history is rebuilt, reset
+    on each episode boundary.
+
+    Blank output (perceive() runs without error but returns an empty string)
+    is also recorded as a failure — the agent receives no features either way.
+
+    Returns up to ``max_errors`` entries, oldest first, each:
+    ``{"step": int, "error": str, "raw_obs": str, "history": list[str]}``
+    where ``history`` is the per-episode observation history up to and
+    including the failing observation (suitable for re-validating a fix on
+    the same input).
+    """
+    from mixed_improve import (
+        _run_perception_on_history_with_error,
+        _run_perception_on_observation_with_error,
+    )
+
+    if not perception_code or not perception_code.strip() or not trajectory_buffer:
+        return []
+
+    errors: list[dict] = []
+    ep_history: list[str] = []
+    for entry in trajectory_buffer:
+        if entry.get("episode_boundary"):
+            ep_history = []
+            continue
+        if entry.get("action") is None:
+            continue
+        raw_obs = entry.get("raw_long_term_context", "")
+        if raw_obs:
+            ep_history.append(raw_obs)
+        if not raw_obs:
+            continue
+        if history_window is not None:
+            out, err = _run_perception_on_history_with_error(
+                perception_code, ep_history, history_window
+            )
+        else:
+            out, err = _run_perception_on_observation_with_error(
+                perception_code, raw_obs
+            )
+        if err is None and not out.strip():
+            err = BLANK_OUTPUT_ERROR
+        if err:
+            errors.append(
+                {
+                    "step": entry.get("step"),
+                    "error": err,
+                    "raw_obs": raw_obs,
+                    "history": list(ep_history),
+                }
+            )
+            if len(errors) >= max_errors:
+                break
+    return errors
+
+
+def format_perception_runtime_errors(
+    errors: list[dict],
+    max_display: int = 3,
+    input_head_chars: int = 800,
+) -> str:
+    """Format collected perception runtime failures as a prompt block.
+
+    Deduplicates by error message; for each unique error shows the affected
+    steps, the error, and the head of the first failing perception input so
+    the LLM can see the exact input format that broke the module. Returns ""
+    when there are no errors.
+    """
+    if not errors:
+        return ""
+
+    grouped: dict[str, dict] = {}
+    for e in errors:
+        g = grouped.setdefault(e["error"], {"steps": [], "first": e})
+        g["steps"].append(e["step"])
+
+    lines = [
+        "The current perception module FAILS at runtime on some real "
+        "observations: it either crashes or returns blank output. In both "
+        "cases the agent receives NO perception features for that step, which "
+        "is undesirable — perceive() must run without errors and always return "
+        "a non-empty summary. Fixing these failures takes priority over any "
+        "other perception improvement. Each unique failure below shows the "
+        "affected steps and the exact observation input that triggered it.",
+        "",
+    ]
+    for i, (err, g) in enumerate(list(grouped.items())[:max_display], 1):
+        steps = g["steps"]
+        steps_shown = ", ".join(str(s) for s in steps[:10])
+        if len(steps) > 10:
+            steps_shown += ", ..."
+        raw = g["first"]["raw_obs"]
+        obs_head = raw[:input_head_chars]
+        if len(raw) > input_head_chars:
+            obs_head += "\n[... input truncated]"
+        lines.append(
+            f'<runtime_error n="{i}" occurrences="{len(steps)}" steps="{steps_shown}">\n'
+            f"<error>{err}</error>\n"
+            f"<failing_input>\n{obs_head}\n</failing_input>\n"
+            f"</runtime_error>"
+        )
+    if len(grouped) > max_display:
+        lines.append(
+            f"(+{len(grouped) - max_display} more unique error(s) not shown)"
+        )
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ from dataclasses import asdict, dataclass
 
 from omegaconf import DictConfig
 
+from goal_prompts import is_goal_aware
 from llm_utils import extract_xml_key
 from mixed_improve import (
     QAPair,
@@ -1602,6 +1603,11 @@ async def select_qa_pairs_for_experiment(
 {beliefs}
 === END CURRENT BELIEFS ===
 """
+    selection_criterion = (
+        "most useful at achieving the environment objective"
+        if is_goal_aware(config)
+        else "most useful for understanding how the environment works"
+    )
     prompt = f"""You are selecting the next question target for learning about how a game works.
 
 {default_knowledge_section}
@@ -1612,7 +1618,7 @@ async def select_qa_pairs_for_experiment(
 {qa_list_text}
 === END AVAILABLE QUESTIONS ===
 
-Select up to {max_unanswered_qa_pairs} questions that will be most useful at achieving the environment objective while covering distinct aspects of the environment.
+Select up to {max_unanswered_qa_pairs} questions that will be {selection_criterion} while covering distinct aspects of the environment.
 
 Use each question's Q number in the <q n="..."> attribute. Format your response as:
 <think>
@@ -1773,10 +1779,15 @@ async def select_qa_pairs_and_formulate_experiments(
 === END CURRENT BELIEFS ===
 """
 
+    selection_criterion = (
+        "most useful at achieving the environment objective"
+        if is_goal_aware(config)
+        else "most useful for understanding how the environment works"
+    )
     if filter_questions:
         task_instruction = (
-            f"Select up to {max_unanswered_qa_pairs} questions that will be most "
-            "useful at achieving the environment objective while covering "
+            f"Select up to {max_unanswered_qa_pairs} questions that will be "
+            f"{selection_criterion} while covering "
             "distinct aspects of the environment.\n\n"
             "For each selected question, also formulate a 1-3 sentence actionable "
             "experiment plan that, when executed by the agent from the current "

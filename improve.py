@@ -22,11 +22,20 @@ END_REASON_MAP = {
 
 
 def _get_response_cost(response, model_id: str) -> float:
-    """Extract cost from a litellm response object using BALROG pricing."""
+    """Extract cost from a litellm response object.
+
+    Prefer the provider-reported cost (OpenRouter returns ``usage.cost`` when the
+    request is made with ``extra_body={"usage": {"include": True}}``); this covers
+    models missing from the local BALROG pricing table (e.g. deepseek). Falls back
+    to the pricing-table estimate when no provider cost is available.
+    """
     try:
         usage = response.usage
         if usage is None:
             return 0.0
+        provider_cost = getattr(usage, 'cost', None)
+        if isinstance(provider_cost, (int, float)) and provider_cost > 0:
+            return float(provider_cost)
         input_tokens = getattr(usage, 'input_tokens', 0) or 0
         output_tokens = getattr(usage, 'output_tokens', 0) or 0
         return calculate_cost(model_id, input_tokens, output_tokens)
@@ -518,10 +527,13 @@ def validate_perception_code(
     except SyntaxError as e:
         return False, f"Syntax error at line {e.lineno}: {e.msg}"
 
+    from stepwise_explore import perceive_deadline
+
     # Try to execute and verify the perceive function exists and is callable
     try:
         namespace = {}
-        exec(code, namespace)
+        with perceive_deadline():
+            exec(code, namespace)
         if "perceive" not in namespace:
             return False, "No 'perceive' function found in the code"
         if not callable(namespace["perceive"]):
@@ -554,7 +566,8 @@ def validate_perception_code(
 
         for i, test_input in enumerate(test_inputs):
             try:
-                result = fn(test_input)
+                with perceive_deadline():
+                    result = fn(test_input)
                 if not isinstance(result, str):
                     return False, f"'perceive' function must return a string, got {type(result).__name__} (test input {i})"
             except Exception as e:

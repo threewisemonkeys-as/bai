@@ -1,0 +1,186 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue]{hyperref}
+
+\newcommand{\YES}{\textsc{yes}}
+\newcommand{\NO}{\textsc{no}}
+\newcommand{\MAYBE}{\textsc{maybe}}
+\newcommand{\Vllm}{V_{\mathrm{llm}}}
+\newcommand{\Lconsist}{\mathcal{L}_{\mathrm{consist}}}
+
+\title{Selecting Correct Programs under a Noisy Verifier\\
+\large Exploiting Shared Structure for Consistency and Correctness}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Problem}
+
+We synthesise, for each natural-language question $q$, a program $p_q$ that maps
+a trajectory $x$ to an answer in $\{\YES,\NO,\MAYBE\}$. We have \emph{no} solid
+way to verify that $p_q$ correctly implements $q$. One available verifier is an
+LLM call
+\[
+\Vllm\big(q,\; p_q,\; \{(x_i,\, p_q(x_i))\}_i\big) \;\to\; \{0,1\},
+\]
+which judges correctness from the question, the program, and input/output
+pairs. It is \emph{noisy}. Under $\Vllm$ there is a class
+$P = \{p_q\}$ of plausible (high-probability) programs, and we must select the
+correct ones from within it.
+
+The extra leverage: questions and their programs refer to \emph{shared objects}
+--- ``the white cross,'' ``the highlighted $3{\times}3$ grid,'' ``a perimeter
+square.'' Independently synthesised programs each re-derive a checker for such an
+object; we instead want a checker that is \emph{consistent across the whole
+universe of questions and programs.} The goal is to write down objectives that
+turn that shared structure into a correctness signal.
+
+\section*{Core reframe}
+
+Stop verifying each $p_q$ in isolation. Treat correctness as a \textbf{joint
+inference problem over a population of programs that share latent concepts},
+where agreement on the shared latents is a label-free signal. $\Vllm$ becomes a
+noisy \emph{prior} per program, not the decision procedure; the decision comes
+from coupling programs together. Four sources of signal:
+
+\begin{itemize}[nosep]
+  \item $\Vllm(q,p_q)$ --- noisy local plausibility;
+  \item \textbf{cross-program agreement} on shared sub-concepts (the structural signal);
+  \item \textbf{logical coherence} of the \emph{answers} under a single world model;
+  \item \textbf{behavioral grounding} --- a subset of concepts have observable
+        consequences in the trajectory (a partial oracle).
+\end{itemize}
+
+\section{Factored synthesis over a shared concept library (MDL)}
+
+Define a library $L = \{c_1,\dots,c_m\}$ of concept sub-programs ---
+\texttt{highlighted\_grid}, \texttt{white\_cross},
+\texttt{perimeter\_cells}. Require each question-program to be a composition
+\[
+p_q \;=\; g_q \circ \big(c_{i_1},\dots,c_{i_k}\big),
+\]
+with question-specific glue $g_q$ over library calls. MDL / Bayesian objective:
+\[
+\max_{L,\{p_q\}} \;\sum_q \log \Vllm(q,p_q) \;-\; \lambda\,|L|.
+\]
+The $-\lambda|L|$ (description-length) term \emph{forces} sharing: a concept used
+by five programs is paid for once, so there is pressure toward a single
+realisation (this is DreamCoder's wake/compression loop). The point is not
+compactness --- it is that \textbf{a shared $c$ has its posterior sharpened by
+the union of all questions that touch it}, strictly more evidence than
+per-program $\Vllm$. MDL alone is syntactic, though; it does not know whether the
+shared concept is \emph{correct}. Hence the next term.
+
+\section{Cross-program agreement on shared latents (the key signal)}
+
+This is co-training / multi-view consistency, and it needs no oracle. For a
+shared concept $c$, extract the \emph{intermediate value} each program computes
+for it on every real state $x_i$. If two programs both reference ``the
+highlighted $3{\times}3$ grid,'' each emits an index $c_j(x_i),\,c_k(x_i)$.
+Define
+\[
+\boxed{\;\Lconsist(c) \;=\; \sum_i \;\sum_{j,k\,\text{use } c}
+\mathbb{1}\!\big[c_j(x_i)\neq c_k(x_i)\big]\;}
+\]
+Minimising total disagreement over the \emph{choice of which candidate
+implementation each program uses} selects implementations that agree about the
+shared object on the actual data. The concept is the shared latent; each question
+is a different ``view''; agreement across views is self-supervised.
+
+\paragraph{Why this fixes the prototype failure.} Program \texttt{Q01} invented
+``perimeter $=$ the $64{\times}64$ outer edge.'' Any other program referencing
+``perimeter square'' that encoded it as the border of a $3{\times}3$ grid would
+produce a \emph{different mask on the same states} --- the disagreement flags the
+wrong encoding with no ground truth. Where a hand-written probe was a privileged
+adjudicator, here \textbf{every other program that touches the concept is a
+probe.}
+
+\section{Answer-level coherence under a single world model}
+
+Questions are logically entangled: ``can red revert to blue?'' and ``can blue
+become anything but red?'' both constrain the same transition relation. A correct
+set of answers must be jointly satisfiable by one transition model $M$:
+\[
+\text{Coherence}\big(\{a_q\}\big) \;=\;
+\max_{M}\;\sum_q \mathbb{1}\!\big[a_q \text{ consistent with } M\big].
+\]
+In practice no full \textsc{sat} is needed: extract pairwise
+entailment/exclusion edges between questions once (an LLM produces the relation
+graph cheaply), and penalise answer assignments that violate them. This is the
+only term that looks \emph{across} questions at the answer level, so it catches
+contradictions per-program verification structurally cannot see.
+
+\section{Truth discovery to fold in the noisy verifier}
+
+To \emph{use} $\Vllm$ and the legacy log-reading answers without trusting any of
+them, run Dawid--Skene / truth-discovery EM. Treat each source (log-reader, each
+candidate program, the verifier) as a noisy estimator of a latent truth $a_q^*$
+with its own reliability $\theta_s$ (a confusion matrix). EM jointly estimates
+$\{a_q^*\}$ and $\{\theta_s\}$: sources that track consensus gain weight, and the
+consensus shifts toward reliable sources. This requires \emph{independent}
+estimators --- so synthesise $k$ candidate programs per question at varied
+temperature/prompt, which Section~2 wants anyway.
+
+\section{Unified objective}
+
+\[
+\boxed{\;
+\max_{L,\{p_q\}}\;
+\underbrace{\sum_q \log \Vllm(q,p_q)}_{\text{local prior}}
+\;+\; \beta\underbrace{\sum_c\big(-\Lconsist(c)\big)}_{\text{structural agreement}}
+\;+\; \gamma\,\underbrace{\text{Coherence}(\{a_q\})}_{\text{answer logic}}
+\;-\; \lambda\underbrace{|L|}_{\text{reuse pressure}}
+\;}
+\]
+
+Each term covers a blind spot of the others: $\Vllm$ keeps programs on-topic,
+MDL creates the sharing, agreement validates the shared concepts on data,
+coherence validates the answers against each other.
+
+\paragraph{Optimisation} is block-coordinate ascent / EM over a discrete space:
+\begin{enumerate}[nosep]
+  \item \emph{Propose:} sample $k$ candidate programs per question from the LLM
+        (diversity matters).
+  \item \emph{Select \& refactor (M-step):} find sub-programs that, if unified
+        into one library entry, reduce both $|L|$ and $\Lconsist$ --- DreamCoder
+        compression, but the refactor is \emph{validated by agreement on real
+        trajectory data}, not just syntactic anti-unification.
+  \item \emph{Re-estimate (E-step):} given the library, reselect each $p_q$'s
+        implementation and re-run truth discovery on the votes.
+\end{enumerate}
+
+\section{Identifiability caveat --- and why this environment escapes it}
+
+Agreement is necessary, not sufficient: programs can \emph{agree on a wrong
+concept} (all encode perimeter wrong, identically) --- standard co-training
+collusion. Three anchors break it; the last is specific to this setting.
+
+\begin{enumerate}[nosep]
+  \item \textbf{Semi-supervised anchoring} --- pin a few concepts to hand-written
+        structural probes / a validated perception layer. Agreement then
+        \emph{propagates} grounding from anchored to unanchored concepts.
+  \item \textbf{Generation diversity} --- independent derivations colluding on the
+        same wrong mask is unlikely under varied prompts; collusion probability is
+        what one is implicitly bounding.
+  \item \textbf{Behavioral grounding (the partial oracle we already have).} Some
+        concepts have observable consequences. ``Highlighted grid'' should be
+        \emph{the grid where clicks change cells}; clicking elsewhere should not.
+        So a concept implementation can be scored against the actual transitions:
+        \texttt{highlighted\_grid}$(x)$ is correct iff the cells that change under
+        the logged click fall inside it. This grounds a subset of concepts
+        directly, and agreement carries it to the rest. It is the deepest signal
+        --- the environment, not the LLM, adjudicates --- and it is what makes the
+        scheme more than mutual hallucination.
+\end{enumerate}
+
+\paragraph{Throughline.} The earlier prototype concluded ``make predicates call a
+validated perception layer.'' These formulations say the validation signal for
+that layer is \textbf{cross-question agreement plus behavioral grounding}, so the
+layer can be \emph{learned} rather than hand-labelled --- which is what is needed
+to scale past a handful of questions.
+
+\end{document}

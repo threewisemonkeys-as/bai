@@ -47,7 +47,7 @@ Each observation is a 2D grid of color-name strings (rows x cols).
 At each step you choose one of the currently available actions listed in the auxiliary observation.
 
 - left / right / up / down — move (meaning depends on the game's dynamics)
-- click ROW COL — click grid cell at (row, col), 0-indexed
+- click ROW COL — click the grid cell at row ROW and column COL, 0-indexed. The row index comes FIRST, then the column index. This matches the (row, col) order the perception module reports: to click the cell reported at (row=R, col=C), emit `click R C`.
 - noop — wait one step
 - reset — reset the interactive phase to the initial state when available
 - quit — give up
@@ -187,7 +187,7 @@ def _build_action_strings(action_space: list, grid_size: int) -> list[str]:
         t = act.text_data
         if t == "go-to-test":
             continue
-        s = f"click ROW COL  (ROW, COL in 0..{grid_size - 1})" if t.startswith("click [") else t
+        s = f"click ROW COL  (ROW first, then COL, both in 0..{grid_size - 1}; matches the (row, col) order the perception reports)" if t.startswith("click [") else t
         if s not in seen:
             seen.add(s)
             out.append(s)
@@ -434,9 +434,10 @@ class AutumnBenchEnvWrapper:
     def _coerce_action(self, action: str) -> str:
         """Clip to the first word set the interpreter actually accepts.
 
-        The LLM may emit 'click 3 4' or 'click ROW COL' — pass first-line,
-        literal strings through. Unknown strings become noop (with a failed
-        candidate record).
+        The LLM-facing click interface is row-major ('click ROW COL'); the
+        native interpreter is column-first, so concrete clicks are transposed
+        here. Other literal strings pass through; unknown strings become noop
+        (with a failed candidate record).
         """
         first = action.strip().split("\n")[0].strip()
         if first in self.language_action_space:
@@ -461,8 +462,16 @@ class AutumnBenchEnvWrapper:
             self.failed_candidates.append(action)
             return self.default_action
         if head.startswith("click"):
-            # preserve full 'click X Y'
-            return first
+            # The LLM-facing interface is ROW-MAJOR: it emits `click ROW COL`.
+            # The native Autumn interpreter is column-first (`click(x=col, y=row)`),
+            # so transpose the two indices here before handing off. Malformed
+            # clicks fall through to the failed-candidate path below.
+            m = re.match(r"click\s+(\d+)\s+(\d+)\s*$", first, re.IGNORECASE)
+            if m:
+                row, col = m.group(1), m.group(2)
+                return f"click {col} {row}"
+            self.failed_candidates.append(action)
+            return self.default_action
         if match := re.search(r"\bchoose[_ -]?option[_ -]?(\d+)\b", lowered):
             return f"choose_option_{match.group(1)}"
         if match := re.search(r"\bchoose[_ -]?frame[_ -]?(\d+)\b", lowered):
