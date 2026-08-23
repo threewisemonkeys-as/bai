@@ -41,7 +41,33 @@ dependencies = [
     "protobuf>=5.29.5",
     "tabulate>=0.10.0",
     "pyyaml>=6.0.3",
-    "gepa>=0.1.1",
+]
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# Installed editable (uv sync) so imports resolve venv-wide with no sys.path shim:
+#   - `explore/` is the exploration/self-improvement package (explore.explore,
+#     explore.stepwise_eb_learn, ...); run its entry points via `python -m explore.<mod>`.
+#   - the remaining shared libs + env wrappers stay as flat top-level modules at the
+#     repo root (py-modules below), imported bare (`import llm_utils`).
+# Explicit packages + py-modules disables auto-discovery (keeps setuptools from
+# scanning launch/, tests/, BALROG/, offline_learning/, ... as packages). Add a new
+# root module's stem to py-modules (or a new package to `packages`) to keep it importable.
+packages = ["explore"]
+py-modules = [
+    "arc_agi_env",
+    "arc_agi_prompts",
+    "autumn_env",
+    "autumn_oracle",
+    "diff_utils",
+    "get_stats_g",
+    "goal_prompts",
+    "llm_utils",
+    "rollout",
+    "run_utils",
 ]
 
 [tool.uv]

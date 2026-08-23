@@ -26,7 +26,7 @@ testbed (decoupling algorithm quality from the noisy active-collection data path
 ## Setup
 
 - **Data:** hand-played informative trajectories, 30 transitions each, persisted at
-  `prototypes/perc_invdyn/clean_data/<game>/episode_0/trajectory.csv`. Generated with two
+  `offline_learning/clean_data/<game>/episode_0/trajectory.csv`. Generated with two
   new drivers: `autumn_drive.py` (drives `AutumnBenchEnvWrapper`) and `arc_drive.py`
   (drives live `arc_agi.Arcade`). Each demonstrates the game's controllable dynamics
   (see "Trajectory design" below).
@@ -105,11 +105,11 @@ testbed (decoupling algorithm quality from the noisy active-collection data path
 
 ## Artifacts & repro
 
-- Data: `prototypes/perc_invdyn/clean_data/{dq8gc,f5w3n,ls20,ft09}/episode_0/trajectory.csv`
-- Drivers: `prototypes/perc_invdyn/autumn_drive.py`, `prototypes/perc_invdyn/arc_drive.py`
-- Sweep: `prototypes/perc_invdyn/clean_sweep.py` (per-game whitelist + budget + keep-params)
+- Data: `offline_learning/clean_data/{dq8gc,f5w3n,ls20,ft09}/episode_0/trajectory.csv`
+- Drivers: `offline_learning/autumn_drive.py`, `offline_learning/arc_drive.py`
+- Sweep: `offline_learning/clean_sweep.py` (per-game whitelist + budget + keep-params)
 - Outputs: `logs/clean_sweep/results.json` and `logs/clean_sweep/<game>_seed<N>/`
   (`stdout.txt`, `best_perception_gepa_seed*.py`, `best_beliefs_gepa_seed*.txt`)
 - Repro one cell:
-  `uv run python prototypes/perc_invdyn/gepa_optimize.py --run prototypes/perc_invdyn/clean_data/ft09 --train-n 20 --val-n 20 --test-n 10 --tie-train-val --actions ACTION6 --keep-action-params --start empty --fd-scorer none --max-metric-calls 220 --compare --legacy-rounds 6 --seed 1`
-- Full sweep: `uv run python prototypes/perc_invdyn/clean_sweep.py --seeds 1,2,3 --parallel 6`
+  `uv run python offline_learning/gepa_optimize.py --run offline_learning/clean_data/ft09 --train-n 20 --val-n 20 --test-n 10 --tie-train-val --actions ACTION6 --keep-action-params --start empty --fd-scorer none --max-metric-calls 220 --compare --legacy-rounds 6 --seed 1`
+- Full sweep: `uv run python offline_learning/clean_sweep.py --seeds 1,2,3 --parallel 6`

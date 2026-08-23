@@ -10,7 +10,7 @@ LOG_DIR=/tmp/oracle_5x
 mkdir -p "$LOG_DIR"
 
 for task in "${TASKS[@]}"; do
-  uv run python -u stepwise_eb_learn_oracle.py "$task" \
+  uv run python -u -m explore.stepwise_eb_learn_oracle "$task" \
       --selector llm \
       --num-steps 20 \
       --candidates-per-step 6 \

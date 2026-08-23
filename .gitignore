@@ -242,3 +242,16 @@ log_environment_interfaces*.txt
 .nfs*
 
 .zed/
+
+# Large local data blob (231M), not a repo artifact
+basis_data.zip
+basis_data/
+
+# Dormant stepwise_eb runs moved out of data/ (972M, already in history; never re-add)
+archive/data/stepwise_eb_runs/
+
+# Derived from basis_data.zip via offline_learning/human_replay.py (221M, regenerable)
+offline_learning/human_data/
+
+# Redundant with the tracked autumn_programs/ sources
+autumn_programs_55.zip

@@ -39,9 +39,9 @@ from scripts.simulate_theories import (  # reuse exact context reconstruction
     extract_default_knowledge,
     get_perception_output,
 )
-from theory_exploration import assign_rank_weights, parse_theories
+from explore.theory_exploration import assign_rank_weights, parse_theories
 
-import multi_theory_exploration as M
+import explore.multi_theory_exploration as M
 
 
 async def run(config, episode_dir: Path, step: int, theory_dump: Path,

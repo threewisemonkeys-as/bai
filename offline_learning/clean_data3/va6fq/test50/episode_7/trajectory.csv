@@ -1,0 +1,76 @@
+Step,Action,Reasoning,Observation,Auxiliary_Observation,Reward,Done
+35,noop,manual,"Task: interactive
+Step: 35
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..9; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""black"", ""black"", ""red"", ""black"", ""black"", ""black"", ""black"", ""green"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""skyblue""], [""black"", ""black"", ""tan"", ""black"", ""tan"", ""tan"", ""black"", ""tan"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""black"", ""tan"", ""tan"", ""black"", ""tan"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""black""], [""tan"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""tan""], [""tan"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""tan""]]",,0.0,False
+36,noop,manual,"Task: interactive
+Step: 36
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..9; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""black"", ""black"", ""red"", ""black"", ""black"", ""black"", ""black"", ""green"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""black"", ""tan"", ""tan"", ""black"", ""tan"", ""black"", ""skyblue""], [""black"", ""black"", ""tan"", ""black"", ""tan"", ""tan"", ""black"", ""tan"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""black""], [""tan"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""tan""], [""tan"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""tan""]]",,0.0,False
+37,noop,manual,"Task: interactive
+Step: 37
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..9; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""black"", ""black"", ""red"", ""black"", ""black"", ""black"", ""black"", ""green"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""black"", ""tan"", ""tan"", ""black"", ""tan"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""black"", ""tan"", ""tan"", ""black"", ""tan"", ""black"", ""skyblue""], [""black"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""black""], [""tan"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""tan""], [""tan"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""tan""]]",,0.0,False
+38,noop,manual,"Task: interactive
+Step: 38
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..9; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""black"", ""black"", ""red"", ""black"", ""black"", ""black"", ""black"", ""green"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""black"", ""tan"", ""tan"", ""black"", ""tan"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""black"", ""tan"", ""tan"", ""black"", ""tan"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""skyblue""], [""tan"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""tan""], [""tan"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""tan""]]",,0.0,False
+39,noop,manual,"Task: interactive
+Step: 39
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..9; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""black"", ""black"", ""red"", ""black"", ""black"", ""black"", ""black"", ""green"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""black"", ""tan"", ""tan"", ""black"", ""tan"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""black"", ""tan"", ""tan"", ""black"", ""tan"", ""black"", ""black""], [""black"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""skyblue"", ""black""], [""tan"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""sandybrown"", ""black""], [""tan"", ""black"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""tan"", ""black"", ""tan""]]",,0.0,False

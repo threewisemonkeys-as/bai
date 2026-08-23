@@ -34,8 +34,8 @@ from omegaconf import OmegaConf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from question_scoring import score_questions_b_diff  # noqa: E402
-from stepwise_eb_learn_improve import (  # noqa: E402
+from explore.question_scoring import score_questions_b_diff  # noqa: E402
+from explore.stepwise_eb_learn_improve import (  # noqa: E402
     EBQAPair,
     deserialize_eb_qa_pairs,
 )

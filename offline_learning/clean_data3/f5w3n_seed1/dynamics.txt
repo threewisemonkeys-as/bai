@@ -1,0 +1,88 @@
+F5W3N — Game Dynamics (Space-Invaders shooter; regenerated under NON-ZERO seeds)
+
+Grid: 16x16, black background. Coords are (x, y) with y increasing DOWNWARD; the
+render is grid[y][x], so "row" = y, "col" = x. Hero starts at (x=8, y=15), bottom-center.
+
+WHY THIS DATASET EXISTS (the seed-0 bug):
+  The sibling dataset clean_data3/f5w3n was generated at seed=0, which is PATHOLOGICAL
+  for this game's enemy-fire randomness. Enemies auto-fire every 15 ticks (rule
+  `time % 15 == 3`) at a target chosen by `uniformChoice` over the COMBINED enemy pool
+  (enemies1 row y=1 UNION enemies2 row y=3 = 10 enemies). Under seed 0 `uniformChoice`
+  collapses to always returning the SAME index-0 enemy, so every fire spawns at the
+  enemies1 col-1 enemy; its only motion is the ±1 formation march, so the targets
+  degenerate to a fixed 2-value alternation confined to a SINGLE row:
+      seed 0 spawns (x,y) = (2,1),(1,1),(2,1),(1,1),... forever
+  The y=3 row is NEVER hit and only 2/10 pool candidates ever fire.
+  Under NON-ZERO seeds the draw is genuine: targets span BOTH enemy rows with real
+  variety. This dataset (seeds train 101-108, test 301-302, test50 501-508) exercises
+  the enemy-fire RNG properly. VERIFIED in the generated data:
+      spawn-row histogram y=1: 16 fires, y=3: 10 fires  (both rows fired)
+      14 distinct spawn cells: (1,1)(1,3)(2,1)(4,1)(4,3)(5,1)(7,1)(7,3)(8,1)(8,3)
+                               (10,3)(11,1)(13,1)(14,1)
+  vs seed-0's 2 cells {(1,1),(2,1)}, all y=1.
+  See memory seed0-degenerate-data-gen and F5W3N.sexp.
+
+OBJECTS (initial state, time=0):
+- Hero: one cell, gray when alive / black (invisible) when dead. Boolean `alive` field.
+  Starts at (x=8, y=15).
+- Enemy enemies1: blue cells on row y=1 at every x where x%3==1 -> x=1,4,7,10,13.
+- Enemy enemies2: blue cells on row y=3 at every x where x%3==2 -> x=2,5,8,11,14.
+- Bullet: red cells. Hero's shots. NONE at start.
+- EnemyBullet: orange cells. Enemy shots. NONE at start.
+
+PLAYER ACTIONS (whitelist: left, right, up, noop -- NO click, NO down):
+- left:  hero moves one cell left (x-1), blocked at the grid edge (moveLeftNoCollision).
+- right: hero moves one cell right (x+1), blocked at the grid edge.
+- up:    FIRES a red bullet from the hero's current cell, but ONLY if the hero is alive.
+         On the fire step the red bullet is drawn on the hero's cell, briefly occluding
+         the gray hero (renders as the bullet's color for that one frame; the gray hero
+         reappears the next frame once the bullet climbs away). This is NOT death.
+- down:  NO handler -- pure no-op (not in the whitelist).
+- click: NO handler -- pure no-op; click location irrelevant (not in the whitelist).
+- noop:  does nothing; the clock/passive dynamics still advance.
+
+PASSIVE / CLOCK DYNAMICS (every tick):
+- `time` increments by 1 each step (starts at 0). Actions do NOT consume RNG.
+- Every step: all red (hero) bullets move UP (y-1); all orange (enemy) bullets move DOWN (y+1).
+- Enemy formation march (time-keyed, hits 2 of every 10 steps, static the other 8):
+    time%10==5: enemies1 move LEFT, enemies2 move RIGHT.
+    time%10==0: enemies1 move RIGHT, enemies2 move LEFT.
+  Each row just oscillates ±1 around its start columns (opposite directions per row);
+  the formation never drifts. Uses plain moveLeft/moveRight (no edge collision).
+- Enemy firing (time%15==3): if any enemy remains, ONE new orange bullet spawns at the
+  current cell of a UNIFORMLY RANDOM remaining enemy (drawn from enemies1 U enemies2). If
+  no enemies remain, nothing spawns. Under a proper (non-zero) seed the target is genuinely
+  random over BOTH rows; under seed 0 it collapses (see top). In 20-step episodes the fires
+  land at observed steps 4 and 19 (2 fire events per episode).
+
+COLLISIONS / INTERACTIONS:
+- Hero bullet ∩ enemy (either row): both removed (enemy destroyed by being shot). 1-step
+  prev-delayed: they co-locate on frame N, removal fires on N->N+1.
+- Hero ∩ enemy bullet: hero `alive`->false (gray -> black/invisible; can no longer fire).
+  The orange bullet is NOT consumed -- it keeps descending.
+- Hero bullet ∩ enemy bullet: both removed (red and orange shots cancel).
+
+SPAWN / DESPAWN:
+- Red bullets spawn on `up` (one per fire, at the hero cell, only while alive); despawn
+  when they hit an enemy, an enemy bullet, or fly off the top edge.
+- Orange bullets spawn on the timed enemy-fire rule (one per fire, at a remaining enemy's
+  current cell); despawn ONLY when they hit a red bullet (NOT when they kill the hero) or
+  when they fly off the bottom edge.
+- Enemies only despawn when shot; never respawned.
+
+COLOR CHANGES:
+- Hero is gray while alive, black when killed (indistinguishable from empty background).
+
+WIN / TERMINATION / REWARD:
+- No explicit win/loss/termination/reward. Reward is 0.0 every step. Hero death only
+  disables firing; the sim keeps running (a dead hero still moves left/right, aliasing
+  with noop since it is invisible). In this dataset only 3/18 episodes end in a real death,
+  and always on the LAST transition (obs 18->19) when fire#1's bullet reaches the bottom row
+  -- the hero is alive and visible for the rest of every episode.
+
+IDENTIFIABILITY NOTE:
+- `up` is distinguishable from noop (spawns a visible red bullet, even though the hero cell
+  is briefly occluded on the fire frame). left/right are distinguishable while the hero is
+  alive (gray cell shifts ±1 col). Enemy-fire and march are passive/time-keyed and best
+  learned under FD; enemy-fire+ now has genuine both-row/varied-column targets (unlike the
+  seed-0 data, where the fixed single-cell alternation let a step-counter fake it).

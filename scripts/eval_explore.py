@@ -124,7 +124,7 @@ def run_step_eval(
     step_out.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        sys.executable, explore_py,
+        sys.executable, "-m", explore_py,
         "eval.mode=eval",
         f"eval.beliefs_path={step['beliefs_path']}",
         f"eval.perception_path={step['perception_path']}",
@@ -265,7 +265,7 @@ def main():
     parser.add_argument("--steps", type=str, default=None,
                         help="Steps to eval, e.g. '2,5,9,12,14' or '15-20' or '5-' or '-10' or '3' (default: all)")
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory (default: <run_dir>/evals)")
-    parser.add_argument("--explore-py", type=str, default=None, help="Path to explore.py (default: auto-detect)")
+    parser.add_argument("--explore-py", type=str, default=None, help="Module to run as the explore entry point (default: explore.explore)")
     args = parser.parse_args(our_args)
 
     run_dir = Path(args.explore_run_dir).resolve()
@@ -276,27 +276,12 @@ def main():
     output_dir = Path(args.output_dir).resolve() if args.output_dir else run_dir / "evals"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Locate explore.py
-    if args.explore_py:
-        explore_py = str(Path(args.explore_py).resolve())
-    else:
-        # Try common locations relative to this script
-        candidates = [
-            Path(__file__).resolve().parent.parent / "explore.py",
-            Path.cwd() / "explore.py",
-        ]
-        explore_py = None
-        for c in candidates:
-            if c.exists():
-                explore_py = str(c)
-                break
-        if explore_py is None:
-            print("Error: could not find explore.py. Use --explore-py to specify its path.")
-            sys.exit(1)
+    # `explore` is a package module now — run via `python -m explore.explore`.
+    explore_py = args.explore_py or "explore.explore"
 
     print(f"Explore run dir: {run_dir}")
     print(f"Output dir:      {output_dir}")
-    print(f"explore.py:      {explore_py}")
+    print(f"explore module:  {explore_py}")
 
     # Discover steps
     steps = discover_steps(run_dir)

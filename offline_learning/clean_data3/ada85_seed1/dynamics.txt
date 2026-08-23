@@ -1,0 +1,121 @@
+ADA85 (ada85_seed1) — game mechanics + regeneration notes
+
+This is a NON-ZERO-SEED regeneration of ada85. The original clean_data3/ada85 was
+generated at seed 0, which is PATHOLOGICAL for this game's randomness (see "Randomness"
+below). Grids here come from the env's own render (render_grid), identical plumbing to the
+original; only the seeds and the (fresh) action plan differ.
+
+Grid: 11 x 11. Coordinates below are (row, col), row-first, matching how the perception
+reports cells. (Internally the program uses column-first Position(x=col, y=row).)
+
+Objects (initial state)
+- Suzie: single BLUE cell at top-left, (row 0, col 0). Stationary clickable "button".
+- Billy: single RED cell at bottom-left, (row 10, col 0). Stationary clickable "button".
+- Bottle: a 5-cell VERTICAL object in the last column (col 10), rows 3,4,5,6,7. Boolean
+    "broken" flag, starts false (intact).
+    - Intact  (rows 3..7 of col 10): [white, yellow, yellow, yellow, white].
+    - Broken  (rows 3..7 of col 10): [yellow, white, GOLD, white, yellow]. The palette
+      flips and a GOLD cell appears in the middle at (row 5, col 10) — the unambiguous
+      "broken" signal.
+- BottleSpot: a single white cell at (row 5, col 10), the rocks' target. It sits inside
+    the bottle (its middle cell) and is drawn behind the bottle, so it is never visible.
+- Rocks: a dynamic list, initially empty. Each Rock is a single GRAY cell and carries a
+    HIDDEN boolean "breaksBottle" (chosen randomly true/false at spawn — see Randomness).
+
+Player actions (click LOCATION matters; the handler keys off the clicked object)
+- Suzie click: spawns ONE new Rock at (row 0, col 0), breaksBottle = random.
+- Billy click: spawns ONE new Rock at (row 10, col 0), breaksBottle = random.
+- Bottle click (any bottle cell, col 10 rows 3..7): if the bottle is broken, it shows
+    INTACT for that ONE frame only (broken:=false); next step it reverts to broken.
+    Clicking an intact bottle does nothing. (Not exercised by ada85_seed1's action plan.)
+- click on empty cells: no handler, no effect.
+- left / right / up / down: NO handlers — all four are no-ops.
+- noop: no effect except the per-step rock movement below still runs.
+
+  CLICK LABELS (replay-consistent with the standard engine path)
+  Actions are applied via env_utils.interpreter_action_to_text(interp, label) + step(),
+  with NO manual coordinate swap (exactly like the corpus / gen_s2kt7_seed1.py). That
+  function calls interp.click(int(arg1), int(arg2)) and the engine's click(x, y) reads
+  (x=col, y=row), so a label "click A B" applies at (col=A, row=B). A button at
+  (row R, col C) is therefore hit by the label "click C R". The WORKING spawn labels
+  (empirically confirmed via evaluate_to_string('rocks')) are:
+      - Suzie (row 0,  col 0):  "click 0 0"
+      - Billy (row 10, col 0):  "click 0 10"     <-- NOT "click 10 0"
+    ("click 10 0" spawns NOTHING under this path; a bottle click would be "click 10 5".)
+  These labels are exactly reproducible: replaying the recorded actions with
+  interpreter_action_to_text from the episode seed regenerates every grid (validated:
+  0 mismatched frames across all 18 episodes).
+  NOTE — the recorded observation HEADER still carries the corpus-standard phrasing
+  "click ROW COL (ROW first, then COL)". The label-argument order actually consumed by
+  the engine is (col, row); this ROW/COL-vs-COL/ROW header mismatch is a KNOWN corpus-wide
+  issue handled uniformly elsewhere (prompt / label canonicalization), NOT per-game. The
+  data here is simply self-consistent with the standard replay path.
+
+Passive / per-step (clock) dynamics
+- Every noop step, each existing rock moves one cell toward BottleSpot (5,10). Both
+    spawners are in col 0, so the path is: (1) horizontal along the spawn row, col 0->10
+    (one col/step), then (2) vertical along col 10 toward row 5 (one row/step). unitVector
+    steps the LARGER remaining axis first; horizontal (10) > vertical (5), so the rock
+    finishes the horizontal leg first. A Suzie/row-0 rock then moves DOWN; a Billy/row-10
+    rock moves UP.
+- A rock is HIDDEN on its spawn frame (under Suzie/Billy at the corner) and first becomes
+    visible one step later at col 1. It is also HIDDEN while it occupies the bottle's cells
+    (col 10, rows 3..7) — drawn behind the bottle (last visible just outside, e.g. (2,10)
+    for a Suzie rock or (8,10) for a Billy rock).
+- ENGINE QUIRK — clicks freeze movement: on any frame whose action is a click (any
+    spawner), the `on clicked` handler reassigns `rocks` and the movement `next` is skipped
+    that frame, so existing rocks do NOT advance on a click frame. Each click before a rock
+    arrives delays its arrival by one frame. (This is why the action plan keeps the run from
+    a spawn to the bottle click-free.)
+
+Bottle breaking and repair
+- When a breaksBottle=TRUE rock reaches BottleSpot (5,10), the bottle becomes broken
+    starting the next step (gold appears at (5,10)); it then STAYS broken indefinitely and
+    never auto-repairs.
+- A breaksBottle=FALSE rock travels to BottleSpot the same way and produces NO change —
+    the bottle stays intact. This is the ONLY observable difference between a true and a
+    false rock.
+
+Win / termination / reward
+- None. No win condition, no score, no termination. All rewards are 0.0. Open-ended sandbox.
+
+====================================================================================
+Randomness (breaksBottle) — the reason for regeneration
+====================================================================================
+Each Rock's breaksBottle is set at spawn by (uniformChoice (list true false)).
+
+- SEED 0 (the original clean_data3/ada85) IS DEGENERATE: EVERY rock spawned in an episode
+  gets breaksBottle=TRUE (verified 8/8 spawns). The true/false randomness is never exercised
+  — every rock that reaches the bottle breaks it.
+  NOTE: the ORIGINAL ada85/dynamics.txt UNDERSTATED this as "under seed 0 the FIRST rock
+  has breaksBottle=true". It is actually ALL rocks, not just the first.
+
+- NON-ZERO seeds give a genuine true/false MIX. Verified first-draw across seeds:
+  seed 1 false, 2 true, 3 false, 7 false, 42 true, 101 false, 102 true, ... ; an 8-rock
+  batch under seed 42 was {true:4, false:4}. ada85_seed1 uses per-episode seeds
+  101..108 (train), 301..302 (test), 501..508 (test50) — all non-zero, disjoint per split.
+
+OBSERVABILITY caveat (important for whether regeneration changes the USABLE data)
+- A Rock is ALWAYS a plain gray cell: breaksBottle is NOT rendered on the rock and is NOT
+  visible while the rock travels. Its ONLY observable consequence is the delayed bottle
+  break — and a corner-spawned rock takes ~16-17 steps to reach BottleSpot (break appears at
+  spawn_frame + 17, +1 per intervening click freeze).
+- Consequence: in a SHORT (<~18-step) episode the rock never reaches the bottle, so a true
+  and a false rock look IDENTICAL (a gray cell moving), and the VISIBLE dynamics are
+  effectively SEED-INDEPENDENT even though the hidden breaksBottle state varies. Naive short
+  regeneration would NOT change the usable (observable) data.
+- ada85_seed1 is built to MAKE the randomness observable: each episode spawns the
+  determining rock at frame 0 and runs length 20, so the break lands (frame 18, after one
+  secondary-click freeze) inside the episode. The observed outcome (bottle breaks vs stays
+  intact) therefore tracks the seed's first breaksBottle draw: in train, episodes 1/3/5/7
+  (primary true) show the break (gold at (5,10), frames 18-19); episodes 0/2/4/6 (primary
+  false) never break — a real ~50/50 split that seed-0 data can never produce (seed 0 would
+  break in EVERY episode).
+
+REPLAY / SEED PROVENANCE
+- These episodes are seed-varied, so they must be replayed FROM THEIR OWN per-episode seed
+  (train 101-108, test 301-302, test50 501-508), like every other seed-varied regenerated
+  game (s2kt7_seed1, 83wkq_seed1). Seed-aware replay via interpreter_action_to_text
+  reproduces every grid exactly (0 mismatches). A hardcoded seed-0 replay would diverge only
+  at the break frames of the no-break episodes (seed 0 always breaks) — that divergence IS
+  the intended non-degeneracy, not a defect.

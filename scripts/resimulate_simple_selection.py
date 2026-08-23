@@ -24,8 +24,8 @@ from dotenv import load_dotenv
 from omegaconf import OmegaConf
 from PIL import Image
 
-import mixed_improve
-from mixed_improve import _llm_call
+import explore.mixed_improve as mixed_improve
+from explore.mixed_improve import _llm_call
 
 load_dotenv()
 

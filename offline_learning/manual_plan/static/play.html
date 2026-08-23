@@ -1,0 +1,143 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Autumn — play & record</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header>
+  <h1>play &amp; record</h1>
+  <select id="game"></select>
+  <label class="dim">seed <input type="number" id="seed" value="1"></label>
+  <button class="primary" id="new">new session</button>
+  <span class="sp"></span>
+  <span class="status" id="status">no session</span>
+  <button id="save" disabled>save session</button>
+  <a href="/curate">curate &rarr;</a>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <h2>grid <span class="dim" id="ginfo"></span></h2>
+    <div id="grid"></div>
+    <div class="keys" style="margin-top:10px">
+      <b>&larr;&darr;&uarr;&rarr;</b> or <b>hjkl</b> move &nbsp;·&nbsp;
+      <b>space</b> noop &nbsp;·&nbsp; <b>click a cell</b> click &nbsp;·&nbsp;
+      <b>u</b> undo &nbsp;·&nbsp; <b>m</b> mark this moment &nbsp;·&nbsp; <b>s</b> save
+    </div>
+    <div class="keys" id="verbs" style="margin-top:4px"></div>
+  </div>
+
+  <div class="panel" style="min-width:260px">
+    <h2>actions</h2>
+    <div class="log" id="log"></div>
+    <div style="margin-top:8px"><button id="mark">mark moment (m)</button>
+      <button id="undo">undo (u)</button></div>
+    <h2 style="margin-top:12px">marks</h2>
+    <div id="marks" class="dim">none yet — marks become the candidate windows in the curator</div>
+  </div>
+</div>
+
+<script src="/static/common.js"></script>
+<script>
+let S = null, INFO = null, prevGrid = null;
+
+async function boot() {
+  const {games} = await api('/api/games');
+  const sel = document.getElementById('game');
+  games.forEach(g => {
+    const o = el('option', null, `${g.human_name} (${g.game})`);
+    o.value = g.game; sel.appendChild(o);
+  });
+  document.getElementById('new').onclick = newSession;
+  document.getElementById('save').onclick = save;
+  document.getElementById('undo').onclick = () => act('undo');
+  document.getElementById('mark').onclick = mark;
+  window.addEventListener('keydown', onKey);
+}
+
+async function newSession() {
+  const game = document.getElementById('game').value;
+  const seed = +document.getElementById('seed').value;
+  S = await api('/api/session', {game, seed});
+  INFO = S.info; prevGrid = null;
+  document.getElementById('verbs').innerHTML =
+    'actions: ' + INFO.verbs.map(v => '<b>' + v + '</b>').join(', ') +
+    ` &nbsp;·&nbsp; grid ${INFO.size}×${INFO.size}` +
+    (INFO.tick_locked ? ' &nbsp;·&nbsp; <span style="color:var(--warn)">tick-locked scenery</span>' : '');
+  document.getElementById('save').disabled = false;
+  render();
+}
+
+async function step(action) {
+  if (!S) return;
+  prevGrid = S.grid;
+  const r = await api(`/api/session/${S.sid}/step`, {action});
+  if (!r.ok) { flash(r.error, true); }
+  S = Object.assign(S, r);
+  render(action);
+}
+
+async function act(what) {
+  if (!S) return;
+  prevGrid = S.grid;
+  S = Object.assign(S, await api(`/api/session/${S.sid}/${what}`, {}));
+  render();
+}
+
+async function mark() {
+  if (!S) return;
+  const note = prompt('note for this moment (optional)') ?? '';
+  S = Object.assign(S, await api(`/api/session/${S.sid}/mark`, {note}));
+  render();
+}
+
+async function save() {
+  const r = await api(`/api/session/${S.sid}/save`, {});
+  flash('saved ' + r.name);
+}
+
+function onKey(e) {
+  if (!S || e.target.tagName === 'INPUT') return;
+  const K = {ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down',
+             h:'left', l:'right', k:'up', j:'down'};
+  if (K[e.key] && INFO.verbs.includes(K[e.key])) { e.preventDefault(); step(K[e.key]); }
+  else if (e.key === ' ' || e.key === '.') { e.preventDefault(); step('noop'); }
+  else if (e.key === 'u') act('undo');
+  else if (e.key === 'm') mark();
+  else if (e.key === 's') save();
+}
+
+function render(lastAction) {
+  const g = document.getElementById('grid');
+  g.innerHTML = '';
+  const changed = prevGrid && prevGrid !== S.grid;
+  g.appendChild(gridEl(S.grid, {cell: 26,
+    onClick: INFO.verbs.includes('click') ? (r, c) => step(`click ${r} ${c}`) : null}));
+  document.getElementById('ginfo').textContent =
+    `${S.game} seed ${S.seed} · step ${S.t}` +
+    (lastAction ? ` · ${lastAction} ${changed ? '→ frame changed' : '→ NO visible change'}` : '');
+  const st = document.getElementById('status');
+  st.textContent = `${S.t} actions · ${S.marks.length} marks`;
+  st.className = 'status ' + (changed ? 'ok' : '');
+
+  const log = document.getElementById('log');
+  log.innerHTML = '';
+  const markAt = new Map(S.marks.map(m => [m.t, m.note]));
+  S.actions.forEach((a, i) => {
+    if (markAt.has(i)) log.appendChild(el('div', 'mark', `  ★ ${markAt.get(i) || 'mark'}`));
+    log.appendChild(el('div', null, `${String(i).padStart(4)}  ${a}`));
+  });
+  if (markAt.has(S.actions.length))
+    log.appendChild(el('div', 'mark', `  ★ ${markAt.get(S.actions.length) || 'mark'}`));
+  log.scrollTop = log.scrollHeight;
+
+  document.getElementById('marks').innerHTML = S.marks.length
+    ? S.marks.map(m => `<div>t=${m.t} ${m.note || ''}</div>`).join('')
+    : '<span class="dim">none yet</span>';
+}
+
+function flash(msg, bad) {
+  const st = document.getElementById('status');
+  st.textContent = msg; st.className = 'status ' + (bad ? 'bad' : 'ok');
+}
+boot();
+</script>
+</body></html>

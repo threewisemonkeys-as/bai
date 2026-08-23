@@ -1,0 +1,315 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Autumn — curate & audit</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header>
+  <h1>curate &amp; audit</h1>
+  <select id="game"></select>
+  <select id="session"><option value="">— session —</option></select>
+  <button id="load">load</button>
+  <label class="dim"><input type="checkbox" id="mech"> mechanics</label>
+  <span class="sp"></span>
+  <span class="status" id="status">exact frames — a plan must land on the goal cell-for-cell</span>
+  <a href="/static/play.html">&larr; play</a>
+</header>
+
+<div class="panel" style="margin:14px">
+  <h2>filmstrip <span class="dim">click a frame = START · shift-click = GOAL</span></h2>
+  <div class="film" id="film"><span class="dim">load a session</span></div>
+</div>
+
+<div class="wrap">
+  <div class="panel" style="min-width:330px">
+    <h2>plan <span class="dim" id="planinfo"></span></h2>
+    <div id="plan"><span class="dim">select a window in the filmstrip</span></div>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+      <button id="addnoop">+ noop</button>
+      <button id="stripnoop">strip all noops</button>
+      <button id="striplead">strip leading</button>
+      <button id="striptrail">strip trailing</button>
+      <button id="reset">revert edits</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>start &rarr; end &rarr; goal <span class="dim" id="diffinfo"></span></h2>
+    <div style="display:flex;gap:14px;align-items:flex-start">
+      <div><div class="dim">start</div><div id="gstart"></div></div>
+      <div><div class="dim">end of plan</div><div id="gend"></div></div>
+      <div><div class="dim">goal <span id="goalpin"></span></div><div id="ggoal"></div></div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button id="reanchor">re-anchor goal to end frame</button>
+      <button id="repair">suggest repair</button>
+      <button class="primary" id="audit">audit</button>
+      <button class="primary" id="save" disabled>save problem</button>
+      <input id="note" placeholder="note (what does this problem test?)" style="flex:1;min-width:180px">
+    </div>
+  </div>
+
+  <div class="panel" style="min-width:300px;flex:1">
+    <h2>audit</h2>
+    <div id="chips" class="dim">not run</div>
+    <div id="warns" style="margin-top:6px"></div>
+    <h2 style="margin-top:14px">problems <span class="dim" id="pcount"></span></h2>
+    <table id="plist"><tbody></tbody></table>
+  </div>
+</div>
+
+<script src="/static/common.js"></script>
+<script>
+let GAMES = {}, INFO = null, SES = null, ARMED = null;
+let E = {game:null, seed:1, prefix:[], plan:[], goal:null, id:null, session:null, t:0};
+let ORIG = null, EXEC = null;
+
+async function boot() {
+  const {games} = await api('/api/games');
+  games.forEach(g => GAMES[g.game] = g);
+  const sel = document.getElementById('game');
+  games.forEach(g => { const o = el('option', null, `${g.human_name} (${g.game})`);
+                       o.value = g.game; sel.appendChild(o); });
+  sel.onchange = onGame;
+  document.getElementById('load').onclick = loadSession;
+  document.getElementById('audit').onclick = runAudit;
+  document.getElementById('repair').onclick = runRepair;
+  document.getElementById('save').onclick = saveProblem;
+  document.getElementById('reanchor').onclick = () => { E.goal = EXEC && EXEC.end_grid; refresh(); };
+  document.getElementById('addnoop').onclick = () => { E.plan.push('noop'); refresh(); };
+  document.getElementById('stripnoop').onclick = () => { E.plan = E.plan.filter(a => a !== 'noop'); refresh(); };
+  document.getElementById('striplead').onclick = () => { while (E.plan[0] === 'noop') E.plan.shift(); refresh(); };
+  document.getElementById('striptrail').onclick = () => { while (E.plan.at(-1) === 'noop') E.plan.pop(); refresh(); };
+  document.getElementById('reset').onclick = () => { if (ORIG) { E.plan = ORIG.slice(); refresh(); } };
+  document.getElementById('mech').onchange = refresh;
+  await onGame();
+}
+
+async function onGame() {
+  const g = document.getElementById('game').value;
+  INFO = GAMES[g]; E.game = g;
+  const {sessions} = await api('/api/sessions/' + g);
+  const s = document.getElementById('session');
+  s.innerHTML = '<option value="">— session —</option>';
+  sessions.forEach(x => { const o = el('option', null,
+      `${x.name}  seed ${x.seed} · ${x.n} steps · ${x.marks} marks`); o.value = x.name; s.appendChild(o); });
+  await loadProblems();
+}
+
+async function loadSession() {
+  const name = document.getElementById('session').value;
+  if (!name) return;
+  SES = await api(`/api/session_file/${E.game}/${name}`);
+  SES.name = name;
+  E.seed = SES.seed; E.session = name;
+  drawFilm();
+}
+
+function drawFilm() {
+  const f = document.getElementById('film');
+  f.innerHTML = '';
+  if (!SES) return;
+  const markAt = new Map((SES.marks || []).map(m => [m.t, m.note]));
+  const s = E.startIx, g = E.goalIx;
+  SES.grids.forEach((grid, i) => {
+    const d = el('div', 'frame');
+    if (i === s) d.classList.add('start');
+    else if (i === g) d.classList.add('goal');
+    else if (s != null && g != null && i > s && i < g) d.classList.add('inwin');
+    d.appendChild(canvasEl(grid, 6));
+    const cap = el('div', 'cap');
+    cap.innerHTML = `<b>${i}</b> ${i > 0 ? (SES.actions[i-1] || '') : 'reset'}` +
+                    (markAt.has(i) ? ` <span class="m">★${markAt.get(i)||''}</span>` : '');
+    d.appendChild(cap);
+    d.onclick = ev => pickFrame(i, ev.shiftKey);
+    f.appendChild(d);
+  });
+}
+
+function pickFrame(i, isGoal) {
+  if (isGoal) { if (E.startIx == null || i <= E.startIx) return; E.goalIx = i; }
+  else { E.startIx = i; if (E.goalIx != null && E.goalIx <= i) E.goalIx = null; }
+  if (E.startIx != null && E.goalIx != null) {
+    E.prefix = SES.actions.slice(0, E.startIx);
+    E.plan = SES.actions.slice(E.startIx, E.goalIx);
+    E.goal = SES.grids[E.goalIx];
+    E.t = E.startIx; E.id = null;
+    ORIG = E.plan.slice();
+    document.getElementById('note').value = '';
+    clearAudit();
+  }
+  drawFilm(); refresh();
+}
+
+async function refresh() {
+  drawPlan();
+  if (!E.plan.length && !E.prefix.length) return;
+  EXEC = await api('/api/exec', {game: E.game, seed: E.seed, prefix: E.prefix,
+                                 plan: E.plan, goal: E.goal,
+                                 mechanics: document.getElementById('mech').checked});
+  if (!E.goal) E.goal = EXEC.end_grid;
+  const cell = INFO.size > 16 ? 14 : 18;
+  const pick = (r, c) => { if (ARMED != null) { E.plan[ARMED] = `click ${r} ${c}`; ARMED = null; refresh(); } };
+  show('gstart', EXEC.start_grid, {cell, onClick: pick});
+  show('gend', EXEC.end_grid, {cell, diff: EXEC.diff, onClick: pick});
+  show('ggoal', E.goal, {cell, onClick: pick});
+  const ok = EXEC.reaches_goal;
+  document.getElementById('diffinfo').innerHTML = ok
+    ? '<span style="color:var(--ok)">end frame == goal</span>'
+    : `<span style="color:var(--bad)">${EXEC.diff.length} cells differ from goal</span>`;
+  document.getElementById('save').disabled = !ok || !E.plan.length;
+  document.getElementById('goalpin').innerHTML = ok ? '' :
+    '<span style="color:var(--warn)">(pinned)</span>';
+  drawPlan();
+}
+
+function show(id, grid, opts) {
+  const host = document.getElementById(id);
+  host.innerHTML = ''; host.appendChild(gridEl(grid, opts));
+}
+
+function drawPlan() {
+  const host = document.getElementById('plan');
+  host.innerHTML = '';
+  document.getElementById('planinfo').textContent =
+    E.plan.length ? `h=${E.plan.length} · prefix ${E.prefix.length} · seed ${E.seed}` : '';
+  if (!E.plan.length) { host.innerHTML = '<span class="dim">no actions</span>'; return; }
+  E.plan.forEach((a, i) => {
+    const row = el('div', 'row' + (ARMED === i ? ' sel' : ''));
+    row.appendChild(el('span', 'ix', i));
+    const sel = el('select');
+    INFO.verbs.forEach(v => { const o = el('option', null, v); o.value = v; sel.appendChild(o); });
+    sel.value = isClick(a) ? 'click' : a;
+    sel.onchange = () => {
+      E.plan[i] = sel.value === 'click' ? `click 0 0` : sel.value;
+      if (sel.value === 'click') ARMED = i;
+      refresh();
+    };
+    row.appendChild(sel);
+    if (isClick(a)) {
+      const [r, c] = clickRC(a);
+      const ri = el('input'); ri.type = 'number'; ri.value = r;
+      const ci = el('input'); ci.type = 'number'; ci.value = c;
+      const upd = () => { E.plan[i] = `click ${ri.value} ${ci.value}`; refresh(); };
+      ri.onchange = upd; ci.onchange = upd;
+      row.appendChild(ri); row.appendChild(ci);
+      const pick = el('button', null, ARMED === i ? 'click a cell…' : 'pick');
+      pick.onclick = () => { ARMED = ARMED === i ? null : i; drawPlan(); };
+      row.appendChild(pick);
+    }
+    const del = el('button', 'danger', '✕');
+    del.title = 'delete this action';
+    del.onclick = () => { E.plan.splice(i, 1); refresh(); };
+    row.appendChild(del);
+    const ins = el('button', null, '+');
+    ins.title = 'insert a noop after';
+    ins.onclick = () => { E.plan.splice(i + 1, 0, 'noop'); refresh(); };
+    row.appendChild(ins);
+    if (EXEC && EXEC.mechanics && EXEC.mechanics[i]) {
+      const m = EXEC.mechanics[i];
+      m.action.forEach(x => row.appendChild(el('span', 'chip ok', x)));
+      m.passive.forEach(x => row.appendChild(el('span', 'chip', x)));
+      if (!m.visible) row.appendChild(el('span', 'chip weak', 'no visible effect'));
+    }
+    host.appendChild(row);
+  });
+}
+
+async function runAudit() {
+  setStatus('auditing…');
+  const problem = {game: E.game, seed: E.seed, prefix: E.prefix, gt_actions: E.plan,
+                   start_grid: EXEC.start_grid, goal_grid: E.goal};
+  const r = await api('/api/audit', {problem});
+  drawAudit(r);
+  setStatus(r.ok ? 'audit passes' : 'audit fails', r.ok);
+}
+
+function drawAudit(r) {
+  const c = document.getElementById('chips');
+  c.innerHTML = '';
+  Object.values(r.screens).forEach(s => {
+    const ch = el('span', 'chip ' + (s.ok ? (s.weak || s.vacuous ? 'weak' : 'ok') : 'bad'),
+                  (s.ok ? '✓ ' : '✗ ') + s.label);
+    ch.title = s.detail;
+    c.appendChild(ch);
+    if (!s.ok) c.appendChild(el('div', 'dim', '   ' + s.detail));
+  });
+  c.appendChild(el('div', 'dim', JSON.stringify(r.stats)));
+  document.getElementById('warns').innerHTML =
+    (r.warnings || []).map(w => `<div class="chip weak">${w}</div>`).join('');
+}
+
+async function runRepair() {
+  setStatus('searching small edits…');
+  const problem = {game: E.game, seed: E.seed, prefix: E.prefix, gt_actions: E.plan,
+                   goal_grid: E.goal};
+  const {candidates} = await api('/api/repair', {problem});
+  const w = document.getElementById('warns');
+  w.innerHTML = '';
+  if (!candidates.length) { setStatus('no single edit reaches the goal', false); return; }
+  setStatus(`${candidates.length} single edit(s) reach the goal`);
+  candidates.forEach(c => {
+    const b = el('button', null, `${c.kind} @${c.index} → h=${c.h}`);
+    b.title = c.plan.join(' · ');
+    b.onclick = () => { E.plan = c.plan.slice(); w.innerHTML = ''; refresh(); };
+    w.appendChild(b);
+  });
+}
+
+function clearAudit() {
+  document.getElementById('chips').innerHTML = '<span class="dim">not run</span>';
+  document.getElementById('warns').innerHTML = '';
+}
+
+async function saveProblem() {
+  setStatus('saving + auditing…');
+  const r = await api('/api/problems/' + E.game, {
+    seed: E.seed, prefix: E.prefix, plan: E.plan, session: E.session, t: E.t,
+    note: document.getElementById('note').value, id: E.id});
+  E.id = r.id;
+  drawAudit(r.problem.audit);
+  setStatus(`saved ${r.id} — audit ${r.problem.audit.ok ? 'PASSES' : 'FAILS'}`,
+            r.problem.audit.ok);
+  await loadProblems();
+}
+
+async function loadProblems() {
+  const {problems} = await api('/api/problems/' + document.getElementById('game').value);
+  const tb = document.querySelector('#plist tbody');
+  tb.innerHTML = '<tr><th>id</th><th>h</th><th>audit</th><th>note</th><th></th></tr>';
+  document.getElementById('pcount').textContent = `${problems.length} saved`;
+  problems.forEach(p => {
+    const tr = el('tr', 'clickable');
+    const a = p.audit || {};
+    const bad = a.ok ? '' : Object.values(a.screens || {}).filter(s => !s.ok)
+                              .map(s => s.id).join(' ');
+    tr.innerHTML = `<td>${p.id}</td><td>${p.h}</td>` +
+      `<td style="color:${a.ok ? 'var(--ok)' : 'var(--bad)'}">${a.ok ? 'pass' : 'FAIL ' + bad}</td>` +
+      `<td>${p.note || ''}</td>`;
+    const td = el('td');
+    const del = el('button', 'danger', '✕');
+    del.onclick = async ev => { ev.stopPropagation();
+      await api(`/api/problems/${p.game}/${p.id}`, null, 'DELETE'); loadProblems(); };
+    td.appendChild(del); tr.appendChild(td);
+    tr.onclick = () => openProblem(p);
+    tb.appendChild(tr);
+  });
+}
+
+function openProblem(p) {
+  E = {game: p.game, seed: p.seed, prefix: p.prefix, plan: p.gt_actions.slice(),
+       goal: p.goal_grid, id: p.id, session: p.session, t: p.t,
+       startIx: p.t, goalIx: p.t + p.h};
+  ORIG = p.gt_actions.slice();
+  document.getElementById('note').value = p.note || '';
+  if (p.audit) drawAudit(p.audit); else clearAudit();
+  if (!SES || SES.name !== p.session) drawFilm();
+  refresh();
+}
+
+function setStatus(msg, ok) {
+  const s = document.getElementById('status');
+  s.textContent = msg;
+  s.className = 'status' + (ok === undefined ? '' : ok ? ' ok' : ' bad');
+}
+boot();
+</script>
+</body></html>

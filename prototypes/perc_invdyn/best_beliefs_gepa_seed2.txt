@@ -1,8 +1,0 @@
-world knowledge
-- Coordinates are given as [row, column] with rows increasing downward and columns increasing rightward.
-- The agent is represented by the darkgreen cells.
-- Each action moves the agent one step in the corresponding direction:
-  - left: column decreases by 1 (row unchanged)
-  - right: column increases by 1 (row unchanged)
-  - up: row decreases by 1 (column unchanged)
-  - down: row increases by 1 (column unchanged)

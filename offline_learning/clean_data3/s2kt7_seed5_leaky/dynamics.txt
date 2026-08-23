@@ -1,0 +1,35 @@
+S2KT7 — Game Dynamics (REAL game, non-degenerate; generated under non-zero seeds)
+
+Grid: 16x16, black background. NOTE: the sibling dataset clean_data3/s2kt7 was
+generated at seed=0, which is PATHOLOGICAL — (randomPositions GRID_SIZE 2) collapses
+to (0,0) for every draw, so there every click drops food at (0,0). THIS dataset uses
+non-zero per-episode seeds so clicks scatter food randomly (the intended mechanic).
+See memory seed0-degenerate-data-gen and S2KT7.sexp.
+
+Objects (initial state):
+- Ants: 2 gray cells, start at (row 5, col 5) and (row 14, col 1) [SEXP Position(5,5),
+  (1,14); render is grid[y][x]]. Always exactly two ants; never created/destroyed.
+- Food: red cells. NONE at start. Created only by clicking.
+
+Player actions:
+- click ROW COL: spawns TWO Food at `randomPositions GRID_SIZE 2` — two RANDOM cells on
+  the 16x16 grid. The click ROW/COL is IGNORED (randomPositions does not use it); only the
+  fact of a click matters. The two random cells may coincide (rendered as one red cell) or
+  land on an ant's cell (eaten within a tick). Under a non-zero seed the positions vary.
+- left, right, up, down, noop: NO handler — pure no-ops. Only `click` affects world state.
+
+Passive / clock dynamics (every tick):
+- Ant movement: each ant steps one cell toward its NEAREST food (ant->food unit vector).
+  Both ants target the global food set. With no food, ants idle where they are.
+- Eating: a food is removed once an ant occupies (intersects) its cell.
+
+Collisions/interactions: ant-on-food removes the food (the only interaction).
+Spawning/despawning: food spawns only on click (2 per click, random cells); despawns when
+eaten. Ants never spawn/despawn.
+Color changes: none.
+Win/termination/reward: none (open-ended foraging: click to scatter food, ants converge).
+
+Identifiability note: because a click spawns visible food, click IS distinguishable from
+noop whenever the spawned food renders (the common case). Click LOCATION remains
+unidentifiable (randomPositions ignores it). This is UNLIKE the seed-0 dataset, where
+click and noop were aliased whenever food already sat at (0,0).

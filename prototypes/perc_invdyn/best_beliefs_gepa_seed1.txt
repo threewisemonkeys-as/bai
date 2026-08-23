@@ -1,7 +1,0 @@
-The agent is a single-cell entity.
-(row, column) coordinates are used. (0,0) is the top-left corner.
-ACTION0: The agent moves one step North (decreases row).
-ACTION1: The agent moves one step East (increases column).
-ACTION2: The agent moves one step South (increases row).
-ACTION3: The agent moves one step West (decreases column).
-ACTION4: The agent remains in the same position.

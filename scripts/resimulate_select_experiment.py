@@ -25,7 +25,7 @@ from omegaconf import OmegaConf
 from PIL import Image
 
 from llm_utils import extract_xml_key
-from mixed_improve import _llm_call
+from explore.mixed_improve import _llm_call
 
 load_dotenv()
 

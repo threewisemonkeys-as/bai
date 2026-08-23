@@ -1,0 +1,1128 @@
+<title>Sixty Autumn Tasks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600;700&display=swap">
+
+<style>
+:root {
+  color-scheme: light;
+  --paper: #f4f6f2;
+  --surface: #fcfcfb;
+  --surface-2: #eef1ec;
+  --ink: #0c0e0c;
+  --ink-2: #4d524c;
+  --muted: #858a82;
+  --rule: #dee2d9;
+  --hair: rgba(11, 11, 11, 0.10);
+  --accent: #2a78d6;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --good: #0ca30c;
+  --critical: #d03b3b;
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.05);
+
+  /* Sequential blue, near-surface at zero and darkening with the score. Six
+     quantised steps so the legend is exhaustive and the fill is theme-safe. */
+  --ramp-0: #e4ebf5;  --ink-0: #0c0e0c;
+  --ramp-1: #cde2fb;  --ink-1: #0c0e0c;
+  --ramp-2: #9ec5f4;  --ink-2-on: #0c0e0c;
+  --ramp-3: #5598e7;  --ink-3: #0c0e0c;
+  --ramp-4: #2a78d6;  --ink-4: #ffffff;
+  --ramp-5: #184f95;  --ink-5: #ffffff;
+  /* White holds 4.8:1 on the fixed critical red in both themes. */
+  --ink-neg: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #101210;
+    --surface: #1c1e1c;
+    --surface-2: #232622;
+    --ink: #f2f5f0;
+    --ink-2: #b9bfb6;
+    --muted: #898f86;
+    --rule: #2c2f2b;
+    --hair: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+
+    --ramp-0: #1f2a35;  --ink-0: #f2f5f0;
+    --ramp-1: #0d366b;  --ink-1: #f2f5f0;
+    --ramp-2: #184f95;  --ink-2-on: #f2f5f0;
+    --ramp-3: #256abf;  --ink-3: #f2f5f0;
+    --ramp-4: #3987e5;  --ink-4: #0c0e0c;
+    --ramp-5: #86b6ef;  --ink-5: #0c0e0c;
+    --ink-neg: #ffffff;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #101210;
+  --surface: #1c1e1c;
+  --surface-2: #232622;
+  --ink: #f2f5f0;
+  --ink-2: #b9bfb6;
+  --muted: #898f86;
+  --rule: #2c2f2b;
+  --hair: rgba(255, 255, 255, 0.10);
+  --accent: #3987e5;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+
+  --ramp-0: #1f2a35;  --ink-0: #f2f5f0;
+  --ramp-1: #0d366b;  --ink-1: #f2f5f0;
+  --ramp-2: #184f95;  --ink-2-on: #f2f5f0;
+  --ramp-3: #256abf;  --ink-3: #f2f5f0;
+  --ramp-4: #3987e5;  --ink-4: #0c0e0c;
+  --ramp-5: #86b6ef;  --ink-5: #0c0e0c;
+  --ink-neg: #ffffff;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 56px 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+}
+
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+h1 {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(34px, 5vw, 52px);
+  line-height: 1.06;
+  letter-spacing: -0.015em;
+  margin: 12px 0 0;
+  text-wrap: balance;
+}
+
+h2 {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-weight: 600;
+  font-size: 23px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+h3 {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0;
+}
+
+p { margin: 0; max-width: 66ch; }
+.lede { font-size: 17px; color: var(--ink-2); margin-top: 18px; }
+.note { font-size: 13.5px; color: var(--ink-2); }
+
+.masthead { border-bottom: 1px solid var(--rule); padding-bottom: 32px; }
+
+.runmeta {
+  list-style: none;
+  margin: 28px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.runmeta b { color: var(--muted); font-weight: 500; }
+
+/* ---- stat tiles ---------------------------------------------------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tile { background: var(--surface); padding: 18px 18px 20px; }
+.tile .k {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tile .v {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 1.1;
+  margin-top: 8px;
+  letter-spacing: -0.02em;
+}
+.tile .s { font-size: 12.5px; color: var(--ink-2); margin-top: 4px; }
+
+/* ---- shared section furniture -------------------------------------- */
+
+section { display: flex; flex-direction: column; gap: 18px; }
+.sechead { display: flex; flex-direction: column; gap: 8px; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 22px;
+  padding-bottom: 4px;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.segmented button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.segmented button + button { border-left: 1px solid var(--rule); }
+.segmented button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.segmented button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.legend .swatches { display: flex; gap: 2px; }
+.legend .sw { width: 22px; height: 12px; border-radius: 2px; }
+.legend .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend .box { width: 12px; height: 12px; border-radius: 2px; }
+
+/* ---- the board ------------------------------------------------------ */
+
+.board {
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--surface);
+  overflow-x: auto;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.4fr) repeat(3, minmax(112px, 1fr));
+  min-width: 620px;
+  gap: 2px;
+  padding: 2px;
+}
+.grid .head {
+  padding: 12px 12px 10px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  align-self: end;
+}
+.grid .head.num { text-align: center; line-height: 1.4; }
+
+.world {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  min-height: 46px;
+}
+.world .id {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.world .name { font-size: 12.5px; color: var(--muted); }
+
+.cell {
+  position: relative;
+  min-height: 46px;
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: default;
+  border: 0;
+  padding: 0;
+  width: 100%;
+  font-feature-settings: "tnum";
+}
+.cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cell .sub { font-size: 10px; letter-spacing: 0.06em; opacity: 0.78; font-weight: 400; }
+
+.cell.s0 { background: var(--ramp-0); color: var(--ink-0); }
+.cell.s1 { background: var(--ramp-1); color: var(--ink-1); }
+.cell.s2 { background: var(--ramp-2); color: var(--ink-2-on); }
+.cell.s3 { background: var(--ramp-3); color: var(--ink-3); }
+.cell.s4 { background: var(--ramp-4); color: var(--ink-4); }
+.cell.s5 { background: var(--ramp-5); color: var(--ink-5); }
+.cell.neg { background: var(--critical); color: var(--ink-neg); }
+.cell.none {
+  background: transparent;
+  border: 1px dashed var(--rule);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tip {
+  position: fixed;
+  z-index: 40;
+  pointer-events: none;
+  max-width: 320px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--hair);
+  border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  opacity: 0;
+  transition: opacity 90ms linear;
+}
+.tip[data-show="1"] { opacity: 1; }
+.tip h4 {
+  margin: 0 0 8px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+}
+.tip dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; }
+.tip dt { color: var(--muted); font-size: 11.5px; }
+.tip dd {
+  margin: 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+}
+.tip .attempt { border-top: 1px solid var(--rule); margin-top: 8px; padding-top: 8px; }
+
+/* ---- per-task bars --------------------------------------------------- */
+
+.bars {
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--surface);
+  padding: 22px 22px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
+.barrow { display: grid; grid-template-columns: minmax(132px, 168px) 1fr; gap: 18px; align-items: center; }
+.barrow .label { display: flex; flex-direction: column; gap: 2px; }
+.barrow .label .t { font-weight: 600; font-size: 14px; }
+.barrow .label .n {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+.track { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.lane { position: relative; height: 18px; }
+.lane .zero, .lane .floor {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+}
+.zero { background: var(--rule); }
+.bar {
+  position: absolute;
+  top: 0;
+  height: 18px;
+  border-radius: 0 3px 3px 0;
+  border: 1px solid var(--surface);
+}
+.bar.first { background: var(--series-1); }
+.bar.best { background: var(--series-2); }
+.bar .val {
+  position: absolute;
+  left: calc(100% + 7px);
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.axis {
+  position: relative;
+  height: 16px;
+  margin-top: 6px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.axis span { position: absolute; transform: translateX(-50%); }
+.floormark {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 0;
+  border-left: 1px dashed var(--muted);
+}
+.floormark::after {
+  content: attr(data-label);
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 4px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---- strip plot ------------------------------------------------------ */
+
+.strips {
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--surface);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.strip { display: grid; grid-template-columns: minmax(132px, 168px) 1fr; gap: 18px; align-items: center; }
+.strip .plot {
+  position: relative;
+  height: 34px;
+  border-bottom: 1px solid var(--rule);
+}
+.dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--series-1);
+  border: 2px solid var(--surface);
+  transform: translate(-50%, -50%);
+  top: 50%;
+  cursor: default;
+}
+.dot.explore { background: var(--series-1); }
+.cap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule);
+}
+
+/* ---- table ----------------------------------------------------------- */
+
+.tablewrap {
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--surface);
+  overflow-x: auto;
+}
+table { border-collapse: collapse; width: 100%; min-width: 780px; font-size: 12.5px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+  background: var(--surface);
+}
+td.num {
+  text-align: right;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+td.mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--surface-2); }
+
+.pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  border: 1px solid var(--hair);
+}
+.pill.ok { color: var(--good); }
+.pill.bad { color: var(--critical); }
+
+/* ---- method ---------------------------------------------------------- */
+
+.method {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+  gap: 26px 40px;
+}
+.method h3 { margin-bottom: 6px; }
+.method p { font-size: 13.5px; color: var(--ink-2); }
+.method code {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding-top: 22px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">AutumnBench &middot; one coding-agent session per task</p>
+    <h1>Sixty Autumn Tasks</h1>
+    <p class="lede" id="lede"></p>
+    <ul class="runmeta" id="runmeta"></ul>
+  </header>
+
+  <section class="tiles" id="tiles"></section>
+
+  <section id="board">
+    <div class="sechead">
+      <h2>Every world, every test</h2>
+      <p class="note">
+        One cell per task. The number is the reward the test paid; the fill is that
+        number, quantised into six steps so the legend is exhaustive. A world with
+        two names is one row &mdash; scoring it twice would weight it double. A
+        negative cell is a penalty: a wrong frame, or a change called before one
+        happened.
+      </p>
+    </div>
+    <div class="controls">
+      <div class="segmented" role="group" aria-label="Which attempt to show">
+        <button type="button" data-view="first" aria-pressed="true">First attempt</button>
+        <button type="button" data-view="best" aria-pressed="false">Best of attempts</button>
+      </div>
+      <div class="legend">
+        <span>0.0</span>
+        <span class="swatches" aria-hidden="true">
+          <span class="sw" style="background:var(--ramp-0)"></span>
+          <span class="sw" style="background:var(--ramp-1)"></span>
+          <span class="sw" style="background:var(--ramp-2)"></span>
+          <span class="sw" style="background:var(--ramp-3)"></span>
+          <span class="sw" style="background:var(--ramp-4)"></span>
+          <span class="sw" style="background:var(--ramp-5)"></span>
+        </span>
+        <span>1.0</span>
+        <span class="chip"><span class="box" style="background:var(--critical)"></span>&minus;1 penalty</span>
+        <span class="chip"><span class="box" style="border:1px dashed var(--rule)"></span>no verdict</span>
+      </div>
+    </div>
+    <div class="board"><div class="grid" id="grid"></div></div>
+  </section>
+
+  <section id="bytask">
+    <div class="sechead">
+      <h2>What each test paid</h2>
+      <p class="note">
+        The three tests are scored on different scales and pay nothing for
+        different things, so the floor is drawn on each row rather than averaged
+        away. Bars are the mean over the worlds that reached a verdict.
+      </p>
+    </div>
+    <div class="controls">
+      <div class="legend">
+        <span class="chip"><span class="box" style="background:var(--series-1)"></span>First attempt</span>
+        <span class="chip"><span class="box" style="background:var(--series-2)"></span>Best of attempts</span>
+        <span class="chip"><span class="box" style="border-left:1px dashed var(--muted);width:1px;border-radius:0"></span>Floor &mdash; what the test pays for knowing nothing</span>
+      </div>
+    </div>
+    <div class="bars" id="bars"></div>
+    <p class="note" id="finding"></p>
+  </section>
+
+  <section id="effort">
+    <div class="sechead">
+      <h2>What exploration cost</h2>
+      <p class="note">
+        Every action counts against one budget of 501, and exploration &mdash; the
+        only phase with <code>reset</code> &mdash; is capped at 300 of them. One dot
+        is one session, placed at the actions it spent before the test.
+      </p>
+    </div>
+    <div class="strips" id="strips"></div>
+  </section>
+
+  <section id="sessions">
+    <div class="sechead">
+      <h2>Every session</h2>
+      <p class="note">
+        The board above folds these; this is the record it folds. A session with no
+        verdict scored nothing because it never reached its test, which is a missing
+        measurement rather than a zero.
+      </p>
+    </div>
+    <div class="tablewrap"><table id="table"></table></div>
+  </section>
+
+  <section id="method">
+    <div class="sechead"><h2>How this was measured</h2></div>
+    <div class="method" id="method"></div>
+  </section>
+
+  <footer id="footer"></footer>
+</div>
+
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+const DATA = {"runs":"/home/ays57/autumn-runs","tasks":["mfp","cd","planning"],"floors":{"mfp":-0.6666666666666666,"planning":0.0,"cd":-1.0},"same_world":{"BT3GB":"ice"},"worlds":["27VWC","7WWW9","7XF97","83WKQ","ADA85","AW9WD","DGG2C","DQ8GC","E3V6M","EAHCW","F5W3N","N2NTD","NRDF6","NTQ4Y","QFSVC","QQM74","S2KT7","VA6FQ","VQJH6","ice"],"names":{"27VWC":"bbq","7WWW9":"magnets","7XF97":"grow","83WKQ":"particles","ADA85":"bottle","AW9WD":"hatch","ice":"ice","DGG2C":"wind","DQ8GC":"disease","E3V6M":"lights","EAHCW":"paint","F5W3N":"space_invaders","N2NTD":"mario","NRDF6":"buoyancy","NTQ4Y":"waterplug","QFSVC":"coins","QQM74":"gravity_3","S2KT7":"ants","VA6FQ":"sand","VQJH6":"gravity"},"cells":[{"world":"27VWC","task":"cd","first":{"launch":"20260822-143357","workspace":"27VWC_cd","stream":"agent_stream.jsonl","program":"27VWC","world":"27VWC","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":355,"explore_used":300,"turns":112,"tool_calls":59,"compactions":0,"cost_usd":3.3741820000000007,"seconds":891.5535409100121,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"27VWC_cd","stream":"agent_stream.jsonl","program":"27VWC","world":"27VWC","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":355,"explore_used":300,"turns":112,"tool_calls":59,"compactions":0,"cost_usd":3.3741820000000007,"seconds":891.5535409100121,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["27VWC"],"attempts":[{"launch":"20260822-143357","workspace":"27VWC_cd","stream":"agent_stream.jsonl","program":"27VWC","world":"27VWC","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":355,"explore_used":300,"turns":112,"tool_calls":59,"compactions":0,"cost_usd":3.3741820000000007,"seconds":891.5535409100121,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"27VWC","task":"mfp","first":{"launch":"20260822-143357","workspace":"27VWC_mfp","stream":"agent_stream.jsonl","program":"27VWC","world":"27VWC","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":417,"explore_used":300,"turns":101,"tool_calls":55,"compactions":0,"cost_usd":4.243256500000001,"seconds":1194.6424455159577,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":54,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"27VWC_mfp","stream":"agent_stream.jsonl","program":"27VWC","world":"27VWC","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":417,"explore_used":300,"turns":101,"tool_calls":55,"compactions":0,"cost_usd":4.243256500000001,"seconds":1194.6424455159577,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":54,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["27VWC"],"attempts":[{"launch":"20260822-143357","workspace":"27VWC_mfp","stream":"agent_stream.jsonl","program":"27VWC","world":"27VWC","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":417,"explore_used":300,"turns":101,"tool_calls":55,"compactions":0,"cost_usd":4.243256500000001,"seconds":1194.6424455159577,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":54,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"27VWC","task":"planning","first":{"launch":"20260822-143357","workspace":"27VWC_planning","stream":"agent_stream.jsonl","program":"27VWC","world":"27VWC","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":364,"explore_used":298,"turns":81,"tool_calls":40,"compactions":0,"cost_usd":1.9500844999999996,"seconds":606.7630297309952,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":3,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"27VWC_planning","stream":"agent_stream.jsonl","program":"27VWC","world":"27VWC","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":364,"explore_used":298,"turns":81,"tool_calls":40,"compactions":0,"cost_usd":1.9500844999999996,"seconds":606.7630297309952,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":3,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["27VWC"],"attempts":[{"launch":"20260822-143357","workspace":"27VWC_planning","stream":"agent_stream.jsonl","program":"27VWC","world":"27VWC","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":364,"explore_used":298,"turns":81,"tool_calls":40,"compactions":0,"cost_usd":1.9500844999999996,"seconds":606.7630297309952,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":3,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"7WWW9","task":"cd","first":{"launch":"20260822-143357","workspace":"7WWW9_cd","stream":"agent_stream.jsonl","program":"7WWW9","world":"7WWW9","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":187,"explore_used":178,"turns":96,"tool_calls":53,"compactions":0,"cost_usd":2.670549,"seconds":672.8317084129667,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":6,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"7WWW9_cd","stream":"agent_stream.jsonl","program":"7WWW9","world":"7WWW9","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":187,"explore_used":178,"turns":96,"tool_calls":53,"compactions":0,"cost_usd":2.670549,"seconds":672.8317084129667,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":6,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["7WWW9"],"attempts":[{"launch":"20260822-143357","workspace":"7WWW9_cd","stream":"agent_stream.jsonl","program":"7WWW9","world":"7WWW9","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":187,"explore_used":178,"turns":96,"tool_calls":53,"compactions":0,"cost_usd":2.670549,"seconds":672.8317084129667,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":6,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"7WWW9","task":"mfp","first":{"launch":"20260822-143357","workspace":"7WWW9_mfp","stream":"agent_stream.jsonl","program":"7WWW9","world":"7WWW9","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":265,"explore_used":253,"turns":106,"tool_calls":58,"compactions":0,"cost_usd":3.5503554999999993,"seconds":888.4511886180262,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":8,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"7WWW9_mfp","stream":"agent_stream.jsonl","program":"7WWW9","world":"7WWW9","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":265,"explore_used":253,"turns":106,"tool_calls":58,"compactions":0,"cost_usd":3.5503554999999993,"seconds":888.4511886180262,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":8,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["7WWW9"],"attempts":[{"launch":"20260822-143357","workspace":"7WWW9_mfp","stream":"agent_stream.jsonl","program":"7WWW9","world":"7WWW9","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":265,"explore_used":253,"turns":106,"tool_calls":58,"compactions":0,"cost_usd":3.5503554999999993,"seconds":888.4511886180262,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":8,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"7WWW9","task":"planning","first":{"launch":"20260822-143357","workspace":"7WWW9_planning","stream":"agent_stream.jsonl","program":"7WWW9","world":"7WWW9","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":288,"explore_used":286,"turns":67,"tool_calls":35,"compactions":0,"cost_usd":2.0866580000000003,"seconds":646.2556048700353,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":20,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"7WWW9_planning","stream":"agent_stream.jsonl","program":"7WWW9","world":"7WWW9","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":288,"explore_used":286,"turns":67,"tool_calls":35,"compactions":0,"cost_usd":2.0866580000000003,"seconds":646.2556048700353,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":20,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["7WWW9"],"attempts":[{"launch":"20260822-143357","workspace":"7WWW9_planning","stream":"agent_stream.jsonl","program":"7WWW9","world":"7WWW9","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":288,"explore_used":286,"turns":67,"tool_calls":35,"compactions":0,"cost_usd":2.0866580000000003,"seconds":646.2556048700353,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":20,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"7XF97","task":"cd","first":{"launch":"20260822-143357","workspace":"7XF97_cd","stream":"agent_stream.jsonl","program":"7XF97","world":"7XF97","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":379,"explore_used":295,"turns":132,"tool_calls":67,"compactions":0,"cost_usd":3.639770499999999,"seconds":979.2346927800099,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":22,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"7XF97_cd","stream":"agent_stream.jsonl","program":"7XF97","world":"7XF97","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":379,"explore_used":295,"turns":132,"tool_calls":67,"compactions":0,"cost_usd":3.639770499999999,"seconds":979.2346927800099,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":22,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["7XF97"],"attempts":[{"launch":"20260822-143357","workspace":"7XF97_cd","stream":"agent_stream.jsonl","program":"7XF97","world":"7XF97","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":379,"explore_used":295,"turns":132,"tool_calls":67,"compactions":0,"cost_usd":3.639770499999999,"seconds":979.2346927800099,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":22,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"7XF97","task":"mfp","first":{"launch":"20260822-143357","workspace":"7XF97_mfp","stream":"agent_stream.jsonl","program":"7XF97","world":"7XF97","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":407,"explore_used":295,"turns":121,"tool_calls":64,"compactions":0,"cost_usd":4.150977000000001,"seconds":1008.2392415409558,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":22,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"7XF97_mfp","stream":"agent_stream.jsonl","program":"7XF97","world":"7XF97","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":407,"explore_used":295,"turns":121,"tool_calls":64,"compactions":0,"cost_usd":4.150977000000001,"seconds":1008.2392415409558,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":22,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["7XF97"],"attempts":[{"launch":"20260822-143357","workspace":"7XF97_mfp","stream":"agent_stream.jsonl","program":"7XF97","world":"7XF97","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":407,"explore_used":295,"turns":121,"tool_calls":64,"compactions":0,"cost_usd":4.150977000000001,"seconds":1008.2392415409558,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":22,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"7XF97","task":"planning","first":{"launch":"20260822-143357","workspace":"7XF97_planning","stream":"agent_stream.jsonl","program":"7XF97","world":"7XF97","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":344,"explore_used":253,"turns":154,"tool_calls":78,"compactions":0,"cost_usd":6.1090345,"seconds":1422.2086340539972,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":38,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"7XF97_planning","stream":"agent_stream.jsonl","program":"7XF97","world":"7XF97","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":344,"explore_used":253,"turns":154,"tool_calls":78,"compactions":0,"cost_usd":6.1090345,"seconds":1422.2086340539972,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":38,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["7XF97"],"attempts":[{"launch":"20260822-143357","workspace":"7XF97_planning","stream":"agent_stream.jsonl","program":"7XF97","world":"7XF97","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":344,"explore_used":253,"turns":154,"tool_calls":78,"compactions":0,"cost_usd":6.1090345,"seconds":1422.2086340539972,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":38,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"83WKQ","task":"cd","first":{"launch":"20260822-143357","workspace":"83WKQ_cd","stream":"agent_stream.jsonl","program":"83WKQ","world":"83WKQ","task":"cd","reward":0.8917281655715406,"phase":"End","terminal":true,"actions_used":190,"explore_used":183,"turns":64,"tool_calls":33,"compactions":0,"cost_usd":1.384679,"seconds":407.88590119901346,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"83WKQ_cd","stream":"agent_stream.jsonl","program":"83WKQ","world":"83WKQ","task":"cd","reward":0.8917281655715406,"phase":"End","terminal":true,"actions_used":190,"explore_used":183,"turns":64,"tool_calls":33,"compactions":0,"cost_usd":1.384679,"seconds":407.88590119901346,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["83WKQ"],"attempts":[{"launch":"20260822-143357","workspace":"83WKQ_cd","stream":"agent_stream.jsonl","program":"83WKQ","world":"83WKQ","task":"cd","reward":0.8917281655715406,"phase":"End","terminal":true,"actions_used":190,"explore_used":183,"turns":64,"tool_calls":33,"compactions":0,"cost_usd":1.384679,"seconds":407.88590119901346,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"83WKQ","task":"mfp","first":{"launch":"20260822-143357","workspace":"83WKQ_mfp","stream":"agent_stream.jsonl","program":"83WKQ","world":"83WKQ","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":167,"explore_used":150,"turns":77,"tool_calls":40,"compactions":0,"cost_usd":2.372316,"seconds":663.7218905600021,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":35,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"83WKQ_mfp","stream":"agent_stream.jsonl","program":"83WKQ","world":"83WKQ","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":167,"explore_used":150,"turns":77,"tool_calls":40,"compactions":0,"cost_usd":2.372316,"seconds":663.7218905600021,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":35,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["83WKQ"],"attempts":[{"launch":"20260822-143357","workspace":"83WKQ_mfp","stream":"agent_stream.jsonl","program":"83WKQ","world":"83WKQ","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":167,"explore_used":150,"turns":77,"tool_calls":40,"compactions":0,"cost_usd":2.372316,"seconds":663.7218905600021,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":35,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"83WKQ","task":"planning","first":{"launch":"20260822-143357","workspace":"83WKQ_planning","stream":"agent_stream.jsonl","program":"83WKQ","world":"83WKQ","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":150,"explore_used":148,"turns":66,"tool_calls":35,"compactions":0,"cost_usd":1.3003984999999998,"seconds":316.04975422797725,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"83WKQ_planning","stream":"agent_stream.jsonl","program":"83WKQ","world":"83WKQ","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":150,"explore_used":148,"turns":66,"tool_calls":35,"compactions":0,"cost_usd":1.3003984999999998,"seconds":316.04975422797725,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["83WKQ"],"attempts":[{"launch":"20260822-143357","workspace":"83WKQ_planning","stream":"agent_stream.jsonl","program":"83WKQ","world":"83WKQ","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":150,"explore_used":148,"turns":66,"tool_calls":35,"compactions":0,"cost_usd":1.3003984999999998,"seconds":316.04975422797725,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"ADA85","task":"cd","first":{"launch":"20260822-143357","workspace":"ADA85_cd","stream":"agent_stream.jsonl","program":"ADA85","world":"ADA85","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":332,"explore_used":300,"turns":114,"tool_calls":60,"compactions":0,"cost_usd":3.1987375,"seconds":960.4738614779781,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":20,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"ADA85_cd","stream":"agent_stream.jsonl","program":"ADA85","world":"ADA85","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":332,"explore_used":300,"turns":114,"tool_calls":60,"compactions":0,"cost_usd":3.1987375,"seconds":960.4738614779781,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":20,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["ADA85"],"attempts":[{"launch":"20260822-143357","workspace":"ADA85_cd","stream":"agent_stream.jsonl","program":"ADA85","world":"ADA85","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":332,"explore_used":300,"turns":114,"tool_calls":60,"compactions":0,"cost_usd":3.1987375,"seconds":960.4738614779781,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":20,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"ADA85","task":"mfp","first":{"launch":"20260822-143357","workspace":"ADA85_mfp","stream":"agent_stream.jsonl","program":"ADA85","world":"ADA85","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":306,"explore_used":263,"turns":77,"tool_calls":41,"compactions":0,"cost_usd":2.0461445,"seconds":520.9661300689913,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":10,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"ADA85_mfp","stream":"agent_stream.jsonl","program":"ADA85","world":"ADA85","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":306,"explore_used":263,"turns":77,"tool_calls":41,"compactions":0,"cost_usd":2.0461445,"seconds":520.9661300689913,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":10,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["ADA85"],"attempts":[{"launch":"20260822-143357","workspace":"ADA85_mfp","stream":"agent_stream.jsonl","program":"ADA85","world":"ADA85","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":306,"explore_used":263,"turns":77,"tool_calls":41,"compactions":0,"cost_usd":2.0461445,"seconds":520.9661300689913,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":10,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"ADA85","task":"planning","first":{"launch":"20260822-143357","workspace":"ADA85_planning","stream":"agent_stream.jsonl","program":"ADA85","world":"ADA85","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":304,"explore_used":287,"turns":73,"tool_calls":39,"compactions":0,"cost_usd":2.4997500000000006,"seconds":650.4140094550094,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"ADA85_planning","stream":"agent_stream.jsonl","program":"ADA85","world":"ADA85","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":304,"explore_used":287,"turns":73,"tool_calls":39,"compactions":0,"cost_usd":2.4997500000000006,"seconds":650.4140094550094,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["ADA85"],"attempts":[{"launch":"20260822-143357","workspace":"ADA85_planning","stream":"agent_stream.jsonl","program":"ADA85","world":"ADA85","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":304,"explore_used":287,"turns":73,"tool_calls":39,"compactions":0,"cost_usd":2.4997500000000006,"seconds":650.4140094550094,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"AW9WD","task":"cd","first":{"launch":"20260822-143357","workspace":"AW9WD_cd","stream":"agent_stream.jsonl","program":"AW9WD","world":"AW9WD","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":297,"explore_used":290,"turns":82,"tool_calls":45,"compactions":0,"cost_usd":2.0621065,"seconds":580.3897240250371,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":9,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"AW9WD_cd","stream":"agent_stream.jsonl","program":"AW9WD","world":"AW9WD","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":297,"explore_used":290,"turns":82,"tool_calls":45,"compactions":0,"cost_usd":2.0621065,"seconds":580.3897240250371,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":9,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["AW9WD"],"attempts":[{"launch":"20260822-143357","workspace":"AW9WD_cd","stream":"agent_stream.jsonl","program":"AW9WD","world":"AW9WD","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":297,"explore_used":290,"turns":82,"tool_calls":45,"compactions":0,"cost_usd":2.0621065,"seconds":580.3897240250371,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":9,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"AW9WD","task":"mfp","first":{"launch":"20260822-143357","workspace":"AW9WD_mfp","stream":"agent_stream.jsonl","program":"AW9WD","world":"AW9WD","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":352,"explore_used":263,"turns":188,"tool_calls":98,"compactions":0,"cost_usd":11.728744499999998,"seconds":2494.6888355749543,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":33,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"AW9WD_mfp","stream":"agent_stream.jsonl","program":"AW9WD","world":"AW9WD","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":352,"explore_used":263,"turns":188,"tool_calls":98,"compactions":0,"cost_usd":11.728744499999998,"seconds":2494.6888355749543,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":33,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["AW9WD"],"attempts":[{"launch":"20260822-143357","workspace":"AW9WD_mfp","stream":"agent_stream.jsonl","program":"AW9WD","world":"AW9WD","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":352,"explore_used":263,"turns":188,"tool_calls":98,"compactions":0,"cost_usd":11.728744499999998,"seconds":2494.6888355749543,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":33,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"AW9WD","task":"planning","first":{"launch":"20260822-143357","workspace":"AW9WD_planning","stream":"agent_stream.jsonl","program":"AW9WD","world":"AW9WD","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":343,"explore_used":298,"turns":100,"tool_calls":51,"compactions":0,"cost_usd":3.301674000000001,"seconds":850.2605647780001,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":52,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"AW9WD_planning","stream":"agent_stream.jsonl","program":"AW9WD","world":"AW9WD","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":343,"explore_used":298,"turns":100,"tool_calls":51,"compactions":0,"cost_usd":3.301674000000001,"seconds":850.2605647780001,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":52,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["AW9WD"],"attempts":[{"launch":"20260822-143357","workspace":"AW9WD_planning","stream":"agent_stream.jsonl","program":"AW9WD","world":"AW9WD","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":343,"explore_used":298,"turns":100,"tool_calls":51,"compactions":0,"cost_usd":3.301674000000001,"seconds":850.2605647780001,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":52,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"DGG2C","task":"cd","first":{"launch":"20260822-143357","workspace":"DGG2C_cd","stream":"agent_stream.jsonl","program":"DGG2C","world":"DGG2C","task":"cd","reward":0.9250470111751752,"phase":"End","terminal":true,"actions_used":207,"explore_used":199,"turns":56,"tool_calls":30,"compactions":0,"cost_usd":1.5698950000000005,"seconds":391.28756866196636,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":3,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"DGG2C_cd","stream":"agent_stream.jsonl","program":"DGG2C","world":"DGG2C","task":"cd","reward":0.9250470111751752,"phase":"End","terminal":true,"actions_used":207,"explore_used":199,"turns":56,"tool_calls":30,"compactions":0,"cost_usd":1.5698950000000005,"seconds":391.28756866196636,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":3,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["DGG2C"],"attempts":[{"launch":"20260822-143357","workspace":"DGG2C_cd","stream":"agent_stream.jsonl","program":"DGG2C","world":"DGG2C","task":"cd","reward":0.9250470111751752,"phase":"End","terminal":true,"actions_used":207,"explore_used":199,"turns":56,"tool_calls":30,"compactions":0,"cost_usd":1.5698950000000005,"seconds":391.28756866196636,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":3,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"DGG2C","task":"mfp","first":{"launch":"20260822-143357","workspace":"DGG2C_mfp","stream":"agent_stream.jsonl","program":"DGG2C","world":"DGG2C","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":189,"explore_used":161,"turns":63,"tool_calls":35,"compactions":0,"cost_usd":1.5881395,"seconds":392.1100455050473,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"DGG2C_mfp","stream":"agent_stream.jsonl","program":"DGG2C","world":"DGG2C","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":189,"explore_used":161,"turns":63,"tool_calls":35,"compactions":0,"cost_usd":1.5881395,"seconds":392.1100455050473,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["DGG2C"],"attempts":[{"launch":"20260822-143357","workspace":"DGG2C_mfp","stream":"agent_stream.jsonl","program":"DGG2C","world":"DGG2C","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":189,"explore_used":161,"turns":63,"tool_calls":35,"compactions":0,"cost_usd":1.5881395,"seconds":392.1100455050473,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"DGG2C","task":"planning","first":{"launch":"20260822-143357","workspace":"DGG2C_planning","stream":"agent_stream.jsonl","program":"DGG2C","world":"DGG2C","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":232,"explore_used":223,"turns":57,"tool_calls":28,"compactions":0,"cost_usd":1.304471,"seconds":375.9898772040033,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":12,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"DGG2C_planning","stream":"agent_stream.jsonl","program":"DGG2C","world":"DGG2C","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":232,"explore_used":223,"turns":57,"tool_calls":28,"compactions":0,"cost_usd":1.304471,"seconds":375.9898772040033,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":12,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["DGG2C"],"attempts":[{"launch":"20260822-143357","workspace":"DGG2C_planning","stream":"agent_stream.jsonl","program":"DGG2C","world":"DGG2C","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":232,"explore_used":223,"turns":57,"tool_calls":28,"compactions":0,"cost_usd":1.304471,"seconds":375.9898772040033,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":12,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"DQ8GC","task":"cd","first":{"launch":"20260817-221419","workspace":"DQ8GC_cd","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":127,"explore_used":119,"turns":93,"tool_calls":48,"compactions":0,"cost_usd":4.534253,"seconds":1110.668080849,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":15,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260818-232209","workspace":"DQ8GC_cd","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"cd","reward":0.9931366075211017,"phase":"End","terminal":true,"actions_used":307,"explore_used":296,"turns":100,"tool_calls":56,"compactions":0,"cost_usd":4.398143500000001,"seconds":917.2960275579971,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["DQ8GC"],"attempts":[{"launch":"20260817-221419","workspace":"DQ8GC_cd","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"cd","reward":-1.0,"phase":"End","terminal":true,"actions_used":127,"explore_used":119,"turns":93,"tool_calls":48,"compactions":0,"cost_usd":4.534253,"seconds":1110.668080849,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":15,"reaudited":true,"reconstructed":false,"complete":true},{"launch":"20260818-232209","workspace":"DQ8GC_cd","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"cd","reward":0.9931366075211017,"phase":"End","terminal":true,"actions_used":307,"explore_used":296,"turns":100,"tool_calls":56,"compactions":0,"cost_usd":4.398143500000001,"seconds":917.2960275579971,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"DQ8GC","task":"mfp","first":{"launch":"20260817-221419","workspace":"DQ8GC_mfp","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":204,"explore_used":175,"turns":83,"tool_calls":43,"compactions":0,"cost_usd":2.9559925000000007,"seconds":553.4606531929994,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":21,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260817-221419","workspace":"DQ8GC_mfp","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":204,"explore_used":175,"turns":83,"tool_calls":43,"compactions":0,"cost_usd":2.9559925000000007,"seconds":553.4606531929994,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":21,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["DQ8GC"],"attempts":[{"launch":"20260817-221419","workspace":"DQ8GC_mfp","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":204,"explore_used":175,"turns":83,"tool_calls":43,"compactions":0,"cost_usd":2.9559925000000007,"seconds":553.4606531929994,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":21,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"DQ8GC","task":"planning","first":{"launch":"20260817-212537","workspace":"DQ8GC_planning","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":195,"explore_used":187,"turns":131,"tool_calls":70,"compactions":0,"cost_usd":4.951151500000001,"seconds":997.4998523200002,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":50,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260817-212537","workspace":"DQ8GC_planning","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":195,"explore_used":187,"turns":131,"tool_calls":70,"compactions":0,"cost_usd":4.951151500000001,"seconds":997.4998523200002,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":50,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["DQ8GC"],"attempts":[{"launch":"20260817-212537","workspace":"DQ8GC_planning","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":195,"explore_used":187,"turns":131,"tool_calls":70,"compactions":0,"cost_usd":4.951151500000001,"seconds":997.4998523200002,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":50,"reaudited":true,"reconstructed":false,"complete":true},{"launch":"20260817-221419","workspace":"DQ8GC_planning","stream":"agent_stream.jsonl","program":"DQ8GC","world":"DQ8GC","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":153,"explore_used":145,"turns":128,"tool_calls":64,"compactions":0,"cost_usd":6.379002499999999,"seconds":1314.5253007090014,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":4,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"E3V6M","task":"cd","first":{"launch":"20260822-143357","workspace":"E3V6M_cd","stream":"agent_stream.jsonl","program":"E3V6M","world":"E3V6M","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":184,"explore_used":166,"turns":54,"tool_calls":27,"compactions":0,"cost_usd":1.058403,"seconds":514.769743902958,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":12,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"E3V6M_cd","stream":"agent_stream.jsonl","program":"E3V6M","world":"E3V6M","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":184,"explore_used":166,"turns":54,"tool_calls":27,"compactions":0,"cost_usd":1.058403,"seconds":514.769743902958,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":12,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["E3V6M"],"attempts":[{"launch":"20260822-143357","workspace":"E3V6M_cd","stream":"agent_stream.jsonl","program":"E3V6M","world":"E3V6M","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":184,"explore_used":166,"turns":54,"tool_calls":27,"compactions":0,"cost_usd":1.058403,"seconds":514.769743902958,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":12,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"E3V6M","task":"mfp","first":{"launch":"20260822-143357","workspace":"E3V6M_mfp","stream":"agent_stream.jsonl","program":"E3V6M","world":"E3V6M","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":322,"explore_used":296,"turns":68,"tool_calls":38,"compactions":0,"cost_usd":1.3200400000000003,"seconds":302.8095025399816,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":5,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"E3V6M_mfp","stream":"agent_stream.jsonl","program":"E3V6M","world":"E3V6M","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":322,"explore_used":296,"turns":68,"tool_calls":38,"compactions":0,"cost_usd":1.3200400000000003,"seconds":302.8095025399816,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":5,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["E3V6M"],"attempts":[{"launch":"20260822-143357","workspace":"E3V6M_mfp","stream":"agent_stream.jsonl","program":"E3V6M","world":"E3V6M","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":322,"explore_used":296,"turns":68,"tool_calls":38,"compactions":0,"cost_usd":1.3200400000000003,"seconds":302.8095025399816,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":5,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"E3V6M","task":"planning","first":{"launch":"20260822-143357","workspace":"E3V6M_planning","stream":"agent_stream.jsonl","program":"E3V6M","world":"E3V6M","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":218,"explore_used":211,"turns":61,"tool_calls":32,"compactions":0,"cost_usd":1.0789345000000001,"seconds":287.7473140640068,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":6,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"E3V6M_planning","stream":"agent_stream.jsonl","program":"E3V6M","world":"E3V6M","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":218,"explore_used":211,"turns":61,"tool_calls":32,"compactions":0,"cost_usd":1.0789345000000001,"seconds":287.7473140640068,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":6,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["E3V6M"],"attempts":[{"launch":"20260822-143357","workspace":"E3V6M_planning","stream":"agent_stream.jsonl","program":"E3V6M","world":"E3V6M","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":218,"explore_used":211,"turns":61,"tool_calls":32,"compactions":0,"cost_usd":1.0789345000000001,"seconds":287.7473140640068,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":6,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"EAHCW","task":"cd","first":{"launch":"20260822-143357","workspace":"EAHCW_cd","stream":"agent_stream.jsonl","program":"EAHCW","world":"EAHCW","task":"cd","reward":0.9931366075211017,"phase":"End","terminal":true,"actions_used":260,"explore_used":249,"turns":61,"tool_calls":30,"compactions":0,"cost_usd":1.8895474999999995,"seconds":578.833873911004,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":4,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"EAHCW_cd","stream":"agent_stream.jsonl","program":"EAHCW","world":"EAHCW","task":"cd","reward":0.9931366075211017,"phase":"End","terminal":true,"actions_used":260,"explore_used":249,"turns":61,"tool_calls":30,"compactions":0,"cost_usd":1.8895474999999995,"seconds":578.833873911004,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":4,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["EAHCW"],"attempts":[{"launch":"20260822-143357","workspace":"EAHCW_cd","stream":"agent_stream.jsonl","program":"EAHCW","world":"EAHCW","task":"cd","reward":0.9931366075211017,"phase":"End","terminal":true,"actions_used":260,"explore_used":249,"turns":61,"tool_calls":30,"compactions":0,"cost_usd":1.8895474999999995,"seconds":578.833873911004,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":4,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"EAHCW","task":"mfp","first":{"launch":"20260822-143357","workspace":"EAHCW_mfp","stream":"agent_stream.jsonl","program":"EAHCW","world":"EAHCW","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":204,"explore_used":160,"turns":67,"tool_calls":35,"compactions":0,"cost_usd":1.41279,"seconds":370.522795359022,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":12,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"EAHCW_mfp","stream":"agent_stream.jsonl","program":"EAHCW","world":"EAHCW","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":204,"explore_used":160,"turns":67,"tool_calls":35,"compactions":0,"cost_usd":1.41279,"seconds":370.522795359022,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":12,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["EAHCW"],"attempts":[{"launch":"20260822-143357","workspace":"EAHCW_mfp","stream":"agent_stream.jsonl","program":"EAHCW","world":"EAHCW","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":204,"explore_used":160,"turns":67,"tool_calls":35,"compactions":0,"cost_usd":1.41279,"seconds":370.522795359022,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":12,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"EAHCW","task":"planning","first":{"launch":"20260822-143357","workspace":"EAHCW_planning","stream":"agent_stream.jsonl","program":"EAHCW","world":"EAHCW","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":191,"explore_used":179,"turns":69,"tool_calls":31,"compactions":0,"cost_usd":1.6882674999999998,"seconds":520.7765228959615,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":30,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"EAHCW_planning","stream":"agent_stream.jsonl","program":"EAHCW","world":"EAHCW","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":191,"explore_used":179,"turns":69,"tool_calls":31,"compactions":0,"cost_usd":1.6882674999999998,"seconds":520.7765228959615,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":30,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["EAHCW"],"attempts":[{"launch":"20260822-143357","workspace":"EAHCW_planning","stream":"agent_stream.jsonl","program":"EAHCW","world":"EAHCW","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":191,"explore_used":179,"turns":69,"tool_calls":31,"compactions":0,"cost_usd":1.6882674999999998,"seconds":520.7765228959615,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":30,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"F5W3N","task":"cd","first":null,"best":{"launch":"20260822-143357","workspace":"F5W3N_cd","stream":"agent_stream.jsonl","program":"F5W3N","world":"F5W3N","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":235,"explore_used":80,"turns":104,"tool_calls":57,"compactions":0,"cost_usd":4.5237325,"seconds":1070.0995269620325,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":7,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[{"launch":"20260822-143357","workspace":"F5W3N_cd","stream":"agent_stream-attempt1.jsonl","program":"F5W3N","world":"F5W3N","task":"cd","reward":0.0,"phase":"Change","terminal":false,"actions_used":501,"explore_used":284,"turns":108,"tool_calls":0,"compactions":0,"cost_usd":5.479529500000001,"seconds":1468.4807772550266,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":null,"audit_findings":[],"grids_in_context":0,"reaudited":false,"reconstructed":true,"complete":true}],"aliases":["F5W3N"],"attempts":[{"launch":"20260822-143357","workspace":"F5W3N_cd","stream":"agent_stream-attempt1.jsonl","program":"F5W3N","world":"F5W3N","task":"cd","reward":0.0,"phase":"Change","terminal":false,"actions_used":501,"explore_used":284,"turns":108,"tool_calls":0,"compactions":0,"cost_usd":5.479529500000001,"seconds":1468.4807772550266,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":null,"audit_findings":[],"grids_in_context":0,"reaudited":false,"reconstructed":true,"complete":true},{"launch":"20260822-143357","workspace":"F5W3N_cd","stream":"agent_stream.jsonl","program":"F5W3N","world":"F5W3N","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":235,"explore_used":80,"turns":104,"tool_calls":57,"compactions":0,"cost_usd":4.5237325,"seconds":1070.0995269620325,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":7,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"F5W3N","task":"mfp","first":{"launch":"20260822-143357","workspace":"F5W3N_mfp","stream":"agent_stream.jsonl","program":"F5W3N","world":"F5W3N","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":334,"explore_used":298,"turns":120,"tool_calls":65,"compactions":0,"cost_usd":4.172116,"seconds":897.0121229990036,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"F5W3N_mfp","stream":"agent_stream.jsonl","program":"F5W3N","world":"F5W3N","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":334,"explore_used":298,"turns":120,"tool_calls":65,"compactions":0,"cost_usd":4.172116,"seconds":897.0121229990036,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["F5W3N"],"attempts":[{"launch":"20260822-143357","workspace":"F5W3N_mfp","stream":"agent_stream.jsonl","program":"F5W3N","world":"F5W3N","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":334,"explore_used":298,"turns":120,"tool_calls":65,"compactions":0,"cost_usd":4.172116,"seconds":897.0121229990036,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"F5W3N","task":"planning","first":{"launch":"20260822-143357","workspace":"F5W3N_planning","stream":"agent_stream.jsonl","program":"F5W3N","world":"F5W3N","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":287,"explore_used":270,"turns":149,"tool_calls":83,"compactions":0,"cost_usd":9.164264499999996,"seconds":3112.174161902978,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":15,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"F5W3N_planning","stream":"agent_stream.jsonl","program":"F5W3N","world":"F5W3N","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":287,"explore_used":270,"turns":149,"tool_calls":83,"compactions":0,"cost_usd":9.164264499999996,"seconds":3112.174161902978,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":15,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["F5W3N"],"attempts":[{"launch":"20260822-143357","workspace":"F5W3N_planning","stream":"agent_stream.jsonl","program":"F5W3N","world":"F5W3N","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":287,"explore_used":270,"turns":149,"tool_calls":83,"compactions":0,"cost_usd":9.164264499999996,"seconds":3112.174161902978,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":15,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"N2NTD","task":"cd","first":{"launch":"20260817-221419","workspace":"N2NTD_cd","stream":"agent_stream.jsonl","program":"N2NTD","world":"N2NTD","task":"cd","reward":0.9954944196827804,"phase":"End","terminal":true,"actions_used":399,"explore_used":85,"turns":95,"tool_calls":49,"compactions":0,"cost_usd":4.87669,"seconds":1017.4376931549996,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":10,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260817-221419","workspace":"N2NTD_cd","stream":"agent_stream.jsonl","program":"N2NTD","world":"N2NTD","task":"cd","reward":0.9954944196827804,"phase":"End","terminal":true,"actions_used":399,"explore_used":85,"turns":95,"tool_calls":49,"compactions":0,"cost_usd":4.87669,"seconds":1017.4376931549996,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":10,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["N2NTD"],"attempts":[{"launch":"20260817-221419","workspace":"N2NTD_cd","stream":"agent_stream.jsonl","program":"N2NTD","world":"N2NTD","task":"cd","reward":0.9954944196827804,"phase":"End","terminal":true,"actions_used":399,"explore_used":85,"turns":95,"tool_calls":49,"compactions":0,"cost_usd":4.87669,"seconds":1017.4376931549996,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":10,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"N2NTD","task":"mfp","first":{"launch":"20260817-221419","workspace":"N2NTD_mfp","stream":"agent_stream.jsonl","program":"N2NTD","world":"N2NTD","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":330,"explore_used":300,"turns":124,"tool_calls":62,"compactions":0,"cost_usd":6.999775499999999,"seconds":1457.9082203200005,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":66,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260817-221419","workspace":"N2NTD_mfp","stream":"agent_stream.jsonl","program":"N2NTD","world":"N2NTD","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":330,"explore_used":300,"turns":124,"tool_calls":62,"compactions":0,"cost_usd":6.999775499999999,"seconds":1457.9082203200005,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":66,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["N2NTD"],"attempts":[{"launch":"20260817-221419","workspace":"N2NTD_mfp","stream":"agent_stream.jsonl","program":"N2NTD","world":"N2NTD","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":330,"explore_used":300,"turns":124,"tool_calls":62,"compactions":0,"cost_usd":6.999775499999999,"seconds":1457.9082203200005,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":66,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"N2NTD","task":"planning","first":null,"best":{"launch":"20260818-194130","workspace":"N2NTD_planning","stream":"agent_stream.jsonl","program":"N2NTD","world":"N2NTD","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":273,"explore_used":259,"turns":158,"tool_calls":79,"compactions":0,"cost_usd":7.521006499999998,"seconds":1355.187917059011,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":8,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[{"launch":"20260817-221419","workspace":"N2NTD_planning","stream":"agent_stream.jsonl","program":"N2NTD","world":"N2NTD","task":"planning","reward":0.0,"phase":"Planning","terminal":false,"actions_used":501,"explore_used":273,"turns":299,"tool_calls":131,"compactions":0,"cost_usd":12.766485499999998,"seconds":2021.8334316709988,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":24,"reaudited":true,"reconstructed":false,"complete":true}],"aliases":["N2NTD"],"attempts":[{"launch":"20260817-221419","workspace":"N2NTD_planning","stream":"agent_stream.jsonl","program":"N2NTD","world":"N2NTD","task":"planning","reward":0.0,"phase":"Planning","terminal":false,"actions_used":501,"explore_used":273,"turns":299,"tool_calls":131,"compactions":0,"cost_usd":12.766485499999998,"seconds":2021.8334316709988,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":24,"reaudited":true,"reconstructed":false,"complete":true},{"launch":"20260818-194130","workspace":"N2NTD_planning","stream":"agent_stream.jsonl","program":"N2NTD","world":"N2NTD","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":273,"explore_used":259,"turns":158,"tool_calls":79,"compactions":0,"cost_usd":7.521006499999998,"seconds":1355.187917059011,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":8,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"NRDF6","task":"cd","first":{"launch":"20260822-143357","workspace":"NRDF6_cd","stream":"agent_stream.jsonl","program":"NRDF6","world":"NRDF6","task":"cd","reward":0.9452399743686448,"phase":"End","terminal":true,"actions_used":287,"explore_used":278,"turns":74,"tool_calls":38,"compactions":0,"cost_usd":2.772615000000001,"seconds":799.8381363620283,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":126,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"NRDF6_cd","stream":"agent_stream.jsonl","program":"NRDF6","world":"NRDF6","task":"cd","reward":0.9452399743686448,"phase":"End","terminal":true,"actions_used":287,"explore_used":278,"turns":74,"tool_calls":38,"compactions":0,"cost_usd":2.772615000000001,"seconds":799.8381363620283,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":126,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["NRDF6"],"attempts":[{"launch":"20260822-143357","workspace":"NRDF6_cd","stream":"agent_stream.jsonl","program":"NRDF6","world":"NRDF6","task":"cd","reward":0.9452399743686448,"phase":"End","terminal":true,"actions_used":287,"explore_used":278,"turns":74,"tool_calls":38,"compactions":0,"cost_usd":2.772615000000001,"seconds":799.8381363620283,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":126,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"NRDF6","task":"mfp","first":{"launch":"20260822-143357","workspace":"NRDF6_mfp","stream":"agent_stream.jsonl","program":"NRDF6","world":"NRDF6","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":340,"explore_used":300,"turns":167,"tool_calls":87,"compactions":0,"cost_usd":6.293832000000001,"seconds":1495.3099213790265,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":106,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"NRDF6_mfp","stream":"agent_stream.jsonl","program":"NRDF6","world":"NRDF6","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":340,"explore_used":300,"turns":167,"tool_calls":87,"compactions":0,"cost_usd":6.293832000000001,"seconds":1495.3099213790265,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":106,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["NRDF6"],"attempts":[{"launch":"20260822-143357","workspace":"NRDF6_mfp","stream":"agent_stream.jsonl","program":"NRDF6","world":"NRDF6","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":340,"explore_used":300,"turns":167,"tool_calls":87,"compactions":0,"cost_usd":6.293832000000001,"seconds":1495.3099213790265,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":106,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"NRDF6","task":"planning","first":{"launch":"20260822-143357","workspace":"NRDF6_planning","stream":"agent_stream.jsonl","program":"NRDF6","world":"NRDF6","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":307,"explore_used":295,"turns":146,"tool_calls":81,"compactions":0,"cost_usd":7.1138485000000005,"seconds":2013.7692356369807,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":147,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"NRDF6_planning","stream":"agent_stream.jsonl","program":"NRDF6","world":"NRDF6","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":307,"explore_used":295,"turns":146,"tool_calls":81,"compactions":0,"cost_usd":7.1138485000000005,"seconds":2013.7692356369807,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":147,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["NRDF6"],"attempts":[{"launch":"20260822-143357","workspace":"NRDF6_planning","stream":"agent_stream.jsonl","program":"NRDF6","world":"NRDF6","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":307,"explore_used":295,"turns":146,"tool_calls":81,"compactions":0,"cost_usd":7.1138485000000005,"seconds":2013.7692356369807,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":147,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"NTQ4Y","task":"cd","first":{"launch":"20260822-143357","workspace":"NTQ4Y_cd","stream":"agent_stream.jsonl","program":"NTQ4Y","world":"NTQ4Y","task":"cd","reward":0.19996098019243358,"phase":"End","terminal":true,"actions_used":497,"explore_used":277,"turns":105,"tool_calls":52,"compactions":0,"cost_usd":5.395331999999998,"seconds":1591.805054763041,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"NTQ4Y_cd","stream":"agent_stream.jsonl","program":"NTQ4Y","world":"NTQ4Y","task":"cd","reward":0.19996098019243358,"phase":"End","terminal":true,"actions_used":497,"explore_used":277,"turns":105,"tool_calls":52,"compactions":0,"cost_usd":5.395331999999998,"seconds":1591.805054763041,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["NTQ4Y"],"attempts":[{"launch":"20260822-143357","workspace":"NTQ4Y_cd","stream":"agent_stream.jsonl","program":"NTQ4Y","world":"NTQ4Y","task":"cd","reward":0.19996098019243358,"phase":"End","terminal":true,"actions_used":497,"explore_used":277,"turns":105,"tool_calls":52,"compactions":0,"cost_usd":5.395331999999998,"seconds":1591.805054763041,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"NTQ4Y","task":"mfp","first":{"launch":"20260822-143357","workspace":"NTQ4Y_mfp","stream":"agent_stream.jsonl","program":"NTQ4Y","world":"NTQ4Y","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":320,"explore_used":297,"turns":125,"tool_calls":64,"compactions":0,"cost_usd":6.294724500000002,"seconds":1605.9559176960029,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":23,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"NTQ4Y_mfp","stream":"agent_stream.jsonl","program":"NTQ4Y","world":"NTQ4Y","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":320,"explore_used":297,"turns":125,"tool_calls":64,"compactions":0,"cost_usd":6.294724500000002,"seconds":1605.9559176960029,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":23,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["NTQ4Y"],"attempts":[{"launch":"20260822-143357","workspace":"NTQ4Y_mfp","stream":"agent_stream.jsonl","program":"NTQ4Y","world":"NTQ4Y","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":320,"explore_used":297,"turns":125,"tool_calls":64,"compactions":0,"cost_usd":6.294724500000002,"seconds":1605.9559176960029,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":23,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"NTQ4Y","task":"planning","first":{"launch":"20260822-143357","workspace":"NTQ4Y_planning","stream":"agent_stream.jsonl","program":"NTQ4Y","world":"NTQ4Y","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":247,"explore_used":231,"turns":102,"tool_calls":53,"compactions":0,"cost_usd":3.2453305,"seconds":848.9964411029941,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":26,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"NTQ4Y_planning","stream":"agent_stream.jsonl","program":"NTQ4Y","world":"NTQ4Y","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":247,"explore_used":231,"turns":102,"tool_calls":53,"compactions":0,"cost_usd":3.2453305,"seconds":848.9964411029941,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":26,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["NTQ4Y"],"attempts":[{"launch":"20260822-143357","workspace":"NTQ4Y_planning","stream":"agent_stream.jsonl","program":"NTQ4Y","world":"NTQ4Y","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":247,"explore_used":231,"turns":102,"tool_calls":53,"compactions":0,"cost_usd":3.2453305,"seconds":848.9964411029941,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":26,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"QFSVC","task":"cd","first":{"launch":"20260822-143357","workspace":"QFSVC_cd","stream":"agent_stream.jsonl","program":"QFSVC","world":"QFSVC","task":"cd","reward":0.9971540250057087,"phase":"End","terminal":true,"actions_used":325,"explore_used":280,"turns":90,"tool_calls":46,"compactions":0,"cost_usd":3.8987414999999994,"seconds":1036.4528824159643,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"QFSVC_cd","stream":"agent_stream.jsonl","program":"QFSVC","world":"QFSVC","task":"cd","reward":0.9971540250057087,"phase":"End","terminal":true,"actions_used":325,"explore_used":280,"turns":90,"tool_calls":46,"compactions":0,"cost_usd":3.8987414999999994,"seconds":1036.4528824159643,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["QFSVC"],"attempts":[{"launch":"20260822-143357","workspace":"QFSVC_cd","stream":"agent_stream.jsonl","program":"QFSVC","world":"QFSVC","task":"cd","reward":0.9971540250057087,"phase":"End","terminal":true,"actions_used":325,"explore_used":280,"turns":90,"tool_calls":46,"compactions":0,"cost_usd":3.8987414999999994,"seconds":1036.4528824159643,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"QFSVC","task":"mfp","first":{"launch":"20260822-143357","workspace":"QFSVC_mfp","stream":"agent_stream.jsonl","program":"QFSVC","world":"QFSVC","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":140,"explore_used":127,"turns":70,"tool_calls":35,"compactions":0,"cost_usd":2.876731999999999,"seconds":889.1106318739476,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":16,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"QFSVC_mfp","stream":"agent_stream.jsonl","program":"QFSVC","world":"QFSVC","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":140,"explore_used":127,"turns":70,"tool_calls":35,"compactions":0,"cost_usd":2.876731999999999,"seconds":889.1106318739476,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":16,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["QFSVC"],"attempts":[{"launch":"20260822-143357","workspace":"QFSVC_mfp","stream":"agent_stream.jsonl","program":"QFSVC","world":"QFSVC","task":"mfp","reward":-1.0,"phase":"End","terminal":true,"actions_used":140,"explore_used":127,"turns":70,"tool_calls":35,"compactions":0,"cost_usd":2.876731999999999,"seconds":889.1106318739476,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":16,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"QFSVC","task":"planning","first":{"launch":"20260822-143357","workspace":"QFSVC_planning","stream":"agent_stream.jsonl","program":"QFSVC","world":"QFSVC","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":259,"explore_used":234,"turns":106,"tool_calls":58,"compactions":0,"cost_usd":3.0718319999999997,"seconds":748.4953288820107,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":24,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"QFSVC_planning","stream":"agent_stream.jsonl","program":"QFSVC","world":"QFSVC","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":259,"explore_used":234,"turns":106,"tool_calls":58,"compactions":0,"cost_usd":3.0718319999999997,"seconds":748.4953288820107,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":24,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["QFSVC"],"attempts":[{"launch":"20260822-143357","workspace":"QFSVC_planning","stream":"agent_stream.jsonl","program":"QFSVC","world":"QFSVC","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":259,"explore_used":234,"turns":106,"tool_calls":58,"compactions":0,"cost_usd":3.0718319999999997,"seconds":748.4953288820107,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":24,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"QQM74","task":"cd","first":{"launch":"20260822-143357","workspace":"QQM74_cd","stream":"agent_stream.jsonl","program":"QQM74","world":"QQM74","task":"cd","reward":0.19900000000000007,"phase":"End","terminal":true,"actions_used":500,"explore_used":183,"turns":76,"tool_calls":39,"compactions":0,"cost_usd":2.5731399999999995,"seconds":1216.3819803430233,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":2,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"QQM74_cd","stream":"agent_stream.jsonl","program":"QQM74","world":"QQM74","task":"cd","reward":0.19900000000000007,"phase":"End","terminal":true,"actions_used":500,"explore_used":183,"turns":76,"tool_calls":39,"compactions":0,"cost_usd":2.5731399999999995,"seconds":1216.3819803430233,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":2,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["QQM74"],"attempts":[{"launch":"20260822-143357","workspace":"QQM74_cd","stream":"agent_stream.jsonl","program":"QQM74","world":"QQM74","task":"cd","reward":0.19900000000000007,"phase":"End","terminal":true,"actions_used":500,"explore_used":183,"turns":76,"tool_calls":39,"compactions":0,"cost_usd":2.5731399999999995,"seconds":1216.3819803430233,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":2,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"QQM74","task":"mfp","first":{"launch":"20260822-143357","workspace":"QQM74_mfp","stream":"agent_stream.jsonl","program":"QQM74","world":"QQM74","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":305,"explore_used":295,"turns":104,"tool_calls":54,"compactions":0,"cost_usd":3.992807000000001,"seconds":1171.9620563159697,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":5,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"QQM74_mfp","stream":"agent_stream.jsonl","program":"QQM74","world":"QQM74","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":305,"explore_used":295,"turns":104,"tool_calls":54,"compactions":0,"cost_usd":3.992807000000001,"seconds":1171.9620563159697,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":5,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["QQM74"],"attempts":[{"launch":"20260822-143357","workspace":"QQM74_mfp","stream":"agent_stream.jsonl","program":"QQM74","world":"QQM74","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":305,"explore_used":295,"turns":104,"tool_calls":54,"compactions":0,"cost_usd":3.992807000000001,"seconds":1171.9620563159697,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":5,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"QQM74","task":"planning","first":{"launch":"20260822-143357","workspace":"QQM74_planning","stream":"agent_stream.jsonl","program":"QQM74","world":"QQM74","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":97,"explore_used":96,"turns":71,"tool_calls":37,"compactions":0,"cost_usd":1.2712249999999998,"seconds":403.9511377629824,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":8,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"QQM74_planning","stream":"agent_stream.jsonl","program":"QQM74","world":"QQM74","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":97,"explore_used":96,"turns":71,"tool_calls":37,"compactions":0,"cost_usd":1.2712249999999998,"seconds":403.9511377629824,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":8,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["QQM74"],"attempts":[{"launch":"20260822-143357","workspace":"QQM74_planning","stream":"agent_stream.jsonl","program":"QQM74","world":"QQM74","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":97,"explore_used":96,"turns":71,"tool_calls":37,"compactions":0,"cost_usd":1.2712249999999998,"seconds":403.9511377629824,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":8,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"S2KT7","task":"cd","first":{"launch":"20260817-221419","workspace":"S2KT7_cd","stream":"agent_stream.jsonl","program":"S2KT7","world":"S2KT7","task":"cd","reward":0.19900000000000007,"phase":"End","terminal":true,"actions_used":501,"explore_used":107,"turns":55,"tool_calls":28,"compactions":0,"cost_usd":2.5024614999999995,"seconds":718.4446763220003,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":1,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260819-013453","workspace":"S2KT7_cd","stream":"agent_stream.jsonl","program":"S2KT7","world":"S2KT7","task":"cd","reward":0.9999018872169159,"phase":"End","terminal":true,"actions_used":263,"explore_used":225,"turns":86,"tool_calls":49,"compactions":0,"cost_usd":4.9073835,"seconds":1011.2104023369902,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":2,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["S2KT7"],"attempts":[{"launch":"20260817-221419","workspace":"S2KT7_cd","stream":"agent_stream.jsonl","program":"S2KT7","world":"S2KT7","task":"cd","reward":0.19900000000000007,"phase":"End","terminal":true,"actions_used":501,"explore_used":107,"turns":55,"tool_calls":28,"compactions":0,"cost_usd":2.5024614999999995,"seconds":718.4446763220003,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":1,"reaudited":true,"reconstructed":false,"complete":true},{"launch":"20260819-013453","workspace":"S2KT7_cd","stream":"agent_stream.jsonl","program":"S2KT7","world":"S2KT7","task":"cd","reward":0.9999018872169159,"phase":"End","terminal":true,"actions_used":263,"explore_used":225,"turns":86,"tool_calls":49,"compactions":0,"cost_usd":4.9073835,"seconds":1011.2104023369902,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":2,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"S2KT7","task":"mfp","first":{"launch":"20260817-221419","workspace":"S2KT7_mfp","stream":"agent_stream.jsonl","program":"S2KT7","world":"S2KT7","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":152,"explore_used":127,"turns":71,"tool_calls":37,"compactions":0,"cost_usd":2.5301720000000003,"seconds":442.22210692499993,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":16,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260817-221419","workspace":"S2KT7_mfp","stream":"agent_stream.jsonl","program":"S2KT7","world":"S2KT7","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":152,"explore_used":127,"turns":71,"tool_calls":37,"compactions":0,"cost_usd":2.5301720000000003,"seconds":442.22210692499993,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":16,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["S2KT7"],"attempts":[{"launch":"20260817-221419","workspace":"S2KT7_mfp","stream":"agent_stream.jsonl","program":"S2KT7","world":"S2KT7","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":152,"explore_used":127,"turns":71,"tool_calls":37,"compactions":0,"cost_usd":2.5301720000000003,"seconds":442.22210692499993,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":16,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"S2KT7","task":"planning","first":{"launch":"20260817-221419","workspace":"S2KT7_planning","stream":"agent_stream.jsonl","program":"S2KT7","world":"S2KT7","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":89,"explore_used":87,"turns":87,"tool_calls":33,"compactions":0,"cost_usd":1.9369125,"seconds":400.96091355000135,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":0,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260817-221419","workspace":"S2KT7_planning","stream":"agent_stream.jsonl","program":"S2KT7","world":"S2KT7","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":89,"explore_used":87,"turns":87,"tool_calls":33,"compactions":0,"cost_usd":1.9369125,"seconds":400.96091355000135,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":0,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["S2KT7"],"attempts":[{"launch":"20260817-221419","workspace":"S2KT7_planning","stream":"agent_stream.jsonl","program":"S2KT7","world":"S2KT7","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":89,"explore_used":87,"turns":87,"tool_calls":33,"compactions":0,"cost_usd":1.9369125,"seconds":400.96091355000135,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":0,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"VA6FQ","task":"cd","first":{"launch":"20260822-143357","workspace":"VA6FQ_cd","stream":"agent_stream.jsonl","program":"VA6FQ","world":"VA6FQ","task":"cd","reward":0.9989902632880145,"phase":"End","terminal":true,"actions_used":223,"explore_used":200,"turns":116,"tool_calls":62,"compactions":0,"cost_usd":6.222832,"seconds":1572.6997552289977,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":49,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"VA6FQ_cd","stream":"agent_stream.jsonl","program":"VA6FQ","world":"VA6FQ","task":"cd","reward":0.9989902632880145,"phase":"End","terminal":true,"actions_used":223,"explore_used":200,"turns":116,"tool_calls":62,"compactions":0,"cost_usd":6.222832,"seconds":1572.6997552289977,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":49,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["VA6FQ"],"attempts":[{"launch":"20260822-143357","workspace":"VA6FQ_cd","stream":"agent_stream.jsonl","program":"VA6FQ","world":"VA6FQ","task":"cd","reward":0.9989902632880145,"phase":"End","terminal":true,"actions_used":223,"explore_used":200,"turns":116,"tool_calls":62,"compactions":0,"cost_usd":6.222832,"seconds":1572.6997552289977,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":49,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"VA6FQ","task":"mfp","first":{"launch":"20260822-143357","workspace":"VA6FQ_mfp","stream":"agent_stream.jsonl","program":"VA6FQ","world":"VA6FQ","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":307,"explore_used":285,"turns":135,"tool_calls":71,"compactions":0,"cost_usd":6.252737,"seconds":1393.6148072850192,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":127,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"VA6FQ_mfp","stream":"agent_stream.jsonl","program":"VA6FQ","world":"VA6FQ","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":307,"explore_used":285,"turns":135,"tool_calls":71,"compactions":0,"cost_usd":6.252737,"seconds":1393.6148072850192,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":127,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["VA6FQ"],"attempts":[{"launch":"20260822-143357","workspace":"VA6FQ_mfp","stream":"agent_stream.jsonl","program":"VA6FQ","world":"VA6FQ","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":307,"explore_used":285,"turns":135,"tool_calls":71,"compactions":0,"cost_usd":6.252737,"seconds":1393.6148072850192,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":127,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"VA6FQ","task":"planning","first":{"launch":"20260822-143357","workspace":"VA6FQ_planning","stream":"agent_stream.jsonl","program":"VA6FQ","world":"VA6FQ","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":299,"explore_used":289,"turns":130,"tool_calls":71,"compactions":0,"cost_usd":4.3426800000000005,"seconds":1143.1053944859887,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":85,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"VA6FQ_planning","stream":"agent_stream.jsonl","program":"VA6FQ","world":"VA6FQ","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":299,"explore_used":289,"turns":130,"tool_calls":71,"compactions":0,"cost_usd":4.3426800000000005,"seconds":1143.1053944859887,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":85,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["VA6FQ"],"attempts":[{"launch":"20260822-143357","workspace":"VA6FQ_planning","stream":"agent_stream.jsonl","program":"VA6FQ","world":"VA6FQ","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":299,"explore_used":289,"turns":130,"tool_calls":71,"compactions":0,"cost_usd":4.3426800000000005,"seconds":1143.1053944859887,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":85,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"VQJH6","task":"cd","first":{"launch":"20260822-143357","workspace":"VQJH6_cd","stream":"agent_stream.jsonl","program":"VQJH6","world":"VQJH6","task":"cd","reward":0.9452399743686448,"phase":"End","terminal":true,"actions_used":287,"explore_used":278,"turns":107,"tool_calls":54,"compactions":0,"cost_usd":3.5171034999999993,"seconds":952.3142878829967,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"VQJH6_cd","stream":"agent_stream.jsonl","program":"VQJH6","world":"VQJH6","task":"cd","reward":0.9452399743686448,"phase":"End","terminal":true,"actions_used":287,"explore_used":278,"turns":107,"tool_calls":54,"compactions":0,"cost_usd":3.5171034999999993,"seconds":952.3142878829967,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["VQJH6"],"attempts":[{"launch":"20260822-143357","workspace":"VQJH6_cd","stream":"agent_stream.jsonl","program":"VQJH6","world":"VQJH6","task":"cd","reward":0.9452399743686448,"phase":"End","terminal":true,"actions_used":287,"explore_used":278,"turns":107,"tool_calls":54,"compactions":0,"cost_usd":3.5171034999999993,"seconds":952.3142878829967,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":13,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"VQJH6","task":"mfp","first":{"launch":"20260822-143357","workspace":"VQJH6_mfp","stream":"agent_stream.jsonl","program":"VQJH6","world":"VQJH6","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":283,"explore_used":264,"turns":80,"tool_calls":40,"compactions":0,"cost_usd":2.1409990000000003,"seconds":498.7492421969655,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"VQJH6_mfp","stream":"agent_stream.jsonl","program":"VQJH6","world":"VQJH6","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":283,"explore_used":264,"turns":80,"tool_calls":40,"compactions":0,"cost_usd":2.1409990000000003,"seconds":498.7492421969655,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["VQJH6"],"attempts":[{"launch":"20260822-143357","workspace":"VQJH6_mfp","stream":"agent_stream.jsonl","program":"VQJH6","world":"VQJH6","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":283,"explore_used":264,"turns":80,"tool_calls":40,"compactions":0,"cost_usd":2.1409990000000003,"seconds":498.7492421969655,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":11,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"VQJH6","task":"planning","first":{"launch":"20260822-143357","workspace":"VQJH6_planning","stream":"agent_stream.jsonl","program":"VQJH6","world":"VQJH6","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":187,"explore_used":186,"turns":129,"tool_calls":69,"compactions":0,"cost_usd":5.172491000000002,"seconds":1714.7600620819721,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":18,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260822-143357","workspace":"VQJH6_planning","stream":"agent_stream.jsonl","program":"VQJH6","world":"VQJH6","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":187,"explore_used":186,"turns":129,"tool_calls":69,"compactions":0,"cost_usd":5.172491000000002,"seconds":1714.7600620819721,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":18,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["VQJH6"],"attempts":[{"launch":"20260822-143357","workspace":"VQJH6_planning","stream":"agent_stream.jsonl","program":"VQJH6","world":"VQJH6","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":187,"explore_used":186,"turns":129,"tool_calls":69,"compactions":0,"cost_usd":5.172491000000002,"seconds":1714.7600620819721,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":18,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"ice","task":"cd","first":{"launch":"20260817-221419","workspace":"ice_cd","stream":"agent_stream.jsonl","program":"ice","world":"ice","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":321,"explore_used":300,"turns":93,"tool_calls":43,"compactions":0,"cost_usd":4.007276000000001,"seconds":1619.798620215999,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":3,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260817-221419","workspace":"ice_cd","stream":"agent_stream.jsonl","program":"ice","world":"ice","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":321,"explore_used":300,"turns":93,"tool_calls":43,"compactions":0,"cost_usd":4.007276000000001,"seconds":1619.798620215999,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":3,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["BT3GB","ice"],"attempts":[{"launch":"20260817-221419","workspace":"BT3GB_cd","stream":"agent_stream.jsonl","program":"BT3GB","world":"ice","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":283,"explore_used":220,"turns":104,"tool_calls":55,"compactions":0,"cost_usd":4.976036,"seconds":1121.0787154299996,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":18,"reaudited":true,"reconstructed":false,"complete":true},{"launch":"20260817-221419","workspace":"ice_cd","stream":"agent_stream.jsonl","program":"ice","world":"ice","task":"cd","reward":1.0,"phase":"End","terminal":true,"actions_used":321,"explore_used":300,"turns":93,"tool_calls":43,"compactions":0,"cost_usd":4.007276000000001,"seconds":1619.798620215999,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":3,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"ice","task":"mfp","first":{"launch":"20260817-221419","workspace":"ice_mfp","stream":"agent_stream.jsonl","program":"ice","world":"ice","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":311,"explore_used":238,"turns":121,"tool_calls":62,"compactions":0,"cost_usd":5.712539500000001,"seconds":1109.6111155470007,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":33,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260817-221419","workspace":"ice_mfp","stream":"agent_stream.jsonl","program":"ice","world":"ice","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":311,"explore_used":238,"turns":121,"tool_calls":62,"compactions":0,"cost_usd":5.712539500000001,"seconds":1109.6111155470007,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":33,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[],"aliases":["BT3GB","ice"],"attempts":[{"launch":"20260817-221419","workspace":"BT3GB_mfp","stream":"agent_stream.jsonl","program":"BT3GB","world":"ice","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":320,"explore_used":247,"turns":118,"tool_calls":60,"compactions":0,"cost_usd":5.1776105,"seconds":1027.2196479499999,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":37,"reaudited":true,"reconstructed":false,"complete":true},{"launch":"20260817-221419","workspace":"ice_mfp","stream":"agent_stream.jsonl","program":"ice","world":"ice","task":"mfp","reward":1.0,"phase":"End","terminal":true,"actions_used":311,"explore_used":238,"turns":121,"tool_calls":62,"compactions":0,"cost_usd":5.712539500000001,"seconds":1109.6111155470007,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":33,"reaudited":true,"reconstructed":false,"complete":true}]},{"world":"ice","task":"planning","first":{"launch":"20260817-221419","workspace":"ice_planning","stream":"agent_stream.jsonl","program":"ice","world":"ice","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":353,"explore_used":300,"turns":101,"tool_calls":48,"compactions":0,"cost_usd":3.4356649999999993,"seconds":721.7938325369996,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true},"best":{"launch":"20260817-221419","workspace":"ice_planning","stream":"agent_stream.jsonl","program":"ice","world":"ice","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":353,"explore_used":300,"turns":101,"tool_calls":48,"compactions":0,"cost_usd":3.4356649999999993,"seconds":721.7938325369996,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true},"unfinished":[{"launch":"20260817-221419","workspace":"BT3GB_planning","stream":"agent_stream.jsonl","program":"BT3GB","world":"ice","task":"planning","reward":0.0,"phase":"Planning","terminal":false,"actions_used":501,"explore_used":188,"turns":95,"tool_calls":37,"compactions":0,"cost_usd":4.437532,"seconds":1031.4587182619998,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true}],"aliases":["BT3GB","ice"],"attempts":[{"launch":"20260817-221419","workspace":"BT3GB_planning","stream":"agent_stream.jsonl","program":"BT3GB","world":"ice","task":"planning","reward":0.0,"phase":"Planning","terminal":false,"actions_used":501,"explore_used":188,"turns":95,"tool_calls":37,"compactions":0,"cost_usd":4.437532,"seconds":1031.4587182619998,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true},{"launch":"20260817-221419","workspace":"ice_planning","stream":"agent_stream.jsonl","program":"ice","world":"ice","task":"planning","reward":1.0,"phase":"End","terminal":true,"actions_used":353,"explore_used":300,"turns":101,"tool_calls":48,"compactions":0,"cost_usd":3.4356649999999993,"seconds":721.7938325369996,"model":"claude-opus-5","agent":"claude","exit_code":0,"audit_clean":true,"audit_findings":[],"grids_in_context":14,"reaudited":true,"reconstructed":false,"complete":true}]}],"generated":"2026-08-22 20:36 UTC","model":"claude-opus-5","effort":"high (CLI default)","seed":0,"launches":6};
+
+const TASK_LABEL = {
+  mfp: "Masked frame prediction",
+  cd: "Change detection",
+  planning: "Planning",
+};
+const TASK_SUB = {
+  mfp: "one choice among six frames",
+  cd: "call the change, as it happens",
+  planning: "reach a given grid",
+};
+
+const fmt = (x, n = 3) => (x >= 0 ? "" : "−") + Math.abs(x).toFixed(n);
+const cellOf = (world, task) =>
+  DATA.cells.find((c) => c.world === world && c.task === task);
+
+function stepClass(reward) {
+  if (reward < 0) return "neg";
+  if (reward <= 0) return "s0";
+  return "s" + Math.min(5, Math.ceil(reward / 0.2));
+}
+
+/* ---- masthead, tiles ------------------------------------------------- */
+
+// A task with a first-attempt score, and a task answered at any attempt. They
+// differ by the two whose opening session ran out of actions without answering.
+function scored() {
+  return DATA.cells.filter((c) => c.first);
+}
+function answered() {
+  return DATA.cells.filter((c) => c.best);
+}
+
+function header() {
+  const cells = scored();
+  const done = answered();
+  const total = DATA.worlds.length * 3;
+  const sessions = DATA.cells.flatMap((c) => c.attempts);
+  const solvedFirst = cells.filter((c) => c.first.reward > 0.999).length;
+  const solvedBest = cells.filter((c) => c.best.reward > 0.999).length;
+  // Two of the three tests pay -1 for a wrong answer, so a penalty is its own
+  // outcome and not just a low score.
+  const penalties = cells.filter((c) => c.first.reward < 0).length;
+  const spend = sessions.reduce((a, r) => a + (r.cost_usd || 0), 0);
+  const hours = sessions.reduce((a, r) => a + (r.seconds || 0), 0) / 3600;
+
+  document.getElementById("lede").textContent =
+    `Stock Claude Code, given a shell, a filesystem and one command for taking ` +
+    `actions, played all ${total} of the benchmark's public tasks — ${DATA.worlds.length} ` +
+    `worlds it had never seen, three tests each — and answered every one of them. ` +
+    `${cells.length} carry a first-attempt score, ${solvedFirst} of them exact. ` +
+    `Nothing about Autumn is built into the harness: each session works out its ` +
+    `world from scratch, writes its own parser and simulator, and throws them away when ` +
+    `the task ends.`;
+
+  const meta = [
+    ["model", DATA.model || "claude-opus-5"],
+    ["effort", DATA.effort || "high (CLI default)"],
+    ["budget", "501 actions, 300 exploring"],
+    ["seed", String(DATA.seed ?? 0)],
+    ["tools", "Bash, Read, Write, Edit, Grep, Glob"],
+    ["generated", DATA.generated],
+  ];
+  document.getElementById("runmeta").innerHTML = meta
+    .map(([k, v]) => `<li><b>${k}</b> ${v}</li>`)
+    .join("");
+
+  const tiles = [
+    ["worlds played", `${new Set(cells.map((c) => c.world)).size}/${DATA.worlds.length}`,
+      "distinct programs, one row each"],
+    ["tasks answered", `${done.length}/${total}`, `${sessions.length} sessions in total`],
+    ["exact first time", `${solvedFirst}/${cells.length}`,
+      `${solvedBest} of ${total} counting replays`],
+    ["paid a penalty", `${penalties}/${cells.length}`,
+      "a wrong frame, or a change called early"],
+    ["spend", "$" + spend.toFixed(0), `$${(spend / Math.max(sessions.length, 1)).toFixed(2)} a session`],
+    ["session time", hours.toFixed(1) + " h", `${(hours * 60 / Math.max(sessions.length, 1)).toFixed(0)} min a session`],
+  ];
+  document.getElementById("tiles").innerHTML = tiles
+    .map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`)
+    .join("");
+}
+
+/* ---- the board -------------------------------------------------------- */
+
+let view = "first";
+
+function board() {
+  const grid = document.getElementById("grid");
+  const head = [`<div class="head">world</div>`].concat(
+    DATA.tasks.map(
+      (t) => `<div class="head num">${TASK_LABEL[t]}<br><span style="opacity:.7">${t}</span></div>`
+    )
+  );
+  const rows = DATA.worlds.map((world) => {
+    const name = DATA.names[world];
+    const label =
+      `<div class="world"><span class="id">${world}</span>` +
+      (name ? `<span class="name">${name}</span>` : "") +
+      `</div>`;
+    const cells = DATA.tasks.map((task) => {
+      const cell = cellOf(world, task);
+      const pick = cell && cell[view];
+      if (!pick) {
+        // Three different absences, and calling them all "no result" hides which.
+        const why = !cell || !cell.attempts.length
+          ? "not played"
+          : cell.best
+          ? "no answer"
+          : "no verdict";
+        return (
+          `<button class="cell none" type="button" data-world="${world}" ` +
+          `data-task="${task}">${why}</button>`
+        );
+      }
+      const more =
+        cell.attempts.length > 1
+          ? `<span class="sub">${cell.attempts.length} attempts</span>`
+          : "";
+      return (
+        `<button class="cell ${stepClass(pick.reward)}" type="button" ` +
+        `data-world="${world}" data-task="${task}">` +
+        `<span>${fmt(pick.reward)}</span>${more}</button>`
+      );
+    });
+    return label + cells.join("");
+  });
+  grid.innerHTML = head.join("") + rows.join("");
+}
+
+/* ---- tooltip ---------------------------------------------------------- */
+
+const tip = document.getElementById("tip");
+
+function tipHTML(world, task) {
+  const cell = cellOf(world, task);
+  const name = DATA.names[world];
+  const title = `${world}${name ? " · " + name : ""} — ${TASK_LABEL[task]}`;
+  if (!cell) {
+    return `<h4>${title}</h4><p class="note">Never played.</p>`;
+  }
+  const body = cell.attempts
+    .map((a) => {
+      const rows = [
+        ["reward", a.terminal ? fmt(a.reward) : "no verdict"],
+        ["phase", a.phase],
+        ["actions", `${a.actions_used} (${a.explore_used} exploring)`],
+        ["turns", a.turns ? String(a.turns) : "—"],
+        ["cost", a.cost_usd ? "$" + a.cost_usd.toFixed(2) : "—"],
+        ["minutes", a.seconds ? (a.seconds / 60).toFixed(0) : "—"],
+        ["launch", a.launch],
+      ];
+      if (a.program !== world) rows.unshift(["played as", a.program]);
+      if (a.reconstructed) rows.push(["record", "reconstructed"]);
+      return (
+        `<div class="attempt"><dl>` +
+        rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("") +
+        `</dl></div>`
+      );
+    })
+    .join("");
+  return `<h4>${title}</h4>${body}`;
+}
+
+function place(event) {
+  const pad = 14;
+  const box = tip.getBoundingClientRect();
+  let x = event.clientX + pad;
+  let y = event.clientY + pad;
+  if (x + box.width > window.innerWidth - 8) x = event.clientX - box.width - pad;
+  if (y + box.height > window.innerHeight - 8) y = event.clientY - box.height - pad;
+  tip.style.left = Math.max(8, x) + "px";
+  tip.style.top = Math.max(8, y) + "px";
+}
+
+function wireTips(root, html) {
+  root.addEventListener("mouseover", (event) => {
+    const target = event.target.closest("[data-world]");
+    if (!target) return;
+    tip.innerHTML = html(target.dataset.world, target.dataset.task, target.dataset);
+    tip.dataset.show = "1";
+    place(event);
+  });
+  root.addEventListener("mousemove", (event) => {
+    if (tip.dataset.show === "1") place(event);
+  });
+  root.addEventListener("mouseout", (event) => {
+    if (!event.target.closest("[data-world]")) return;
+    tip.dataset.show = "0";
+  });
+  root.addEventListener("focusin", (event) => {
+    const target = event.target.closest("[data-world]");
+    if (!target) return;
+    const box = target.getBoundingClientRect();
+    tip.innerHTML = html(target.dataset.world, target.dataset.task, target.dataset);
+    tip.dataset.show = "1";
+    place({ clientX: box.left, clientY: box.bottom });
+  });
+  root.addEventListener("focusout", () => { tip.dataset.show = "0"; });
+}
+
+/* ---- per-task bars ---------------------------------------------------- */
+
+const LO = -1, HI = 1;
+const pos = (v) => ((v - LO) / (HI - LO)) * 100;
+
+function bars() {
+  const host = document.getElementById("bars");
+  host.innerHTML = DATA.tasks
+    .map((task) => {
+      const cells = scored().filter((c) => c.task === task);
+      if (!cells.length) {
+        return (
+          `<div class="barrow"><div class="label"><span class="t">${TASK_LABEL[task]}</span>` +
+          `<span class="n">no verdicts yet</span></div><div class="track"></div></div>`
+        );
+      }
+      const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+      const first = mean(cells.map((c) => c.first.reward));
+      const best = mean(cells.map((c) => c.best.reward));
+      const floor = DATA.floors[task];
+      const lane = (value, klass) => {
+        const zero = pos(0);
+        const end = pos(value);
+        const left = Math.min(zero, end);
+        const width = Math.abs(end - zero);
+        return (
+          `<div class="lane"><span class="zero" style="left:${zero}%"></span>` +
+          `<span class="bar ${klass}" style="left:${left}%;width:${width}%">` +
+          `<span class="val">${fmt(value)}</span></span></div>`
+        );
+      };
+      return (
+        `<div class="barrow"><div class="label">` +
+        `<span class="t">${TASK_LABEL[task]}</span>` +
+        `<span class="n">n=${cells.length} · ${TASK_SUB[task]}</span>` +
+        `</div><div class="track">` +
+        `<span class="floormark" style="left:${pos(floor)}%" data-label="floor ${fmt(floor, 1)}"></span>` +
+        lane(first, "first") +
+        lane(best, "best") +
+        `</div></div>`
+      );
+    })
+    .join("");
+  host.insertAdjacentHTML(
+    "beforeend",
+    `<div class="barrow"><div class="label"></div><div class="axis">` +
+      [-1, -0.5, 0, 0.5, 1]
+        .map((v) => `<span style="left:${pos(v)}%">${fmt(v, v % 1 ? 1 : 0)}</span>`)
+        .join("") +
+      `</div></div>`
+  );
+}
+
+function finding() {
+  const split = (task) => {
+    const rewards = scored()
+      .filter((c) => c.task === task)
+      .map((c) => c.first.reward);
+    return {
+      n: rewards.length,
+      exact: rewards.filter((r) => r > 0.999).length,
+      penalty: rewards.filter((r) => r < 0).length,
+      partial: rewards.filter((r) => r >= 0 && r <= 0.999).length,
+    };
+  };
+  const plan = split("planning"), frame = split("mfp"), change = split("cd");
+  document.getElementById("finding").innerHTML =
+    `<b>The three tests come apart.</b> Planning is reached or it is not, and it was ` +
+    `reached ${plan.exact} times out of ${plan.n}. Frame prediction is one guess among ` +
+    `six and ${frame.exact} of ${frame.n} landed. Change detection is where the harness ` +
+    `separates: ${change.exact} calls hit the frame the change happened on, ` +
+    `${change.partial} were late but still paid, and ${change.penalty} came <em>before</em> ` +
+    `the change had happened, which pays &minus;1 rather than 0. Knowing the world is ` +
+    `not the whole of that test &mdash; answering it on time is, and being early is the ` +
+    `expensive way to be wrong.`;
+}
+
+/* ---- exploration strip ------------------------------------------------ */
+
+function strips() {
+  const host = document.getElementById("strips");
+  const CAP = 501, EXPLORE_CAP = 300;
+  host.innerHTML = DATA.tasks
+    .map((task) => {
+      const runs = DATA.cells
+        .filter((c) => c.task === task)
+        .flatMap((c) => c.attempts)
+        .filter((a) => a.explore_used > 0);
+      const dots = runs
+        .map((a) => {
+          const left = (a.explore_used / CAP) * 100;
+          return (
+            `<span class="dot" tabindex="0" style="left:${left}%" ` +
+            `data-world="${a.world}" data-task="${task}" data-launch="${a.launch}" ` +
+            `aria-label="${a.workspace}, ${a.explore_used} actions exploring"></span>`
+          );
+        })
+        .join("");
+      const median = runs.length
+        ? [...runs].map((a) => a.explore_used).sort((a, b) => a - b)[Math.floor(runs.length / 2)]
+        : 0;
+      return (
+        `<div class="strip"><div class="label">` +
+        `<span class="t">${TASK_LABEL[task]}</span>` +
+        `<span class="n">${runs.length} sessions · median ${median}</span>` +
+        `</div><div class="plot">` +
+        `<span class="cap" style="left:${(EXPLORE_CAP / CAP) * 100}%"></span>${dots}</div></div>`
+      );
+    })
+    .join("");
+  host.insertAdjacentHTML(
+    "beforeend",
+    `<div class="strip"><div class="label"></div><div class="axis">` +
+      [0, 100, 200, 300, 400, 501]
+        .map(
+          (v) =>
+            `<span style="left:${(v / 501) * 100}%">${v === 300 ? "300 cap" : v}</span>`
+        )
+        .join("") +
+      `</div></div>`
+  );
+}
+
+/* ---- table ------------------------------------------------------------ */
+
+function table() {
+  const rows = DATA.cells
+    .flatMap((c) => c.attempts.map((a) => ({ ...a, cell: c })))
+    .sort((a, b) =>
+      a.world.localeCompare(b.world) ||
+      DATA.tasks.indexOf(a.task) - DATA.tasks.indexOf(b.task) ||
+      a.launch.localeCompare(b.launch)
+    );
+  const head =
+    `<thead><tr>` +
+    ["world", "program", "task", "launch", "reward", "phase", "actions", "exploring",
+      "turns", "cost", "min", "audit"]
+      .map((h) => `<th>${h}</th>`)
+      .join("") +
+    `</tr></thead>`;
+  const body = rows
+    .map((r) => {
+      const name = DATA.names[r.world];
+      const audit =
+        r.reconstructed
+          ? `<span class="pill">record reconstructed</span>`
+          : r.audit_clean === null
+          ? `<span class="pill">n/a</span>`
+          : r.audit_clean
+          ? `<span class="pill ok">clean</span>`
+          : `<span class="pill bad">${r.audit_findings.join(", ")}</span>`;
+      return (
+        `<tr><td class="mono">${r.world}${name ? ` <span style="color:var(--muted)">${name}</span>` : ""}</td>` +
+        `<td class="mono">${r.program}</td>` +
+        `<td>${r.task}</td>` +
+        `<td class="mono">${r.launch}</td>` +
+        `<td class="num">${r.terminal ? fmt(r.reward) : "—"}</td>` +
+        `<td>${r.phase}</td>` +
+        `<td class="num">${r.actions_used}</td>` +
+        `<td class="num">${r.explore_used}</td>` +
+        `<td class="num">${r.turns || "—"}</td>` +
+        `<td class="num">${r.cost_usd ? "$" + r.cost_usd.toFixed(2) : "—"}</td>` +
+        `<td class="num">${r.seconds ? (r.seconds / 60).toFixed(0) : "—"}</td>` +
+        `<td>${audit}</td></tr>`
+      );
+    })
+    .join("");
+  document.getElementById("table").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+/* ---- method ----------------------------------------------------------- */
+
+function method() {
+  const folded = DATA.cells.filter((c) => c.aliases.length > 1);
+  const unfinished = DATA.cells.flatMap((c) => c.unfinished);
+  const notes = [
+    [
+      "One session, one task",
+      `Each task is a fresh workspace holding the brief, the method prompt and an ` +
+        `<code>act</code> shim, and nothing else. The agent explores, then leaves for ` +
+        `one test that is scored once and cannot be retried. Exploration is capped at ` +
+        `300 actions out of a shared budget of 501; <code>noop</code> and ` +
+        `<code>reset</code> both cost one.`,
+    ],
+    [
+      "What each test pays",
+      `<b>Masked frame prediction</b> is one choice among six candidate frames, paying ` +
+        `1 for the right one and <b>&minus;1 for any other</b> &mdash; so guessing is ` +
+        `worth &minus;⅔, not zero. <b>Planning</b> pays 1 for reaching the given grid ` +
+        `and nothing otherwise. <b>Change detection</b> pays 1 for calling the change ` +
+        `on the frame it happens, decays with how late the call is, and pays &minus;1 ` +
+        `for calling a change that had not happened. Two of the three pay less than ` +
+        `nothing for a wrong answer, which is why the floors are drawn.`,
+    ],
+    [
+      "One world, one row",
+      folded.length
+        ? `${folded[0].aliases.join(" and ")} are the same program byte for byte. ` +
+          `The tasks built on each differ &mdash; their goals, videos and injected ` +
+          `faults are not the same &mdash; but the world an agent has to work out is ` +
+          `one world, so it holds one row. Attempts in a folded row are therefore not ` +
+          `repeats of a single task.`
+        : `No world in this set ships under two names.`,
+    ],
+    [
+      "Attempts are ordered",
+      `A task replayed after a bad result has more than one record. <b>First attempt</b> ` +
+        `is the earliest session at that task — and if it never answered, the task has ` +
+        `no first-attempt score, because letting the replay fill the slot would report a ` +
+        `second pass as a first one. <b>Best of attempts</b> is pass@N, where N is ` +
+        `however many attempts that particular task got, which is not the same N ` +
+        `everywhere.`,
+    ],
+    [
+      "One record was rebuilt",
+      `Replaying a task used to rotate its log but overwrite its report, so the ` +
+        `<code>F5W3N/cd</code> session that ran out of actions was destroyed by the ` +
+        `replay that answered it. Its figures were read off the file before it went and ` +
+        `are typed back in, marked <em>reconstructed</em> in the table; the stream that ` +
+        `would let its audit be re-run is gone. A replay now carries the whole attempt ` +
+        `across, so this cannot recur.`,
+    ],
+    [
+      "Judged by one audit",
+      `The benchmark ships its answers on the same disk as the workspaces, so every ` +
+        `session's event stream is scanned for reaching past the game &mdash; the ` +
+        `network, the programs, the answer files, a sibling task's notes. The audit's ` +
+        `patterns have been narrowed since the first launches, so every session here is ` +
+        `re-judged by the current rules rather than by the ones it ran under.`,
+    ],
+    [
+      "What is missing",
+      unfinished.length
+        ? `${unfinished.length} session${unfinished.length > 1 ? "s" : ""} never ` +
+          `reached a verdict — ` +
+          unfinished.map((a) => `<code>${a.program}/${a.task}</code>`).join(", ") +
+          ` — and every one of them spent all 501 actions without answering rather ` +
+          `than failing. No session in this corpus crashed. Those are missing ` +
+          `measurements, not zeroes, and are excluded from every mean above; a task ` +
+          `whose <em>first</em> pass ran out this way has no first-attempt score even ` +
+          `where a replay later answered it.`
+        : `Every session reached a verdict.`,
+    ],
+  ];
+  document.getElementById("method").innerHTML = notes
+    .map(([h, p]) => `<div><h3>${h}</h3><p>${p}</p></div>`)
+    .join("");
+  document.getElementById("footer").textContent =
+    `Read back from ${DATA.launches} launch${DATA.launches === 1 ? "" : "es"} under ` +
+    `${DATA.runs} by tools/results.py · rebuilt ${DATA.generated}`;
+}
+
+/* ---- go --------------------------------------------------------------- */
+
+header();
+board();
+bars();
+finding();
+strips();
+table();
+method();
+
+wireTips(document.getElementById("grid"), tipHTML);
+wireTips(document.getElementById("strips"), (world, task, data) => {
+  const cell = cellOf(world, task);
+  const run = cell.attempts.find((a) => a.launch === data.launch);
+  const name = DATA.names[world];
+  const rows = [
+    ["exploring", `${run.explore_used} of 300`],
+    ["actions", `${run.actions_used} of 501`],
+    ["reward", run.terminal ? fmt(run.reward) : "no verdict"],
+    ["turns", run.turns ? String(run.turns) : "—"],
+  ];
+  return (
+    `<h4>${world}${name ? " · " + name : ""} — ${TASK_LABEL[task]}</h4><dl>` +
+    rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("") +
+    `</dl>`
+  );
+});
+
+document.querySelectorAll("[data-view]").forEach((button) => {
+  button.addEventListener("click", () => {
+    view = button.dataset.view;
+    document.querySelectorAll("[data-view]").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.view === view))
+    );
+    board();
+  });
+});
+</script>

@@ -2,7 +2,7 @@
 
 BAI is an LLM agent evaluation and self-improvement framework built on top of
 [BALROG](https://github.com/balrog-ai/BALROG). It runs LLM agents in interactive
-environments and uses a stepwise "explore-and-build" loop (`stepwise_eb_learn.py`)
+environments and uses a stepwise "explore-and-build" loop (`explore.stepwise_eb_learn`)
 to iteratively learn beliefs (instruction prompts) about how each environment
 works. Supported environments include MiniHack, [AutumnBench](https://github.com/basis-research/MARAProtocol)
 (via MARAProtocol + Autumn.cpp), and ARC-AGI 3.
@@ -60,12 +60,12 @@ GEMINI_API_KEY=...
 
 ```bash
 # Quick smoke test on Autumn
-uv run stepwise_eb_learn.py envs.names=autumn tasks.autumn_tasks=[ice]
+uv run python -m explore.stepwise_eb_learn envs.names=autumn tasks.autumn_tasks=[ice]
 ```
 
-## 2. Running experiments with `stepwise_eb_learn.py`
+## 2. Running experiments with `explore.stepwise_eb_learn`
 
-`stepwise_eb_learn.py` is the main entry point. It runs the agent through an
+`explore.stepwise_eb_learn` (run with `uv run python -m explore.stepwise_eb_learn`) is the main entry point. It runs the agent through an
 environment for a number of steps and, along the way, generates theories /
 questions, runs experiments to discriminate between them, and accumulates a set
 of beliefs about the environment. It is configured with
@@ -100,7 +100,7 @@ MiniHack tasks are text-based (no images). Pick a task from
 `envs.minihack_kwargs.seeds`.
 
 ```bash
-uv run stepwise_eb_learn.py \
+uv run python -m explore.stepwise_eb_learn \
     envs.names=minihack \
     tasks.minihack_tasks=[MiniHack-Quest-Easy-v0] \
     client.client_name=openrouter \
@@ -114,11 +114,15 @@ uv run stepwise_eb_learn.py \
 
 Autumn programs run through the locally built Autumn interpreter and use
 image+text observations. Task ids are AutumnBench program ids (see
-`MARAProtocol/python_examples/autumnbench/example_benchmark/programs/`). Set
+`MARAProtocol/python_examples/autumnbench/example_benchmark/programs/`). Games that
+come from `autumn_programs_55.zip` rather than the benchmark download (rink,
+logic_gates, balloon, colour_lines, diffusion, dino, tetris) are tracked under
+`autumn_programs/` and installed into that directory with
+`uv run tools/install_autumn_programs.py`. Set
 `autumn_eval_after_learn=true` to run a frozen evaluation after learning.
 
 ```bash
-uv run stepwise_eb_learn.py \
+uv run python -m explore.stepwise_eb_learn \
     envs.names=autumn \
     tasks.autumn_tasks=[ice] \
     client.client_name=openrouter \
@@ -137,7 +141,7 @@ id (e.g. `ls20`, `sp80`, `tn36`, `vc33`, `ft09`) passed via
 `tasks.arc_agi_tasks`.
 
 ```bash
-uv run stepwise_eb_learn.py \
+uv run python -m explore.stepwise_eb_learn \
     envs.names=arc_agi \
     tasks.arc_agi_tasks=[ls20] \
     client.client_name=openrouter \
@@ -149,20 +153,20 @@ uv run stepwise_eb_learn.py \
 
 ### Launching a matrix of experiments
 
-`launch.py` runs a cross-product of `{env, model}` cells as parallel
+`launch/launch.py` runs a cross-product of `{env, model}` cells as parallel
 subprocesses, applying the tuned per-cell overrides shown above. This is the
 easiest way to fan out over several ARC-AGI games or environments at once.
 
 ```bash
 # Preview the commands without running them
-uv run launch.py --log-dir logs/matrix --dry-run
+uv run launch/launch.py --log-dir logs/matrix --dry-run
 
 # Run MiniHack + Autumn with a single model
-uv run launch.py --log-dir logs/matrix \
+uv run launch/launch.py --log-dir logs/matrix \
     --scripts eb_learn --envs minihack,autumn --models gemini-2.5-flash
 
 # Run 5 ARC-AGI 3 games in parallel
-uv run launch.py --log-dir logs/matrix \
+uv run launch/launch.py --log-dir logs/matrix \
     --scripts eb_learn --envs arc_agi --models gemini-2.5-flash \
     --arc-games ls20,sp80,tn36,vc33,ft09 --parallel 5
 ```
@@ -172,7 +176,7 @@ Each cell writes to `<log-dir>/<timestamp>/<cell_name>/` with `stdout.log`,
 
 ## 3. Question selection & perception improvement modes
 
-At every step `stepwise_eb_learn.py` decides (a) **which question to investigate
+At every step `explore.stepwise_eb_learn` decides (a) **which question to investigate
 next** and (b) **how to fold what it learned back into the agent**. Both are
 configurable via `eval.evolve.*` overrides; the defaults live in
 `BALROG/balrog/config/config.yaml`.
@@ -242,10 +246,10 @@ Once questions are scored, this controls how experiments are formulated:
 
 ### Example: theory-entropy + single selection
 
-This is the tuned setup used by `launch.py`:
+This is the tuned setup used by `launch/launch.py`:
 
 ```bash
-uv run stepwise_eb_learn.py \
+uv run python -m explore.stepwise_eb_learn \
     envs.names=arc_agi tasks.arc_agi_tasks=[ls20] \
     eval.evolve.question_scoring_method=theory_entropy \
     eval.evolve.experiment_selection_mode=single \
@@ -296,17 +300,25 @@ to edit how individual tabs render (`viz/stepwise_eb_learn/app.js`).
 
 ```
 bai/
-├── stepwise_eb_learn.py    # Main entry point — stepwise explore-and-build learning loop
-├── stepwise_eb_learn_improve.py  # Belief/theory improvement logic
-├── autumn_env.py           # Autumn (AutumnBench) environment wrapper
-├── arc_agi_env.py          # ARC-AGI 3 environment wrapper
-├── launch.py               # Experiment matrix launcher (env × model cells)
+├── explore/                # Exploration/self-improvement package (run entry points with -m):
+│   ├── explore.py          #   python -m explore.explore — main evolution loop
+│   ├── stepwise_eb_learn.py#   python -m explore.stepwise_eb_learn — stepwise explore-and-build loop
+│   ├── stepwise_b_learn.py, stepwise_explore.py, *_improve.py, improve.py, offline.py, ...
+│   └── theory_exploration.py, multi_theory_exploration.py, question_scoring.py
+├── autumn_env.py           # Autumn (AutumnBench) environment wrapper (root module)
+├── arc_agi_env.py          # ARC-AGI 3 environment wrapper (root module)
+├── rollout.py, llm_utils.py, run_utils.py, diff_utils.py, goal_prompts.py  # shared root modules
 ├── setup.sh                # One-shot bootstrap (submodules, deps, Autumn, protobuf, dataset)
+├── launch/                 # Experiment-matrix launchers (env × model cells): launch.py, launch_ee.py, ...
+├── eval_runners/           # Per-method artifact eval scripts (eval_stepwise_eb_artifacts.py, ...)
+├── uncertainty/            # Question-uncertainty scoring (score_uncertainty.py, ...)
+├── tests/                  # Pytest suite (uv run python -m pytest tests/)
 ├── BALROG/                 # Git submodule — BALROG benchmark framework + Hydra config
 ├── MARAProtocol/           # Git submodule — AutumnBench harness + protobuf
 ├── Autumn.cpp/             # Git submodule — Autumn language interpreter (built locally)
 ├── viz/                    # Local web viewer + static exporter for eb_learn runs
 ├── curated/                # Hand-written beliefs and perception modules
 ├── scripts/                # Evaluation, simulation, play/replay utilities
+├── archive/                # Dormant/superseded prototypes kept for reference
 └── logs/                   # Output from runs
 ```

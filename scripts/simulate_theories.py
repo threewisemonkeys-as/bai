@@ -37,7 +37,7 @@ from PIL import Image
 
 # Reuse the production LLM call so model selection, the Responses API path, and
 # cost accounting are identical to the real run.
-from mixed_improve import _llm_call, _run_perception_on_observation, extract_perception_input
+from explore.mixed_improve import _llm_call, _run_perception_on_observation, extract_perception_input
 
 DK_START = "=== DEFAULT KNOWLEDGE ==="
 DK_END = "=== END DEFAULT KNOWLEDGE ==="
@@ -55,7 +55,7 @@ def extract_default_knowledge(step_dir: Path) -> str:
             if i != -1 and j != -1:
                 return prompt[i + len(DK_START):j].strip()
     # Fallback: rebuild from the prompt module (generic action set + run goal).
-    from explore import append_agent_goal, get_default_knowledge  # noqa
+    from explore.explore import append_agent_goal, get_default_knowledge  # noqa
     raise RuntimeError(
         f"Could not extract DEFAULT KNOWLEDGE from {exp_log}; no logged prompt found."
     )

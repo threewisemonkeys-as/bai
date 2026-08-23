@@ -1,0 +1,52 @@
+83WKQ — Game Dynamics (REAL uniformChoice random walk; non-degenerate; non-zero seeds)
+
+Grid: 16x16, black background. Rows and cols both indexed 0..15.
+
+WHY THIS DATASET EXISTS — the sibling clean_data3/83wkq was generated at seed=0, which is
+PATHOLOGICAL for this game. Each particle's random walk is `uniformChoice(adjPositions ...)`;
+under seed=0 the RNG collapses so the walk becomes a DETERMINISTIC 1-D straight line + wall
+bounce (verified: a particle spawned at (row 8) slid col 8->0 then oscillated col 0<->1
+forever, with row FIXED at 8 across 40 steps — 0 movement on the row axis). That data hides
+the game's core mechanic (a 2-D random walk). THIS dataset uses non-zero per-episode seeds,
+under which the particle wanders on BOTH axes (row deltas {-1,0,1} AND col deltas {-1,0,1}).
+See ../s2kt7_seed1 for the sibling fix of the same seed-0 bug class, and 83WKQ.sexp.
+
+Objects (initial state):
+- Particle: a single blue cell (prototype declared at (0,0) "blue"). The `particles` list is
+  initialized EMPTY, so the grid starts completely blank — no particle exists until a click.
+
+Player actions (whitelist for this game = noop,click):
+- click a b: adds ONE new blue Particle. The interpreter's click(x,y) maps arg1->x(col) and
+  arg2->y(row), so `click a b` spawns the particle at render cell (row=b, col=a). (NB: this is
+  the interpreter's actual x/y order; the observation header's "ROW COL" wording is the fixed
+  balrog template, not the true arg order. The click LOCATION is a real dynamic — the particle
+  really is created at exactly that cell — but which arg is row vs col is swapped from the
+  header text.) Click is the ONLY way to introduce particles. The new particle first appears
+  AT the click cell and does NOT move on its spawn frame; it begins walking on the next
+  non-click frame. Particle count grows by 1 per click; nothing is ever removed.
+- noop (and left/right/up/down, which have no handlers): the clock still ticks, so every
+  EXISTING particle random-walks. Only noop and click are whitelisted here.
+
+Passive / clock dynamics (every NON-click tick):
+- Random walk: EVERY existing particle moves to a uniformly-random IN-BOUNDS orthogonal
+  neighbor — uniformChoice over adjPositions(origin). The current cell is never a candidate,
+  so on a non-click tick a particle ALWAYS moves (it can never stay in place; verified: 99/99
+  single-particle noop transitions moved). Interior particle has 4 choices, edge 3, corner 2
+  (off-grid neighbors excluded) — the boundary-adjacency constraint (D4). Walks are
+  independent per particle.
+
+Click-frame movement suppression (D2): on a tick where a click occurs, the `on clicked`
+handler reassigns the whole particles list, which SUPERSEDES that frame's random-walk update,
+so existing particles FREEZE (hold position) while only the new particle appears at the click
+cell. Movement resumes on the next non-click tick. (Verified: existing particle frozen on
+9/9 click frames in this dataset.)
+
+Collisions/interactions: none. Particles pass through each other freely; two particles may
+occupy the same cell (the on-screen blue-CELL count can then read below the true particle
+count). No despawn: true count = #clicks issued, monotonically non-decreasing.
+Color changes: none (always blue). Win/termination/reward: none (open-ended sandbox).
+
+Identifiability note: under a non-zero seed a click is distinguishable from noop because a NEW
+blue cell appears (D1) and existing particles freeze (D2), while a noop shows the particle(s)
+displacing with no new cell (D3). This is UNLIKE the seed-0 dataset where the walk was a
+predictable 1-D line, letting a "moves along one axis / step-clock" heuristic pass.

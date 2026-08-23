@@ -1,0 +1,61 @@
+Step,Action,Reasoning,Observation,Auxiliary_Observation,Reward,Done
+29,noop,manual,"Task: interactive
+Step: 29
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..11; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""mediumpurple"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""gold"", ""white"", ""white"", ""white"", ""white"", ""mediumpurple"", ""white"", ""white"", ""white"", ""white"", ""white""], [""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""red"", ""white"", ""white"", ""white""]]",,0.0,False
+30,down,manual,"Task: interactive
+Step: 30
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..11; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""mediumpurple"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""gold"", ""white"", ""white"", ""white"", ""white"", ""mediumpurple"", ""white"", ""white"", ""white"", ""white"", ""white""], [""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""red"", ""white"", ""white"", ""white""]]",,0.0,False
+31,noop,manual,"Task: interactive
+Step: 31
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..11; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""mediumpurple"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""gold"", ""white"", ""white"", ""white"", ""white"", ""mediumpurple"", ""white"", ""white"", ""white"", ""white"", ""white""], [""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""red"", ""white"", ""white"", ""white""]]",,0.0,False
+32,,manual,"Task: interactive
+Step: 32
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..11; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""mediumpurple"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""gold"", ""white"", ""white"", ""white"", ""white"", ""mediumpurple"", ""white"", ""white"", ""white"", ""white"", ""white""], [""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""red"", ""white"", ""white"", ""white""]]",,0.0,True

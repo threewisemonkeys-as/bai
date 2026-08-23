@@ -18,8 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from omegaconf import OmegaConf
 from PIL import Image
 
-from stepwise_eb_learn_improve import EBQAPair, deserialize_eb_qa_pairs
-from theory_exploration import (
+from explore.stepwise_eb_learn_improve import EBQAPair, deserialize_eb_qa_pairs
+from explore.theory_exploration import (
     generate_crux_questions,
     generate_theories,
     score_questions_theory_entropy,

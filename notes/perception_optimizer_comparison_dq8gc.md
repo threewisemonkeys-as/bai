@@ -109,11 +109,11 @@ robust.*
 ## Artifacts & repro
 
 - Data: `/tmp/dq8gc_first15/episode_0/trajectory.csv` (15 transitions).
-- Scripts: `prototypes/perc_invdyn/compare_alt_joint.py` (alt/joint),
+- Scripts: `offline_learning/compare_alt_joint.py` (alt/joint),
   `greedy_matched.py` (greedy none/judge/textdiff, matched split),
   `greedy_fd.py`, `gepa_optimize.py` (`--fd-scorer none|judge|textdiff --tie-train-val`).
 - Outputs: `logs/greedy_matched/`, `logs/matched_gepa_id_seed*/`, `logs/matched_gepa_fd_seed*/`,
   `logs/alt_vs_joint/`, `logs/gepa_id_seed*/`, `logs/gepa_fd_seed*/`.
 - GEPA matched repro:
-  `uv run prototypes/perc_invdyn/gepa_optimize.py --run /tmp/dq8gc_first15 --train-n 15 --val-n 15 --test-n 0 --tie-train-val --actions left,right,up,down,noop,click --start empty --fd-scorer none --max-metric-calls 150 --seed S`
-- Greedy matched repro: `uv run prototypes/perc_invdyn/greedy_matched.py`
+  `uv run offline_learning/gepa_optimize.py --run /tmp/dq8gc_first15 --train-n 15 --val-n 15 --test-n 0 --tie-train-val --actions left,right,up,down,noop,click --start empty --fd-scorer none --max-metric-calls 150 --seed S`
+- Greedy matched repro: `uv run offline_learning/greedy_matched.py`

@@ -1,0 +1,91 @@
+Step,Action,Reasoning,Observation,Auxiliary_Observation,Reward,Done
+12,up,manual,"Task: interactive
+Step: 12
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..11; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""gold"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""red""], [""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""gold"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""]]",,0.0,False
+13,noop,manual,"Task: interactive
+Step: 13
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..11; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""gold"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""red""], [""white"", ""gold"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""]]",,0.0,False
+14,down,manual,"Task: interactive
+Step: 14
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..11; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""gold"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""gold"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""red""], [""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""]]",,0.0,False
+15,noop,manual,"Task: interactive
+Step: 15
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..11; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""gold"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""gold"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""red""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""]]",,0.0,False
+16,right,manual,"Task: interactive
+Step: 16
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..11; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""gold"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""gold"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""red""]]",,0.0,False
+17,left,manual,"Task: interactive
+Step: 17
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..11; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""blue"", ""blue"", ""blue"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""gold"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""gold"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""darkorange"", ""darkorange"", ""darkorange"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white""], [""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""white"", ""red""]]",,0.0,False

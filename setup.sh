@@ -60,4 +60,4 @@ echo "==> [5/5] Downloading AutumnBench example dataset"
 
 echo
 echo "Setup complete. Try:"
-echo "  uv run stepwise_eb_learn.py envs.names=autumn tasks.autumn_tasks=[ice]"
+echo "  uv run python -m explore.stepwise_eb_learn envs.names=autumn tasks.autumn_tasks=[ice]"

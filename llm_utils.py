@@ -67,6 +67,39 @@ def extract_llm_response_text(response) -> str:
         raise RuntimeError(error_msg) from e
 
 
+def extract_llm_reasoning(response) -> str:
+    """The provider's hidden reasoning from a responses-API result, or "" if absent.
+
+    Reasoning models return it as a separate output item (`type == "reasoning"`) whose
+    `summary` holds the text; OpenRouter also surfaces it as `reasoning` /
+    `reasoning_content` on the message.  Never raises: a missing trace is normal (not every
+    model emits one) and must not take down a call whose text arrived fine.
+    """
+    try:
+        parts: list[str] = []
+        for item in getattr(response, "output", None) or []:
+            if getattr(item, "type", None) != "reasoning":
+                continue
+            for chunk in getattr(item, "summary", None) or []:
+                text = getattr(chunk, "text", None) or (
+                    chunk.get("text") if isinstance(chunk, dict) else None)
+                if text:
+                    parts.append(text)
+            direct = getattr(item, "reasoning", None) or getattr(item, "content", None)
+            if isinstance(direct, str) and direct:
+                parts.append(direct)
+        if parts:
+            return "\n".join(parts)
+        msg = getattr(response, "message", None)
+        for attr in ("reasoning", "reasoning_content"):
+            val = getattr(msg, attr, None) if msg is not None else None
+            if isinstance(val, str) and val:
+                return val
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
 def extract_xml_key(data: str, key: str) -> str | None:
     """Extract a single XML key from text.
 

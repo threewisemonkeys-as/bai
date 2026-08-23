@@ -1,0 +1,202 @@
+GEPA Learned-Belief vs. Ground-Truth Dynamics — Qualitative Scores
+==================================================================
+Run: logs/clean_sweep_gepa_padded_ctxk9  (GEPA, noop-padded cross-trajectory data,
+     context_k=9, deepseek-v4-flash, seed1)
+Ground truth: offline_learning/clean_data2/<game>/dynamics.txt  (SEXP-derived,
+     empirically corrected against the interpreter)
+Scored beliefs: <game>_seed1/best_beliefs_gepa_seed1.txt
+
+Scoring schema (1-5), judged on understanding of the DYNAMICS only (not terminology):
+  1 = completely incorrect, not even partial coverage
+  2 = some parts correct but mostly wrong / misses the core of the game
+  3 = covers the core partially OR many plausible inferences but also many wrong/missing
+  4 = covers the core, but some missed dynamics or incorrect interpretations
+  5 = fully covers the ground truth with no incorrect understanding
+
+Results (all 21 games scored)
+-------
+| Game   | Score |
+|--------|-------|
+| 27vwc  |   2   |
+| 7www9  |   2   |
+| 7xf97  |   2   |
+| 83wkq  |   2   |
+| ada85  |   2   |
+| aw9wd  |   1   |
+| bt3gb  |   2   |
+| dgg2c  |   2   |
+| dq8gc  |   2   |
+| e3v6m  |   4   |
+| eahcw  |   2   |
+| f5w3n  |   2   |
+| ice    |   2   |
+| n2ntd  |   3   |
+| nrdf6  |   2   |
+| ntq4y  |   3   |
+| qfsvc  |   3   |
+| qqm74  |   3   |
+| s2kt7  |   3   |
+| va6fq  |   1   |
+| vqjh6  |   3   |
+|--------|-------|
+| MEAN   |  2.29 |
+
+Score distribution (of 21 scored): 1×2, 2×12, 3×6, 4×1, 5×0
+
+
+Per-game summaries
+------------------
+
+27vwc — 2
+Captures the interactive click layer (clicking the meat feeds the person, scaled to
+doneness; clicking the burner toggles fire gated on gas; clicking the corner button
+refuels). Misses the CORE passive dynamics: fire cooks the meat +1/tick advancing
+lightblue->pink->sandybrown->brown, and a lit fire burns gas down each step and
+auto-extinguishes at empty. Also mis-states the burnt penalty and the undercooked feed.
+
+7www9 — 2
+Gets the object structure (blue mobile 2-cell pair, red stationary pair), 1-cell
+directional movement, out-of-bounds/overlap blocking. Misses the entire magnetic core:
+repulsion (move cancelled when like poles become orthogonally adjacent) and attraction
+(auto-snap 2-cell pull when opposite poles align 2 apart on an axis).
+
+7xf97 — 2
+Right that the cloud moves on left/right, water falls under gravity and despawns, and the
+sun only moves on click. Misses the core: `down` spawns a water raindrop, watering grows a
+leaf column upward (incl. purple-at-row-12 and the sun-blocks-cloud suppression), and the
+sun's movingLeft/edge-bounce direction control; hardcodes click=move-right instead.
+
+83wkq — 2
+Correctly: `click ROW COL` spawns a persistent blue particle at the clicked cell, existing
+particles unchanged that frame. Wrong on the single most important rule: claims noop shifts
+every cell one column left (deterministic), when truth is each particle random-walks to a
+uniformly random in-bounds orthogonal neighbor every tick (including on arrow/noop frames).
+
+ada85 — 2
+Correct: 11x11 grid, two corner spawners that spawn a gray object on click, objects moving
+one cell/step along the spawn row, exact intact/broken col-10 palettes. Wrong/missing: the
+break is caused by a rock with a random breaksBottle flag reaching BottleSpot (5,10) and is
+PERMANENT; clicking a broken bottle only flashes it intact for one frame. Beliefs invent a
+timer-based palette auto-toggle and a boundary-bounce movement model instead.
+
+aw9wd — 1
+Perception collapsed: the belief text reports the observation as "grid_not_found" with no
+visual information and concludes no inference is possible. Captures none of the ground truth
+(click breaks tan eggshells; broken shells drain like liquid and pile; shells despawn on
+feather cells, uncovering the chick). Same perception-collapse failure mode as ice/83wkq in
+the prior run.
+
+bt3gb — 2
+Correct that `click` toggles an object's color and that auto downward motion happens per
+tick (loosely = droplets falling). But it misframes the game as a single auto-moving object
+on a fabricated boustrophedon path, and misses the cloud + left/right motion, `down`=rain
+spawn, the day/night celestial state, and the liquid-vs-solid falling/stacking/spreading.
+
+dgg2c — 2
+Gets that objects fall each step (gravity), that left/right control horizontal drift, and that
+click creates/deletes nothing. Misses the core rain spawn (four water cells every 5 ticks at
+fixed columns), gets off-grid wrong (claims row-wrap-to-2 instead of despawn), and hallucinates
+active up/down/click semantics (all no-ops) plus a "three-noops-then-action" cycle (the
+padding-rhythm artifact) and a garbled wind model with no [-1,1] clamp.
+
+dq8gc — 2
+Right that noop is inert and directional actions move the active particle one step. Misses
+the core: per-step orthogonal-adjacency contagion that spreads darkgreen monotonically, and
+the click-swap (clicking an inactive takes control of it, releasing the old active). Also
+invents wrong rules (direction actions creating/removing/moving distant objects).
+
+e3v6m — 4  (best)
+Nails the two-mode core: a 5-cell line where click toggles state, one state rotates the
+line on the arrow keys and the other translates it rigidly, anchored at (7,7), with 4
+visible orientations (correct, since the symmetric beam aliases dir and dir+4). up/down map
+exactly onto dir±1. Only flaw: left/right are a full 90° rotation (swap horizontal<->vertical
+too) but beliefs capture only the diagonal swap; click coordinate-irrelevance unstated.
+
+eahcw — 2
+Correct: 16x16, clicks spawn a persistent cell at the clicked location, existing cells
+untouched. Misses the core: arrow keys arm a direction AND select the paint color
+(up=gold/down=purple/left=green/right=blue, opposite cancels to red). Beliefs assert arrows
+are inert and attribute color to a click-count-mod-5 cycle (right palette, wrong cause).
+
+f5w3n — 2
+Right that the hero shifts column on left/right, `up` spawns a red bullet at the hero, and
+bullets rise one row/step. Badly misframes the rest: fabricates an auto-advancing "agent"
+and a phase-flip rule, and misses the actual Space-Invaders mechanics (marching blue enemies,
+enemy bullets + downward motion, firing schedule, all collisions, hero death).
+
+ice — 2
+Right that two states toggle on click and that in one state `down` spawns a cell that drifts
+down and despawns at the bottom (water spawn/fall). Misframes the rest: invents a drifting
+"agent" with row teleports, treats left/right as shifting gray cells rather than moving the
+cloud, and misses the day/night liquid-vs-solid spawn and the click melt/freeze flip.
+
+n2ntd — 3
+Good close inferences: gravity/falling, up=jump-4, left/right movement, gold
+collect-and-vanish, and notably that the bullet spawns at the player's own cell and rises
+one row/tick until frozen below a platform. Gets platform support backwards, and misses the
+enemy (patrol + bullet kill) and the whole ammo economy (coins grant ammo, click needs ammo>0).
+
+nrdf6 — 2
+Right: 7x7, rocks fall under gravity and rest on solid cells, clicking creates a falling
+rock. Misses the core crate-sink mechanic (the brown container sinks one row per rock dropped
+in, freezing ~5), inventing a spurious step%4 brown shift; also fabricates removable black
+blocks and omits the water body + rock-displaces-water interaction.
+
+ntq4y — 3
+Captures the painter core: top-row buttons select particle type, clicking empty cells places
+the active particle, gray removes all plugs, red clears to blue default. Misunderstands the
+water sim: water falls by gravity EVERY step (with sideways spread toward holes), confined by
+the V-vessel and plugs, but beliefs model it as a discrete shift firing only on certain clicks.
+
+qfsvc — 3
+Correct: 4-way agent movement, bullets auto-rise one row/step (+off-grid despawn), gold
+static until collected, click spawns a bullet at the agent. Misses the ammo/coin economy
+(landing on a coin removes it and +1 ammo; click only fires when ammo>0); also wrongly
+requires the click to land on the agent's cell (location is actually irrelevant).
+
+qqm74 — 3
+Captures the core movement: global drift on the 21x21 grid, the one-step delay (motion uses
+the previous tick's velocity), and velocity clamping to {-1,0,+1} (same-direction persists,
+opposite cancels to 0, from-zero sets a new direction). Gets the click mechanic substantially
+wrong (a fixed single-cell spawn at an env offset rather than a blob at the clicked FREE cell,
+unlimited) and wrongly says off-grid blobs vanish permanently (they persist and can re-enter).
+
+s2kt7 — 3
+Correct on the click half: food (red) always spawns at the FIXED cell (0,0) one tick later
+regardless of click coordinates, and arrows/noop are no-ops. Misses the ant-foraging half:
+two ants step one cell/tick toward their nearest food and eat it on contact; treats ant
+motion as vague "objects may move/change color" instead.
+
+va6fq — 1
+Perception collapsed: the belief text asserts the grid is "always empty" with no perceptible
+change, then reduces the game to a click-timing meta-pattern (every 4th action = the padding
+rhythm) over a repeating 5-coordinate cycle. Captures NONE of the falling-sand core: the two
+brush-selector buttons (sand/water paint mode), free-cell spawn of sand/water, gravity (solid
+sand stacks straight down, water/wet sand flow diagonally into holes), and water permanently
+wetting adjacent sand.
+
+vqjh6 — 3
+Correct: grid + four fixed edge buttons (positions/colors), 2x2 blob spawn from clicking an
+empty cell, new blobs don't move on their spawn tick, default downward drift on noop, and
+buttons tied to blob direction. Misses that buttons set a PERSISTENT gravity (models them as
+one-time single-cell shifts reverting to "down"), and maps all four button->direction wrong.
+
+
+Overall
+-------
+Mean 2.29 across all 21 games. Distribution is dominated by 2s (12/21);
+one collapse (aw9wd=1, perception degenerated to grid_not_found) and one strong result
+(e3v6m=4). On the 15 games also scored in the prior within-trajectory ctxk3 run, this run is
+essentially flat (≈2.27 vs 2.20): 4 up (83wkq 1->2, ice 1->2, qfsvc 2->3, s2kt7 2->3), 3 down
+(aw9wd 2->1, bt3gb 3->2, f5w3n 3->2), 8 unchanged.
+
+Key finding: the noop-padding + context_k=9 did NOT materially improve belief quality, and
+in particular did not fix the dominant failure mode it was meant to target -- PASSIVE / CLOCK
+dynamics are still consistently missed or mis-modeled: per-tick contagion (dq8gc), cook+gas
+burn (27vwc), random-walk diffusion (83wkq), crate sinking (nrdf6), ant foraging (s2kt7),
+persistent gravity (vqjh6), leaf growth (7xf97). The padding supplies clean passive baselines
+in the windows, but the learned beliefs still fail to articulate the underlying passive laws;
+several runs instead invent deterministic surrogates (83wkq's "shift left", nrdf6's step%4,
+ada85's timer toggle). The recurring structural failures remain: (1) perception collapse to a
+constant/blank output zeroes a game (aw9wd and va6fq here), and (2) interactive/economy mechanics
+(ammo in n2ntd/qfsvc, magnetism in 7www9) and click-location semantics are under-learned.

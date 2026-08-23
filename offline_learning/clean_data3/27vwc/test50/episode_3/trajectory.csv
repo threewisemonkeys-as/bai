@@ -1,0 +1,166 @@
+Step,Action,Reasoning,Observation,Auxiliary_Observation,Reward,Done
+64,noop,manual,"Task: interactive
+Step: 64
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""orange"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""]]",,0.0,False
+65,noop,manual,"Task: interactive
+Step: 65
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""orange"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""]]",,0.0,False
+66,click 4 3,manual,"Task: interactive
+Step: 66
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""]]",,0.0,False
+67,click 4 3,manual,"Task: interactive
+Step: 67
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""]]",,0.0,False
+68,click 6 0,manual,"Task: interactive
+Step: 68
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""]]",,0.0,False
+69,click 6 0,manual,"Task: interactive
+Step: 69
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""]]",,0.0,False
+70,click 6 0,manual,"Task: interactive
+Step: 70
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""]]",,0.0,False
+71,click 6 0,manual,"Task: interactive
+Step: 71
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""]]",,0.0,False
+72,click 6 0,manual,"Task: interactive
+Step: 72
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""]]",,0.0,False
+73,click 4 3,manual,"Task: interactive
+Step: 73
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""white"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""]]",,0.0,False
+74,noop,manual,"Task: interactive
+Step: 74
+Phase: Interactive
+Available actions now:
+- left
+- right
+- up
+- down
+- click ROW COL  (ROW first, then COL, both in 0..6; matches the (row, col) order the perception reports)
+- noop
+- quit
+- reset
+
+========== Start of Direct Observation ==========
+[[""blue"", ""blue"", ""blue"", ""blue"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""black"", ""black"", ""black"", ""black""], [""black"", ""black"", ""black"", ""brown"", ""black"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""orange"", ""gray"", ""black"", ""black""], [""black"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""], [""yellow"", ""black"", ""gray"", ""yellow"", ""gray"", ""black"", ""black""]]",,0.0,False
