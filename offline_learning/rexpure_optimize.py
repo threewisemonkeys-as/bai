@@ -327,6 +327,10 @@ def main():
     (train, test, action_pool, context_k, whitelist, transitions,
      id_n) = build_data(args, rng)
 
+    # Scope the proposer's OBSERVATION SCHEMA to the format of the loaded frames (autumn vs
+    # ARC) so the other env's palette never leaks into the proposed perception code.
+    env_name = infer_env_name(transitions)
+
     if args.no_perception:
         if args.start_perception:
             parser.error("--no-perception freezes P to the identity module; "
@@ -402,7 +406,7 @@ def main():
         reflect_raw_prefix=args.reflect_raw_prefix,
         image_cls=Image,
     )
-    templates = build_reflection_templates(None)  # env-agnostic (offline main has no env handle)
+    templates = build_reflection_templates(env_name)
     selector = RExPureCandidateSelector(c=args.rex_c, rng=random.Random(args.seed + 7331))
     module_selector = (SingleComponentSelector("world_knowledge") if args.no_perception
                        else PerceptionBiasedComponentSelector(args.belief_update_period))

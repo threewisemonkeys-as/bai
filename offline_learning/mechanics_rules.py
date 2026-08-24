@@ -29,10 +29,14 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
+from offline_learning.program_meta import (  # noqa: E402
+    DerivedTable, background as _program_background, grid_size as _program_grid_size)
+
 # ---------------------------------------------------------------- per-game constants
-BG = {"bt3gb": {"black"}, "dq8gc": {"black"}, "n2ntd": {"white"},
-      "s2kt7": {"black"}, "83wkq": {"black"}}
-SIZE = {"bt3gb": 16, "dq8gc": 16, "n2ntd": 12, "s2kt7": 16, "83wkq": 16}
+# BG / SIZE are derived from each program's source on first access (program_meta), so
+# every installed game resolves and non-black backgrounds are read, not assumed.
+BG = DerivedTable(lambda game: {_program_background(game)})
+SIZE = DerivedTable(_program_grid_size)
 
 # Object classes per game: colour -> class. Used for GOAL MASKING (compare only the
 # classes a tested mechanic touches) and for background identification.

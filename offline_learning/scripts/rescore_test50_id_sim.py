@@ -28,6 +28,7 @@ import os as _bos, sys as _bsys  # offline_learning/ on sys.path (flat-import th
 _bsys.path.insert(0, _bos.path.dirname(_bos.path.dirname(_bos.path.abspath(__file__))))
 import argparse
 import json
+from collections import Counter
 import random
 import sys
 import time
@@ -179,9 +180,10 @@ class DriveSim:
 
     def click_enum(self, t: int, target: str, start_grid: list) -> tuple[bool, str | None]:
         """Does clicking ANY cell reproduce the target grid? Non-background first."""
+        bg = Counter(v for row in start_grid for v in row).most_common(1)[0][0]  # modal = background
         cells = sorted(
             ((r, c) for r in range(len(start_grid)) for c in range(len(start_grid[0]))),
-            key=lambda rc: start_grid[rc[0]][rc[1]] == "black",
+            key=lambda rc: start_grid[rc[0]][rc[1]] == bg,
         )
         for r, c in cells:
             if grids_equal(self.outcome(t, f"click {r} {c}"), target):

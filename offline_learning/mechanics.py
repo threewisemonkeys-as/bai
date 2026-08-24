@@ -32,14 +32,12 @@ from __future__ import annotations
 
 import json
 
-# per-game background colour(s) that are not objects
-_BG = {
-    "bt3gb": {"black"},
-    "dq8gc": {"black"},
-    "n2ntd": {"white"},
-    "s2kt7": {"black"},
-    "83wkq": {"black"},
-}
+from offline_learning.program_meta import DerivedTable, background as _program_background
+
+# per-game background colour(s) that are not objects -- derived from the program's
+# `(= background ...)` declaration (default black) so any installed game resolves and a
+# non-black world (n2ntd white, balloon skyblue) is never mistaken for one made of objects
+_BG = DerivedTable(lambda game: {_program_background(game)})
 
 # canonical bucket list per game. kind: "action" (input handler) | "passive" (clock rule)
 # | "null" (nothing observably happened -- kept so a static noop still has a home).

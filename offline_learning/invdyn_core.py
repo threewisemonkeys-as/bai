@@ -256,6 +256,38 @@ DEFAULT_KNOWLEDGE = (
 )
 
 
+def infer_env_name(transitions) -> "str | None":
+    """'arc_agi' | 'autumn' | None, from the observation format of the logged frames."""
+    for tr in list(transitions)[:8]:
+        raw = tr.x_t
+        if "<grid_" in raw:
+            return "arc_agi"
+        if "[[" in raw:
+            return "autumn"
+    return None
+
+
+def infer_background(transitions, n: int = 8):
+    """DIAGNOSTIC ONLY -- never fed to a prompt (decision 2026-08-23: the background is
+    derivable from the frames, so stating it would be feature engineering). (dominant
+    colour, (rows, cols)) over the first n logged autumn frames, or (None, None) when
+    nothing parses; use it to audit whether a learned P found the background itself. The
+    dominant colour is the empty-cell colour in every catalogue world except those with a
+    large static object (rink's 484-cell ice)."""
+    counts: Counter = Counter()
+    shape = None
+    for tr in list(transitions)[:n]:
+        g = parse_grid(tr.x_t)
+        if not g or not isinstance(g[0], list) or not g[0] or not isinstance(g[0][0], str):
+            continue
+        shape = (len(g), len(g[0]))
+        for row in g:
+            counts.update(row)
+    if not counts:
+        return None, None
+    return counts.most_common(1)[0][0], shape
+
+
 FORWARD_TMPL = """You predict the NEXT-state features of a grid environment from the current features and an action.
 
 === DEFAULT KNOWLEDGE (always-true facts about this environment) ===
@@ -2699,11 +2731,12 @@ _SCHEMA_ARC = """  (A) ARC integer grid -- a marker line `<grid_0>` (there may b
         (integers outside 0-11 can occur; they render as a neutral gray.)
       The IMAGE you are shown is exactly these integers painted with the palette above, so a region you SEE as e.g. maroon corresponds to grid cells whose value is 9, sky-blue to 8, green to 3, etc. Use the palette to translate what you see in the image into the integer values your text parser must look for."""
 
-_SCHEMA_AUTUMN = """  (B) Autumn string grid -- a JSON 2D array of lowercase colour-NAME strings embedded in the text, e.g. [["black","gold",...],["black","blue",...], ...]. Cells are names like "black","gray","blue","red","green","gold","lightblue","darkgreen".
+_SCHEMA_AUTUMN = """  (B) Autumn string grid -- a JSON 2D array of lowercase colour-NAME strings embedded in the text, e.g. [["black","gold",...],["black","blue",...], ...] in a black-background world, or [["skyblue","skyblue",...],["skyblue","brown",...], ...] in a skyblue one. Cells are names like "black","white","gray","grey","skyblue","lightblue","blue","darkblue","red","green","darkgreen","limegreen","gold","yellow","orange","brown","tan","pink","mediumpurple","purple".
+      The BACKGROUND (empty-cell) colour DIFFERS BETWEEN WORLDS (black, white, skyblue, gray, ...). Never hardcode "black": determine the background as the dominant colour of the grid and filter on that.
       IMPORTANT: the whole 2D array is one CONTIGUOUS JSON value (it is NOT split one-row-per-line; do not iterate over text lines looking for a row each). The first row is NOT always black (e.g. it may start with [["gray",...). Parse it robustly and directly, e.g.:
           s = obs.find("[["); e = obs.rfind("]]") + 2
           grid = json.loads(obs[s:e])   # grid[r][c] is the colour-name string at row r, col c
-      Then summarise the cells that are NOT the dominant/background colour (their (row,col,colour)), so the action between two states is recoverable from the two summaries."""
+      Then summarise the cells that are NOT the background colour (their (row,col,colour)), so the action between two states is recoverable from the two summaries."""
 
 _SCHEMA_FOOTER = """- Parse defensively: the grid may be 64+ rows; never assume only the first row(s) exist; never assume a fixed length per row; on any parse error return a best-effort summary string (never raise, never return empty)."""
 
@@ -2714,7 +2747,7 @@ def observation_schema(env_name: str | None = None) -> str:
         body, conj = _SCHEMA_AUTUMN, ", encoded as the grid below:"
     elif env_name == "arc_agi":
         body, conj = _SCHEMA_ARC, ", encoded as the grid below:"
-    else:  # unknown -> describe BOTH (back-compat; offline main has no env handle)
+    else:  # unknown -> describe BOTH (back-compat)
         body = _SCHEMA_ARC + "\n" + _SCHEMA_AUTUMN
         conj = " and must handle either of the two encodings below (detect which is present):"
     return f"{_SCHEMA_INTRO}{conj}\n{body}\n{_SCHEMA_FOOTER}"

@@ -83,7 +83,7 @@ def _scan_drive(prog: str, d: dict) -> list[dict]:
     cf = noop_counterfactual(prog, d["seed"], acts, idx)
     d["rep"] = rep
     code = GAMES_CODE(prog)
-    bg = _BG.get(code, set())
+    bg = _BG[code]  # derived from the program; a missing game raises instead of treating every cell as foreground
     recs = []
     for i, a in enumerate(acts):
         if i + 1 >= len(grids):
