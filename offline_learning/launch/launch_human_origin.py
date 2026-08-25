@@ -5,19 +5,22 @@ The question: the aug9/aug10 results were produced on hand-curated synthetic dri
 the transitions come from real human play (`basis_data.zip`, replayed by
 `offline_learning/human_replay.py`)?
 
-Both learners now default to the UNIFIED human dataset (`informative_unified3`, the
-2026-08-24 recipe for the 15-game selection: horizon 8, --oov noop, coverage/under-fill
-guards -- see HUMAN_DATA_METHODOLOGY.md): one shared
-60-target train pool + identical 50-target test set per game, built by human_replay.py with
-`--drive-rank nonnoop`, so a rexpure-vs-worldcoder head-to-head is on the SAME transitions.
+Both learners now default to the CURATED human dataset (`informative_curated`, the
+2026-08-24 variant of record for the 15-game selection: the unified3 recipe -- horizon 8,
+--oov noop, coverage/under-fill guards -- with the drives picked by hand per game from
+`offline_learning/curated_drives.json`; see HUMAN_DATA_METHODOLOGY.md): one shared
+60-target train pool + identical 50-target test set per game, so a rexpure-vs-worldcoder
+head-to-head is on the SAME transitions. `--variant informative_unified3` is the
+uncurated (ranked-drive) control arm.
 For matched consumption rexpure's reference `--train-n 30` is lifted to the 60-target pool
 (worldcoder has no `--train-n` and already consumes the whole pool), and worldcoder's
 `--collapse-action-params` is dropped so both learners score the end-of-run inverse-dynamics
 test at click-LOCATION level (wc collapse is test-ID-only, so this leaves its program
-synthesis untouched). Results land in `logs/2026-08-24/human_unified3/` (--out-root to
-change). Pass `--variant informative_unified --out-root logs/2026-08-11/human_unified`
-to reproduce the 2026-08-11 arms, or `--variant informative` / `informative_wc` for the
-old reference-sized ones.
+synthesis untouched). Results land in `logs/2026-08-24/human_curated/` (--out-root to
+change; use `--variant informative_unified3 --out-root logs/2026-08-24/human_unified3` for
+the control arm). Pass `--variant informative_unified --out-root
+logs/2026-08-11/human_unified` to reproduce the 2026-08-11 arms, or `--variant
+informative` / `informative_wc` for the old reference-sized ones.
 
 So the ONLY thing that changes is the data. Each command is rebuilt from the reference
 run's own `launch.json` -- every flag is carried over byte-identically and only the four
@@ -49,7 +52,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "offline_learning/human_data"
-OUT_ROOT = ROOT / "logs/2026-08-24/human_unified3"   # overridable via --out-root
+OUT_ROOT = ROOT / "logs/2026-08-24/human_curated"   # overridable via --out-root
 # the 15-game selection of experimental_plan.md (2026-08-24)
 GAMES = ["eahcw", "egg", "bt3gb", "dq8gc", "7xf97", "n2ntd", "va6fq", "s2kt7",
          "colour_lines", "SET", "diffusion", "dino", "f5w3n", "logic_gates", "7www9"]
@@ -61,17 +64,19 @@ REF = {
     "worldcoder": (ROOT / "logs/archive/2026-08-11/wc_seed1_consolidated", "{game}_s1_wc",
                    "offline_learning/worldcoder_optimize.py"),
 }
-# both learners read the UNIFIED shared pool (informative_unified: flat 60 train / 50 test,
-# --drive-rank nonnoop). Pass --variant informative / informative_wc for the old arms.
-VARIANT = {"rexpure": "informative_unified3", "worldcoder": "informative_unified3"}
+# both learners read the CURATED shared pool (flat 60 train / 50 test, hand-picked drives).
+# --variant informative_unified3 = ranked-drive control; informative / informative_wc =
+# the old reference-sized arms.
+VARIANT = {"rexpure": "informative_curated", "worldcoder": "informative_curated"}
 # the unified pool size; rexpure's reference --train-n is lifted to this so both learners
-# consume the whole shared pool (worldcoder has no --train-n). Any informative_unified*
-# variant gets the unified treatment (train-n lift + wc uncollapse).
+# consume the whole shared pool (worldcoder has no --train-n). Every 60/50 flat-pool
+# variant (informative_unified* and informative_curated) gets the unified treatment
+# (train-n lift + wc uncollapse).
 UNIFIED_TRAIN_N = 60
 
 
 def is_unified(variant: str) -> bool:
-    return variant.startswith("informative_unified")
+    return variant.startswith("informative_unified") or variant == "informative_curated"
 
 DATA_FLAGS = ("--run", "--context-source-run", "--test-run",
               "--test-context-source-run", "--out-dir", "--actions")
