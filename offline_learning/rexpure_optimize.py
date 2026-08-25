@@ -202,6 +202,11 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--reflection-hedge-delay", type=float, default=None)
     ap.add_argument("--reflection-timeout", type=float, default=None)
     ap.add_argument("--client", default="openrouter")
+    ap.add_argument("--reflection-client", default=None,
+                    help="litellm provider prefix for the reflection/analysis calls only "
+                         "(default: --client). 'vllm' = any OpenAI-compatible endpoint via "
+                         "litellm's hosted_vllm provider, e.g. the local Claude CLI proxy "
+                         "(scripts/claude_cli_proxy.py) with HOSTED_VLLM_API_BASE set")
     ap.add_argument("--max-nodes", type=int, default=67,
                     help="search budget = number of evaluated candidates (nodes): the seed "
                     "plus admitted children. Default 67 = the canonical rex_pure production "
@@ -307,8 +312,9 @@ def main():
     task_cfg = make_config(args.task_model, args.client,
                            provider_order=args.task_provider_order,
                            reasoning_json=args.task_reasoning_json)
+    refl_client = args.reflection_client or args.client
     refl_cfg = make_config(
-        args.reflection_model, args.client,
+        args.reflection_model, refl_client,
         provider_order=args.reflection_provider_order,
         hedge_delay_s=args.reflection_hedge_delay, timeout_s=args.reflection_timeout,
         reasoning_json=args.reflection_reasoning_json,
@@ -319,7 +325,7 @@ def main():
     # reasoning setting separately switchable to isolate that risk; default = the
     # proposer's, i.e. one flag still moves both.
     analysis_cfg = refl_cfg if args.analysis_reasoning_json is None else make_config(
-        args.reflection_model, args.client,
+        args.reflection_model, refl_client,
         provider_order=args.reflection_provider_order,
         hedge_delay_s=args.reflection_hedge_delay, timeout_s=args.reflection_timeout,
         reasoning_json=args.analysis_reasoning_json,

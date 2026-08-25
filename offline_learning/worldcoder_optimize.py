@@ -398,6 +398,10 @@ def main():
                     help="warm-start from a previously LEARNED program file")
     ap.add_argument("--reflection-model", default="openai/gpt-oss-120b")
     ap.add_argument("--client", default="openrouter")
+    ap.add_argument("--reflection-client", default=None,
+                    help="litellm provider prefix for the reflection calls (default: --client); "
+                         "'vllm' = OpenAI-compatible endpoint via HOSTED_VLLM_API_BASE, e.g. "
+                         "the local Claude CLI proxy (scripts/claude_cli_proxy.py)")
     ap.add_argument("--reflection-provider-order", default=None)
     ap.add_argument("--reflection-hedge-delay", type=float, default=60.0)
     ap.add_argument("--reflection-timeout", type=float, default=240.0)
@@ -410,7 +414,7 @@ def main():
 
     rng = random.Random(args.seed)
     refl_cfg = make_config(
-        args.reflection_model, args.client,
+        args.reflection_model, args.reflection_client or args.client,
         provider_order=args.reflection_provider_order,
         hedge_delay_s=args.reflection_hedge_delay,
         timeout_s=args.reflection_timeout,

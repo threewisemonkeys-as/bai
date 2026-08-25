@@ -43,7 +43,24 @@ AUTH_ENV_KEYS = {
 
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    # OpenAI allows either a plain string or a list of content parts; litellm's
+    # responses->chat bridge (what the offline learners send) always uses the list form.
+    content: str | list[dict[str, Any]]
+
+    def text(self) -> str:
+        if isinstance(self.content, str):
+            return self.content
+        parts = []
+        for part in self.content:
+            kind = part.get("type")
+            if kind in ("text", "input_text"):
+                parts.append(str(part.get("text", "")))
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported content part type for the Claude CLI proxy: {kind!r}",
+                )
+        return "\n".join(parts)
 
 
 class ChatRequest(BaseModel):
@@ -56,10 +73,10 @@ def render_prompt(request: ChatRequest) -> str:
     """Accept standard chat messages while retaining the supplied prompt-only shorthand."""
     if request.messages:
         if len(request.messages) == 1 and request.messages[0].role == "user":
-            prompt = request.messages[0].content
+            prompt = request.messages[0].text()
         else:
             prompt = "\n\n".join(
-                f"<{message.role}>\n{message.content}\n</{message.role}>"
+                f"<{message.role}>\n{message.text()}\n</{message.role}>"
                 for message in request.messages
             )
     else:
@@ -85,14 +102,31 @@ def scrub_terminal_output(raw_text: str) -> str:
     return clean_text.strip()
 
 
+EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
+
+
+def split_model_effort(model: str) -> tuple[str, str | None]:
+    """`claude-opus-5:medium` -> ("claude-opus-5", "medium"); no suffix -> env default
+    CLAUDE_PROXY_EFFORT (unset = the CLI's own default, adaptive thinking)."""
+    base, _, effort = model.partition(":")
+    effort = effort or os.getenv("CLAUDE_PROXY_EFFORT", "")
+    if effort and effort not in EFFORT_LEVELS:
+        raise HTTPException(status_code=400, detail=f"Invalid effort level: {effort!r}")
+    return base, (effort or None)
+
+
 def claude_command(cli_path: str, model: str, system_prompt: str) -> list[str]:
     if not MODEL_RE.fullmatch(model):
         raise HTTPException(status_code=400, detail=f"Invalid Claude model name: {model!r}")
+    base, effort = split_model_effort(model)
     return [
         cli_path,
         "--print",
         "--model",
-        model,
+        base,
+        "--max-turns",
+        "1",
+        *(["--effort", effort] if effort else []),
         "--output-format",
         "json",
         "--no-session-persistence",
@@ -277,8 +311,11 @@ def create_app(
     async def chat_completions(request: ChatRequest) -> dict[str, Any]:
         prompt = render_prompt(request)
         command = claude_command(resolved_cli, request.model, system_prompt)
+        t_req = time.time()
+        t_queue = None
         try:
             async with semaphore:
+                t_queue = time.time() - t_req
                 with isolated_cli_environment(
                     api.state.runtime_root,
                     resolved_credentials,
@@ -321,7 +358,30 @@ def create_app(
                 status_code=502,
                 detail=f"Claude CLI returned invalid JSON: {stdout_text[-1000:]}",
             ) from exc
-        return openai_response(payload, request.model)
+        result = openai_response(payload, request.model)
+        u = result["usage"]
+        dump_dir = os.getenv("CLAUDE_PROXY_DUMP_DIR")
+        if dump_dir:
+            try:
+                d = Path(dump_dir)
+                d.mkdir(parents=True, exist_ok=True)
+                stem = f"{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
+                (d / f"{stem}.json").write_text(json.dumps({
+                    "model": request.model, "wall_s": round(time.time() - t_req, 1),
+                    "usage": u, "prompt": prompt,
+                    "response": result["choices"][0]["message"]["content"],
+                }, indent=1))
+            except OSError:
+                pass
+        # one line per completed request: queue wait, CLI wall, sizes, nominal cost
+        print(
+            f"[proxy] {time.strftime('%H:%M:%S')} model={request.model} "
+            f"queue={t_queue or 0:.1f}s wall={time.time() - t_req:.1f}s "
+            f"prompt_chars={len(prompt)} in_tok={u['prompt_tokens']} out_tok={u['completion_tokens']} "
+            f"out_chars={len(result['choices'][0]['message']['content'])} cost=${u['cost']:.4f}",
+            flush=True,
+        )
+        return result
 
     return api
 

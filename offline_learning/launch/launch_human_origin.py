@@ -36,9 +36,20 @@ Human slices are 2 rows (one scored target each), so temporal context always com
 passed even for the reference commands that did not use them (bt3gb/83wkq/s2kt7 under
 worldcoder pointed at self-contained clean_data3 slices instead).
 
+Reflection-model arm (2026-08-24): `--reflection-model claude-opus-5 --reflection-client vllm`
+swaps ONLY the reflection/analysis LLM of either learner for Claude served by the local
+CLI proxy (`scripts/claude_cli_proxy.py`, start it with `scripts/claude_proxy_ctl.sh start`);
+the reference's reflection routing flags (provider order, hedge, timeout) are replaced by
+proxy-appropriate ones (no pin, no hedge -- a hedge would be a second full CLI call --
+timeout 900 s) and HOSTED_VLLM_API_BASE/KEY are exported to the run. rexpure's task model F
+is untouched, so the arm isolates the reflection model. Use a separate --out-root.
+
 Usage:
     uv run python offline_learning/launch/launch_human_origin.py --learner rexpure
     uv run python offline_learning/launch/launch_human_origin.py --learner worldcoder
+    uv run python offline_learning/launch/launch_human_origin.py --learner worldcoder \
+        --reflection-model claude-opus-5 --reflection-client vllm \
+        --out-root logs/2026-08-24/human_curated_opus5
 """
 from __future__ import annotations
 
@@ -80,6 +91,11 @@ def is_unified(variant: str) -> bool:
 
 DATA_FLAGS = ("--run", "--context-source-run", "--test-run",
               "--test-context-source-run", "--out-dir", "--actions")
+# value-taking reference flags replaced wholesale when --reflection-model is given
+REFLECTION_FLAGS = ("--reflection-model", "--reflection-client", "--reflection-provider-order",
+                    "--reflection-hedge-delay", "--reflection-timeout",
+                    "--reflection-reasoning-json", "--analysis-reasoning-json")
+PROXY_BASE = "http://127.0.0.1:8000/v1"
 
 # s2kt7 has no batch3 launch.json; it is the 83wkq config with s2kt7 data. The 10 games
 # added 2026-08-24 have no reference run at all: they inherit FALLBACK's config -- safe
@@ -127,11 +143,16 @@ def ref_cmd(learner: str, game: str) -> list[str]:
     return [sys.executable, str(ROOT / script)] + cmd[i + 1:]
 
 
-def build(learner: str, game: str, outd: Path, variant: str) -> list[str]:
+def build(learner: str, game: str, outd: Path, variant: str,
+          reflection_model: str | None = None, reflection_client: str | None = None,
+          reflection_timeout: float = 900.0) -> list[str]:
     cmd = ref_cmd(learner, game)
     # value-taking flags to drop: data paths always; for the unified variant also rexpure's
-    # --train-n cap (re-added below at the shared pool size).
+    # --train-n cap (re-added below at the shared pool size); with a reflection override
+    # every reflection routing flag (re-added below for the new endpoint).
     drop = set(DATA_FLAGS) | ({"--train-n"} if is_unified(variant) else set())
+    if reflection_model:
+        drop |= set(REFLECTION_FLAGS)
     # valueless (store_true) flags to drop: for the unified variant un-collapse worldcoder's
     # test ID so BOTH learners score inverse-dynamics at click-location level. wc collapse is
     # test-ID-only (the program is always fit on full 'click ROW COL'), so dropping it does
@@ -150,6 +171,13 @@ def build(learner: str, game: str, outd: Path, variant: str) -> list[str]:
         i += 1
     if is_unified(variant) and learner == "rexpure":
         stripped += ["--train-n", str(UNIFIED_TRAIN_N)]
+    if reflection_model:
+        stripped += ["--reflection-model", reflection_model,
+                     "--reflection-provider-order", "",      # explicit no-pin
+                     "--reflection-hedge-delay", "0",         # a hedge = a 2nd full call
+                     "--reflection-timeout", str(reflection_timeout)]
+        if reflection_client:
+            stripped += ["--reflection-client", reflection_client]
     paths = json.loads((DATA / game / variant / "dataset_paths.json").read_text())
     return cmd[:2] + [
         "--run", paths["run"],
@@ -175,8 +203,22 @@ def main() -> None:
     ap.add_argument("--max-parallel", type=int, default=3)
     ap.add_argument("--out-root", default=str(OUT_ROOT),
                     help="tree for <learner><suffix>/<game>_s1 out-dirs")
+    ap.add_argument("--reflection-model", default=None,
+                    help="swap the reflection LLM (e.g. claude-opus-5 via the CLI proxy)")
+    ap.add_argument("--reflection-client", default=None,
+                    help="litellm provider for the reflection model; 'vllm' = OpenAI-compatible "
+                         "endpoint at --proxy-base (the Claude CLI proxy)")
+    ap.add_argument("--reflection-timeout", type=float, default=900.0)
+    ap.add_argument("--proxy-base", default=PROXY_BASE)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
+    if args.reflection_client == "vllm":
+        import urllib.request
+        try:
+            urllib.request.urlopen(args.proxy_base.rsplit("/", 1)[0] + "/healthz", timeout=5)
+        except Exception as exc:  # noqa: BLE001
+            raise SystemExit(f"reflection proxy not reachable at {args.proxy_base}: {exc} "
+                             "(start it: bash offline_learning/scripts/claude_proxy_ctl.sh start)")
 
     # The groq pin exists for rexpure's TASK model (gpt-oss-20b@groq). worldcoder has no
     # task LLM -- exporting it there pins its reflection model to a provider that does not
@@ -184,6 +226,9 @@ def main() -> None:
     env = dict(os.environ)
     if args.learner == "rexpure":
         env["OPENROUTER_PROVIDER_ORDER"] = "groq"
+    if args.reflection_client == "vllm":
+        env["HOSTED_VLLM_API_BASE"] = args.proxy_base
+        env["HOSTED_VLLM_API_KEY"] = "local-proxy"
     live: list[subprocess.Popen] = []
     for game in args.games.split(","):
         variant = args.variant or VARIANT[args.learner]
@@ -191,7 +236,8 @@ def main() -> None:
         if done_marker(args.learner, outd).exists():
             print(f"skip  {game}: already complete")
             continue
-        cmd = build(args.learner, game, outd, variant)
+        cmd = build(args.learner, game, outd, variant, args.reflection_model,
+                    args.reflection_client, args.reflection_timeout)
         if args.dry_run:
             print(f"[dry-run] {game}:\n  {' '.join(cmd)}\n")
             continue
@@ -205,8 +251,11 @@ def main() -> None:
         live.append(p)
         (outd / "launch.json").write_text(json.dumps(
             {"game": game, "learner": args.learner, "variant": variant,
+             "reflection_model": args.reflection_model, "reflection_client": args.reflection_client,
              "pid": p.pid, "cmd": cmd,
-             "env": ref_env(args.learner, game)}, indent=2) + "\n")
+             "env": {**ref_env(args.learner, game),
+                     **({"HOSTED_VLLM_API_BASE": args.proxy_base} if args.reflection_client == "vllm" else {})}},
+            indent=2) + "\n")
         print(f"start {args.learner}/{game}: pid={p.pid} -> {outd}", flush=True)
     for p in live:
         p.wait()
