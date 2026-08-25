@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Filmstrip visualisation of the human TRAINING data (informative_unified) per game.
+"""Filmstrip visualisation of the human TRAINING data (one human_data variant) per game.
 
 Two views, toggled per game:
   * "Full drives"  -- each recorded human session (drives/{train,test}_d*) as a
@@ -14,6 +14,8 @@ Grids are interned into a shared pool (referenced by index) so the repeated cont
 frames don't blow up the file.
 
     uv run python offline_learning/scripts/viz_training_data.py --out logs/training_data_viz.html
+    uv run python offline_learning/scripts/viz_training_data.py --variant informative_unified3 \
+        --unselected-cap 12 --out logs/2026-08-24/human_unified3_build/training_data_viz.html
 """
 from __future__ import annotations
 
@@ -33,8 +35,12 @@ from validate import load_transitions, backfill_context_from_source  # noqa: E40
 CACHE = REPO / "offline_learning/human_data/_cache"
 
 csv.field_size_limit(10_000_000)
-GAMES = ["bt3gb", "dq8gc", "n2ntd", "s2kt7", "83wkq"]
-NAME = {"bt3gb": "ice", "dq8gc": "disease", "n2ntd": "mario", "s2kt7": "ants", "83wkq": "particles"}
+# default = the 15-game selection of experimental_plan.md (2026-08-24), in table order;
+# --games picks any subset of human_replay.GAMES (e.g. 83wkq/particles, no longer selected)
+GAMES = ["eahcw", "egg", "bt3gb", "dq8gc", "7xf97", "n2ntd", "va6fq", "s2kt7", "colour_lines",
+         "SET", "diffusion", "dino", "f5w3n", "logic_gates", "7www9"]
+NAME = {k: v[1] for k, v in HGAMES.items()}
+VARIANT = "informative_unified"   # overridden by --variant
 CSS = {"black": "#0d1017", "white": "#eef1f5", "gray": "#8b929c", "blue": "#2f6fd0",
        "lightblue": "#8fc4e8", "gold": "#e0a92e", "darkgreen": "#2e8b57", "red": "#d1442f",
        "darkorange": "#e07b1a", "mediumpurple": "#9575cd", "green": "#3fae5a",
@@ -73,10 +79,11 @@ class Pool:
 
 def build_drives(game: str, pool: Pool, max_steps: int, cap: int) -> tuple[list[dict], list]:
     """Every human-play segment for the game (via human_replay), replayed to frames and
-    marked train / test / unselected. The 6 train/test drives are the ones informative_unified
+    marked train / test / unselected. The 6 train/test drives are the ones the variant
     selected; the rest are the unselected pool. Ordered train, test, then unselected."""
-    root = REPO / f"offline_learning/human_data/{game}/informative_unified"
+    root = REPO / f"offline_learning/human_data/{game}/{VARIANT}"
     man = json.loads((root / "MANIFEST.json").read_text())
+    oov = man.get("oov", "drop")  # segment exactly as the variant did (seg_idx must match)
     wl = set(man["whitelist"])
     prog = HGAMES[game][0]
     selmap = {}  # (user_id, seed, seg_idx) -> (split, dname)
@@ -85,7 +92,7 @@ def build_drives(game: str, pool: Pool, max_steps: int, cap: int) -> tuple[list[
             selmap[(d["user_id"], d["seed"], d["seg_idx"])] = (split, f"{split}_d{i}")
 
     sessions = HR.load_sessions(game, HR.DEFAULT_ZIP, CACHE)
-    segs = [seg for s in sessions for seg in HR.segment(s, wl)]
+    segs = [seg for s in sessions for seg in HR.segment(s, wl, oov)]
     # train + test first, then unselected (optionally capped)
     sel = [s for s in segs if (s["user_id"], s["seed"], s["seg_idx"]) in selmap]
     uns = [s for s in segs if (s["user_id"], s["seed"], s["seg_idx"]) not in selmap]
@@ -122,7 +129,7 @@ def build_drives(game: str, pool: Pool, max_steps: int, cap: int) -> tuple[list[
 
 
 def build_transitions(game: str, split: str, whitelist, pool: Pool) -> list[dict]:
-    root = REPO / f"offline_learning/human_data/{game}/informative_unified"
+    root = REPO / f"offline_learning/human_data/{game}/{VARIANT}"
     wl = set(whitelist)
     out = []
     for i in range(9):
@@ -143,7 +150,7 @@ def build_transitions(game: str, split: str, whitelist, pool: Pool) -> list[dict
 def encode(games: set[str], max_steps: int, cap: int) -> dict:
     pool = Pool()
     out_games = []
-    for g in GAMES:
+    for g in (GAMES + sorted(set(games) - set(GAMES))):
         if games and g not in games:
             continue
         drives, whitelist = build_drives(g, pool, max_steps, cap)
@@ -339,13 +346,18 @@ refreshVerbs();update();
 
 
 def main():
+    global VARIANT
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(REPO / "logs/training_data_viz.html"))
     ap.add_argument("--games", default="", help="comma-separated subset")
+    ap.add_argument("--variant", default=VARIANT,
+                    help="human_data variant dir to visualise (informative_unified, "
+                         "informative_unified3, ...)")
     ap.add_argument("--max-steps", type=int, default=0, help="cap drive frames (0=all)")
     ap.add_argument("--unselected-cap", type=int, default=0,
                     help="cap unselected drives per game (0=all)")
     args = ap.parse_args()
+    VARIANT = args.variant
     games = set(filter(None, args.games.split(",")))
     enc = encode(games, args.max_steps, args.unselected_cap)
     html = HTML.replace("/*DATA*/{}", json.dumps(enc))

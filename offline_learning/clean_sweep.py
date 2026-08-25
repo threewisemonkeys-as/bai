@@ -81,6 +81,8 @@ GAMES = {
     "logic_gates":  ("noop,click", True, 120, 6),
     "balloon":      ("noop,click", True, 120, 6),
     "colour_lines": ("noop,click", True, 120, 6),
+    "SET":          ("noop,click", True, 120, 6),  # only handler: (on (clicked cards))
+    "egg":          ("left,right,up,down,noop,click", False, 120, 6),  # click = gravity button, collapse like ice
 }
 
 

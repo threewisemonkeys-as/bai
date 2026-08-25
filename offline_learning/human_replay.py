@@ -11,6 +11,10 @@ Human game name -> repo program (established by content hash, GRID_SIZE vs the c
 max (x,y), object names and the input-handler fingerprint):
 
     ice=BT3GB  disease=DQ8GC  ants=S2KT7  mario=N2NTD  particles=83WKQ
+    paint=EAHCW  magnets=7WWW9  grow=7XF97  sand=VA6FQ  space_invaders=F5W3N
+    (byte-identical / click-extent matches, 2026-08-23), and the zip-sourced programs
+    egg, colour_lines, diffusion, dino, logic_gates, SET under their own names (installed
+    into the harness by tools/install_autumn_programs.py).
 
 Output layout per game (mirrors what rexpure/worldcoder already consume):
 
@@ -75,6 +79,18 @@ GAMES = {
     "n2ntd": ("N2NTD", "mario", ["left", "right", "up", "down", "noop", "click"]),
     "s2kt7": ("S2KT7", "ants", ["noop", "click"]),
     "83wkq": ("83WKQ", "particles", ["noop", "click"]),
+    # --- 2026-08-23 selection (experimental_plan.md); whitelists == clean_sweep.GAMES ---
+    "eahcw": ("EAHCW", "paint", ["left", "right", "up", "down", "noop", "click"]),
+    "7www9": ("7WWW9", "magnets", ["left", "right", "up", "down", "noop"]),
+    "7xf97": ("7XF97", "grow", ["left", "right", "up", "down", "noop", "click"]),
+    "va6fq": ("VA6FQ", "sand", ["noop", "click"]),
+    "f5w3n": ("F5W3N", "space_invaders", ["left", "right", "up", "noop"]),
+    "egg": ("egg", "egg", ["left", "right", "up", "down", "noop", "click"]),
+    "colour_lines": ("colour_lines", "colour_lines", ["noop", "click"]),
+    "diffusion": ("diffusion", "diffusion", ["up", "noop", "click"]),
+    "dino": ("dino", "dino", ["up", "noop"]),
+    "logic_gates": ("logic_gates", "logic_gates", ["noop", "click"]),
+    "SET": ("SET", "SET", ["noop", "click"]),
 }
 
 CSV_FIELDS = ["Step", "Action", "Reasoning", "Observation",
@@ -84,6 +100,7 @@ MIN_SEG = 40        # a segment must have at least this many in-whitelist core a
 MAX_DRIVE = 240     # cap a drive (keeps the O(n^2) counterfactual probe cheap)
 N_TRAIN_DRIVES = 3  # mirrors the reference runs' 3 train run-dirs
 N_TEST_DRIVES = 3
+MAX_DRIVES = 8      # under-fill guard: extra drives appended until the pool target is met
 
 # Scored-pool sizes of the ARTIFICIAL reference runs, measured with load_transitions on
 # their own launch.json paths. The human pools are built to the same size so the only
@@ -121,14 +138,22 @@ def load_sessions(game: str, data_zip: Path, cache_dir: Path) -> list[dict]:
     return out
 
 
-def segment(session: dict, whitelist: set[str]) -> list[dict]:
+def segment(session: dict, whitelist: set[str], oov: str = "drop") -> list[dict]:
     """Split one interactive phase into replayable segments, one per `reset`.
 
     A reset restarts the program with a NEW seed, so a segment is the largest run of
     actions that shares an initial state. Out-of-whitelist actions (inputs the program
-    has no handler for, e.g. arrows in a click-only game) are dropped: they are exactly
-    the actions `load_transitions` would drop anyway.
+    has no handler for, e.g. arrows in a click-only game) are handled per `oov`:
+
+      drop  (historical, the 2026-08-11 `informative_unified` pools) delete the event,
+            which also deletes its TICK -- the replay is shorter than what the human saw
+            and passive dynamics / RNG draws shift relative to the human's later actions.
+      noop  record the event as `noop`: the engine treats an unhandled input as a tick
+            with no effect, so this preserves the human's timeline exactly. Decision
+            2026-08-23 for the 15-game selection (`informative_unified3`).
     """
+    if oov not in ("drop", "noop"):
+        raise ValueError(f"oov must be 'drop' or 'noop', got {oov!r}")
     segs, cur = [], None
     for e in session["events"]:
         at = e.get("actionType")
@@ -137,8 +162,11 @@ def segment(session: dict, whitelist: set[str]) -> list[dict]:
                 segs.append(cur)
             cur = {"seed": int(e["seed"]), "actions": [],
                    "user_id": session["user_id"], "task_id": session["task_id"]}
-        elif cur is not None and at in MOVES and at in whitelist:
-            if at == "click":
+        elif cur is not None and at in MOVES:
+            if at not in whitelist:
+                if oov == "noop":
+                    cur["actions"].append("noop")
+            elif at == "click":
                 # log stores (x=col, y=row); the wrapper's interface is ROW-major and
                 # transposes to the column-first interpreter (autumn_env ~line 469).
                 cur["actions"].append(f"click {e['y']} {e['x']}")
@@ -333,7 +361,8 @@ def pick_targets(pools: list[tuple[int, list[dict]]], n_want: int, mode: str,
 # ---------------------------------------------------------------------- generation
 def build_variant(game: str, name: str, mode: str, drives: dict, out_root: Path,
                   n_train: int, n_test: int, rng: random.Random,
-                  informative_horizon: int = 1) -> dict:
+                  informative_horizon: int = 1, oov: str = "drop",
+                  drive_selection: str = "", selection_note: str = "") -> dict:
     prog, human_name, whitelist = GAMES[game]
     root = out_root / game / name
     if root.exists():
@@ -375,7 +404,8 @@ def build_variant(game: str, name: str, mode: str, drives: dict, out_root: Path,
     manifest = {
         "game": game, "program": prog, "human_game": human_name,
         "variant": name, "selection": mode, "whitelist": whitelist,
-        "informative_horizon": informative_horizon,
+        "informative_horizon": informative_horizon, "oov": oov,
+        "drive_selection": drive_selection, "selection_note": selection_note,
         "drives": {s: [{k: d[k] for k in ("user_id", "task_id", "seed", "seg_idx",
                                           "n_steps", "n_informative", "n_changed")}
                        for d in drives[s]] for s in ("train", "test")},
@@ -427,30 +457,56 @@ def rank_drives(prog: str, segs: list[dict], mode: str, t0: float, game: str) ->
 
 def generate(game: str, out_root: Path, data_zip: Path, seed: int,
              n_train: int, n_test: int, variants: list[str],
-             drive_rank: str = "score", informative_horizon: int = 1) -> None:
+             drive_rank: str = "score", informative_horizon: int = 1,
+             oov: str = "drop", curated_picks: dict | None = None) -> None:
     prog, human_name, whitelist = GAMES[game]
     wl = set(whitelist)
     rng = random.Random(seed)
     t0 = time.time()
 
     sessions = load_sessions(game, data_zip, out_root / "_cache")
-    segs = [s for sess in sessions for s in segment(sess, wl)]
+    segs = [s for sess in sessions for s in segment(sess, wl, oov)]
     print(f"[{game}] {len(sessions)} sessions -> {len(segs)} replayable segments "
           f"(>={MIN_SEG} in-whitelist actions)", flush=True)
 
     ranked = rank_drives(prog, segs, drive_rank, t0, game)
 
-    # train/test drives from DISJOINT users (no cross-split leakage)
-    train, test, used_users = [], [], set()
-    for d in ranked:
-        if len(train) < N_TRAIN_DRIVES:
-            train.append(d)
-            used_users.add(d["user_id"])
-    for d in ranked:
-        if len(test) < N_TEST_DRIVES and d["user_id"] not in used_users:
-            test.append(d)
-    if len(test) < N_TEST_DRIVES:
-        raise SystemExit(f"[{game}] not enough distinct-user segments for a clean test split")
+    if curated_picks:
+        # MANUAL drive selection (2026-08-24 decision): the experimenter names the
+        # session segments per split -- (user_id, seed, seg_idx) triples -- and only
+        # the within-drive sampling (informative filter + verb round-robin) stays
+        # mechanical. Guards below still act as a backstop and print when they fire.
+        by_key = {(s["user_id"], s["seed"], s["seg_idx"]): s for s in segs}
+        def resolve(triples, split):
+            out = []
+            for u, sd, si in triples:
+                s = by_key.get((u, int(sd), int(si)))
+                if s is None:
+                    near = [k for k in by_key if k[0] == u]
+                    raise SystemExit(f"[{game}] curated {split} drive ({u},{sd},{si}) not found; "
+                                     f"segments for that user: {near}")
+                out.append(s)
+            return out
+        train = resolve(curated_picks["train"], "train")
+        test = resolve(curated_picks["test"], "test")
+        used_users = {d["user_id"] for d in train}
+        overlap = used_users & {d["user_id"] for d in test}
+        if overlap:
+            raise SystemExit(f"[{game}] curated picks share users across splits: {sorted(overlap)}")
+        print(f"[{game}] MANUAL drive selection: {len(train)} train / {len(test)} test "
+              f"({curated_picks.get('note', 'no note')})", flush=True)
+    else:
+        # train/test drives from DISJOINT users (no cross-split leakage)
+        train, test, used_users = [], [], set()
+        for d in ranked:
+            if len(train) < N_TRAIN_DRIVES:
+                train.append(d)
+                used_users.add(d["user_id"])
+        for d in ranked:
+            if len(test) < N_TEST_DRIVES and d["user_id"] not in used_users:
+                test.append(d)
+        if len(test) < N_TEST_DRIVES:
+            raise SystemExit(f"[{game}] not enough distinct-user segments for a clean test split")
 
     # replay-free ranks (nonnoop/length) haven't replayed the chosen drives yet
     for d in train + test:
@@ -461,26 +517,93 @@ def generate(game: str, out_root: Path, data_zip: Path, seed: int,
             d["n_changed"] = sum(rep["grids"][i + 1] != rep["grids"][i]
                                  for i in range(len(rep["actions"])))
 
+    def probe(d: dict, split: str) -> None:
+        if "rep" not in d:
+            rep = replay(prog, d["seed"], d["actions"])
+            d["rep"] = rep
+            d["n_steps"] = len(rep["actions"])
+            d["n_changed"] = sum(rep["grids"][i + 1] != rep["grids"][i]
+                                 for i in range(len(rep["actions"])))
+        idx = [i for i, a in enumerate(d["rep"]["actions"]) if a.split()[0] != "noop"]
+        t1 = time.time()
+        cf = noop_counterfactual(prog, d["seed"], d["rep"]["actions"], idx,
+                                 horizon=informative_horizon)
+        d["cands"] = candidates(d["rep"], cf)
+        d["rows"] = drive_rows(d["rep"])
+        d["n_informative"] = sum(c["informative"] for c in d["cands"])
+        print(f"[{game}] {split} drive u={d['user_id'][:8]} seed={d['seed']} "
+              f"steps={d['n_steps']} changed={d['n_changed']} "
+              f"informative={d['n_informative']} ({time.time() - t1:.0f}s probe)",
+              flush=True)
+
+    test_users = {d["user_id"] for d in test}
+
+    def add_drive(d: dict, split: str, ds: list, chosen: set) -> None:
+        probe(d, split)
+        ds.append(d)
+        chosen.add((d["user_id"], d["seed"], d["seg_idx"]))
+        if split == "train":
+            used_users.add(d["user_id"])
+
+    def eligible(d: dict, split: str, chosen: set) -> bool:
+        """A guard may only append a drive that keeps the user split disjoint."""
+        if (d["user_id"], d["seed"], d["seg_idx"]) in chosen:
+            return False
+        if split == "test" and d["user_id"] in used_users:
+            return False
+        if split == "train" and d["user_id"] in test_users:
+            return False  # a train append must never reuse a test user (leak)
+        return True
+
     for split, ds in (("train", train), ("test", test)):
         for d in ds:
-            idx = [i for i, a in enumerate(d["rep"]["actions"]) if a.split()[0] != "noop"]
-            t1 = time.time()
-            cf = noop_counterfactual(prog, d["seed"], d["rep"]["actions"], idx,
-                                     horizon=informative_horizon)
-            d["cands"] = candidates(d["rep"], cf)
-            d["rows"] = drive_rows(d["rep"])
-            d["n_informative"] = sum(c["informative"] for c in d["cands"])
-            print(f"[{game}] {split} drive u={d['user_id'][:8]} seed={d['seed']} "
-                  f"steps={d['n_steps']} changed={d['n_changed']} "
-                  f"informative={d['n_informative']} ({time.time() - t1:.0f}s probe)",
-                  flush=True)
+            probe(d, split)
+        chosen = {(d["user_id"], d["seed"], d["seg_idx"]) for d in train + test}
+        # Verb-coverage guard (2026-08-24): the nonnoop rank is blind to WHICH inputs a
+        # session used, so a split's 3 drives can lack a whitelist verb the corpus does
+        # contain (diffusion: the top-3 train drives had zero `up` presses while test had
+        # 25 -> 16 test targets on a mechanic absent from training). For each such verb,
+        # append the best-ranked unchosen drive that uses it (test: user outside train).
+        # Verbs no session ever pressed are left alone.
+        for verb in [v for v in wl if v != "noop"]:
+            if any(a.split()[0] == verb for d in ds for a in d["actions"]):
+                continue
+            if len(ds) >= MAX_DRIVES:
+                break
+            for d in ranked:
+                if not eligible(d, split, chosen):
+                    continue
+                if any(a.split()[0] == verb for a in d["actions"]):
+                    print(f"[{game}] {split}: adding drive u={d['user_id'][:8]} "
+                          f"seed={d['seed']} for verb coverage ({verb})", flush=True)
+                    add_drive(d, split, ds, chosen)
+                    break
+        # Under-fill guard (2026-08-24): the nonnoop rank counts inputs that are no-ops in
+        # effect (paint's arrows, dino's off-whitelist keys), so the fixed 3 drives can hold
+        # fewer informative transitions than the pool needs (paint test 30/50, logic_gates
+        # 27/50). Keep appending the next ranked drives -- test drives still from users
+        # outside train -- until the pool fills or MAX_DRIVES is hit. Games whose 3 drives
+        # already fill the pool are untouched, so earlier variants reproduce unchanged.
+        want = n_train if split == "train" else n_test
+        for d in ranked:
+            if sum(x["n_informative"] for x in ds) >= want or len(ds) >= MAX_DRIVES:
+                break
+            if not eligible(d, split, chosen):
+                continue
+            add_drive(d, split, ds, chosen)
+        have = sum(x["n_informative"] for x in ds)
+        if have < want:
+            print(f"[{game}] WARNING {split}: only {have} informative transitions in "
+                  f"{len(ds)} drives (pool target {want})", flush=True)
 
     drives = {"train": train, "test": test}
     for spec in variants:
         name, _, mode = spec.partition(":")
         mode = mode or name
         m = build_variant(game, name, mode, drives, out_root, n_train, n_test, rng,
-                          informative_horizon=informative_horizon)
+                          informative_horizon=informative_horizon, oov=oov,
+                          drive_selection=("manual" if curated_picks else drive_rank),
+                          selection_note=(curated_picks or {}).get("note", ""))
         print(f"[{game}/{name}] train pool={m['stats']['train']['n_targets']} "
               f"{m['stats']['train']['verbs']} | test pool={m['stats']['test']['n_targets']} "
               f"{m['stats']['test']['verbs']}", flush=True)
@@ -514,7 +637,21 @@ def main() -> None:
                     help="how to pick the 3 train / 3 test drives: score=original "
                          "activity+variety proxy (replays 24 to rank); nonnoop=rank by "
                          "non-noop action count (no replay); length=raw action count")
+    ap.add_argument("--oov", choices=("drop", "noop"), default="drop",
+                    help="out-of-whitelist human inputs: drop=delete the event AND its tick "
+                         "(historical); noop=keep the tick as `noop`, which is what the "
+                         "engine does with an unhandled input (2026-08-23 decision)")
+    ap.add_argument("--curated-drives",
+                    default=str(_BAI_ROOT / "offline_learning/curated_drives.json"),
+                    help="JSON of manual per-game drive picks {game: {train: [[user,seed,"
+                         "seg_idx],...], test: [...], note}}; a game listed there uses the "
+                         "picks instead of --drive-rank (within-drive sampling unchanged)")
+    ap.add_argument("--ignore-curated", action="store_true",
+                    help="force ranked selection even for games in --curated-drives")
     args = ap.parse_args()
+    curated_all: dict = {}
+    if not args.ignore_curated and Path(args.curated_drives).exists():
+        curated_all = json.loads(Path(args.curated_drives).read_text())
     if not args.game and not args.all:
         ap.error("pass --game or --all")
     if args.train_pool is None and not args.profile:
@@ -524,7 +661,8 @@ def main() -> None:
         pool = args.train_pool or REF_TRAIN_POOL[args.profile][g]
         generate(g, Path(args.out), Path(args.data_zip), args.seed,
                  pool, args.test_pool, args.variants.split(","), args.drive_rank,
-                 informative_horizon=args.informative_horizon)
+                 informative_horizon=args.informative_horizon, oov=args.oov,
+                 curated_picks=curated_all.get(g))
 
 
 if __name__ == "__main__":

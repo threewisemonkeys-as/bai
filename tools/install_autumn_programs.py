@@ -29,7 +29,9 @@ SRC = ROOT / "autumn_programs"
 DST = ROOT / "MARAProtocol/python_examples/autumnbench/example_benchmark/programs"
 
 # Games in experimental_plan.md that come from the zip rather than the benchmark download.
-SELECTED = ["rink", "logic_gates", "balloon", "colour_lines", "diffusion", "dino", "tetris"]
+# the zip-sourced games of the 2026-08-23 selection in experimental_plan.md (rink, balloon,
+# tetris were dropped from the selection; still installable by name or --all)
+SELECTED = ["logic_gates", "colour_lines", "diffusion", "dino", "SET", "egg"]
 
 
 def main() -> int:

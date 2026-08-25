@@ -85,6 +85,38 @@ human_data/<game>/<variant>/
 - **raw** — uniform random sample over every in-whitelist transition, no filtering and no
   balancing, so the pool keeps the natural ~80–90% noop composition. The control arm for
   "human data exactly as logged".
+- **informative_unified** (2026-08-11) — the informative selection with a FLAT pool of
+  60 train / 50 test for every game, `--drive-rank nonnoop`, horizon 1. What every
+  reference run in `logs/2026-08-11/human_unified` trained on.
+- **informative_unified2** (2026-08-19) — same, `--informative-horizon 8`: the
+  waited-instead branch is continued through the human's own next 8 actions, so an
+  action whose only immediate effect is latent (dq8gc click=select, paint's colour
+  arrows, colour_lines' select-click) is kept when it changes what happens later. Built
+  for the 5 original games; no run trained on it.
+- **informative_unified3** (2026-08-24) — the recipe for the 15-game selection in
+  `experimental_plan.md`: unified2 (horizon 8, nonnoop drive rank, 60/50, seed 1) plus
+  `--oov noop`: a human input the program has no handler for is recorded as a `noop`
+  tick instead of being deleted, so the replayed timeline (passive dynamics, RNG draws)
+  matches what the human actually experienced. logic_gates keeps the plain user split
+  (train and test are in-distribution; the question there is whether the learner needs
+  to see every switch combination to tell the gates apart). Two drive-selection guards
+  were added for it, both no-ops on the original 5 games: **verb coverage** — if a
+  whitelist verb that the corpus contains is absent from a split's drives, the best-ranked
+  unchosen drive using it is appended (diffusion's top-3 train drives had zero `up`
+  presses while its test had 25); **under-fill** — if the drives hold fewer informative
+  transitions than the pool needs, further ranked drives are appended (test: users
+  outside train) up to `MAX_DRIVES` = 8 (paint's next-3 test segments were one user's
+  arrow-only sessions with 30 informative transitions). Command:
+  `human_replay.py --game <g> --train-pool 60 --test-pool 50 --seed 1 --drive-rank nonnoop
+  --informative-horizon 8 --oov noop --variants informative_unified3:informative`.
+- **informative_curated** (2026-08-24) — unified3 recipe with MANUAL drive selection:
+  `offline_learning/curated_drives.json` names the session segments per split (user, seed,
+  seg_idx + note); listed games use the picks instead of `--drive-rank` (`--ignore-curated`
+  reverts). Within-drive sampling is unchanged, so curation is session-level only. The
+  guards still backstop under-fill/verb coverage, and guard appends now respect user
+  disjointness in BOTH directions (a train append never reuses a test user). First game:
+  mario (n2ntd) — both splits carry the coin→ammo→shoot→enemy-death chain the ranked
+  pools missed. Candidate sheets for manual review: `scripts/drive_review_sheet.py`.
 
 ### Pool sizes are matched to the artificial reference
 
