@@ -233,6 +233,10 @@ def main() -> None:
     if args.reflection_client == "vllm":
         env["HOSTED_VLLM_API_BASE"] = args.proxy_base
         env["HOSTED_VLLM_API_KEY"] = "local-proxy"
+        # the proxy HOLDS requests through a subscription usage limit (<= 45 min each,
+        # then 503); the learner's retry backoff caps at 30 s, so give it enough retries
+        # to ride out a multi-hour limit window instead of finishing with 0 calls.
+        env.setdefault("LLM_RETRIES", "40")
     live: list[subprocess.Popen] = []
     for game in args.games.split(","):
         variant = args.variant or VARIANT[args.learner]

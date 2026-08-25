@@ -212,6 +212,19 @@ def isolated_cli_environment(
         shutil.rmtree(request_root, ignore_errors=True)
 
 
+LIMIT_RE = re.compile(r"usage limit|rate limit|limit (?:will )?reset|resets? at|quota|out of (?:extra )?usage|too many requests",
+                      re.IGNORECASE)
+
+
+def is_usage_limit(payload: dict[str, Any]) -> bool:
+    """A subscription usage-limit refusal: the CLI reports an error without having made
+    an API call (duration_api_ms == 0), or says so in the result text."""
+    if not payload.get("is_error"):
+        return False
+    text = str(payload.get("result", ""))
+    return payload.get("duration_api_ms") == 0 or bool(LIMIT_RE.search(text))
+
+
 def openai_response(payload: dict[str, Any], model: str) -> dict[str, Any]:
     if payload.get("is_error"):
         detail = scrub_terminal_output(str(payload.get("result", payload)))
@@ -255,6 +268,8 @@ def create_app(
     max_concurrency: int = 4,
     timeout_s: float = 600.0,
     system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+    limit_hold_s: float = 2700.0,
+    limit_poll_s: float = 300.0,
 ) -> FastAPI:
     if max_concurrency < 1:
         raise ValueError("max_concurrency must be at least 1")
@@ -307,6 +322,28 @@ def create_app(
             },
         }
 
+    async def run_cli(command: list[str], prompt: str) -> tuple[int, str, str]:
+        with isolated_cli_environment(api.state.runtime_root, resolved_credentials) as (project_dir, env):
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=project_dir,
+                env=env,
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(prompt.encode("utf-8")), timeout=timeout_s,
+                )
+            except TimeoutError:
+                process.kill()
+                await process.communicate()
+                raise HTTPException(status_code=504, detail=f"Claude CLI timed out after {timeout_s:g}s")
+        return (process.returncode,
+                scrub_terminal_output(stdout.decode("utf-8", errors="replace")),
+                scrub_terminal_output(stderr.decode("utf-8", errors="replace")))
+
     @api.post("/v1/chat/completions")
     async def chat_completions(request: ChatRequest) -> dict[str, Any]:
         prompt = render_prompt(request)
@@ -316,48 +353,42 @@ def create_app(
         try:
             async with semaphore:
                 t_queue = time.time() - t_req
-                with isolated_cli_environment(
-                    api.state.runtime_root,
-                    resolved_credentials,
-                ) as (project_dir, env):
-                    process = await asyncio.create_subprocess_exec(
-                        *command,
-                        stdin=asyncio.subprocess.PIPE,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE,
-                        cwd=project_dir,
-                        env=env,
-                    )
-                    try:
-                        stdout, stderr = await asyncio.wait_for(
-                            process.communicate(prompt.encode("utf-8")),
-                            timeout=timeout_s,
-                        )
-                    except TimeoutError:
-                        process.kill()
-                        await process.communicate()
-                        raise HTTPException(
-                            status_code=504,
-                            detail=f"Claude CLI timed out after {timeout_s:g}s",
-                        )
+                # A subscription usage limit makes the CLI refuse instantly. Instead of
+                # failing the request (the learners retry with a 30 s cap and burn their
+                # budget), HOLD it: poll the CLI every limit_poll_s until it works again
+                # or limit_hold_s elapses, then return 503 so the caller's retry re-enters
+                # the hold. A held slot keeps its semaphore, so the whole proxy pauses.
+                while True:
+                    rc, stdout_text, stderr_text = await run_cli(command, prompt)
+                    payload = None
+                    if rc == 0:
+                        try:
+                            payload = json.loads(stdout_text)
+                        except json.JSONDecodeError:
+                            payload = None
+                    limited = (payload is not None and is_usage_limit(payload)) or (
+                        rc != 0 and bool(LIMIT_RE.search(stderr_text + stdout_text)))
+                    if not limited:
+                        break
+                    waited = time.time() - t_req
+                    detail = (payload or {}).get("result") if payload else (stderr_text or stdout_text)
+                    print(f"[proxy] {time.strftime('%H:%M:%S')} USAGE LIMIT (held {waited:.0f}s): "
+                          f"{str(detail)[:300]!r}", flush=True)
+                    if waited >= limit_hold_s:
+                        raise HTTPException(status_code=503,
+                                            detail=f"Claude usage limit; held {waited:.0f}s: {str(detail)[:300]}")
+                    await asyncio.sleep(limit_poll_s)
         except FileNotFoundError as exc:
-            raise HTTPException(
-                status_code=503,
-                detail=f"Claude CLI executable not found: {resolved_cli}",
-            ) from exc
-
-        stderr_text = scrub_terminal_output(stderr.decode("utf-8", errors="replace"))
-        stdout_text = scrub_terminal_output(stdout.decode("utf-8", errors="replace"))
-        if process.returncode != 0:
-            detail = stderr_text or stdout_text or f"exit status {process.returncode}"
+            raise HTTPException(status_code=503, detail=f"Claude CLI executable not found: {resolved_cli}") from exc
+        if rc != 0:
+            detail = stderr_text or stdout_text or f"exit status {rc}"
+            print(f"[proxy] {time.strftime('%H:%M:%S')} CLI FAILED rc={rc}: {detail[-600:]!r}", flush=True)
             raise HTTPException(status_code=502, detail=f"Claude CLI failed: {detail[-4000:]}")
-        try:
-            payload = json.loads(stdout_text)
-        except json.JSONDecodeError as exc:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Claude CLI returned invalid JSON: {stdout_text[-1000:]}",
-            ) from exc
+        if payload is None:
+            print(f"[proxy] {time.strftime('%H:%M:%S')} CLI BAD JSON: {stdout_text[-600:]!r}", flush=True)
+            raise HTTPException(status_code=502, detail=f"Claude CLI returned invalid JSON: {stdout_text[-1000:]}")
+        if payload.get("is_error"):
+            print(f"[proxy] {time.strftime('%H:%M:%S')} CLI ERROR: {str(payload.get('result'))[:600]!r}", flush=True)
         result = openai_response(payload, request.model)
         u = result["usage"]
         dump_dir = os.getenv("CLAUDE_PROXY_DUMP_DIR")
@@ -393,6 +424,8 @@ app = create_app(
     max_concurrency=int(os.getenv("CLAUDE_PROXY_MAX_CONCURRENCY", "4")),
     timeout_s=float(os.getenv("CLAUDE_PROXY_TIMEOUT_SECONDS", "600")),
     system_prompt=os.getenv("CLAUDE_PROXY_SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT),
+    limit_hold_s=float(os.getenv("CLAUDE_PROXY_LIMIT_HOLD_SECONDS", "2700")),
+    limit_poll_s=float(os.getenv("CLAUDE_PROXY_LIMIT_POLL_SECONDS", "300")),
 )
 
 
@@ -427,6 +460,8 @@ def main() -> None:
         max_concurrency=args.max_concurrency,
         timeout_s=args.timeout,
         system_prompt=os.getenv("CLAUDE_PROXY_SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT),
+        limit_hold_s=float(os.getenv("CLAUDE_PROXY_LIMIT_HOLD_SECONDS", "2700")),
+        limit_poll_s=float(os.getenv("CLAUDE_PROXY_LIMIT_POLL_SECONDS", "300")),
     )
     uvicorn.run(direct_app, host=args.host, port=args.port)
 
