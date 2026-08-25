@@ -407,6 +407,9 @@ def main():
     ap.add_argument("--reflection-timeout", type=float, default=240.0)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--out-dir", default=None)
+    ap.add_argument("--resume", action="store_true",
+                    help="re-attach to <out-dir>/wc_run_seed<seed>/resume_state.json (rex_search "
+                         "node-level checkpoint) instead of starting the search from scratch")
     args = ap.parse_args()
 
     os.environ.setdefault("LLM_TIMEOUT_S", "240")
@@ -495,6 +498,7 @@ def main():
         max_nodes=max_nodes,
         run_dir=run_dir,
         log_prefix="wc",
+        resume=args.resume,
         # cap iterations so an all-perfect pool (programs can fit every transition
         # -> perfect -> skipped, costing no budget) can't spin forever.
         max_iters=20 * args.max_proposals + 100,

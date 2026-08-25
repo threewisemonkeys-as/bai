@@ -210,6 +210,10 @@ def main() -> None:
                          "endpoint at --proxy-base (the Claude CLI proxy)")
     ap.add_argument("--reflection-timeout", type=float, default=900.0)
     ap.add_argument("--proxy-base", default=PROXY_BASE)
+    ap.add_argument("--resume", action="store_true",
+                    help="for games whose out-dir already holds a search checkpoint "
+                         "(<learner>_run_seed1/resume_state.json), add the learner's --resume so "
+                         "an interrupted run re-attaches instead of restarting")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     if args.reflection_client == "vllm":
@@ -238,6 +242,10 @@ def main() -> None:
             continue
         cmd = build(args.learner, game, outd, variant, args.reflection_model,
                     args.reflection_client, args.reflection_timeout)
+        ckpt = outd / ("rexpure_run_seed1" if args.learner == "rexpure" else "wc_run_seed1") / "resume_state.json"
+        if args.resume and ckpt.exists():
+            cmd.append("--resume")
+            print(f"resume {game}: checkpoint {ckpt.resolve().relative_to(ROOT)}")
         if args.dry_run:
             print(f"[dry-run] {game}:\n  {' '.join(cmd)}\n")
             continue
