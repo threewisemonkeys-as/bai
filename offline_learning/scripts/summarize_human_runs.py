@@ -89,7 +89,8 @@ def main() -> None:
              "Credited test ID = rexpure `inverse_accuracy` / worldcoder `set_credit` (same ~1/|S| rule). "
              "Deltas in parentheses are against the reference tree.", "",
              "`rex z-blind` = share of test targets whose shipped-P features are identical at t and t+1 "
-             "(every target's frame changed, so >0 means P misses it); `P err` = share with an error string in "
+             "(a blindness signal ONLY where every target's frame changes; on latent-effect games -- paint's "
+             "colour arrows, disease's select-clicks -- identical features are correct); `P err` = share with an error string in "
              "the features; `wc stale` = wc's `stale_fd_exact` (program output == input frame).", "",
              "| game | rex raw ID | rex ID | rex strict | rex z-blind | P err | rex train | nodes | rex $ "
              "| wc ID | wc strict | wc FD(changed) | wc stale | wc train FD | wc $ | wc wall |",
