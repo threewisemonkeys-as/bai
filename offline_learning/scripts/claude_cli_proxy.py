@@ -212,8 +212,11 @@ def isolated_cli_environment(
         shutil.rmtree(request_root, ignore_errors=True)
 
 
-LIMIT_RE = re.compile(r"usage limit|rate limit|limit (?:will )?reset|resets? at|quota|out of (?:extra )?usage|too many requests",
-                      re.IGNORECASE)
+# The CLI's refusal texts seen so far: "You've hit your usage limit ..." (2026-08-25 01:10)
+# and "You've hit your session limit · resets 12:40pm" (2026-08-25 08:30, exit status 1 with
+# the JSON payload on stdout). Match the family, not one phrasing.
+LIMIT_RE = re.compile(r"hit your \w+ limit|usage limit|session limit|rate limit|limit (?:will )?reset|resets? \d|resets? at"
+                      r"|quota|out of (?:extra )?usage|too many requests", re.IGNORECASE)
 
 
 def is_usage_limit(payload: dict[str, Any]) -> bool:
@@ -223,6 +226,26 @@ def is_usage_limit(payload: dict[str, Any]) -> bool:
         return False
     text = str(payload.get("result", ""))
     return payload.get("duration_api_ms") == 0 or bool(LIMIT_RE.search(text))
+
+
+def parse_cli_json(text: str) -> dict[str, Any] | None:
+    """The CLI prints its JSON result on stdout even when it exits non-zero (session-limit
+    refusals exit 1). Accept a bare object or one with leading log noise."""
+    text = text.strip()
+    if not text:
+        return None
+    try:
+        obj = json.loads(text)
+        return obj if isinstance(obj, dict) else None
+    except json.JSONDecodeError:
+        i = text.find("{")
+        if i <= 0:
+            return None
+        try:
+            obj = json.loads(text[i:])
+            return obj if isinstance(obj, dict) else None
+        except json.JSONDecodeError:
+            return None
 
 
 def openai_response(payload: dict[str, Any], model: str) -> dict[str, Any]:
@@ -360,14 +383,11 @@ def create_app(
                 # the hold. A held slot keeps its semaphore, so the whole proxy pauses.
                 while True:
                     rc, stdout_text, stderr_text = await run_cli(command, prompt)
-                    payload = None
-                    if rc == 0:
-                        try:
-                            payload = json.loads(stdout_text)
-                        except json.JSONDecodeError:
-                            payload = None
-                    limited = (payload is not None and is_usage_limit(payload)) or (
-                        rc != 0 and bool(LIMIT_RE.search(stderr_text + stdout_text)))
+                    # parse the JSON regardless of exit status: a session-limit refusal is
+                    # rc=1 WITH a full JSON payload (is_error, duration_api_ms=0) on stdout
+                    payload = parse_cli_json(stdout_text)
+                    limited = (payload is not None and is_usage_limit(payload)) or bool(
+                        LIMIT_RE.search(stderr_text + stdout_text))
                     if not limited:
                         break
                     waited = time.time() - t_req
@@ -380,7 +400,7 @@ def create_app(
                     await asyncio.sleep(limit_poll_s)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=503, detail=f"Claude CLI executable not found: {resolved_cli}") from exc
-        if rc != 0:
+        if rc != 0 and not (payload and not payload.get("is_error")):
             detail = stderr_text or stdout_text or f"exit status {rc}"
             print(f"[proxy] {time.strftime('%H:%M:%S')} CLI FAILED rc={rc}: {detail[-600:]!r}", flush=True)
             raise HTTPException(status_code=502, detail=f"Claude CLI failed: {detail[-4000:]}")
