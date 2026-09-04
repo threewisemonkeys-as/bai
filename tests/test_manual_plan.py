@@ -20,7 +20,12 @@ def _problem(game, seed, prefix, plan):
 def test_aliases_and_registry():
     assert S.canon("ice") == "bt3gb"
     assert S.canon("ANTS") == "s2kt7"
-    assert {g["game"] for g in S.games()} == {"bt3gb", "dq8gc", "s2kt7", "n2ntd", "83wkq"}
+    assert S.canon("SET") == "SET"
+    assert S.canon("paint") == "eahcw"
+    assert {g["game"] for g in S.games()} == {
+        "eahcw", "egg", "bt3gb", "dq8gc", "7xf97", "n2ntd", "va6fq", "s2kt7",
+        "colour_lines", "SET", "diffusion", "dino", "f5w3n", "logic_gates", "7www9",
+    }
     assert S.info("mario")["tick_locked"] is True       # n2ntd's enemy patrol
     with pytest.raises(KeyError):
         S.canon("not_a_game")

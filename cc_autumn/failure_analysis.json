@@ -1,0 +1,181 @@
+{
+  "failures": [
+    {
+      "world": "27VWC",
+      "task": "mfp",
+      "verdict": "wrong-model",
+      "reachable": true,
+      "cause": "Read the BBQ's hidden gas as an elapsed-time clock rather than stored fuel, so it could not convert the video's six refill clicks into ticks of cooking runway. The two candidate patches differ in exactly one cell of twelve \u2014 the meat.",
+      "missed": "Re-run on the fixed harness, this session could see all six clicks on the refill button in the log and still misread them: it changed its answer from one wrong patch to another. The information barrier is gone; what remains is the model.",
+      "fix": "Not a harness matter any more. This needs the agent to treat an unexplained scalar as a quantity that can be stocked and spent, rather than as a clock.",
+      "rerun": {
+        "before": -1.0,
+        "after": -1.0,
+        "resolved": false
+      }
+    },
+    {
+      "world": "7WWW9",
+      "task": "mfp",
+      "verdict": "harness-bug",
+      "reachable": false,
+      "cause": "Its simulator reproduced all 253 exploration frames with zero mismatches, and replaying the true masked-frame actions through that same simulator yields the correct answer. Both surviving candidates are legal once the actions are hidden.",
+      "missed": "Nothing. It flagged the gap itself: the video headers said only 'step'. It then estimated a stall rate from seven visible transitions and guessed 3:1 the wrong way.",
+      "fix": "Fixed: act.py now logs the action that produced each video frame.",
+      "rerun": {
+        "before": -1.0,
+        "after": 1.0,
+        "resolved": true
+      }
+    },
+    {
+      "world": "83WKQ",
+      "task": "mfp",
+      "verdict": "wrong-model",
+      "reachable": true,
+      "cause": "Exploration ran at seed 0, where this world's RNG collapses to a deterministic leftward march. It learned 'movement is col-1, rows never change' \u2014 correct for everything it could observe \u2014 then saw rows change in the video and concluded the video was a different program.",
+      "missed": "Having discarded its own correct click-spawn rule, it chose a three-particle patch. Only two particles can exist: one per click, and the video contains two clicks.",
+      "fix": "Explore at a seed that does not de-randomise the world, and log the frame actions so the particle count is visible.",
+      "rerun": {
+        "before": -1.0,
+        "after": 1.0,
+        "resolved": true
+      }
+    },
+    {
+      "world": "NTQ4Y",
+      "task": "mfp",
+      "verdict": "harness-bug",
+      "reachable": false,
+      "cause": "Its simulator reproduced all 296 exploration frames exactly. The two surviving candidates differ in two cells of a row the visible water never reaches, so no frame it was shown constrains them.",
+      "missed": "It named the problem precisely and then broke the tie on which distractor looked more deliberate.",
+      "fix": "Fixed: the frame actions decide this one outright.",
+      "rerun": {
+        "before": -1.0,
+        "after": 1.0,
+        "resolved": true
+      }
+    },
+    {
+      "world": "QFSVC",
+      "task": "mfp",
+      "verdict": "wrong-model",
+      "reachable": true,
+      "cause": "Never discovered that coins are ammunition and a click fires a bullet. All four of its click probes ran while it held no coins, so it recorded that clicking does nothing at all.",
+      "missed": "It stopped exploring at 127 of 300 actions because its simulator matched every frame \u2014 vacuously, since no bullet had ever existed in its data. Six moves and one click would have shown the mechanic.",
+      "fix": "Never conclude an action is inert from probes taken in a single global state.",
+      "rerun": {
+        "before": -1.0,
+        "after": 1.0,
+        "resolved": true
+      }
+    },
+    {
+      "world": "27VWC",
+      "task": "cd",
+      "verdict": "wrong-model",
+      "reachable": true,
+      "cause": "The trigger needs a click on the gas-refill button once five clicks have been counted. It had filed that button as decoration, and never clicked it during the test at all \u2014 the trigger sat armed for fifty frames.",
+      "missed": "It mistook the ordinary deterministic gas countdown for the injected fault and submitted on it, with 146 actions unspent.",
+      "fix": "Re-probe any cell whose click produced no effect in a different global state before calling it inert.",
+      "rerun": {
+        "before": -1.0,
+        "after": -1.0,
+        "resolved": false
+      }
+    },
+    {
+      "world": "ADA85",
+      "task": "cd",
+      "verdict": "right-model-bad-timing",
+      "reachable": true,
+      "cause": "It detected the fault correctly at frame 29. But the scored trigger is a later, agent-caused event \u2014 break the bottle, then click Suzie to repair it \u2014 so it submitted on a clock that had never started.",
+      "missed": "Its dense probe cycle kept more than one rock in flight, and under the fault that makes the bottle unbreakable. Its policy could not have scored above zero however long it ran.",
+      "fix": "Re-run the shortest single-mechanic experiments in isolation during the test, cleanest state first.",
+      "rerun": {
+        "before": -1.0,
+        "after": -1.0,
+        "resolved": false
+      }
+    },
+    {
+      "world": "AW9WD",
+      "task": "cd",
+      "verdict": "right-model-bad-timing",
+      "reachable": true,
+      "cause": "It detected the deviation on the right frame and announced immediately. The trigger needed a click on that same frame; the announce action queues no click, so it never armed.",
+      "missed": "One ordinary action before announcing would have scored 0.985. It was one click short.",
+      "fix": "A detected deviation is worth one or two more ordinary actions before announcing: +1 at the trigger, ~0.98 one frame late, -1 one frame early.",
+      "rerun": {
+        "before": -1.0,
+        "after": -1.0,
+        "resolved": false
+      }
+    },
+    {
+      "world": "NTQ4Y",
+      "task": "cd",
+      "verdict": "wrong-model",
+      "reachable": true,
+      "cause": "It mismodelled the liquid rule, leaving an 'uncertain' class of states \u2014 which is exactly the fault's signature. Its test controller cleared the board whenever a cell entered that class, six times in six identical cycles, mechanically erasing the evidence each time one step after it appeared.",
+      "missed": "Replacing a single one of those clears with a noop makes its own checker fire at frame 24, for 0.996. It submitted at 219, a gap of 196 frames.",
+      "fix": "Forbid the detector from destroying states its model cannot predict; probe the ambiguity instead of clearing it.",
+      "rerun": {
+        "before": 0.19996098019243358,
+        "after": 0.9964403812712241,
+        "resolved": true
+      }
+    },
+    {
+      "world": "QQM74",
+      "task": "cd",
+      "verdict": "fault-unobservable",
+      "reachable": true,
+      "cause": "Its model was correct on all 182 exploration and 315 test actions. The fault only acts when velocity is diagonal, and its probe was a net-zero axis-alternating cycle that never once held a diagonal velocity: zero divergent frames in the whole test.",
+      "missed": "It named the trap and did not act on it. A four-action cycle of up, left, down, right scores 0.985.",
+      "fix": "Mutation-test the probe: it already owns an executable model, so keep only probes that distinguish its own mutants. Coverage of branches, not prediction accuracy.",
+      "rerun": {
+        "before": 0.19900000000000007,
+        "after": 0.2005311182971281,
+        "resolved": false
+      }
+    }
+  ],
+  "themes": [
+    {
+      "name": "The video never said what produced it",
+      "count": "4 tasks, decisive in 2 \u2014 now fixed and re-run",
+      "body": "The MFP environment reports the action behind every frame and the actuator dropped it, while the log preamble promised it. Two sessions had simulators reproducing every exploration frame exactly and still could not answer, because the candidates they were choosing between are indistinguishable without the actions. Fixed, and all 20 masked-frame tasks re-run in fresh workspaces at the same seed: four flipped from wrong to right, sixteen were unchanged, and nothing regressed. 15 of 20 became 19 of 20."
+    },
+    {
+      "name": "Seed 0 de-randomises the stochastic worlds",
+      "count": "2 tasks",
+      "body": "Every launch used seed 0. On 83WKQ a spawned particle walks eight steps left with no vertical movement at all, where seeds 1, 2 and 42 all give a real random walk; on ADA85 a coin that is roughly even elsewhere came up the same way thirty times running. Exploration then teaches a deterministic rule that the test contradicts, and the session concludes the test is a different world. The fix turned out to rescue 83WKQ anyway \u2014 the frame actions reveal how many particles were spawned, which decides the answer even under the deterministic rule seed 0 teaches. The seed problem is still there; it just was not what lost that task."
+    },
+    {
+      "name": "Null tests taken in one state",
+      "count": "3 tasks",
+      "body": "Three sessions recorded that an action does nothing, having only ever tried it in a state where it is disabled \u2014 clicking with no ammunition, refilling a tank that is already full. Each of those actions was the world's one interesting mechanic. Resource-gated affordances are the standard way these programs hide their content, and a probe run only from the reset state is systematically the wrong place to look."
+    },
+    {
+      "name": "Probes that confirm instead of discriminate",
+      "count": "3 tasks, the dominant change-detection failure",
+      "body": "A session builds a simulator, validates it against every frame it has, and then designs a test probe that keeps predicting well \u2014 which means keeping the world in the narrow, quiet region the model already covers. One never reached a diagonal velocity; one kept two rocks in flight where the fault needs one; one actively cleared the board each time a cell entered the state its model could not predict. Prediction accuracy is the wrong objective for a probe. Discrimination is."
+    },
+    {
+      "name": "The change is something you cause",
+      "count": "4 of the 5 change-detection failures",
+      "body": "These triggers are predicates like 'clicked the fill button, and at least five clicks have been counted'. They do not fire on their own. The brief tells the agent the environment 'starts out behaving normally and changes at some point' and to keep acting until it believes it has changed, which reads as waiting. Waiting cannot win these; the dominant strategy is to cause the change early, in a pose where it will be visible."
+    },
+    {
+      "name": "A simulator that fits is not a world you know",
+      "count": "3 tasks",
+      "body": "Sessions left exploration with 40 to 60 percent of it unspent, on the strength of reproducing every frame they had logged. The fit was over data they generated themselves, which never entered the gated regime, so it was vacuous exactly where the test would land. Zero mismatches against your own trajectory is not evidence of coverage."
+    },
+    {
+      "name": "Rewording the change-detection brief did not pay",
+      "count": "two attempts, net zero",
+      "body": "The briefing was wrong about its own scoring \u2014 it promised full marks for submitting 'one or two steps after' the change, when exactly one step pays and it is not after, and it told agents to submit as soon as they were sure, when one step early costs 2.0 and one step late costs 0.03. Correcting it, twice, moved the mean from +0.436 to +0.424 across nineteen worlds. The first correction gave the decay without its floor and never said what silence pays, so two sessions worked out that not submitting was safest and let the budget run out for nothing; the second added the full table and those two submitted again, one of them for a perfect score. But two other worlds swung the opposite way, from good scores to false alarms. Telling an agent the payoffs moves where its errors land \u2014 from silence to false alarms \u2014 without reducing them, because what it cannot do is tell whether the change has fired yet. Three worlds scored -1 under every version of the wording."
+    }
+  ]
+}

@@ -1,5 +1,10 @@
 # Building curated planning problems for an Autumn game
 
+> Historical v1 procedure. It documents the 2026-08-18 five-game artifact and its
+> exact-frame-only assumptions. The prefix-aware exact/Python-goal pipeline used for the
+> selected 15 games is documented in
+> [`planning-problems-15-games.md`](planning-problems-15-games.md).
+
 Procedure behind `logs/2026-08-18/curated/` (5 games, 30 problems, 30/30 validated),
 written so it can be run on any of the 23 programs in
 `MARAProtocol/python_examples/autumnbench/example_benchmark/programs/`.

@@ -903,7 +903,7 @@ _PHASE2: list[NLGoal] = [
     ),
     NLGoal(
         game="dq8gc", pid="swap-drive", tier="L2", seed=0,
-        nl="Take control of one of the healthy particles and drive it to the left wall, "
+        nl="Take control of one of the healthy particles and drive it to any cell of the left wall, "
            "keeping it healthy.",
         check=_dq8gc_swap_drive,
         positives=[["click 3 4", "left", "left", "left", "left"]],   # a different particle
@@ -933,7 +933,8 @@ _PHASE2: list[NLGoal] = [
     ),
     NLGoal(
         game="dq8gc", pid="gather", tier="L4", seed=0,
-        nl="Herd the four healthy particles into a 2x2 block, without infecting any of them.",
+        nl="Herd the four healthy particles into a 2x2 block anywhere on the grid, "
+           "without infecting any of them.",
         check=_dq8gc_gather,
         positives=[["click 3 4", "down", "down", "right", "click 5 3", "down", "right",
                     "right", "click 5 7", "left", "noop"]],
@@ -946,7 +947,8 @@ _PHASE2: list[NLGoal] = [
     ),
     NLGoal(
         game="dq8gc", pid="infect-all-gather", tier="L4", seed=0,
-        nl="Herd the four healthy particles into a 2x2 block, then infect the whole block.",
+        nl="Herd the four healthy particles into a 2x2 block anywhere on the grid, "
+           "then infect all four so no healthy particles remain.",
         check=_dq8gc_infect_all_gather,
         naive=lambda gr, ac: (not cells(gr[-1], "gray")
                               and len(cells(gr[-1], "darkgreen")) == 5),

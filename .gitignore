@@ -255,3 +255,17 @@ offline_learning/human_data/
 
 # Redundant with the tracked autumn_programs/ sources
 autumn_programs_55.zip
+
+# Nested checkouts with their own remotes, not submodules of this repo
+# paper/ is the Overleaf project (git.overleaf.com); cc_autumn/autumn-code is the
+# Claude-Code-on-Autumn harness (github: threewisemonkeys-as/arc-code).
+paper/
+cc_autumn/autumn-code/
+
+# cc_autumn: regenerable, multi-megabyte viewer payloads and export bundles.
+# The small result JSONs and board.html ARE tracked.
+cc_autumn/*.zip
+cc_autumn/bundle.json
+cc_autumn/curated_bundle.json
+cc_autumn/replay.html
+cc_autumn/curated_replay.html

@@ -34,10 +34,20 @@ from offline_learning.mechanics_rules import BACKGROUND, BG, SIZE, fired  # noqa
 
 DATA = _BAI_ROOT / "offline_learning" / "manual_plan_data"
 
-# The five games this pipeline is scoped to, by their study names.
-ALIASES = {"ice": "bt3gb", "disease": "dq8gc", "ants": "s2kt7",
-           "mario": "n2ntd", "particles": "83wkq"}
-ORDER = ["bt3gb", "dq8gc", "s2kt7", "n2ntd", "83wkq"]
+# Human-facing names for every selected game. `canon` lower-cases first, hence the
+# explicit `set` -> `SET` bridge for the one case-sensitive zip program.
+ALIASES = {
+    "ice": "bt3gb", "disease": "dq8gc", "ants": "s2kt7",
+    "mario": "n2ntd", "particles": "83wkq", "paint": "eahcw",
+    "magnets": "7www9", "grow": "7xf97", "sand": "va6fq",
+    "space_invaders": "f5w3n", "space-invaders": "f5w3n", "set": "SET",
+}
+# experimental_plan.md's selected 15 games. Particles remains addressable for legacy
+# artifacts, but it is intentionally outside this planning set.
+ORDER = [
+    "eahcw", "egg", "bt3gb", "dq8gc", "7xf97", "n2ntd", "va6fq", "s2kt7",
+    "colour_lines", "SET", "diffusion", "dino", "f5w3n", "logic_gates", "7www9",
+]
 
 # Games with an object that evolves on a fixed cycle the agent cannot influence. Its
 # position in an exact goal frame encodes the elapsed tick count, so DELETING an action can

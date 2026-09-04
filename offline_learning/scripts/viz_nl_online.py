@@ -111,6 +111,28 @@ table.sum td.flat{color:var(--muted)}
 table.sum td.warn{color:var(--bad)}
 table.sum .id{font-family:ui-monospace,Menlo,monospace}
 table.sum .g{color:var(--muted);font-size:12px}
+.io-btn{margin-top:auto;border:1px solid var(--line);border-radius:5px;padding:3px 5px;
+  color:var(--accent);background:var(--card);font:10px/1.2 ui-sans-serif,system-ui,sans-serif;
+  cursor:pointer}
+.io-btn:hover{background:var(--chip)}
+dialog.io-modal{width:min(1120px,calc(100vw - 32px));max-height:calc(100vh - 32px);
+  color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:0;box-shadow:0 18px 60px #0006}
+dialog.io-modal::backdrop{background:#0008}
+.io-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:12px;
+  padding:12px 16px;background:var(--card);border-bottom:1px solid var(--line)}
+.io-head strong{font-size:14px}.io-head span{color:var(--muted);font-size:12px}
+.io-close{margin-left:auto;border:1px solid var(--line);border-radius:6px;padding:4px 9px;
+  color:var(--ink);background:var(--chip);cursor:pointer}
+.io-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.io-pane{min-width:0;padding:14px 16px}.io-pane+.io-pane{border-left:1px solid var(--line)}
+.io-pane h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;margin:0 0 3px}
+.io-note{min-height:2.8em;color:var(--muted);font-size:11px;margin-bottom:8px}
+.io-pane pre{margin:0;padding:12px;border:1px solid var(--line);border-radius:7px;
+  background:var(--paper);color:var(--ink);font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;
+  white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:760px){.io-grid{grid-template-columns:1fr}.io-pane+.io-pane{
+  border-left:0;border-top:1px solid var(--line)}}
 """
 
 HTML = r"""<!doctype html><meta charset="utf-8">
@@ -145,6 +167,18 @@ HTML = r"""<!doctype html><meta charset="utf-8">
   </div>
   <div id="list"></div>
 </div>
+<dialog class="io-modal" id="ioModal">
+  <form method="dialog" class="io-head">
+    <strong id="ioTitle">Step model I/O</strong><span id="ioMeta"></span>
+    <button class="io-close" value="close">close</button>
+  </form>
+  <div class="io-grid">
+    <section class="io-pane"><h3>Prompt</h3><div class="io-note" id="promptNote"></div>
+      <pre id="promptText"></pre></section>
+    <section class="io-pane"><h3>Response</h3><div class="io-note" id="responseNote"></div>
+      <pre id="responseText"></pre></section>
+  </div>
+</dialog>
 <script>
 const DATA = /*DATA*/{};
 const PAL = DATA.palette, P = DATA.problems, CH = DATA.chars;
@@ -167,6 +201,15 @@ function el(tag, cls, txt){
   if(txt !== undefined) e.textContent = txt;
   return e;
 }
+function showIO(rd){
+  document.getElementById("ioMeta").textContent =
+    "round " + rd.n + " · " + rd.remaining + " actions left";
+  document.getElementById("promptNote").textContent = rd.promptNote || "";
+  document.getElementById("responseNote").textContent = rd.responseNote || "";
+  document.getElementById("promptText").textContent = rd.prompt || "(unavailable)";
+  document.getElementById("responseText").textContent = rd.response || "(unavailable)";
+  document.getElementById("ioModal").showModal();
+}
 function roundSlot(rd){
   const s = el("div", "slot" + (rd.satisfied ? " hit" : ""));
   s.appendChild(el("div", "act", rd.action || "(no plan)"));
@@ -181,6 +224,10 @@ function roundSlot(rd){
   t.onclick = () => t.classList.toggle("open");
   s.appendChild(t);
   if(rd.error) s.appendChild(el("div", "err", rd.error));
+  if(rd.prompt !== undefined || rd.response !== undefined){
+    const b = el("button", "io-btn", "prompt + response");
+    b.type = "button"; b.onclick = () => showIO(rd); s.appendChild(b);
+  }
   return s;
 }
 function rollout(ro){

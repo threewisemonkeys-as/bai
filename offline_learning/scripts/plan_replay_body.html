@@ -1,0 +1,488 @@
+<meta charset="utf-8">
+<title>Planning eval trajectories</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
+
+<style>/*__CSS__*/</style>
+
+<div class="wrap">
+  <div class="mast">
+    <div><h1 id="page-title">Planning eval trajectories</h1></div>
+    <p id="page-blurb"></p>
+  </div>
+
+  <section class="summary" id="page-summary" hidden>
+    <header class="sum-top">
+      <h2>Scoreboard</h2>
+      <div class="prog" id="prog"></div>
+    </header>
+    <div class="sum-scroll"><table class="sumtab" id="sumtab"></table></div>
+  </section>
+
+  <div class="picker"><table class="matrix" id="matrix"></table></div>
+
+  <div class="work">
+    <div>
+      <div class="card">
+        <header>
+          <h2 id="stage-title">Board</h2>
+          <span class="armpick" id="armpick"></span>
+          <span class="hint" id="stage-hint"></span>
+        </header>
+        <div class="body">
+          <div class="stage-wrap"><div id="stage"></div></div>
+          <div class="legend-row" id="legend"></div>
+          <div class="transport">
+            <div class="track" id="track">
+              <div class="head" id="head"></div>
+              <input type="range" id="slider" min="0" value="0" aria-label="Round index">
+            </div>
+            <div class="controls">
+              <button class="tb" id="prev">← round</button>
+              <button class="tb" id="play">▶ play</button>
+              <button class="tb" id="next">round →</button>
+              <span class="counter num" id="counter"></span>
+              <span class="keys">
+                <kbd>←</kbd> <kbd>→</kbd> round · <kbd>space</kbd> play ·
+                <kbd>home</kbd> <kbd>end</kbd> jump · <kbd>a</kbd> switch arm
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <header><h2 id="goal-title">The problem</h2><span class="hint" id="goal-hint"></span></header>
+        <div class="body" id="goal-body"></div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="card">
+        <header><h2>Now</h2><span class="hint" id="now-hint"></span></header>
+        <div class="body">
+          <div class="now-line">
+            <span class="played" id="played"></span>
+            <span class="chip" id="round-chip"></span>
+          </div>
+          <dl class="facts" id="facts"></dl>
+          <div id="now-extra"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h2>Prompt</h2><span class="hint" id="prompt-hint"></span></header>
+        <div class="body">
+          <div class="iobar">
+            <button class="tog" id="diff-btn" aria-pressed="false"
+                    title="Mark the lines that differ from the previous round's prompt">highlight what changed</button>
+            <span class="grow"></span>
+            <button class="tog" id="wrap-btn" aria-pressed="true">wrap</button>
+          </div>
+          <pre class="io" id="prompt"></pre>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h2>Response</h2><span class="hint" id="response-hint"></span></header>
+        <div class="body">
+          <div id="plan-box"></div>
+          <pre class="io" id="response"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer" id="footer"></div>
+</div>
+
+<script type="application/json" id="bundle">/*__DATA__*/</script>
+<script>
+"use strict";
+const DATA = JSON.parse(document.getElementById("bundle").textContent);
+/* Prompts are stored as indices into one shared line table: within a rollout every
+   prompt repeats the same knowledge block and most of the same transcript, so the
+   table is ~6% of the raw bytes and the whole run fits in one page. */
+const LINES = DATA.lines;
+const PROBS = DATA.problems;
+const GAMES = [...new Set(PROBS.map(p => p.game))];
+
+const el = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = (v, d = 2) => v === null || v === undefined ? "—" : Number(v).toFixed(d);
+const text = (ids) => ids.map(i => LINES[i]).join("\n");
+const dotOf = (r) => !r ? "zero" : r.success ? "good" : "critical";
+
+let prob = null, roll = null, idx = 0, timer = null, frames = [], changed = [];
+
+/* ── matrix ─────────────────────────────────────────────────────────────── */
+function buildMatrix() {
+  const t = el("matrix");
+  const widest = Math.max(...GAMES.map(g => PROBS.filter(p => p.game === g).length));
+  const head = document.createElement("tr");
+  head.innerHTML = "<th>Game</th>" +
+    Array.from({ length: widest }, (_, i) => `<th>problem ${i + 1}</th>`).join("");
+  t.appendChild(head);
+
+  for (const g of GAMES) {
+    const mine = PROBS.filter(p => p.game === g);
+    const row = document.createElement("tr");
+    const name = document.createElement("td");
+    name.className = "gamecell";
+    // Per-arm means for the game, so a row is readable without opening a tile.
+    const means = DATA.arms.map(a => {
+      const v = mine.map(p => p.rollouts.find(r => r.arm === a)).filter(Boolean);
+      return v.length
+        ? `${a} ${fmt(v.filter(r => r.success).length / v.length)}` : null;
+    }).filter(Boolean);
+    name.innerHTML = `${esc(mine[0].human || g)}<span class="sub">${esc(means.join(" · "))}` +
+      `<br>cap ${mine[0].cap === null ? "—" : mine[0].cap} · n=${mine.length}</span>`;
+    row.appendChild(name);
+
+    for (let i = 0; i < widest; i++) {
+      const td = document.createElement("td");
+      const p = mine[i];
+      if (p) {
+        const b = document.createElement("button");
+        b.className = "cell-btn prob";
+        b.dataset.uid = p.uid;
+        b.innerHTML =
+          `<span class="pid"><b>${esc(p.tier || "")}</b> ${esc(p.id)}</span>` +
+          `<span class="arms">` + DATA.arms.map(a => {
+            const r = p.rollouts.find(x => x.arm === a);
+            return `<span class="armchip"><span class="dot ${dotOf(r)}"></span>${a}` +
+              (r ? ` ${r.used}` : " —") + `</span>`;
+          }).join("") + `</span>`;
+        b.title = `${p.uid}\n${p.goal}`;
+        b.addEventListener("click", () => load(p.uid));
+        td.appendChild(b);
+      }
+      row.appendChild(td);
+    }
+    t.appendChild(row);
+  }
+}
+
+function markCurrent() {
+  document.querySelectorAll(".cell-btn.prob").forEach(b =>
+    b.setAttribute("aria-current", String(b.dataset.uid === prob.uid)));
+}
+
+/* ── frames ─────────────────────────────────────────────────────────────── */
+/* Stored as edits against the predecessor: a couple of per cent of cells move
+   per action, so rebuilding a whole rollout is a few thousand writes and seeking
+   costs nothing. */
+function rebuild(r) {
+  frames = []; changed = [];
+  let cur = null;
+  for (const f of r.frames) {
+    if (f.full !== undefined) { cur = f.full.split(""); changed.push([]); }
+    else {
+      cur = cur.slice();
+      const hit = [];
+      for (const [i, ch] of f.d) { cur[i] = ch; hit.push(i); }
+      changed.push(hit);
+    }
+    frames.push(cur);
+  }
+}
+
+let cells = [];
+function buildStage(p) {
+  const stage = el("stage");
+  stage.style.gridTemplateColumns = `repeat(${p.cols}, 1fr)`;
+  stage.style.aspectRatio = `${p.cols} / ${p.rows}`;
+  stage.innerHTML = "";
+  cells = [];
+  for (let i = 0; i < p.rows * p.cols; i++) {
+    const d = document.createElement("div");
+    d.className = "cel";
+    stage.appendChild(d);
+    cells.push(d);
+  }
+}
+
+const colourOf = (ch) => DATA.palette[ch] || "transparent";
+
+function paint() {
+  const f = frames[idx], hit = new Set(changed[idx]);
+  const rd = roll.rounds[idx];
+  // Click actions carry a cell; mark where the model clicked.
+  let click = null;
+  const m = /^click\s+(\d+)\s+(\d+)$/.exec(rd.action || "");
+  if (m) click = (+m[1]) * prob.cols + (+m[2]);
+  for (let i = 0; i < cells.length; i++) {
+    const c = cells[i];
+    c.style.background = colourOf(f[i]);
+    let cls = "cel";
+    if (hit.has(i)) cls += " changed";
+    if (i === click) cls += " hit";
+    c.className = cls;
+  }
+}
+
+/* ── transport ──────────────────────────────────────────────────────────── */
+function buildTrack() {
+  const track = el("track"), slider = el("slider");
+  track.querySelectorAll(".seg, .tick").forEach(n => n.remove());
+  const total = prob.cap || roll.rounds.length;
+  const w = 100 / total;
+  roll.rounds.forEach((rd, i) => {
+    const s = document.createElement("div");
+    s.className = "seg " + (rd.reached ? "hitgoal" : rd.carried ? "carried" : "replan");
+    s.style.left = (i * w) + "%";
+    s.style.width = Math.max(0.35, w - 0.08) + "%";
+    s.title = `round ${i}: ${rd.action || "—"}` +
+      (rd.carried ? " (played on from the carried plan)" : " (re-planned)");
+    track.appendChild(s);
+    if (rd.error) {
+      const e = document.createElement("div");
+      e.className = "tick err";
+      e.style.left = (i * w) + "%";
+      e.title = rd.error;
+      track.appendChild(e);
+    }
+  });
+  const spent = roll.rounds.length * w;
+  if (spent < 99.5) {
+    const un = document.createElement("div");
+    un.className = "seg unspent";
+    un.style.left = spent + "%";
+    un.style.width = (100 - spent) + "%";
+    un.title = `${total - roll.rounds.length} of the ${total}-action budget never spent`;
+    track.appendChild(un);
+  }
+  slider.max = String(roll.rounds.length - 1);
+  slider.value = "0";
+}
+
+function moveHead() {
+  const total = prob.cap || roll.rounds.length;
+  el("head").style.left = ((idx + 0.5) / total * 100) + "%";
+}
+
+/* ── rail ───────────────────────────────────────────────────────────────── */
+function renderNow() {
+  const rd = roll.rounds[idx];
+  el("played").textContent = rd.action || "—";
+  const chip = el("round-chip");
+  chip.textContent = rd.reached ? "goal held" : rd.carried ? "carried" : "re-planned";
+  chip.className = "chip " + (rd.reached ? "test" : rd.carried ? "explore" : "");
+  el("now-hint").textContent = `round ${idx} of ${roll.rounds.length - 1}`;
+
+  const facts = [
+    ["round", `${rd.n}`],
+    ["budget left", `${rd.remaining}`],
+    ["plan length", rd.plan ? String(rd.plan.length) : "—"],
+  ];
+  if (rd.zerr) facts.push(["perception", "error"]);
+  el("facts").innerHTML = facts.map(([k, v]) =>
+    `<div class="fact"><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("");
+
+  let extra = "";
+  if (rd.error) extra += `<div class="err"><b>plan rejected</b> — ${esc(rd.error)}</div>`;
+  if (rd.retries && rd.retries.length)
+    extra += `<div class="err">${esc(rd.retries.join(" · "))}</div>`;
+  if (rd.z) extra += `<div class="zline"><b>z after:</b> ${esc(rd.z)}</div>`;
+  if (rd.zerr) extra += `<div class="err"><b>perception error</b> — ${esc(rd.zerr)}</div>`;
+  el("now-extra").innerHTML = extra;
+}
+
+let showDiff = false;
+function renderPrompt() {
+  const rd = roll.rounds[idx];
+  const ids = rd.prompt;
+  const box = el("prompt");
+  el("prompt-hint").textContent = `${ids.length} lines · ${text(ids).length} chars`;
+  if (!showDiff || idx === 0) {
+    box.textContent = text(ids);
+    return;
+  }
+  // What is new relative to the previous round's prompt, by line identity. The
+  // receding-horizon prompt is the same template every round; only the current
+  // state, the transcript window and the remaining budget move.
+  const before = new Set(roll.rounds[idx - 1].prompt);
+  box.innerHTML = ids.map(i => before.has(i)
+    ? esc(LINES[i]) : `<span class="hl">${esc(LINES[i])}</span>`).join("\n");
+}
+
+function renderResponse() {
+  const rd = roll.rounds[idx];
+  el("response").textContent = rd.response === null ? "(not retained)" : text(rd.response);
+  el("response-hint").textContent = rd.response === null ? "—"
+    : `${text(rd.response).length} chars`;
+  const plan = rd.plan || [];
+  el("plan-box").innerHTML = !plan.length ? "" :
+    `<div class="free">The plan it submitted. Only the first action is executed; the rest ` +
+    `is carried into the next round as a starting candidate.</div>` +
+    `<ul class="planlist">` + plan.map((a, i) =>
+      `<li class="${i === 0 ? "now" : ""}">${esc(a)}</li>`).join("") + `</ul>`;
+}
+
+/* ── the problem ────────────────────────────────────────────────────────── */
+function renderGoal() {
+  const p = prob, r = roll;
+  el("goal-hint").textContent =
+    `${p.tier || ""} · h=${p.h} · budget ${p.cap === null ? "—" : p.cap}` +
+    (p.floor === null ? "" : ` · random floor ${fmt(p.floor)}`);
+  const mini = (label, packed) => !packed ? "" :
+    `<div><div class="free">${label}</div><div class="goalgrid" ` +
+    `style="grid-template-columns:repeat(${p.cols},1fr)">` +
+    packed.split("|").join("").split("").map(c =>
+      `<i style="background:${colourOf(c)}"></i>`).join("") + `</div></div>`;
+  // The board never shows the start: round 0 already carries its own action's result.
+  const goalGrid = mini("start", p.startFrame) + mini("goal frame", p.goalFrame);
+  el("goal-body").innerHTML =
+    `<p class="free">Each round the model plans to the goal from the state it can see, ` +
+    `only its first action is executed, and it replans. Scoring is any-step: the goal ` +
+    `counts the moment it first holds after an executed action.</p>` +
+    (p.mode === "nl" ? `<p class="sentence">${esc(p.goal)}</p>` : "") +
+    `<div class="side">${goalGrid}<div style="flex:1;min-width:200px">` +
+    `<div class="fact"><dt>problem</dt><dd>${esc(p.uid)}</dd></div>` +
+    `<div class="fact" style="margin-top:8px"><dt>arm</dt><dd>${esc(r.arm)}</dd></div>` +
+    `<p class="verdict">${r.success
+      ? `Reached the goal at action ${r.reached} of ${p.cap === null ? "?" : p.cap}.`
+      : `Never reached: ${esc(r.failed || "unknown")}, after ${r.used} action${r.used === 1 ? "" : "s"}.`}` +
+    `</p></div></div>`;
+}
+
+function renderLegend() {
+  el("legend").innerHTML = Object.entries(DATA.palette).map(([ch, col]) =>
+    `<span><i style="background:${col}"></i>${esc(DATA.names[ch] || ch)}</span>`).join("");
+}
+
+/* ── arm switch ─────────────────────────────────────────────────────────── */
+function buildArmPick() {
+  el("armpick").innerHTML = prob.rollouts.map(r =>
+    `<button data-arm="${r.arm}" aria-pressed="${r.arm === roll.arm}">${r.arm}</button>`).join("");
+  el("armpick").querySelectorAll("button").forEach(b =>
+    b.addEventListener("click", () => showArm(b.dataset.arm)));
+}
+
+function showArm(arm) {
+  const next = prob.rollouts.find(r => r.arm === arm);
+  if (!next || !next.rounds.length) return;
+  roll = next;
+  idx = 0;
+  rebuild(roll);
+  buildTrack();
+  buildArmPick();
+  el("stage-title").textContent = `${prob.human} · ${prob.id}`;
+  el("stage-hint").textContent =
+    `${roll.arm} · ${roll.success ? "solved" : "unsolved"} · ${roll.rounds.length} rounds`;
+  seek(0);
+}
+
+/* ── driving ────────────────────────────────────────────────────────────── */
+function seek(i) {
+  idx = Math.max(0, Math.min(roll.rounds.length - 1, i));
+  el("slider").value = String(idx);
+  el("counter").textContent = `round ${idx + 1} / ${roll.rounds.length}`;
+  paint(); moveHead(); renderNow(); renderPrompt(); renderResponse(); renderGoal();
+}
+
+function load(uid) {
+  prob = PROBS.find(p => p.uid === uid);
+  buildStage(prob);
+  renderLegend();
+  markCurrent();
+  showArm(prob.rollouts[0].arm);
+  location.hash = uid;
+}
+
+function play() {
+  if (timer) { clearInterval(timer); timer = null; el("play").textContent = "▶ play"; return; }
+  el("play").textContent = "❚❚ pause";
+  timer = setInterval(() => {
+    if (idx >= roll.rounds.length - 1) { play(); return; }
+    seek(idx + 1);
+  }, 380);
+}
+
+el("prev").addEventListener("click", () => seek(idx - 1));
+el("next").addEventListener("click", () => seek(idx + 1));
+el("play").addEventListener("click", play);
+el("slider").addEventListener("input", (e) => seek(+e.target.value));
+el("diff-btn").addEventListener("click", (e) => {
+  showDiff = !showDiff;
+  e.target.setAttribute("aria-pressed", String(showDiff));
+  renderPrompt();
+});
+el("wrap-btn").addEventListener("click", (e) => {
+  const on = e.target.getAttribute("aria-pressed") !== "true";
+  e.target.setAttribute("aria-pressed", String(on));
+  for (const id of ["prompt", "response"])
+    el(id).style.whiteSpace = on ? "pre-wrap" : "pre";
+});
+document.addEventListener("keydown", (e) => {
+  if (/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  const k = e.key;
+  if (k === "ArrowLeft") { seek(idx - 1); e.preventDefault(); }
+  else if (k === "ArrowRight") { seek(idx + 1); e.preventDefault(); }
+  else if (k === " ") { play(); e.preventDefault(); }
+  else if (k === "Home") { seek(0); e.preventDefault(); }
+  else if (k === "End") { seek(roll.rounds.length - 1); e.preventDefault(); }
+  else if (k === "a" || k === "A") {
+    const i = prob.rollouts.findIndex(r => r.arm === roll.arm);
+    showArm(prob.rollouts[(i + 1) % prob.rollouts.length].arm);
+    e.preventDefault();
+  }
+});
+
+/* ── scoreboard ───────────────────────────────────────────────────────────────
+   Game-wise raw vs lmwm, plus how much of the run has landed. Absent while a page
+   is built from an eval that carries no summary (an older run's JSON). */
+function buildSummary() {
+  const S = DATA.summary;
+  if (!S || !S.games || !S.games.length) return;
+  el("page-summary").hidden = false;
+
+  const p = S.progress;
+  const pct = p.rolloutsTotal ? Math.round(100 * p.rollouts / p.rolloutsTotal) : 0;
+  const num = (a, b, w) => `<span class="pn"><b>${a}</b>/${b} ${w}</span>`;
+  el("prog").innerHTML =
+    `<div class="prog-nums">${num(p.games, p.gamesTotal, "games")}` +
+    `${num(p.problems, p.problemsTotal, "problems")}` +
+    `${num(p.rollouts, p.rolloutsTotal, "rollouts")}` +
+    `<span class="pct">${pct}%</span></div>` +
+    `<div class="bar"><i style="width:${pct}%"></i></div>`;
+
+  const pctCell = (v) => v === null || v === undefined ? `<td class="num dim">—</td>`
+    : `<td class="num"><span class="mini"><i style="width:${Math.round(100 * v)}%"></i>` +
+      `</span>${v.toFixed(2)}</td>`;
+  const delta = (r) => {
+    if (r.raw === null || r.lmwm === null || r.raw === undefined
+        || r.lmwm === undefined) return `<td class="num dim">—</td>`;
+    const d = r.lmwm - r.raw;
+    const k = d > 0.001 ? "up" : (d < -0.001 ? "down" : "flat");
+    return `<td class="num ${k}">${d > 0 ? "+" : ""}${d.toFixed(2)}</td>`;
+  };
+  const row = (r, cls) => `<tr class="${cls || ""}">` +
+    `<td class="game">${esc(r.human || r.game)}</td>` +
+    `<td class="st"><span class="dot ${r.status}"></span>${r.status || ""}</td>` +
+    `<td class="num dim">${r.n}${r.expect && r.n !== r.expect ? "/" + r.expect : ""}</td>` +
+    `<td class="num dim">${r.cap === null || r.cap === undefined ? "—" : r.cap}</td>` +
+    pctCell(r.raw) + pctCell(r.lmwm) + delta(r) +
+    pctCell(r.adjRaw) + pctCell(r.adjLmwm) +
+    `<td class="num dim">${r.cost ? "$" + r.cost.toFixed(2) : "—"}</td></tr>`;
+
+  el("sumtab").innerHTML =
+    `<thead><tr><th>game</th><th>status</th><th class="num">rows</th>` +
+    `<th class="num">cap</th><th class="num">raw</th><th class="num">lmwm</th>` +
+    `<th class="num">Δ</th><th class="num">raw adj</th><th class="num">lmwm adj</th>` +
+    `<th class="num">cost</th></tr></thead><tbody>` +
+    S.games.map(g => row(g)).join("") +
+    row(Object.assign({game: "all", status: "", cap: null}, S.overall), "tot") +
+    `</tbody>`;
+}
+
+buildMatrix();
+buildSummary();
+el("page-title").textContent = DATA.page.title;
+el("page-blurb").textContent = DATA.page.blurb;
+el("footer").innerHTML = DATA.page.footer;
+const want = PROBS.find(p => p.uid === decodeURIComponent(location.hash.slice(1)));
+load((want || PROBS[0]).uid);
+</script>

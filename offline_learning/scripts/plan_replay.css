@@ -1,0 +1,323 @@
+/* ── tokens ─────────────────────────────────────────────────────────────────
+   Light is the bare :root. Dark is redefined twice — once for the un-stamped
+   document under prefers-color-scheme, once for an explicit toggle — so all
+   three viewer states resolve. No component color is declared anywhere but
+   here.                                                                     */
+:root {
+  color-scheme: light;
+  --bg:        #f7f8f9;
+  --panel:     #ffffff;
+  --sunk:      #eef1f4;
+  --line:      #dfe4e9;
+  --line-soft: #ecf0f3;
+  --ink:       #0f1317;
+  --ink-2:     #4c5866;
+  --ink-3:     #78838f;
+
+  --explore:   #2a78d6;   /* categorical slot 1 — the unscored phase   */
+  --test:      #eb6834;   /* categorical slot 2 — the one scored phase */
+  --explore-soft: #2a78d61f;
+  --test-soft:    #eb68341f;
+
+  --good:      #0ca30c;
+  --warning:   #fab219;
+  --critical:  #d03b3b;
+
+  --stage:     #0d0f12;   /* the surround the game grid sits on */
+  --focus:     #2a78d6;
+
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --serif: "Instrument Serif", ui-serif, Georgia, serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:        #0f1215;
+    --panel:     #171b20;
+    --sunk:      #1e242a;
+    --line:      #2a313a;
+    --line-soft: #222831;
+    --ink:       #eef1f4;
+    --ink-2:     #a9b4bf;
+    --ink-3:     #7c8894;
+    --explore:   #3987e5;
+    --test:      #d95926;
+    --explore-soft: #3987e526;
+    --test-soft:    #d9592626;
+    --stage:     #0a0c0e;
+    --focus:     #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:        #0f1215;
+  --panel:     #171b20;
+  --sunk:      #1e242a;
+  --line:      #2a313a;
+  --line-soft: #222831;
+  --ink:       #eef1f4;
+  --ink-2:     #a9b4bf;
+  --ink-3:     #7c8894;
+  --explore:   #3987e5;
+  --test:      #d95926;
+  --explore-soft: #3987e526;
+  --test-soft:    #d9592626;
+  --stage:     #0a0c0e;
+  --focus:     #3987e5;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { margin: 0; font-weight: 400; text-wrap: balance; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.wrap { max-width: 1420px; margin: 0 auto; padding: 28px 22px 64px; }
+
+/* ── masthead ───────────────────────────────────────────────────────────── */
+.mast { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px 28px; margin-bottom: 22px; }
+.mast h1 { font-family: var(--serif); font-size: clamp(30px, 4.2vw, 46px); line-height: 1.02; letter-spacing: -0.01em; }
+.mast p { margin: 0; max-width: 56ch; color: var(--ink-2); font-size: 14px; }
+
+/* ── scoreboard ─────────────────────────────────────────────────────────────
+   Where the run stands, above the per-problem picker: one row per game, raw
+   beside lmwm, and a counter for how much has landed.                       */
+.summary { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+           margin-bottom: 20px; overflow: hidden; }
+.sum-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+           gap: 10px 24px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.sum-top h2 { font-size: 12px; font-weight: 500; letter-spacing: 0.08em;
+              text-transform: uppercase; color: var(--ink-3); }
+.prog { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; min-width: 260px; }
+.prog-nums { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--ink-3); }
+.prog-nums .pn b { font-family: var(--mono); font-size: 13px; font-weight: 600;
+                   color: var(--ink); font-variant-numeric: tabular-nums; }
+.prog-nums .pct { font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+                  font-variant-numeric: tabular-nums; }
+.bar { width: 260px; height: 5px; border-radius: 3px; background: var(--sunk); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--explore); }
+
+.sum-scroll { overflow-x: auto; }
+table.sumtab { border-collapse: collapse; width: 100%; min-width: 700px; }
+table.sumtab th { font-weight: 500; font-size: 11px; letter-spacing: 0.08em;
+                  text-transform: uppercase; color: var(--ink-3); padding: 9px 10px;
+                  text-align: left; border-bottom: 1px solid var(--line); }
+table.sumtab td { padding: 6px 10px; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+table.sumtab tr:last-child td { border-bottom: 0; }
+table.sumtab th.num, table.sumtab td.num { text-align: right; font-family: var(--mono);
+                                           font-variant-numeric: tabular-nums; }
+table.sumtab td.game { font-weight: 600; padding-left: 14px; white-space: nowrap; }
+table.sumtab td.dim { color: var(--ink-3); }
+table.sumtab tr.tot td { border-top: 1px solid var(--line); font-weight: 600;
+                         background: var(--sunk); }
+table.sumtab tr.tot td.game { font-style: italic; }
+td.st { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+       margin-right: 6px; background: var(--ink-3); vertical-align: middle; }
+.dot.done { background: var(--good); }
+.dot.running { background: var(--warning); }
+.dot.pending { background: var(--line); border: 1px solid var(--ink-3); }
+/* the bar sits behind the number so the column still reads as a column of numbers */
+.mini { display: inline-block; width: 34px; height: 4px; border-radius: 2px;
+        background: var(--sunk); margin-right: 7px; vertical-align: middle; overflow: hidden; }
+.mini i { display: block; height: 100%; background: var(--ink-3); }
+td.up { color: var(--good); }
+td.down { color: var(--critical); }
+td.flat { color: var(--ink-3); }
+
+/* ── task selector ──────────────────────────────────────────────────────── */
+.picker { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; overflow-x: auto; margin-bottom: 20px; }
+table.matrix { border-collapse: collapse; width: 100%; min-width: 640px; }
+.colmean { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px;
+           letter-spacing: 0; text-transform: none; color: var(--ink-2); font-weight: 400; }
+.colmean b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.colmean .sub2 { display: block; font-size: 10px; color: var(--ink-3); }
+table.matrix th { font-weight: 500; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding: 11px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+table.matrix td { padding: 6px 8px; border-bottom: 1px solid var(--line-soft); }
+table.matrix tr:last-child td { border-bottom: 0; }
+table.matrix td.game { font-weight: 600; font-size: 14px; padding-left: 14px; white-space: nowrap; }
+.cell-btn {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px;
+  background: var(--panel); color: var(--ink); cursor: pointer;
+  font: inherit; font-size: 13px; text-align: left; transition: border-color .12s, background .12s;
+}
+.cell-btn:hover { border-color: var(--ink-3); background: var(--sunk); }
+.cell-btn[aria-current="true"] { border-color: var(--focus); background: var(--explore-soft); box-shadow: inset 0 0 0 1px var(--focus); }
+.cell-btn .r { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; }
+.cell-btn .meta { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+/* A problem of the set with no run to show: present, and plainly not measured. */
+.cell-none { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 10px;
+             border: 1px dashed var(--line); border-radius: 7px; color: var(--ink-3);
+             font-size: 13px; background: transparent; cursor: help; }
+.cell-none .r { font-family: var(--mono); font-weight: 600; font-size: 13px; }
+.cell-none .meta { margin-left: auto; font-family: var(--mono); font-size: 11px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
+.dot.good { background: var(--good); }
+.dot.warning { background: var(--warning); }
+.dot.critical { background: var(--critical); }
+.dot.zero { background: var(--ink-3); }
+
+/* ── working area ───────────────────────────────────────────────────────── */
+.work { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr); gap: 18px; align-items: start; }
+@media (max-width: 1040px) { .work { grid-template-columns: 1fr; } }
+
+.card { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; }
+.card > header {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 11px 14px; border-bottom: 1px solid var(--line-soft);
+}
+.card > header h2 { font-family: var(--serif); font-size: 19px; }
+.card > header .hint { font-size: 11.5px; color: var(--ink-3); margin-left: auto; font-family: var(--mono); }
+.card .body { padding: 14px; }
+
+/* ── the grid stage ─────────────────────────────────────────────────────── */
+.stage-wrap { background: var(--stage); border-radius: 8px; padding: 14px; display: flex; justify-content: center; }
+#stage { display: grid; gap: 1px; width: 100%; max-width: 460px; aspect-ratio: 1 / 1; }
+.cel { position: relative; border-radius: 1px;
+       box-shadow: inset 0 0 0 1px rgba(128, 140, 155, .32); }
+.cel.changed::after {
+  content: ""; position: absolute; inset: -1px;
+  box-shadow: inset 0 0 0 1.5px #ffffff; border-radius: 2px; pointer-events: none;
+}
+.cel.masked {
+  background-image: repeating-linear-gradient(45deg, #ffffff26 0 3px, transparent 3px 6px);
+}
+.cel.goal::before {
+  content: ""; position: absolute; inset: 0;
+  box-shadow: inset 0 0 0 1px #ffffff59; pointer-events: none;
+}
+.cel.region::before {
+  content: ""; position: absolute; inset: 0;
+  box-shadow: inset 0 0 0 1px var(--test); pointer-events: none;
+}
+.cel.hit::after {
+  content: ""; position: absolute; inset: -2px;
+  box-shadow: 0 0 0 2px var(--test); border-radius: 50%; pointer-events: none;
+}
+
+.legend-row { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 12px; font-size: 11px; color: var(--ink-3); font-family: var(--mono); }
+.legend-row span { display: inline-flex; align-items: center; gap: 5px; }
+.legend-row i { width: 10px; height: 10px; border-radius: 2px; border: 1px solid #8888; display: inline-block; }
+
+/* ── transport ──────────────────────────────────────────────────────────── */
+.transport { margin-top: 16px; }
+.track { position: relative; height: 34px; margin-bottom: 6px; }
+.seg { position: absolute; top: 9px; height: 12px; border-radius: 2px; }
+.seg.explore { background: var(--explore); }
+.seg.test { background: var(--test); }
+.seg.unspent { background: var(--line); }
+.cap { position: absolute; top: 2px; height: 26px; border-left: 1.5px dashed var(--ink-3); }
+.cap b { position: absolute; top: -2px; left: 5px; font: 500 10px var(--mono); color: var(--ink-3); white-space: nowrap; }
+.head { position: absolute; top: 0; width: 2px; height: 30px; background: var(--ink); border-radius: 1px; pointer-events: none; }
+.head::after { content: ""; position: absolute; top: -3px; left: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+input[type="range"] { position: absolute; inset: 0; width: 100%; height: 34px; margin: 0; opacity: 0; cursor: pointer; }
+
+.controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+button.tb {
+  font: 500 13px var(--sans); padding: 6px 11px; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer;
+}
+button.tb:hover { background: var(--sunk); border-color: var(--ink-3); }
+.counter { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); margin-left: auto; }
+.keys { font-family: var(--mono); font-size: 11px; color: var(--ink-3); width: 100%; }
+kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--ink-2); }
+
+/* ── right rail ─────────────────────────────────────────────────────────── */
+.rail { display: flex; flex-direction: column; gap: 14px; }
+.now-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.played { font-family: var(--mono); font-size: 25px; font-weight: 600; letter-spacing: -0.01em; }
+.chip {
+  font: 500 11px var(--sans); letter-spacing: .06em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap;
+}
+.chip.explore { border-color: var(--explore); color: var(--explore); background: var(--explore-soft); }
+.chip.test { border-color: var(--test); color: var(--test); background: var(--test-soft); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 10px; margin-top: 12px; }
+.fact { background: var(--sunk); border-radius: 7px; padding: 8px 10px; }
+.fact dt { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.fact dd { margin: 2px 0 0; font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; }
+
+.plan { font-size: 14px; line-height: 1.5; }
+.plan.none { color: var(--ink-3); font-style: italic; }
+.badge { display: inline-flex; align-items: center; gap: 5px; font: 500 11px var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
+.badge i { width: 16px; height: 8px; border-radius: 2px; display: inline-block; }
+pre.code {
+  margin: 8px 0 0; padding: 9px 11px; background: var(--sunk); border-radius: 7px;
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.5; overflow-x: auto;
+  white-space: pre-wrap; word-break: break-word; color: var(--ink-2); max-height: 220px;
+}
+
+.evt { border-top: 1px solid var(--line-soft); padding: 9px 0; }
+.evt:first-child { border-top: 0; }
+.evt .top { display: flex; align-items: center; gap: 8px; }
+.evt .tag { font: 600 9.5px var(--sans); letter-spacing: .09em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; background: var(--sunk); color: var(--ink-3); }
+.evt .name { font-family: var(--mono); font-size: 12px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evt .said { font-size: 13.5px; color: var(--ink-2); }
+.evt button.more { margin-left: auto; font: 500 11px var(--sans); background: none; border: 0; color: var(--explore); cursor: pointer; padding: 2px 4px; }
+.free { font-size: 11.5px; color: var(--ink-3); margin: 0 0 8px; }
+.empty { color: var(--ink-3); font-size: 13px; font-style: italic; }
+
+
+/* ── matrix: one row per game, one tile per problem ─────────────────────── */
+/* Each tile holds every arm's verdict for that problem, so the row reads as
+   "how did the arms do across this game's ladder" without opening anything. */
+.cell-btn.prob { flex-direction: column; align-items: stretch; gap: 5px; }
+.cell-btn.prob .pid { font-family: var(--mono); font-size: 11.5px; color: var(--ink);
+                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-btn.prob .pid b { color: var(--ink-3); font-weight: 500; }
+.arms { display: flex; gap: 6px; }
+.armchip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px;
+           border-radius: 5px; background: var(--sunk);
+           font: 500 10.5px var(--mono); color: var(--ink-2); }
+.armchip .dot { width: 6px; height: 6px; flex: 0 0 6px; }
+td.gamecell { font-weight: 600; font-size: 14px; padding-left: 14px; white-space: nowrap; }
+td.gamecell .sub { display: block; font: 400 10.5px var(--mono); color: var(--ink-3); }
+
+/* ── arm switch on the stage header ─────────────────────────────────────── */
+.armpick { display: inline-flex; gap: 0; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.armpick button { font: 500 12px var(--mono); padding: 4px 11px; border: 0;
+                  background: var(--panel); color: var(--ink-2); cursor: pointer; }
+.armpick button + button { border-left: 1px solid var(--line); }
+.armpick button[aria-pressed="true"] { background: var(--explore-soft); color: var(--explore); }
+
+/* ── transport: one segment per executed action ─────────────────────────── */
+/* The bar is the budget. A round is coloured by whether the model re-planned or
+   simply played on from the plan it was already carrying, which is the thing
+   worth seeing at a glance in a receding-horizon run. */
+.seg.replan  { background: var(--test); }
+.seg.carried { background: var(--explore); }
+.seg.hitgoal { background: var(--good); }
+.tick.err { position: absolute; top: 4px; height: 22px; width: 2px; background: var(--critical); }
+
+/* ── prompt / response ──────────────────────────────────────────────────── */
+.io { margin: 0; padding: 10px 12px; background: var(--sunk); border-radius: 7px;
+      font-family: var(--mono); font-size: 11px; line-height: 1.5; color: var(--ink-2);
+      white-space: pre-wrap; word-break: break-word; overflow-y: auto;
+      max-height: 46vh; scrollbar-width: thin; }
+.io .hl { background: var(--test-soft); color: var(--ink);
+          box-shadow: inset 2px 0 0 var(--test); display: block; }
+.iobar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.iobar .grow { margin-left: auto; }
+button.tog { font: 500 11px var(--sans); padding: 3px 9px; border-radius: 6px;
+             border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); cursor: pointer; }
+button.tog[aria-pressed="true"] { border-color: var(--test); color: var(--test); background: var(--test-soft); }
+.planlist { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 0; }
+.planlist li { list-style: none; font: 500 11.5px var(--mono); padding: 2px 7px;
+               border-radius: 5px; background: var(--sunk); color: var(--ink-2); }
+.planlist li.now { background: var(--test-soft); color: var(--test);
+                   box-shadow: inset 0 0 0 1px var(--test); }
+.planlist li.drop { opacity: .5; text-decoration: line-through; }
+.err { border-left: 3px solid var(--critical); padding: 7px 11px; background: var(--sunk);
+       border-radius: 0 6px 6px 0; font: 400 12px var(--mono); color: var(--ink-2); margin-top: 9px; }
+.zline { font: 400 11px var(--mono); color: var(--ink-3); margin-top: 8px;
+         white-space: pre-wrap; word-break: break-word; max-height: 130px; overflow-y: auto; }

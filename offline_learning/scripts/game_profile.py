@@ -93,9 +93,9 @@ def _size(prog: str) -> int:
     return len(s.grid())
 
 
-def drift(prog: str, n: int = 120) -> dict:
+def drift(prog: str, n: int = 120, seed: int = 1) -> dict:
     """Noop-only rollout from reset: does the world move on its own, and does it cycle?"""
-    s = _sim(prog, 0)
+    s = _sim(prog, seed)
     seen: dict = {}
     frames = [s.grid()]
     period = None
@@ -107,13 +107,17 @@ def drift(prog: str, n: int = 120) -> dict:
         seen.setdefault(g, i + 1)
         frames.append(g)
     changed = sum(1 for a, b in zip(frames, frames[1:]) if a != b)
+    quiet_at_reset = frames[1] == frames[0]
+    settles_after_noops = frames[-1] == frames[-2]
     return {"moves_on_its_own": changed > 0, "ticks_that_changed": changed,
             # First FRAME repeat, which is a lower bound on the true cycle: n2ntd's enemy
             # renders identically at t=3 and t=5 while moving opposite ways, so this reports
             # 2 against a real period of 18.  A short repeat here alongside a HIDDEN flag is
             # the signature of an unrendered direction bit.
             "first_frame_repeat": period,
-            "absorbing_from_reset": frames[-1] == frames[-2]}
+            "absorbing_from_reset": quiet_at_reset,
+            "quiet_at_reset": quiet_at_reset,
+            "settles_after_noops": settles_after_noops}
 
 
 def rng(prog: str, n: int = 40, seeds=(0, 1, 2, 3)) -> dict:
@@ -147,7 +151,8 @@ def hidden(prog: str, drives: int = 12, steps: int = 60) -> dict:
     table: dict = defaultdict(set)
     for d in range(drives):
         rnd = random.Random(d)
-        s = _sim(prog, 0)
+        # Vary non-zero seeds so uniformChoice does not hide real ambiguities.
+        s = _sim(prog, 1 + d)
         cur = s.grid()
         for _ in range(steps):
             a = rand_action(rnd, g)
@@ -165,7 +170,7 @@ def occlusion(prog: str, n: int = 60) -> dict:
     off render_all, which lists elements per object BEFORE they are flattened to a grid."""
     rnd = random.Random(0)
     g = _size(prog)
-    s = _sim(prog, 0)
+    s = _sim(prog, 1)
     worst, hits = 0, 0
     for _ in range(n):
         d = json.loads(s.it.render_all())
@@ -179,13 +184,13 @@ def occlusion(prog: str, n: int = 60) -> dict:
             "max_hidden_cells": worst}
 
 
-def verbs(prog: str, trials: int = 8, offsets: tuple[int, ...] = (0, 3, 8)) -> dict:
+def verbs(prog: str, offsets: tuple[int, ...] = (0, 3, 8)) -> dict:
     """Which verbs ever change the frame RELATIVE TO A NOOP from the same state, and does a
     click's POSITION matter?  The counterfactual is essential: on a game with passive
     dynamics (dino, tetris, diffusion) the frame changes every tick whatever you press, so
-    a plain before/after comparison calls every verb live.  Probed at a few time offsets
-    because several games are quiet at reset.  Seed 1: seed 0 makes `uniformChoice` return
-    its first element forever."""
+    a plain before/after comparison calls every verb live. Probes include one-action setup
+    states (needed for state-dependent verbs such as egg's `down`) and scan every click cell
+    until two distinct effects are found (needed for sparse switches in logic_gates)."""
     g = _size(prog)
     seed = 1
 
@@ -195,20 +200,37 @@ def verbs(prog: str, trials: int = 8, offsets: tuple[int, ...] = (0, 3, 8)) -> d
             _step(s, a)
         return s.grid()
 
+    prefixes = [["noop"] * k for k in offsets]
+    prefixes += [[v] for v in ["left", "right", "up", "down"]]
     live = []
     for v in ["left", "right", "up", "down"]:
-        for k in offsets:
-            if after(["noop"] * k + [v]) != after(["noop"] * (k + 1)):
+        for prefix in prefixes:
+            if after(prefix + [v]) != after(prefix + ["noop"]):
                 live.append(v)
                 break
+
     click_live, outs = False, set()
+    # Do not spend three exhaustive grids proving the absence of a handler when the
+    # source itself contains no click trigger. Positive click claims still require replay.
+    if "clicked" not in (PROGRAMS / f"{prog}.sexp").read_text():
+        return {"live_move_verbs": live, "click_changes_state": False,
+                "click_position_matters": False}
     for k in offsets:
-        base = after(["noop"] * (k + 1))
-        for t in range(trials):
-            out = after(["noop"] * k + [f"click {(t * 5) % g} {(t * 7) % g}"])
-            if out != base:
+        prefix = ["noop"] * k
+        base = after(prefix + ["noop"])
+        for row in range(g):
+            for col in range(g):
+                out = after(prefix + [f"click {row} {col}"])
+                if out == base:
+                    continue
                 click_live = True
                 outs.add(out)
+                if len(outs) > 1:
+                    break
+            if len(outs) > 1:
+                break
+        if len(outs) > 1:
+            break
     return {"live_move_verbs": live, "click_changes_state": click_live,
             "click_position_matters": len(outs) > 1}
 
@@ -229,8 +251,10 @@ def render(p: dict) -> str:
         flags.append(f"HIDDEN({h['ambiguous_keys']}/{h['keys_seen']})")
     if o["objects_overlap"]:
         flags.append(f"OCCLUSION(max {o['max_hidden_cells']})")
-    if d["absorbing_from_reset"]:
+    if d["quiet_at_reset"]:
         flags.append("QUIET-AT-RESET")
+    if d["settles_after_noops"] and not d["quiet_at_reset"]:
+        flags.append("SETTLES-UNDER-NOOP")
     return (f"{p['program']:<9} {p['grid']:>3}  "
             f"moves={','.join(v['live_move_verbs']) or '-':<24} "
             f"click={'pos' if v['click_position_matters'] else ('yes' if v['click_changes_state'] else 'no'):<4} "
