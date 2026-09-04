@@ -69,9 +69,9 @@ from eval_coverage_plan import (  # noqa: E402
     CONTEXT_K, WC_BUDGET, llm_call, parse_plan, resolve_llm_config,
 )
 from eval_curated_plan import (  # noqa: E402
-    ATTEMPTS, CAP_MODES, DEFAULT_ARTIFACT_ROOT, DEFAULT_PROBLEMS, LLM_ARMS, PLAN_CAP,
-    TIERS, _cap_label, _floor, apply_action_caps, build_prompt, gstr,
-    load_eval_problems, select_goal_presentation,
+    ATTEMPTS, CAP_MODES, DEFAULT_ARMS, DEFAULT_ARTIFACT_ROOT, DEFAULT_PROBLEMS, LLM_ARMS,
+    PLAN_CAP, TIERS, _cap_label, _floor, add_icl_args, apply_action_caps, build_prompt,
+    gstr, icl_config, load_eval_problems, load_icl_block, select_goal_presentation,
 )
 
 ARMS = LLM_ARMS + ["wc"]
@@ -122,7 +122,7 @@ def make_goal_test(p: dict):
 
 # ------------------------------------------------------------------ LLM rollout
 async def llm_rollout_v2(arm: str, p: dict, prog: str, perceive, beliefs: str,
-                         llm, llm_sem, args) -> dict:
+                         llm, llm_sem, args, icl_block: str = "") -> dict:
     seed, prefix, dims = p["seed"], p["_prefix"], p["_dims"]
     budget = p["_eval_action_cap"]
     goal_test, quiescence_waived = make_goal_test(p)
@@ -152,7 +152,7 @@ async def llm_rollout_v2(arm: str, p: dict, prog: str, perceive, beliefs: str,
                 p, arm, cur_grid, start_features=cur_z,
                 goal_features=p["_z_goal"], beliefs=beliefs,
                 hist_raw=hist_raw[-CONTEXT_K:], hist_z=hist_z[-CONTEXT_K:],
-                cap=remaining,
+                cap=remaining, icl_block=icl_block,
             )
             if args.warm_start and carry:
                 warm = WARM_TMPL.format(cand="\n".join(carry), remaining=remaining)
@@ -297,11 +297,13 @@ def load_checkpoint(path: Path) -> dict:
 
 
 # ------------------------------------------------------------------- resources
-def build_resources(game: str, root: Path, arms: list[str]) -> tuple[dict, dict]:
+def build_resources(game: str, root: Path, arms: list[str],
+                    icl_cfg: dict | None = None) -> tuple[dict, dict]:
     """Load a game's artifacts; a missing artifact skips that arm with a warning."""
     skipped: dict[str, str] = {}
     R = {"prog": HGAMES[game][0], "verbs": list(HGAMES[game][2]),
-         "perceive": compile_perceive(""), "beliefs": "", "rt": None}
+         "perceive": compile_perceive(""), "beliefs": "", "rt": None,
+         "icl": "", "icl_meta": {}}
     if "lmwm" in arms:
         rex = root / "rexpure" / f"{game}_s1"
         pp = rex / "best_perception_rexpure_seed1.py"
@@ -313,6 +315,17 @@ def build_resources(game: str, root: Path, arms: list[str]) -> tuple[dict, dict]
         else:
             R["perceive"] = compile_perceive(pp.read_text())
             R["beliefs"] = bp.read_text()
+    if "icl" in arms:
+        block, meta = load_icl_block(game, root, icl_cfg)
+        if not block:
+            skipped["icl"] = f"no training pool: {meta.get('error')}"
+            print(f"WARNING: {game}: skipping arm icl -- {skipped['icl']}", flush=True)
+        else:
+            R["icl"], R["icl_meta"] = block, meta
+            print(f"[icl] {game}: {meta['n_transitions']} transitions, "
+                  f"~{meta['est_tokens']} tokens ({meta['render']}"
+                  + (f", ctx {meta['icl_context_k']}" if meta["icl_context_k"] else "")
+                  + ")", flush=True)
     if "wc" in arms:
         wc = root / "worldcoder" / f"{game}_s1/best_transition_wc_seed1.py"
         if not wc.is_file():
@@ -379,8 +392,10 @@ def report(rows, llm, off_idx, elapsed, cost, args, done=0, total=0) -> str:
          "cap-matched any-step random floor where recomputed, else the stored rand@h.", ""]
 
     games = list(dict.fromkeys(r["game"] for r in rows))
-    L += ["## Per game: online pass@1 (offline pass@1)", "",
-          "| game | n | raw | lmwm | wc | rand |", "|---|--:|--:|--:|--:|--:|"]
+    hdr = lambda cols: ["| " + " | ".join(cols) + " |",
+                        "|" + "|".join(["---"] + ["--:"] * (len(cols) - 1)) + "|"]
+    L += ["## Per game: online pass@1 (offline pass@1)", ""] \
+        + hdr(["game", "n"] + ARMS + ["rand"])
     for game in games:
         s = [r for r in rows if r["game"] == game]
         cells = []
@@ -390,15 +405,15 @@ def report(rows, llm, off_idx, elapsed, cost, args, done=0, total=0) -> str:
         L.append(f"| {game} ({HGAMES[game][1]}) | {len(s)} | " + " | ".join(cells)
                  + f" | {cell(sum(_floor(r) or 0 for r in s) / len(s))} |")
 
-    L += ["", "## Per game: pass@any (any attempt succeeded)", "",
-          "| game | n | raw | lmwm |", "|---|--:|--:|--:|"]
+    L += ["", "## Per game: pass@any (any attempt succeeded)", ""] \
+        + hdr(["game", "n"] + LLM_ARMS)
     for game in games:
         s = [r for r in rows if r["game"] == game]
         L.append(f"| {game} | {len(s)} | "
                  + " | ".join(cell(on_any(s, a)) for a in LLM_ARMS) + " |")
 
-    L += ["", "## Per tier: online pass@1 (offline pass@1)", "",
-          "| tier | n | raw | lmwm | wc |", "|---|--:|--:|--:|--:|"]
+    L += ["", "## Per tier: online pass@1 (offline pass@1)", ""] \
+        + hdr(["tier", "n"] + ARMS)
     for tier in TIERS:
         s = [r for r in rows if r["tier"] == tier]
         if s:
@@ -408,9 +423,8 @@ def report(rows, llm, off_idx, elapsed, cost, args, done=0, total=0) -> str:
                 cells.append(f"{cell(on)}" + (f" ({cell(off)})" if off is not None else ""))
             L.append(f"| {tier} | {len(s)} | " + " | ".join(cells) + " |")
 
-    L += ["", "## Per problem (online pass@1)", "",
-          "| task | tier | mode | h | prefix | raw | lmwm | wc | rand |",
-          "|---|---|---|--:|--:|--:|--:|--:|--:|"]
+    L += ["", "## Per problem (online pass@1)", ""] \
+        + hdr(["task", "tier", "mode", "h", "prefix"] + ARMS + ["rand"])
     for r in rows:
         cells = [cell(r[a]["pass_rate"], 1) if a in r and r[a].get("pass_rate") is not None
                  else ("skip" if a in r and r[a].get("status", "").startswith("skipped")
@@ -505,6 +519,9 @@ def emit(problems, per, skipped_by_game, llm, off_idx, elapsed, a, done, total) 
                     "context_k": CONTEXT_K, "wc_budget": a.wc_budget,
                     "warm_start": a.warm_start,
                     "max_floor": a.max_floor,
+                    "arms": [x.strip() for x in a.arms.split(",") if x.strip()],
+                    "icl": ({k: str(v) for k, v in icl_config(a).items()}
+                            if "icl" in a.arms else None),
                     "skipped_arms": skipped_by_game},
          "rows": rows, "cost": cost}, indent=1))
     stem.with_suffix(".md").write_text(md)
@@ -573,7 +590,7 @@ async def main_async(a):
 
     resources, skipped_by_game = {}, {}
     for game, ps in by_game.items():
-        R, skipped = build_resources(game, root, arms)
+        R, skipped = build_resources(game, root, arms, icl_config(a))
         resources[game] = R
         if skipped:
             skipped_by_game[game] = skipped
@@ -628,7 +645,7 @@ async def main_async(a):
                                             "max_actions": p["_eval_action_cap"]})
             return wc_rollout(p, R["rt"], R["verbs"], R["prog"], wc_args)
         return llm_rollout_v2(arm, p, R["prog"], R["perceive"], R["beliefs"],
-                              llm, llm_sem, a)
+                              llm, llm_sem, a, R["icl"])
 
     # FLAT schedule (see the v1 module history: waves collapse concurrency onto the
     # hardest problems -- measured 92% idle); report re-emitted as results land.
@@ -686,7 +703,11 @@ def main():
     ap.add_argument("--artifact-root", default=str(DEFAULT_ARTIFACT_ROOT))
     ap.add_argument("--games", default="")
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--arms", default=",".join(ARMS))
+    ap.add_argument("--arms", default=",".join(DEFAULT_ARMS),
+                    help=f"comma-separated subset of {','.join(ARMS)}; 'icl' is the raw "
+                         "planner with the world model's training transitions in context "
+                         "and is off by default")
+    add_icl_args(ap)
     ap.add_argument("--attempts", type=int, default=ATTEMPTS,
                     help="LLM attempts per problem x arm (wc stays single-shot)")
     ap.add_argument(

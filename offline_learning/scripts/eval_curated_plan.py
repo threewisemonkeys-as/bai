@@ -44,6 +44,7 @@ for _p in (str(OFF), str(REPO), str(HERE)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+import icl_context  # noqa: E402
 import program_runtime as prt  # noqa: E402
 from validate import _parse_tag, run_perceive  # noqa: E402
 from worldcoder_optimize import _clean_program  # noqa: E402
@@ -65,8 +66,15 @@ from eval_coverage_plan import (  # noqa: E402
 PLAN_CAP = 50               # was 20; see module docstring
 CAP_MODES = ("fixed", "per-game", "per-problem")
 ATTEMPTS = 5
-LLM_ARMS = ["raw", "lmwm"]
+LLM_ARMS = ["raw", "lmwm", "icl"]
+# "icl" is the raw planner with the world model's own training transitions pasted
+# into the prompt -- the like-for-like control for "does the learned model do
+# anything the data alone does not?". See offline_learning/icl_context.py.
+RAW_LIKE_ARMS = ("raw", "icl")     # arms that read the raw grid, not P's features
 ARMS = LLM_ARMS + ["wc"]
+# "icl" is opt-in: its prompts carry ~20-160k extra tokens per call, so it must be
+# asked for by name rather than inherited from a default that used to mean "all".
+DEFAULT_ARMS = ["raw", "lmwm", "wc"]
 TIERS = ["L1", "L2", "L3", "L4"]
 DEFAULT_PROBLEMS = REPO / "logs/2026-08-29/planning_v2/problems.json"
 DEFAULT_OUT = REPO / "logs/2026-08-29/planning_v2/eval/offline"
@@ -328,7 +336,7 @@ def oracle_preflight(problems: list[dict]) -> dict:
 
 
 def _exact_template(arm: str, success_mode: str) -> str:
-    template = PLAN_RAW_TMPL if arm == "raw" else PLAN_WIN_TMPL
+    template = PLAN_RAW_TMPL if arm in RAW_LIKE_ARMS else PLAN_WIN_TMPL
     if success_mode == "final":
         return template
     replacements = {
@@ -343,7 +351,7 @@ def _exact_template(arm: str, success_mode: str) -> str:
             "(the last action may achieve it, or it may happen earlier).",
         ),
     }
-    old, new = replacements[arm]
+    old, new = replacements["raw" if arm in RAW_LIKE_ARMS else arm]
     if old not in template:
         raise RuntimeError("shared exact-goal prompt changed; update the any-step rewrite")
     return template.replace(old, new, 1)
@@ -405,11 +413,60 @@ one action per line, at most {cap} line(s)
 </plan>"""
 
 
+def add_icl_args(ap) -> None:
+    """The `icl` arm's data knobs, shared by the offline and online evaluators."""
+    ap.add_argument("--icl-pool", default=icl_context.DEFAULT_POOL,
+                    help="training pool under human_data/<game>/ to paste in; must be "
+                         "the pool the world model was fit on for the comparison to hold")
+    ap.add_argument("--icl-data-root", default=str(icl_context.DEFAULT_DATA_ROOT))
+    ap.add_argument("--icl-render", choices=icl_context.RENDERS, default="full",
+                    help="full = both grids verbatim (default; no representational help); "
+                         "diff = next state as the changed cells, ~half the tokens")
+    ap.add_argument("--icl-context-k", type=int, default=0,
+                    help="earlier frames to show per transition (0 = bare s,a,s\')")
+
+
+def icl_config(a) -> dict:
+    return {"pool": getattr(a, "icl_pool", icl_context.DEFAULT_POOL),
+            "data_root": Path(getattr(a, "icl_data_root", icl_context.DEFAULT_DATA_ROOT)),
+            "render": getattr(a, "icl_render", "full"),
+            "context_k": getattr(a, "icl_context_k", 0)}
+
+
+def load_icl_block(game: str, artifact_root: Path, cfg: dict | None) -> tuple[str, dict]:
+    """The offline-data block for `game`, or ("", reason) if this game has no pool."""
+    cfg = cfg or icl_config(argparse.Namespace())
+    try:
+        return icl_context.build_icl_block(
+            game, pool=cfg["pool"], data_root=cfg["data_root"], render=cfg["render"],
+            context_k=cfg["context_k"], artifact_root=artifact_root)
+    except FileNotFoundError as exc:
+        return "", {"error": str(exc)}
+
+
+_ICL_ANCHOR = "=== END DEFAULT KNOWLEDGE ===\n"
+
+
+def splice_icl(prompt: str, block: str) -> str:
+    """Insert the offline-data block right after DEFAULT KNOWLEDGE.
+
+    It goes at the FRONT, ahead of the per-round transcript, so the block is a stable
+    prefix across a rollout's replanning rounds and a provider's prefix cache can serve
+    it. An anchor that stopped matching means the shared template moved; that must fail
+    loudly rather than silently drop the arm's only distinguishing input."""
+    if not block.strip():
+        raise ValueError("arm 'icl' requires a non-empty offline-data block")
+    if _ICL_ANCHOR not in prompt:
+        raise RuntimeError("shared prompt template changed; update the ICL splice anchor")
+    i = prompt.index(_ICL_ANCHOR) + len(_ICL_ANCHOR)
+    return prompt[:i] + "\n" + block.strip("\n") + "\n" + prompt[i:]
+
+
 def build_prompt(problem: dict, arm: str, start_grid: str, *, start_features: str = "",
                  goal_features: str = "", beliefs: str = "",
                  hist_raw: list[tuple[str, str]] | None = None,
                  hist_z: list[tuple[str, str]] | None = None,
-                 cap: int | None = None) -> str:
+                 cap: int | None = None, icl_block: str = "") -> str:
     """Build a prompt without exposing an NL task's diagnostic reference frame.
 
     `hist_raw`/`hist_z`/`cap` exist for the ONLINE evaluator: same templates, but each
@@ -423,14 +480,16 @@ def build_prompt(problem: dict, arm: str, start_grid: str, *, start_features: st
         raise ValueError("problem must be configured with frame or nl presentation")
     eval_success = problem["_eval_success_mode"]
     eval_nl = problem.get("_eval_nl_goal", problem["nl_goal"])
+    raw_like = arm in RAW_LIKE_ARMS
     if presentation == "frame":
         template = _exact_template(arm, eval_success)
-        if arm == "raw":
-            return template.format(
+        if raw_like:
+            out = template.format(
                 cap=cap, default_knowledge=DEFAULT_KNOWLEDGE,
                 transcript=raw_transcript(hist_raw or [], start_grid),
                 goal=gstr(problem["goal"]),
             )
+            return splice_icl(out, icl_block) if arm == "icl" else out
         return template.format(
             cap=cap, default_knowledge=DEFAULT_KNOWLEDGE,
             beliefs=beliefs.strip() or "(empty)",
@@ -443,22 +502,24 @@ def build_prompt(problem: dict, arm: str, start_grid: str, *, start_features: st
         if eval_success == "final"
         else "the GOAL above is true at some point during your plan."
     )
-    template = _NL_RAW_TMPL if arm == "raw" else _NL_WIN_TMPL
+    template = _NL_RAW_TMPL if raw_like else _NL_WIN_TMPL
     values = {
         "cap": cap,
         "default_knowledge": DEFAULT_KNOWLEDGE,
-        "transcript": (raw_transcript(hist_raw or [], start_grid) if arm == "raw"
+        "transcript": (raw_transcript(hist_raw or [], start_grid) if raw_like
                        else feat_transcript(hist_z or [], start_features)),
         "goal": eval_nl,
         "criterion": criterion,
         "beliefs": beliefs.strip() or "(empty)",
     }
-    return template.format(**values)
+    out = template.format(**values)
+    return splice_icl(out, icl_block) if arm == "icl" else out
 
 
 async def eval_game(game: str, problems: list[dict], sem, llm, artifact_root: Path,
                     arms: list[str], attempts_n: int,
-                    a_reason: bool = True, a_keep: bool = False) -> dict:
+                    a_reason: bool = True, a_keep: bool = False,
+                    icl_cfg: dict | None = None) -> dict:
     llm_arms = [arm for arm in arms if arm in LLM_ARMS]
     need_lmwm = "lmwm" in llm_arms
     need_wc = ("wc" in arms and any(
@@ -485,6 +546,17 @@ async def eval_game(game: str, problems: list[dict], sem, llm, artifact_root: Pa
         else:
             perc_code = perception_path.read_text()
             beliefs = beliefs_path.read_text()
+
+    icl_block, icl_meta = "", {}
+    if "icl" in llm_arms:
+        icl_block, icl_meta = load_icl_block(game, artifact_root, icl_cfg)
+        if not icl_block:
+            skipped["icl"] = f"no training pool: {icl_meta.get('error')}"
+            print(f"WARNING: {game}: skipping arm icl -- {skipped['icl']}", flush=True)
+            llm_arms = [arm for arm in llm_arms if arm != "icl"]
+        else:
+            print(f"[icl] {game}: {icl_meta['n_transitions']} transitions, "
+                  f"~{icl_meta['est_tokens']} tokens ({icl_meta['render']})", flush=True)
 
     rt = None
     verbs = HGAMES[game][2]
@@ -523,7 +595,7 @@ async def eval_game(game: str, problems: list[dict], sem, llm, artifact_root: Pa
         prompt = build_prompt(
             p, arm, prep["start"], start_features=prep["z_t"],
             goal_features=prep["z_goal"], beliefs=beliefs,
-            cap=p["_eval_action_cap"],
+            cap=p["_eval_action_cap"], icl_block=icl_block,
         )
         return await asyncio.gather(
             *(llm_call(prompt, sem, llm) for _ in range(attempts_n))
@@ -958,7 +1030,7 @@ async def main_async(a):
     out = await asyncio.gather(*(
         eval_game(
             game, game_problems, sem, llm, root, arms, a.attempts,
-            a.reasoning_trace, a.keep_thinking,
+            a.reasoning_trace, a.keep_thinking, icl_config(a),
         )
         for game, game_problems in by_game.items()
     ))
@@ -1034,8 +1106,11 @@ def main():
         "--goal-presentation", choices=("frame", "nl"), required=True,
         help="required: present and score every selected problem as frame or NL",
     )
-    ap.add_argument("--arms", default=",".join(ARMS),
-                    help="comma-separated subset of raw,lmwm,wc")
+    ap.add_argument("--arms", default=",".join(DEFAULT_ARMS),
+                    help=f"comma-separated subset of {','.join(ARMS)}; 'icl' is the raw "
+                         "planner with the world model's training transitions in context "
+                         "and is off by default")
+    add_icl_args(ap)
     ap.add_argument("--max-actions", type=int, default=PLAN_CAP,
                     help="plan-length budget under --cap-mode fixed")
     ap.add_argument("--cap-mode", choices=CAP_MODES, default="fixed",
