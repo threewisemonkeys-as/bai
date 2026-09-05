@@ -452,10 +452,14 @@ function buildSummary() {
   const pctCell = (v) => v === null || v === undefined ? `<td class="num dim">—</td>`
     : `<td class="num"><span class="mini"><i style="width:${Math.round(100 * v)}%"></i>` +
       `</span>${v.toFixed(2)}</td>`;
-  const delta = (r) => {
-    if (r.raw === null || r.lmwm === null || r.raw === undefined
-        || r.lmwm === undefined) return `<td class="num dim">—</td>`;
-    const d = r.lmwm - r.raw;
+  // arms come from the data, so a run with a third arm (icl) grows the table itself
+  const ARMS = S.arms || ["raw", "lmwm"];
+  const VS = ARMS.filter(a => a !== "raw");            // each arm gets a Δ against raw
+  const delta = (r, a) => {
+    const p = (r.pass || {}), base = p.raw, v = p[a];
+    if (base === null || v === null || base === undefined || v === undefined)
+      return `<td class="num dim">—</td>`;
+    const d = v - base;
     const k = d > 0.001 ? "up" : (d < -0.001 ? "down" : "flat");
     return `<td class="num ${k}">${d > 0 ? "+" : ""}${d.toFixed(2)}</td>`;
   };
@@ -464,14 +468,17 @@ function buildSummary() {
     `<td class="st"><span class="dot ${r.status}"></span>${r.status || ""}</td>` +
     `<td class="num dim">${r.n}${r.expect && r.n !== r.expect ? "/" + r.expect : ""}</td>` +
     `<td class="num dim">${r.cap === null || r.cap === undefined ? "—" : r.cap}</td>` +
-    pctCell(r.raw) + pctCell(r.lmwm) + delta(r) +
-    pctCell(r.adjRaw) + pctCell(r.adjLmwm) +
+    ARMS.map(a => pctCell((r.pass || {})[a])).join("") +
+    VS.map(a => delta(r, a)).join("") +
+    ARMS.map(a => pctCell((r.adj || {})[a])).join("") +
     `<td class="num dim">${r.cost ? "$" + r.cost.toFixed(2) : "—"}</td></tr>`;
 
   el("sumtab").innerHTML =
     `<thead><tr><th>game</th><th>status</th><th class="num">rows</th>` +
-    `<th class="num">cap</th><th class="num">raw</th><th class="num">lmwm</th>` +
-    `<th class="num">Δ</th><th class="num">raw adj</th><th class="num">lmwm adj</th>` +
+    `<th class="num">cap</th>` +
+    ARMS.map(a => `<th class="num">${esc(a)}</th>`).join("") +
+    VS.map(a => `<th class="num">Δ ${esc(a)}</th>`).join("") +
+    ARMS.map(a => `<th class="num">${esc(a)} adj</th>`).join("") +
     `<th class="num">cost</th></tr></thead><tbody>` +
     S.games.map(g => row(g)).join("") +
     row(Object.assign({game: "all", status: "", cap: null}, S.overall), "tot") +

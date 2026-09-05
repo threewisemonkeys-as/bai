@@ -41,7 +41,7 @@ from viz_nl_goals import CSS, _CHARS, pack  # noqa: E402
 
 BODY = HERE / "plan_replay_body.html"
 STYLE = HERE / "plan_replay.css"
-LLM_ARMS = ("raw", "lmwm", "wc")
+LLM_ARMS = ("raw", "lmwm", "icl", "wc")
 
 
 def human_name(game: str) -> str:
@@ -190,7 +190,7 @@ def _mean(xs: list[float]) -> float | None:
 
 
 def summary(evals: list[dict], curated: dict, expect_games: list[str]) -> dict:
-    """Game-wise raw/lmwm scoreboard plus how much of the run has landed.
+    """Game-wise per-arm scoreboard plus how much of the run has landed.
 
     A game that has started is described by its own `online.json` — its post-exclusion
     row set and its rollout counter are authoritative, so a run that drops saturated
@@ -219,9 +219,17 @@ def summary(evals: list[dict], curated: dict, expect_games: list[str]) -> dict:
         if g not in order:
             order.append(g)
 
-    n_arms = max(2, len({a for ev in evals for r in ev["rows"] for a in LLM_ARMS
-                         if isinstance(r.get(a), dict)
-                         and r[a].get("pass_rate") is not None}))
+    scored = {a for ev in evals for r in ev["rows"] for a in LLM_ARMS
+              if isinstance(r.get(a), dict) and r[a].get("pass_rate") is not None}
+    arms = [a for a in LLM_ARMS if a in scored] or ["raw", "lmwm"]
+    n_arms = max(2, len(arms))
+
+    def cells(rows):
+        pr, adj = {}, {}
+        for a in arms:
+            p_, j_ = _pass_cells(rows, a)
+            pr[a], adj[a] = _mean(p_), _mean(j_)
+        return pr, adj
     games, tot_rows, tot_done, tot_total, tot_cost, done_games = [], [], 0, 0, 0.0, 0
     for g in order:
         seen = by_game.get(g)
@@ -230,7 +238,8 @@ def summary(evals: list[dict], curated: dict, expect_games: list[str]) -> dict:
             games.append({"game": g, "human": human_name(g),
                           "status": "pending", "n": 0,
                           "expect": expect_rows, "cap": None,
-                          "raw": None, "lmwm": None, "adjRaw": None, "adjLmwm": None,
+                          "pass": {a: None for a in arms},
+                          "adj": {a: None for a in arms},
                           "cost": 0.0, "done": 0, "total": expect_rows * n_arms})
             tot_total += expect_rows * n_arms
             continue
@@ -242,8 +251,7 @@ def summary(evals: list[dict], curated: dict, expect_games: list[str]) -> dict:
                   or expect_rows)
         caps = sorted(set(seen["caps"])) or sorted(
             {r["action_cap"] for r in rows if r.get("action_cap") is not None})
-        raw_pr, raw_adj = _pass_cells(rows, "raw")
-        lm_pr, lm_adj = _pass_cells(rows, "lmwm")
+        pr, adj = cells(rows)
         total = seen["total"] or expect * n_arms
         complete = seen["done"] >= total and total > 0
         done_games += complete
@@ -253,8 +261,7 @@ def summary(evals: list[dict], curated: dict, expect_games: list[str]) -> dict:
             "n": len(rows), "expect": expect,
             "cap": (str(caps[0]) if len(caps) == 1
                     else (f"{caps[0]}–{caps[-1]}" if caps else None)),
-            "raw": _mean(raw_pr), "lmwm": _mean(lm_pr),
-            "adjRaw": _mean(raw_adj), "adjLmwm": _mean(lm_adj),
+            "pass": pr, "adj": adj,
             "cost": seen["cost"], "done": seen["done"], "total": total,
         })
         tot_rows += rows
@@ -262,15 +269,14 @@ def summary(evals: list[dict], curated: dict, expect_games: list[str]) -> dict:
         tot_total += total
         tot_cost += seen["cost"]
 
-    raw_pr, raw_adj = _pass_cells(tot_rows, "raw")
-    lm_pr, lm_adj = _pass_cells(tot_rows, "lmwm")
+    tot_pr, tot_adj = cells(tot_rows)
     return {
         "games": games,
+        "arms": arms,
         # row-weighted, so a 9-row game counts for more than a 3-row one
         "overall": {"n": len(tot_rows),
                     "expect": sum(x["expect"] for x in games),
-                    "raw": _mean(raw_pr), "lmwm": _mean(lm_pr),
-                    "adjRaw": _mean(raw_adj), "adjLmwm": _mean(lm_adj),
+                    "pass": tot_pr, "adj": tot_adj,
                     "cost": tot_cost},
         "progress": {"games": done_games, "gamesTotal": len(games),
                      "rollouts": tot_done, "rolloutsTotal": tot_total,

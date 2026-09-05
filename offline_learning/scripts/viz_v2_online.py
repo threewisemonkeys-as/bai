@@ -27,12 +27,12 @@ from offline_learning.human_replay import GAMES  # noqa: E402
 from eval_coverage_online import WARM_TMPL  # noqa: E402
 from eval_curated_online import build_resources, prepare  # noqa: E402
 from eval_curated_plan import (  # noqa: E402
-    build_prompt, load_eval_problems, select_goal_presentation,
+    build_prompt, icl_config, load_eval_problems, select_goal_presentation,
 )
 from viz_nl_goals import CSS, _CHARS, pack  # noqa: E402
 from viz_nl_online import HTML  # noqa: E402
 
-LLM_ARMS = ("raw", "lmwm")
+LLM_ARMS = ("raw", "lmwm", "icl")
 
 
 def _mean(xs):
@@ -71,16 +71,18 @@ def _step_io(p: dict, arm: str, att: dict, resources: dict, config: dict) -> lis
     context_k = int(config.get("context_k") or 9)
     out = []
     for rd in att.get("rounds", []):
-        prompt = build_prompt(
-            p, arm, cur_grid, start_features=cur_z,
-            goal_features=p["_z_goal"], beliefs=resources[p["game"]]["beliefs"],
-            hist_raw=hist_raw[-context_k:], hist_z=hist_z[-context_k:],
-            cap=rd["remaining"],
-        )
-        if config.get("warm_start", True) and carry:
-            warm = WARM_TMPL.format(cand="\n".join(carry), remaining=rd["remaining"])
-            prompt = prompt.replace("\nRespond as:\n", f"\n{warm}\nRespond as:\n", 1)
         exact_prompt = rd.get("prompt")
+        prompt = ""
+        if exact_prompt is None:              # only pay to rebuild what was not stored
+            prompt = build_prompt(
+                p, arm, cur_grid, start_features=cur_z,
+                goal_features=p["_z_goal"], beliefs=resources[p["game"]]["beliefs"],
+                hist_raw=hist_raw[-context_k:], hist_z=hist_z[-context_k:],
+                cap=rd["remaining"], icl_block=resources[p["game"]]["icl"],
+            )
+            if config.get("warm_start", True) and carry:
+                warm = WARM_TMPL.format(cand="\n".join(carry), remaining=rd["remaining"])
+                prompt = prompt.replace("\nRespond as:\n", f"\n{warm}\nRespond as:\n", 1)
         exact_response = rd.get("response")
         out.append({
             "prompt": str(exact_prompt) if exact_prompt is not None else prompt,
@@ -205,8 +207,12 @@ def main() -> None:
         by_game[p["game"]].append(p)
     resources = {}
     artifact_root = Path(ev.get("config", {}).get("artifact_root") or "")
+    icl_cfg = ev.get("config", {}).get("icl")
+    if icl_cfg:                               # rebuild with the run's own settings
+        icl_cfg = {**icl_cfg, "data_root": Path(icl_cfg["data_root"]),
+                   "context_k": int(icl_cfg["context_k"])}
     for game, ps in by_game.items():
-        resources[game], _skipped = build_resources(game, artifact_root, arms)
+        resources[game], _skipped = build_resources(game, artifact_root, arms, icl_cfg)
         prepare(ps, resources[game]["perceive"])
     curated = {p["task_uid"]: p for p in selected}
     off_idx = {}
