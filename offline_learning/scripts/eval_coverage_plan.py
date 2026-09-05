@@ -69,7 +69,9 @@ WC_BEAM = 64
 CONTEXT_K = 9
 ACTION_RE = re.compile(r"^(?:up|down|left|right|noop|click \d{1,2} \d{1,2})$")
 # Appended by every successful llm_call: {wall_s, provider, output_tokens, reasoning_tokens,
-# prompt_tokens, cost}. Read by the eval scripts to report the planner's real p50 latency.
+# prompt_tokens, cost, streamed, ttfb_s, max_gap_s, finish_reason}. Read by the eval scripts
+# to report the planner's real p50 latency; ttfb_s/max_gap_s/finish_reason are the streaming
+# health signals (slow start vs. mid-stream stall vs. an output-capped, truncated plan).
 CALL_STATS: list[dict] = []
 
 
@@ -215,11 +217,93 @@ def parse_plan(text: str, dims: tuple[int, int]) -> tuple[list[str] | None, str 
 
 
 # ---- LLM (OpenAI-compatible chat-completions) -----------------------------------
+# The planner streams, and not because anyone reads the tokens as they arrive: the
+# deadline depends on it. A NON-streamed OpenRouter completion sends no bytes until
+# generation finishes, so httpx's per-read timeout acts as a hard TOTAL deadline --
+# the old flat `timeout=600` silently capped the planner at roughly 80k output tokens
+# (decode measured at a constant ~133 tok/s on this route, independent of prompt size,
+# so the wall is an output budget). Long-horizon rounds cross that, and a trip is not a
+# slow call: llm_call returns "", parse_plan rejects it, and llm_rollout_v2 records
+# failed_reason="invalid-plan" -- an infra zero indistinguishable from a planning failure
+# in the results table. Under SSE the server emits `: OPENROUTER PROCESSING` keep-alives
+# through prefill and a chunk per token after, so the read timeout becomes what it should
+# have been all along: a stall detector, not a length limit.
+#
+# LLM_STALL_TIMEOUT_S  seconds of silence before a call is declared dead (default 180).
+# LLM_TOTAL_TIMEOUT_S  overall wall cap so a runaway generation cannot hang a run
+#                      forever; 0 disables it (default 1800).
+# LLM_STREAM=0         fall back to the old non-streamed request.
+STALL_TIMEOUT_S = float(os.environ.get("LLM_STALL_TIMEOUT_S", "180"))
+TOTAL_TIMEOUT_S = float(os.environ.get("LLM_TOTAL_TIMEOUT_S", "1800"))
+
+
+def _stream_enabled(llm: "LLMConfig") -> bool:
+    # the local Claude CLI proxy answers with a single JSON body and speaks no SSE
+    return llm.backend == "openrouter" and os.environ.get("LLM_STREAM", "1") != "0"
+
+
+def _harvest(d: dict, acc: dict) -> None:
+    """Fold one streamed chunk (or a whole non-streamed body) into the accumulator."""
+    if d.get("error"):
+        raise RuntimeError(str(d["error"]))
+    acc["provider"] = d.get("provider") or acc["provider"]
+    if d.get("usage"):
+        acc["usage"] = d["usage"]
+    for ch in d.get("choices") or []:
+        part = ch.get("delta") or ch.get("message") or {}
+        acc["content"].append(part.get("content") or "")
+        acc["reasoning"].append(part.get("reasoning") or part.get("reasoning_content") or "")
+        acc["finish"] = ch.get("finish_reason") or acc["finish"]
+
+
+async def _stream_call(c: httpx.AsyncClient, llm: "LLMConfig", body: dict,
+                       headers: dict) -> dict:
+    acc = {"content": [], "reasoning": [], "usage": {}, "provider": None, "finish": None}
+    t0 = time.time()
+    ttfb, last, max_gap = None, t0, 0.0
+    async with c.stream("POST", llm.url, json={**body, "stream": True},
+                        headers=headers) as r:
+        if r.status_code >= 400:
+            detail = (await r.aread()).decode("utf-8", "replace")[:300]
+            raise RuntimeError(f"HTTP {r.status_code}: {detail}")
+        async for line in r.aiter_lines():
+            now = time.time()
+            if ttfb is None:
+                ttfb = now - t0          # a slow START is a queued provider ...
+            else:
+                max_gap = max(max_gap, now - last)   # ... a slow MIDDLE is a stall
+            last = now
+            if not line.startswith("data: "):
+                continue                     # `: OPENROUTER PROCESSING` keep-alive
+            payload = line[6:]
+            if payload.strip() == "[DONE]":
+                break
+            try:
+                _harvest(json.loads(payload), acc)
+            except json.JSONDecodeError:
+                continue                     # a split frame; the next line completes it
+    acc["ttfb_s"] = round(ttfb or 0.0, 1)
+    acc["max_gap_s"] = round(max_gap, 1)
+    return acc
+
+
+async def _post_call(c: httpx.AsyncClient, llm: "LLMConfig", body: dict,
+                     headers: dict) -> dict:
+    acc = {"content": [], "reasoning": [], "usage": {}, "provider": None, "finish": None}
+    r = await c.post(llm.url, json=body, headers=headers)
+    if r.status_code >= 400:
+        raise RuntimeError(f"HTTP {r.status_code}: {r.text[:300]}")
+    _harvest(r.json(), acc)
+    acc["ttfb_s"], acc["max_gap_s"] = None, None
+    return acc
+
+
 async def llm_call(prompt: str, sem: asyncio.Semaphore, llm: LLMConfig,
                    attempts: int = 4) -> tuple[str, str, float, list]:
     """Returns (content, reasoning, cost, errors). `reasoning` is the provider's
     hidden thinking (OpenRouter surfaces it as message.reasoning / reasoning_content
-    for reasoning models); empty string when the provider doesn't return it."""
+    for reasoning models, and as delta.reasoning when streamed); empty string when the
+    provider doesn't return it."""
     body: dict = {"model": llm.model, "messages": [{"role": "user", "content": prompt}]}
     headers: dict[str, str] = {}
     if llm.backend == "openrouter":
@@ -238,39 +322,70 @@ async def llm_call(prompt: str, sem: asyncio.Semaphore, llm: LLMConfig,
             body["reasoning"] = json.loads(llm.reasoning_json)
     if llm.api_key:
         headers["Authorization"] = f"Bearer {llm.api_key}"
+    streamed = _stream_enabled(llm)
+    timeout = httpx.Timeout(STALL_TIMEOUT_S, connect=30.0)
     errors: list[str] = []
     for attempt in range(1, attempts + 1):
         try:
             async with sem:
                 t_call = time.time()
-                async with httpx.AsyncClient(timeout=600) as c:
-                    r = await c.post(llm.url, json=body, headers=headers)
-            r.raise_for_status()
-            d = r.json()
-            if d.get("error"):
-                raise RuntimeError(str(d["error"]))
-            msg = d["choices"][0]["message"]
-            text = msg.get("content") or ""
-            reasoning = msg.get("reasoning") or msg.get("reasoning_content") or ""
-            usage = d.get("usage") or {}
+                async with httpx.AsyncClient(timeout=timeout) as c:
+                    run = (_stream_call if streamed else _post_call)(c, llm, body, headers)
+                    try:
+                        acc = await (asyncio.wait_for(run, TOTAL_TIMEOUT_S)
+                                     if TOTAL_TIMEOUT_S > 0 else run)
+                    except asyncio.TimeoutError:
+                        # distinct from a ReadTimeout: the stream was alive and producing,
+                        # it just never finished inside the overall cap
+                        raise RuntimeError(
+                            f"total timeout: no completion in {TOTAL_TIMEOUT_S:.0f}s "
+                            f"(LLM_TOTAL_TIMEOUT_S)") from None
+            text = "".join(acc["content"])
+            reasoning = "".join(acc["reasoning"])
+            usage = acc["usage"] or {}
             cost = float(usage.get("cost") or 0.0)
             if text.strip():
                 # per-call telemetry: which endpoint actually served this, and how long it
                 # took. Planner wall time is a serial chain of these, so a run that cannot
-                # say what its p50 was cannot be tuned.
+                # say what its p50 was cannot be tuned. ttfb_s/max_gap_s separate "the
+                # provider is slow to start" from "the stream stalled mid-generation", and
+                # finish_reason=="length" is a TRUNCATED plan, not a slow one.
                 CALL_STATS.append({
-                    "wall_s": time.time() - t_call, "provider": d.get("provider"),
+                    "wall_s": time.time() - t_call, "provider": acc["provider"],
                     "output_tokens": usage.get("completion_tokens") or 0,
                     "reasoning_tokens": ((usage.get("completion_tokens_details") or {})
                                          .get("reasoning_tokens") or 0),
-                    "prompt_tokens": usage.get("prompt_tokens") or 0, "cost": cost})
+                    "prompt_tokens": usage.get("prompt_tokens") or 0, "cost": cost,
+                    "streamed": streamed, "ttfb_s": acc["ttfb_s"],
+                    "max_gap_s": acc["max_gap_s"], "finish_reason": acc["finish"]})
                 return text, reasoning, cost, errors
-            errors.append(f"attempt {attempt}: empty")
+            errors.append(f"attempt {attempt}: empty (finish={acc['finish']})")
         except Exception as exc:  # noqa: BLE001
             errors.append(f"attempt {attempt}: {type(exc).__name__}: {exc}")
         if attempt < attempts:
             await asyncio.sleep(min(2 ** attempt, 8))
     return "", "", 0.0, errors
+
+
+def transport_health(stats: list[dict], start: int = 0) -> str:
+    """One line of LLM-transport health over CALL_STATS[start:], for the run heartbeat.
+
+    A planner run can only be watched through its calls: p50/p90 wall says whether the
+    route is degrading, ttfb separates a slow provider from a slow generation, gap catches
+    a stream that stalled mid-answer, and finish_reason!="stop" is a TRUNCATED plan --
+    which scores as a planning failure unless someone notices it was an output cap."""
+    rows = stats[start:]
+    if not rows:
+        return "no completed calls yet"
+    def q(key, p):
+        vals = sorted(r[key] for r in rows if r.get(key) is not None)
+        return vals[min(int(p * len(vals)), len(vals) - 1)] if vals else float("nan")
+    trunc = sum(1 for r in rows if r.get("finish_reason") not in (None, "stop"))
+    gap = max((r["max_gap_s"] for r in rows if r.get("max_gap_s") is not None), default=0.0)
+    return (f"{len(rows)} calls: wall p50 {q('wall_s', .5):.0f}s p90 {q('wall_s', .9):.0f}s "
+            f"max {q('wall_s', 1.0):.0f}s | ttfb p50 {q('ttfb_s', .5):.1f}s | "
+            f"worst stream gap {gap:.1f}s | out p90 {q('output_tokens', .9):.0f} tok | "
+            f"non-stop finish {trunc}")
 
 
 # Hidden reasoning is stored capped, not dropped: on a reasoning model it IS the

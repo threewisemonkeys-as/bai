@@ -66,7 +66,8 @@ from eval_coverage_online import (  # noqa: E402
     Branch, RETRY_SUFFIX, WARM_TMPL, _trace, compile_perceive, engine, wc_rollout,
 )
 from eval_coverage_plan import (  # noqa: E402
-    CONTEXT_K, WC_BUDGET, llm_call, parse_plan, resolve_llm_config,
+    CALL_STATS, CONTEXT_K, WC_BUDGET, llm_call, parse_plan, resolve_llm_config,
+    transport_health,
 )
 from eval_curated_plan import (  # noqa: E402
     ATTEMPTS, CAP_MODES, DEFAULT_ARMS, DEFAULT_ARTIFACT_ROOT, DEFAULT_PROBLEMS, LLM_ARMS,
@@ -88,8 +89,12 @@ def count_calls(fn):
 
 
 async def heartbeat(period: int, total_rollouts: int, state: dict, t0: float):
-    """Issued-calls + completions periodically, so an ETA can be measured, not guessed."""
-    last = 0
+    """Issued-calls + completions periodically, so an ETA can be measured, not guessed.
+
+    The second line is transport health over the calls that landed in THIS period, not
+    the whole run: a route that degrades mid-run, or a response mode that starts stalling,
+    shows up there while it can still be acted on."""
+    last, seen = 0, 0
     while True:
         await asyncio.sleep(period)
         n, done = _CALLS["n"], state["done"]
@@ -97,7 +102,9 @@ async def heartbeat(period: int, total_rollouts: int, state: dict, t0: float):
         last = n
         left = total_rollouts - done
         print(f"  .. {done}/{total_rollouts} rollouts, {n} calls issued, "
-              f"{rate:.0f} calls/min, {left} running", flush=True)
+              f"{rate:.0f} calls/min, {left} running\n"
+              f"     .. {transport_health(CALL_STATS, seen)}", flush=True)
+        seen = len(CALL_STATS)
 
 
 # ------------------------------------------------------------------ goal tests
@@ -689,7 +696,10 @@ async def main_async(a):
     for R in resources.values():
         if R["rt"] is not None:
             R["rt"].close()
-    print("all rollouts complete")
+    # the per-call transport record, kept beside the results: a run whose numbers are
+    # later doubted needs to be able to say what its calls actually did
+    Path(f"{a.out}.calls.json").write_text(json.dumps(CALL_STATS, indent=1))
+    print(f"all rollouts complete | {transport_health(CALL_STATS)}")
 
 
 def main():
