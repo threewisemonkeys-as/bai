@@ -44,8 +44,11 @@ from offline_learning.human_replay import GAMES as HGAMES  # noqa: E402
 sys.path.insert(0, str(REPO / "offline_learning/launch"))
 from launch_planning_v2_online import GAME_ORDER  # noqa: E402
 
-LLM_ARMS = ["raw", "lmwm"]
+LLM_ARMS = ["raw", "lmwm", "icl"]
 ARMS = LLM_ARMS + ["wc"]
+DEFAULT_COLUMN_ARM = "lmwm"
+# how an arm prints in a table header (the internal names are not paper words)
+ARM_DISPLAY = {"raw": "Raw", "lmwm": "NLWM", "icl": "ICL", "wc": "WorldCoder"}
 TIERS = ["L1", "L2", "L3", "L4"]
 
 # the paper's row order, and the display name each benchmark id prints as
@@ -114,8 +117,12 @@ def arm_scores(rows: list[dict], arm: str) -> dict:
             "adj": adjusted(pass1, floor)}
 
 
-def load_run(label: str, root: Path) -> dict:
-    """Every landed game of one run, plus the freshness of the pages built from it."""
+def load_run(label: str, root: Path, arm: str = DEFAULT_COLUMN_ARM) -> dict:
+    """Every landed game of one run, plus the freshness of the pages built from it.
+
+    `arm` is which arm of that run this column reports. It is usually `lmwm` (the world
+    model), but the in-context baseline is a THIRD ARM of an existing run rather than a
+    run of its own, so a column has to be able to name it."""
     games, order = {}, []
     for game in GAME_ORDER:
         f = root / game / "online.json"
@@ -146,7 +153,7 @@ def load_run(label: str, root: Path) -> dict:
         order.append(game)
     combined = root / "replay.html"
     return {
-        "label": label, "root": root, "games": games, "order": order,
+        "label": label, "root": root, "arm": arm, "games": games, "order": order,
         "pending": [g for g in GAME_ORDER if g not in games],
         "replay": combined if combined.exists() else None,
         "replay_mtime": combined.stat().st_mtime if combined.exists() else None,
@@ -352,11 +359,11 @@ def tex_results(runs: list[dict], raw_from: dict) -> str:
         cells = [tex(g["arms"]["raw"]["pass1"]) if g else r"\textemdash", r"\textemdash"]
         for r in runs:
             gr = scored(r, game)
-            cells.append(tex(gr["arms"]["lmwm"]["pass1"]) if gr else r"\textemdash")
+            cells.append(tex(gr["arms"][r["arm"]]["pass1"]) if gr else r"\textemdash")
         L.append(f"    {display_name(game):<14} & " + " & ".join(cells) + r" \\")
     L.append(r"    \midrule")
     means = [tex(run_totals(raw_from, "raw", complete)["macro"]), r"\textemdash"]
-    means += [tex(run_totals(r, "lmwm", complete)["macro"]) for r in runs]
+    means += [tex(run_totals(r, r["arm"], complete)["macro"]) for r in runs]
     L.append(r"    \textbf{Mean} & " + " & ".join(means) + r" \\")
     L.append(r"    \bottomrule")
     L.append(f"    % complete-case mean over {len(complete)} games: "
@@ -375,8 +382,9 @@ def tex_protocol(runs: list[dict]) -> str:
          + r" \\",
          "    " + " ".join(r"\cmidrule(lr){%d-%d}" % (2 + 5 * i, 6 + 5 * i)
                           for i in range(len(runs))),
-         r"    Game & " + " & ".join([r"$n$ & Budget & Rand & Raw & NLWM"] * len(runs))
-         + r" \\",
+         r"    Game & " + " & ".join(r"$n$ & Budget & Rand & Raw & "
+                                     + ARM_DISPLAY.get(r["arm"], r["arm"])
+                                     for r in runs) + r" \\",
          r"    \midrule"]
     for game in PAPER_ORDER:
         cells = []
@@ -388,7 +396,8 @@ def tex_protocol(runs: list[dict]) -> str:
             partial = "" if g["complete"] else r"\textsuperscript{*}"
             cells += [str(len(g["rows"])) + partial, g["cap"].replace("-", "--"),
                       tex(g["floor"]),
-                      tex(g["arms"]["raw"]["pass1"]), tex(g["arms"]["lmwm"]["pass1"])]
+                      tex(g["arms"]["raw"]["pass1"]),
+                      tex(g["arms"][r["arm"]]["pass1"])]
         L.append(f"    {display_name(game):<14} & " + " & ".join(cells) + r" \\")
     L.append(r"    \bottomrule")
     return "\n".join(L)
@@ -450,9 +459,12 @@ def write_tex(path: Path, runs: list[dict], raw_from: dict) -> list[str]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--run", action="append", metavar="LABEL=PATH",
+    ap.add_argument("--run", action="append", metavar="LABEL=PATH[@ARM]",
                     help="a run dir and the column name it gets (repeatable); "
-                         "defaults to the two NL runs")
+                         "defaults to the two NL runs. Append @ARM to report an arm "
+                         "other than lmwm -- the in-context baseline is a third arm of "
+                         "an existing run, not a run of its own, e.g. "
+                         "'ICL=logs/.../nl_icl@icl'")
     ap.add_argument("--raw-from", metavar="LABEL",
                     help="which run supplies the shared Raw column "
                          "(default: the first --run)")
@@ -467,10 +479,14 @@ def main() -> None:
     spec = [tuple(s.split("=", 1)) for s in a.run] if a.run else DEFAULT_RUNS
     runs = []
     for label, path in spec:
+        path, _, arm = path.partition("@")
+        arm = arm or DEFAULT_COLUMN_ARM
+        if arm not in LLM_ARMS:
+            raise SystemExit(f"unknown arm {arm!r}; choose from {', '.join(LLM_ARMS)}")
         root = Path(path) if Path(path).is_absolute() else REPO / path
         if not root.is_dir():
             raise SystemExit(f"no such run dir: {root}")
-        runs.append(load_run(label, root))
+        runs.append(load_run(label, root, arm))
     raw_from = next((r for r in runs if r["label"] == a.raw_from), runs[0])
 
     if a.check:
