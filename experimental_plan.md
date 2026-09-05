@@ -133,7 +133,7 @@ The 55-game atlas (`notes/autumn55_game_characteristics.md`) also recommends nin
 We would like to compare our learning approach with other approaches -
 
 - **[X]** Raw LLM: During planning tasks, we present an LLM with the specification directly (states / NL goals) and evaluate its planning abilities. (`raw` arm in the curated evals; 0.32 macro on the 86-problem online NL set.)
-- **[P]** Raw LLM + in-context examples (the `icl` arm): the raw planner with the world model's OWN training transitions pasted into its prompt — the like-for-like control for "does the learned model do anything the data alone does not?". IMPLEMENTED 2026-09-04 (`offline_learning/icl_context.py`; `--arms icl` in both evaluators; `tests/test_icl_context.py`), NOT yet run on the battery. The block is the *complete* pool, not a sample: every game's `informative_curated` pool holds exactly 60 transitions and every rexpure launch passed `--train-n 60`, so the learner's train batch IS the whole pool (`assert_matches_launch` re-derives this from each run's `launch.json` and refuses to build a block that would be a superset of what the world model saw). Only the order differs — the learner shuffles under its seed. The block is spliced after DEFAULT KNOWLEDGE, ahead of the per-round transcript, so it is a stable prefix a provider's cache can serve across a rollout's replanning rounds; nothing else about the raw prompt changes (asserted in the tests). Sizes: ~22k–158k tokens per game at `--icl-render full` (both grids verbatim), ~15k–90k at `--icl-render diff` (next state as the changed cells, lossless — the test reconstructs s' from s + diff for every transition). **Money is not the constraint; wall-clock is.** Added input spend for the full 86-problem battery at `full` is only **+$8.50** uncached (1623 raw-arm calls × the per-game block × $0.0875/M in). But a measured single-call probe on the production route (deepseek-v4-flash, `--provider-only parasail/fp8,novita/fp8,alibaba/fp8`) shows latency blows up, and it is **output**-bound, not prefill-bound — a longer context makes the planner reason longer: colour_lines raw 0.5k tok / 9.5s → icl-diff 16k / 67s → icl-full 29k / 75s; bt3gb raw 0.8k / 78s → icl-diff 39k / **331s** (≈34k output tokens vs the raw call's ≈15k), with icl-full (71k) still unfinished after ten minutes. Budget for the icl arm alone to cost roughly what the existing two-arm battery cost in wall time, or more; prefer `--icl-render diff` on the large-grid games (bt3gb, f5w3n, dq8gc, s2kt7, eahcw, 7www9, 7xf97, dino, SET, logic_gates) if the full run does not fit the window.
+- **[X]** Raw LLM + in-context examples (the `icl` arm) — **RUN 2026-09-04/05, macro 0.57 vs NLWM 0.62 and raw 0.32**; see "In-context baseline" under Results: the raw planner with the world model's OWN training transitions pasted into its prompt — the like-for-like control for "does the learned model do anything the data alone does not?". Implemented 2026-09-04 (`offline_learning/icl_context.py`; `--arms icl` in both evaluators; `tests/test_icl_context.py`). The block is the *complete* pool, not a sample: every game's `informative_curated` pool holds exactly 60 transitions and every rexpure launch passed `--train-n 60`, so the learner's train batch IS the whole pool (`assert_matches_launch` re-derives this from each run's `launch.json` and refuses to build a block that would be a superset of what the world model saw). Only the order differs — the learner shuffles under its seed. The block is spliced after DEFAULT KNOWLEDGE, ahead of the per-round transcript, so it is a stable prefix a provider's cache can serve across a rollout's replanning rounds; nothing else about the raw prompt changes (asserted in the tests). Sizes: ~22k–158k tokens per game at `--icl-render full` (both grids verbatim), ~15k–90k at `--icl-render diff` (next state as the changed cells, lossless — the test reconstructs s' from s + diff for every transition). **Money is not the constraint; wall-clock is.** Added input spend for the full 86-problem battery at `full` is only **+$8.50** uncached (1623 raw-arm calls × the per-game block × $0.0875/M in). But a measured single-call probe on the production route (deepseek-v4-flash, `--provider-only parasail/fp8,novita/fp8,alibaba/fp8`) shows latency blows up, and it is **output**-bound, not prefill-bound — a longer context makes the planner reason longer: colour_lines raw 0.5k tok / 9.5s → icl-diff 16k / 67s → icl-full 29k / 75s; bt3gb raw 0.8k / 78s → icl-diff 39k / **331s** (≈34k output tokens vs the raw call's ≈15k), with icl-full (71k) still unfinished after ten minutes. Budget for the icl arm alone to cost roughly what the existing two-arm battery cost in wall time, or more; prefer `--icl-render diff` on the large-grid games (bt3gb, f5w3n, dq8gc, s2kt7, eahcw, 7www9, 7xf97, dino, SET, logic_gates) if the full run does not fit the window.
 - **[P]** Agentic LLM: In this baseline we provide the training data to an agent while also giving it the planning problem. The agent can learn from the training data autonomously to solve the planning problem. RUN 2026-09-02 with Claude Code as the agent over the curated battery — 0.895 macro on 78 of the 86 problems (`cc_autumn/curated_results.json`, harness `cc_autumn/autumn-code/rig/curated.py`). It is not yet budget- or row-matched to the other arms; see "Agentic baseline" under Results for exactly what has to be closed. Note this agent explores the live world (50 actions) rather than reading the offline training pool, so it is a stronger baseline than the one described here. (The `RGB-Agent` submodule is a separate agentic analyser running on AutumnBench in dynamics mode, still not wired to planning problems.)
 - **[P]** WorldCoder: This is a program learning approach (https://arxiv.org/abs/2402.12275) that learns a program as the world model using a similar optimisation algorithm. We evaluate this for planning by using the learned program as a world model inside a search for action sequences to satisfy the goal. (`offline_learning/worldcoder_optimize.py`; `wc` arm, offline and online.) The learners have run (15/15 deepseek, 4/15 Opus-5), but **the `wc` arm was disabled in all four planning-v2 online runs** — every `wc` cell in those runs reads `N/A`. Enabling it on the 86-problem set is the remaining work.
 - **[ ]** WorldCoder + LLM Planning: This is built on top of WorldCoder where we use the learned program, but instead of using a search on the program, we provide the program in context to a language model and ask the language model to plan to solve the planning problems.
@@ -203,6 +203,7 @@ Four completed online runs. Only the last two are a matched pair and only they b
 | `logs/2026-09-01/planning_v2_online_ds_nl` | NL | flat 50 | 79 | 0.48 | 0.61 |
 | `logs/2026-09-03/planning_v2_online_ds_percap_nl` (**NLWM**) | NL | per-problem | 86 | 0.32 | **0.62** |
 | `logs/2026-09-02/planning_v2_online_opus5_nl` (**NLWM (SL)**) | NL | per-problem | 86 | 0.36 | **0.60** |
+| `logs/2026-09-04/planning_v2_online_ds_percap_nl_icl` (**ICL**) | NL | per-problem | 86 | 0.32 | 0.62 (+ **icl 0.57**) |
 
 The first two runs predate the 83→86 promotion and use a flat 50-action budget, so they share neither
 the problem set nor the budgets with the pair below them and must not be pooled with it. The pair is
@@ -220,6 +221,57 @@ worth reporting rather than a run to repeat.
 `offline_learning/scripts/report_planning_v2_online.py` reads the run dirs, checks that
 `replay.html` is level with the results, and writes the LaTeX between the AUTO markers in
 `paper/main.tex` (`--write-tex`). `--check` reports any comparability breach.
+
+### In-context baseline (the same data, unlearned) — RUN 2026-09-04/05
+
+`logs/2026-09-04/planning_v2_online_ds_percap_nl_icl` is a third arm on the identical 86 problems:
+the raw planner with all 60 training transitions pasted into its prompt (`--arms raw,lmwm,icl
+--icl-render diff`). It answers the question the raw baseline cannot — *does the learned model do
+anything the data alone does not?* — because it and NLWM see the same data, the same problems, the
+same budgets and the same planner, and differ only in how the data is represented.
+
+The run was started with `--seed-from logs/2026-09-03/planning_v2_online_ds_percap_nl`, so the raw
+and lmwm columns are the published rollouts resumed from their checkpoints rather than re-sampled.
+**Verified**: 172 raw/lmwm cells across 15 games, zero mismatches in pass-rate or action cap.
+
+| | Raw | ICL | NLWM |
+|---|---|---|---|
+| macro pass@1 | 0.32 | **0.57** | **0.62** |
+| micro (per-problem) | 0.30 | 0.50 | 0.57 |
+| floor-adjusted macro | 0.28 | 0.55 | 0.60 |
+| L1 (n=15) | 0.60 | 0.93 | 0.93 |
+| L2 (n=17) | 0.29 | 0.41 | 0.53 |
+| L3 (n=30) | 0.20 | 0.40 | 0.60 |
+| L4 (n=24) | 0.25 | **0.42** | 0.33 |
+
+**This is a strong baseline and the honest reading is that most of the gain is available from the
+data itself.** ICL recovers 0.25 of NLWM's 0.30 lift over raw. The world model's remaining advantage
+is real but narrow (+0.05 macro) and it is not uniform: it is concentrated at L2/L3 (+0.12, +0.20),
+vanishes at L1 where both saturate at 0.93, and **inverts at L4**, where ICL beats NLWM 0.42 vs 0.33.
+Per game ICL wins outright on egg (0.80/0.60), mario (0.86/0.71), SET (1.00/0.67) and space_invaders
+(0.11/0.00); it loses badly on ice (0.38/0.62), diffusion (0.36/0.73 — below even raw's 0.45),
+disease (0.57/0.71) and ants (0.17/0.33); the rest tie.
+
+Caveats a reviewer will raise, and the answers:
+- *Was it handicapped by presentation?* It ran at `--icl-render diff` (next state as the changed
+  cells) rather than `full` (both grids verbatim). `full` was measured and abandoned: the planner is
+  output-bound, so a longer prompt makes it reason longer — bt3gb raw 78s → icl-diff 331s →
+  icl-full never returned inside `llm_call`'s 600s timeout, which would have burned every
+  large-grid game on timeout-and-retry. `diff` is the same 60 transitions, lossless (the test
+  reconstructs s′ from s + diff for every transition). The one direct comparison available — the
+  colour_lines smoke run at `full` scored 0.00 against 0.67 at `diff`, n=3 — points the same way,
+  so if anything `diff` favours the baseline. A `full` re-run on the cheap games is the clean way
+  to close this if it is challenged.
+- *Did it actually use the data?* Yes, visibly: the round-1 reasoning on colour_lines reads
+  "Based on the offline data, blue balls are stationary under passive dynamics, while red balls move
+  on noop" — it induces a dynamics rule and plans from it. On that problem the rule was wrong.
+- *Is it the same data?* Exactly. Each pool holds 60 transitions and every rexpure launch passed
+  `--train-n 60`, so the learner's train batch is the whole pool; `assert_matches_launch` re-derives
+  that from each artifact's `launch.json` and refuses to build a superset block.
+
+Cost/wall: **$23.21** and ~15 h for the three-arm run (the two-arm published run was $14.16), i.e.
+~$9 and most of the wall time for the third arm. The combined `replay.html` is 18.1 MB — over the
+16 MB page limit; use the per-game pages, or `--per-game`.
 
 ### Agentic baseline (Claude Code on the same problems)
 
@@ -268,12 +320,10 @@ prose sections are still TODO.
   - [X] Create natural language problem versions for these curated planning tasks. All 86 v2.2 rows carry both a frame goal and a registered NL checker (68 distinct checker programs in `offline_learning/planning_nl_goals.py`); offline and online evaluators require `--goal-presentation frame` or `nl`. Four full online runs have been scored through the NL path, so the adapter work this item was tracking is finished.
   - [ ] Setup the CD/MFP/Masked Planning tasks from autumn for these games (exist for the 9 benchmark-sourced games incl. paint/magnets; must be authored for the 6 zip games).
   - [X] Thoroughly test the formulations of the planning tasks. The independent wrapper audit (`logs/2026-08-29/planning_v2/validation.json`) passes 86/86 rows and all global checks: raw/wrapper parity, prefix replay, reference success, nontrivial/noop failure, frame- and task-deletion minimality, action substitution, quiescence, reproducible random floors, composite-ID uniqueness, semantic goals for stochastic games, and three-seed stochastic templates. Easy L1/L2 random floors remain recorded rather than hidden.
-- [P] Baselines. The agentic arm has run (Claude Code, 0.895 on 78/86) but is not budget- or row-matched; the `wc` arm is implemented but was disabled in every planning-v2 online run; raw + in-context trajectories and WorldCoder + LLM planning are not started.
+- [P] Baselines. The in-context arm is DONE and matched (ICL 0.57 vs NLWM 0.62). The agentic arm has run (Claude Code, 0.895 on 78/86) but is not budget- or row-matched; the `wc` arm is implemented but was disabled in every planning-v2 online run; WorldCoder + LLM planning is not started.
   - [ ] Re-run the agentic arm under per-problem action caps on all 86 rows, or re-score the NLWM pair at flat cap 50 on the shared 78, so the Agent column is comparable.
   - [ ] Enable the `wc` arm in an online planning run on the 86-problem set, and finish the 11 missing WorldCoder (SL) training runs first if that arm is to be reported.
-  - [P] Raw LLM + in-context trajectories — the `icl` arm is implemented and smoke-run (`logs/2026-09-04/icl_smoke/`, colour_lines: the planner visibly reasons *from* the pasted transitions), but the battery run has not been launched. Run it as a third arm alongside the existing pair so all three share one rollout schedule and one report:
-    `uv run python offline_learning/launch/launch_planning_v2_online.py --goal-presentation nl --cap-mode per-problem --arms raw,lmwm,icl --problems logs/2026-09-03/planning_v2_online_ds_percap_nl/problems.per-problem-floors.json --out-root logs/<date>/planning_v2_online_ds_percap_nl_icl`
-    Pass `--seed-from logs/2026-09-03/planning_v2_online_ds_percap_nl` so the finished raw and lmwm rollouts are copied in and resume for free: rollout keys are `(task, arm, attempt, cap)`, so with the same problems file, presentation and cap-mode only the `icl` rollouts are paid for and the raw/lmwm columns stay **bit-identical to the published ones** instead of being resampled. (The colour_lines smoke run shows why that matters: re-rolled from scratch its raw column came out 0.33 against the published 0.00 — same config, different sample.) If `icl` underperforms `raw`, re-run the affected games at `--icl-render diff` before concluding anything: that rules out "swamped by a wall of JSON" as the explanation, since diff is the same data at half the tokens.
+  - [X] Raw LLM + in-context trajectories — RUN 2026-09-04/05, `logs/2026-09-04/planning_v2_online_ds_percap_nl_icl`, macro 0.57 (raw 0.32, NLWM 0.62). In the paper table as the ICL column. Optional follow-up if the presentation is challenged: re-run the cheap games at `--icl-render full` (see the caveats under Results).
   - [ ] WorldCoder + LLM planning.
 - [ ] Ablations: add `--no-id` and `--no-beliefs`. Nothing has been run for the paper's ablation table yet;
   every cell in `paper/main.tex::tab:ablations` is an em-dash.
