@@ -327,10 +327,22 @@ thing touching the body, it is also the right place to normalise every other par
 * **Budgets**: `apply_action_caps(rows, "per-problem")` — 2× reference up to 10 actions, 1.5×
   above. Measured over the 86 rows: **min 2, median 17, max 60, total 1725**. Scaled caps
   require floors measured at the same budget or the run refuses to start.
-* **Scoring**: any-step, closed-loop. `make_goal_test(row)` is the live stop test;
-  `execute_and_score(row, actions)` is the authoritative re-score of a recorded action list.
-  Quiescence-requiring checkers are **waived** online — that is the rule `raw` and `lmwm` were
-  scored under, so it is the rule here, with no second rule and no re-score fork.
+* **Scoring**: any-step, closed-loop. `make_goal_test(row)` is the live stop test, and
+  quiescence-requiring checkers are **waived** online — the rule `raw`, `icl` and `lmwm` were
+  all scored under.
+
+  An earlier draft of this plan also said the authoritative verdict was
+  `execute_and_score(row, actions)`. **Those two rules are not the same rule**, and the dry run
+  measured the gap: `execute_and_score` is the *offline* scorer and it enforces quiescence by
+  probing with a hidden noop, which closed-loop play has no room for. Of the 86 rows, **28
+  carry the waiver and 11 flip verdict** between the two scorers. Scoring this arm offline
+  would hand it a stricter rule than every arm it is compared against and cost it 13% of the
+  battery to a scorer mismatch rather than to planning.
+
+  What that draft actually wanted from `execute_and_score` — a verdict a harness bug cannot
+  fake — is kept by `rig.replay_and_score`: the recorded actions are replayed through a fresh
+  `Branch` from the state address, with the goal test re-derived from the row. Independent of
+  the session, and the same rule. `rescore_online.py` re-judges the other arms the same way.
 * **Filters**: `--max-floor 0.95`.
 
 ### The pool has two layouts, and only one of them is the training signal
@@ -521,7 +533,7 @@ problem 1 it still knows on problem 8, which `raw`, `icl` and `lmwm` never do.
 
 ## 5. Build plan
 
-### Phase 0 — re-point the fork (½ day)
+### Phase 0 — re-point the fork (½ day) — **DONE** (`prolong-autumn` off `upstream/main`)
 
 ```bash
 cd RGB-Agent
@@ -535,7 +547,14 @@ and what produced `evaluation_results_autumn/`). Move the pointer only once the 
 Put the adaptation in a **new sibling**, `research/autumn/`, so the diff against upstream stays
 one readable directory; `research/arc-agi-3/` is touched only by import.
 
-### Phase 1 — the Autumn harness (2–3 days)
+### Phase 1 — the Autumn harness (2–3 days) — **BUILT** (`RGB-Agent@prolong-autumn`)
+
+Landed as `research/autumn/`: `rig.py` (imports the evaluators), `env.py`, `actions.py`,
+`prompts.py`, `runner.py` (study round), `agent.py` (the three codex corrections),
+`launch.py`. Dry run passes with zero paid calls — 86/86 starts reproduced, 86/86 reference
+plans reach goal, 86/86 live-vs-replay agreement, 172 study rounds with budgets untouched.
+Covered by `tests/test_autumn_agent_harness.py` (13 tests, scripted agent, no API key).
+Remaining in this phase: the parity proxy itself, which nothing can substitute for (F15).
 
 Reuse unchanged (2010 lines, zero ARC deps): `agent/base.py`, `codex_agent.py`,
 `codex_events.py`, `action_queue.py`, `utils/`, `metrics/`.
@@ -565,7 +584,7 @@ Write (~600 lines, replacing 1212):
   F7 to `_build_codex_args`, pass the proxy key instead of `CODEX_API_KEY`, and drop the
   `reasoning_effort="none"` default.
 
-### Phase 2 — sanitised corpus exporter (½ day, mostly deleted)
+### Phase 2 — sanitised corpus exporter (½ day, mostly deleted) — **BUILT**
 
 `offline_learning/scripts/export_agent_corpus.py` is a thin shell around the `icl` arm's loader,
 not a new export:
@@ -620,7 +639,8 @@ per-problem budgets, as it already does for the NLWM pair.
       unset means zero reasoning (F12); `model_context_window` pinned (F13)
 - [ ] training corpus = the same 60 transitions `icl_context.load_pool_transitions` gives the
       `icl` arm, byte-identical, leak assertions passing
-- [ ] success = `execute_and_score` on the recorded action list
+- [ ] success = `rig.replay_and_score` — an independent replay under the ONLINE rule, not
+      `execute_and_score`, which enforces quiescence and flips 11 of the 86 rows
 - [ ] study rounds bounded and recorded per problem; no study round ever advanced the engine
 - [ ] agent never reached this repo, the web, or another problem's workspace (audit, not hope —
       `cc_autumn/autumn-code/rig/audit.py` is the precedent worth reusing)
