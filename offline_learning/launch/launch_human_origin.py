@@ -89,6 +89,47 @@ UNIFIED_TRAIN_N = 60
 def is_unified(variant: str) -> bool:
     return variant.startswith("informative_unified") or variant == "informative_curated"
 
+# ---------------------------------------------------------------------------
+# ABLATION ARMS (--ablation). Each is the reference command with ONE documented delta;
+# everything else -- data paths, seed, split sizes, models, provider pins, node budget,
+# propose-batch, rex-C and the test protocol -- is carried over byte-identically by the
+# rebuild above, which is what makes the arms comparable to the NLWM column.
+#
+# The train/test split is provably untouched by all four: build_data() draws it from
+# Random(--seed) and runs BEFORE any of these take effect, and bake_decoys draws from its
+# own Random(seed+9173), so dropping --contrastive-fd cannot advance the split rng either.
+# tests/test_ablation_flags.py asserts exactly this.
+#
+# Note the reference passes `--fd-scorer none`, so the live forward term is the
+# CONTRASTIVE one: "-FD" removes --contrastive-fd/--cfd-hard-decoys, NOT --fd-scorer.
+ABLATIONS = {
+    "nofd": {
+        "drop_flag": {"--contrastive-fd", "--cfd-hard-decoys"},
+        "doc": "objective = ID alone (min over one term)",
+    },
+    "noid": {
+        "add": ["--no-id"],
+        "doc": "objective = contrastive FD alone; ID signal, diagnosis and framing "
+               "withheld from the proposer",
+    },
+    "noperc": {
+        "drop": {"--start-perception"},
+        "add": ["--no-perception",
+                # I/O-ONLY deviation, carried over from launch_aug19_noperc.py: with P
+                # frozen to the identity every F prompt carries 19 raw grids (~10x the
+                # tokens), and under the reference's 30 s hedge every call out-ran the
+                # delay and raced a duplicate, which killed 4 of 5 games with groq 429s.
+                # Same model, same pin, same prompts -- only how long we wait.
+                "--hedge-delay", "120", "--llm-timeout", "180"],
+        "env": {"LLM_RETRIES": "10"},
+        "doc": "P frozen to the identity module; only world_knowledge is learned",
+    },
+    "nobeliefs": {
+        "add": ["--no-beliefs"],
+        "doc": "world_knowledge dropped from the candidate; only perception is learned",
+    },
+}
+
 DATA_FLAGS = ("--run", "--context-source-run", "--test-run",
               "--test-context-source-run", "--out-dir", "--actions")
 # value-taking reference flags replaced wholesale when --reflection-model is given
@@ -145,12 +186,15 @@ def ref_cmd(learner: str, game: str) -> list[str]:
 
 def build(learner: str, game: str, outd: Path, variant: str,
           reflection_model: str | None = None, reflection_client: str | None = None,
-          reflection_timeout: float = 900.0) -> list[str]:
+          reflection_timeout: float = 900.0, ablation: str = "none") -> list[str]:
     cmd = ref_cmd(learner, game)
+    abl = ABLATIONS.get(ablation, {})
     # value-taking flags to drop: data paths always; for the unified variant also rexpure's
     # --train-n cap (re-added below at the shared pool size); with a reflection override
-    # every reflection routing flag (re-added below for the new endpoint).
+    # every reflection routing flag (re-added below for the new endpoint); plus whatever
+    # the ablation removes.
     drop = set(DATA_FLAGS) | ({"--train-n"} if is_unified(variant) else set())
+    drop |= set(abl.get("drop", ()))
     if reflection_model:
         drop |= set(REFLECTION_FLAGS)
     # valueless (store_true) flags to drop: for the unified variant un-collapse worldcoder's
@@ -159,6 +203,7 @@ def build(learner: str, game: str, outd: Path, variant: str,
     # not change wc's learning -- only the end-of-run ID protocol.
     drop_flag = ({"--collapse-action-params"}
                  if is_unified(variant) and learner == "worldcoder" else set())
+    drop_flag |= set(abl.get("drop_flag", ()))
     stripped, i = [], 2
     while i < len(cmd):
         if cmd[i] in drop:
@@ -171,6 +216,7 @@ def build(learner: str, game: str, outd: Path, variant: str,
         i += 1
     if is_unified(variant) and learner == "rexpure":
         stripped += ["--train-n", str(UNIFIED_TRAIN_N)]
+    stripped += list(abl.get("add", ()))
     if reflection_model:
         stripped += ["--reflection-model", reflection_model,
                      "--reflection-provider-order", "",      # explicit no-pin
@@ -209,6 +255,11 @@ def main() -> None:
                     help="litellm provider for the reflection model; 'vllm' = OpenAI-compatible "
                          "endpoint at --proxy-base (the Claude CLI proxy)")
     ap.add_argument("--reflection-timeout", type=float, default=900.0)
+    ap.add_argument("--ablation", default="none",
+                    choices=["none"] + sorted(ABLATIONS),
+                    help="apply ONE documented flag delta to the reference command "
+                         "(rexpure only): " + "; ".join(
+                             f"{k} = {v['doc']}" for k, v in sorted(ABLATIONS.items())))
     ap.add_argument("--proxy-base", default=PROXY_BASE)
     ap.add_argument("--resume", action="store_true",
                     help="for games whose out-dir already holds a search checkpoint "
@@ -224,10 +275,14 @@ def main() -> None:
             raise SystemExit(f"reflection proxy not reachable at {args.proxy_base}: {exc} "
                              "(start it: bash offline_learning/scripts/claude_proxy_ctl.sh start)")
 
+    if args.ablation != "none" and args.learner != "rexpure":
+        raise SystemExit(f"--ablation {args.ablation} applies to rexpure flags only")
+
     # The groq pin exists for rexpure's TASK model (gpt-oss-20b@groq). worldcoder has no
     # task LLM -- exporting it there pins its reflection model to a provider that does not
     # serve it, and every iteration 404s. The reference wc runs never set it.
     env = dict(os.environ)
+    env.update(ABLATIONS.get(args.ablation, {}).get("env", {}))
     if args.learner == "rexpure":
         env["OPENROUTER_PROVIDER_ORDER"] = "groq"
     if args.reflection_client == "vllm":
@@ -245,7 +300,7 @@ def main() -> None:
             print(f"skip  {game}: already complete")
             continue
         cmd = build(args.learner, game, outd, variant, args.reflection_model,
-                    args.reflection_client, args.reflection_timeout)
+                    args.reflection_client, args.reflection_timeout, args.ablation)
         ckpt = outd / ("rexpure_run_seed1" if args.learner == "rexpure" else "wc_run_seed1") / "resume_state.json"
         if args.resume and ckpt.exists():
             cmd.append("--resume")
@@ -263,9 +318,11 @@ def main() -> None:
         live.append(p)
         (outd / "launch.json").write_text(json.dumps(
             {"game": game, "learner": args.learner, "variant": variant,
+             "ablation": args.ablation,
              "reflection_model": args.reflection_model, "reflection_client": args.reflection_client,
              "pid": p.pid, "cmd": cmd,
              "env": {**ref_env(args.learner, game),
+                     **ABLATIONS.get(args.ablation, {}).get("env", {}),
                      **({"HOSTED_VLLM_API_BASE": args.proxy_base} if args.reflection_client == "vllm" else {})}},
             indent=2) + "\n")
         print(f"start {args.learner}/{game}: pid={p.pid} -> {outd}", flush=True)

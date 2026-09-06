@@ -371,15 +371,22 @@ def _tlabel(i: int) -> str:
     return "t" if i == 0 else (f"t{i}" if i < 0 else f"t+{i}")
 
 
-def _inverse_transcript(win):
-    """States X_t-K..X_t+K with the action between each consecutive pair; a_t is MASKED."""
+def _inverse_transcript(win, reveal_action=None):
+    """States X_t-K..X_t+K with the action between each consecutive pair; a_t is MASKED.
+
+    `reveal_action` prints the true a_t in place of the mask. Used by the --no-id
+    ablation's reflective dataset, where the proposer is never asked to make the action
+    recoverable and the "??? (IDENTIFY THIS)" framing would smuggle the dropped inverse
+    objective back into the prompt."""
     lines, n_prev = [], len(win["prev"])
     for k, (z, a) in enumerate(win["prev"]):
         idx = -(n_prev - k)  # -n_prev .. -1
         lines.append(f"STATE[{_tlabel(idx)}] features:\n{z or '(empty)'}")
         lines.append(f"  action({_tlabel(idx)} -> {_tlabel(idx + 1)}): {a}")
     lines.append(f"STATE[t] features:\n{win['z_t'] or '(empty)'}")
-    lines.append("  action(t -> t+1): ??? (IDENTIFY THIS)")
+    lines.append("  action(t -> t+1): "
+                 + (str(reveal_action) if reveal_action is not None
+                    else "??? (IDENTIFY THIS)"))
     lines.append(f"STATE[t+1] features:\n{win['z_t1'] or '(empty)'}")
     for k, (a, z) in enumerate(win["nxt"]):
         lines.append(f"  action({_tlabel(k + 1)} -> {_tlabel(k + 2)}): {a}")
@@ -1277,6 +1284,7 @@ class InvDynAdapter:
         softmin_tau=0.25,
         contrastive_fd=False,
         cfd_raw_targets=False,
+        no_id=False,
         reflect_max_failures=8,
         reflect_raw_prefix=1500,
         analysis_memo=True,
@@ -1357,6 +1365,24 @@ class InvDynAdapter:
         self.cell = cell
         self.fd_scorer = fd_scorer  # "none" | "textdiff" | "judge"
         self.fd_weight = 0.0 if fd_scorer == "none" else fd_weight
+        # --no-id (OBJECTIVE ABLATION): drop the inverse-dynamics term from the composite
+        # AND from everything the proposer reads. The ID call itself still runs, so
+        # id_score stays in predictions.jsonl as a diagnostic and the end-of-run held-out
+        # ID protocol (eval_on) is untouched -- what changes is only the training signal.
+        # Suppressing the reflection side matters as much as the score: leaving the
+        # predicted-vs-true action, F's decoder reasoning and the INVERSE feedback in the
+        # prompt would let the proposer keep optimizing ID by hand, which would make this
+        # an ablation of the scorer rather than of the objective.
+        self.no_id = no_id
+        if no_id and not (self.contrastive_fd or self.fd_weight > 0.0):
+            raise ValueError(
+                "--no-id removes the only term from the composite: enable a forward term "
+                "(--contrastive-fd, or --fd-scorer textdiff|judge|exact) alongside it"
+            )
+        # Heading for the reflective record's evidence block. render_reflection_prompt
+        # turns record keys into `## <key>` markdown headings, so this key is literally
+        # what names the task the proposer believes it is solving.
+        self._evidence_key = "Transition" if no_id else "Inverse Dynamics"
         self.fd_reflect = fd_reflect  # also feed forward failures to the proposer
         self.analyze_mistakes = analyze_mistakes  # LLM diagnosis -> proposer feedback
         # "combined" (default): one diagnosis call per component for ALL its shown mistakes
@@ -1630,11 +1656,19 @@ class InvDynAdapter:
                 )
             elif self.composite in ("min", "softmin"):
                 credited_id = credited_fd = None
-                terms = [id_score]
+                # --no-id drops the ID term; the ctor guarantees a forward term survives,
+                # but an instance with no baked cfd_options (never true for the train
+                # split, which bake_decoys covers) would otherwise leave terms empty.
+                terms = [] if self.no_id else [id_score]
                 if self.fd_weight > 0.0:
                     terms.append(fd_score)
                 if cfd_score is not None:
                     terms.append(cfd_score)
+                if not terms:
+                    raise ValueError(
+                        "--no-id: transition has no forward term to score "
+                        "(no baked contrastive options and no predictive FD scorer)"
+                    )
                 if self.composite == "min":
                     score = min(terms)
                 else:
@@ -1911,7 +1945,9 @@ class InvDynAdapter:
                     if (t.get("win") and (t["win"]["prev"] or t["win"]["nxt"]))
                     else None
                 )
-                if t.get("id_score", 1.0) < 1.0:  # inverse-dynamics mistake
+                # --no-id: never diagnose an inverse-dynamics mistake -- the diagnosis text
+                # is injected straight into the proposer prompt, so it is ID signal.
+                if not self.no_id and t.get("id_score", 1.0) < 1.0:
                     cases.append((ti, "inv", t, tr, win))
                 if (
                     self.fd_reflect
@@ -2024,15 +2060,25 @@ class InvDynAdapter:
                 # is 0 before any per-transition detail.
                 n_obs = len(self.gate_train_x)
                 if comp == "perception":
+                    # why a constant P earns no credit differs by objective: under the
+                    # full composite it makes FD trivially exact AND leaves ID to the
+                    # visible action history; under --no-id there is no ID term, and the
+                    # honest statement is that every contrastive option renders alike.
+                    why = (
+                        "A constant output renders every candidate next observation "
+                        "identically, so the contrastive check cannot be answered from "
+                        "the features at all and none of the credit is real."
+                        if self.no_id else
+                        "A constant output makes the forward prediction trivially exact "
+                        "and leaves the action guessable only from the visible action "
+                        "history, so none of the credit is real."
+                    )
                     gate_fb = (
                         "Score was zeroed: perception output was constant over the "
                         f"batch. perceive() returned the identical output {gate_z!r} "
                         f"for all {n_obs} training observations even though the "
-                        "observations themselves differ. A constant output makes the "
-                        "forward prediction trivially exact and leaves the action "
-                        "guessable only from the visible action history, so none of "
-                        "the credit is real. The composite score stays 0 while the "
-                        "output is constant."
+                        f"observations themselves differ. {why} The composite score "
+                        "stays 0 while the output is constant."
                     )
                 else:  # world_knowledge
                     gate_fb = (
@@ -2044,7 +2090,7 @@ class InvDynAdapter:
                     )
                 records.append(
                     {
-                        "Inverse Dynamics": "(all scores zeroed by the constant-output gate)",
+                        self._evidence_key: "(all scores zeroed by the constant-output gate)",
                         "Forward Prediction": "(all scores zeroed by the constant-output gate)",
                         "Feedback": gate_fb,
                     }
@@ -2066,11 +2112,15 @@ class InvDynAdapter:
                     # ---- INVERSE DYNAMICS section: is the action recoverable from P's
                     # features? The predicted AND the true action are surfaced together as
                     # explicit fields below; here we collect the supporting notes.
-                    inv = [
+                    # Under --no-id this section is renamed TRANSITION and carries only the
+                    # shared evidence (raw states, P's features, the true action): F's
+                    # decoder reasoning, its prediction and every INVERSE note below are
+                    # inverse-dynamics signal and are withheld.
+                    inv = [] if self.no_id else [
                         f"F (which sees ONLY P's text output, not the frames) reasoned when "
                         f"coming up with the predicted action: {_clip_reasoning(t['reasoning'])}"
                     ]
-                    if t.get("id_score", 1.0) < 1.0:
+                    if not self.no_id and t.get("id_score", 1.0) < 1.0:
                         if self.id_set_loss and t.get("id_hit"):
                             m = t.get("id_set_size", 0)
                             inv.insert(
@@ -2097,6 +2147,10 @@ class InvDynAdapter:
                             )
                     if t["z_t"] == t["z_t1"]:
                         inv.append(
+                            "P produced IDENTICAL output for both states. If the state changed "
+                            "between them, the abstraction is not moving when the world moves -- "
+                            "surface whatever distinguishes consecutive states."
+                            if self.no_id else
                             "P produced IDENTICAL output for both states, so the action could not "
                             "be recovered from the features. If the state changed between them, the "
                             "abstraction is not moving when the world moves -- surface whatever "
@@ -2105,8 +2159,14 @@ class InvDynAdapter:
                     # When windowed: show the feature trajectory so the P-writer can see
                     # whether the features carry enough state to make the action recoverable
                     # ACROSS several steps (e.g. a selected/active object persists in time).
+                    # Under --no-id a_t is shown rather than masked (nothing is being asked
+                    # to identify it).
                     if win is not None:
                         inv.append(
+                            "FEATURE TRAJECTORY (your perceive() output over consecutive "
+                            "states, with the action between each pair):\n"
+                            + _inverse_transcript(win, reveal_action=tr.action)
+                            if self.no_id else
                             "FEATURE TRAJECTORY (your perceive() output over consecutive "
                             "states; the action between each pair is shown, a_t masked):\n"
                             + _inverse_transcript(win)
@@ -2163,12 +2223,14 @@ class InvDynAdapter:
                                 ] = _prefix_hint(raw, n_pfx)
                     inverse_dynamics["perceive(state_1)"] = t["z_t"] or "(empty)"
                     inverse_dynamics["perceive(state_2)"] = t["z_t1"] or "(empty)"
-                    pred_key = (
-                        "predicted action set" if self.id_set_loss else "predicted action"
-                    )
-                    inverse_dynamics[pred_key] = repr(t["pred"])
+                    if not self.no_id:  # F's prediction IS the inverse-dynamics signal
+                        pred_key = (
+                            "predicted action set" if self.id_set_loss else "predicted action"
+                        )
+                        inverse_dynamics[pred_key] = repr(t["pred"])
                     inverse_dynamics["TRUE action"] = repr(tr.action)
-                    inverse_dynamics["notes"] = "\n".join(inv)
+                    if inv:
+                        inverse_dynamics["notes"] = "\n".join(inv)
 
                     # ---- FORWARD PREDICTION section: are the features Markov-sufficient to
                     # predict the next state from P(X_t)+action? ----
@@ -2201,7 +2263,7 @@ class InvDynAdapter:
                         fb.append(
                             f"PERCEPTION CRASHED: {t['perc_err']} -> fix so perceive() never raises."
                         )
-                    if t.get("id_score", 1.0) < 1.0:
+                    if not self.no_id and t.get("id_score", 1.0) < 1.0:
                         if self.id_set_loss and t.get("id_hit"):
                             fb.append(
                                 f"INVERSE: the predictor could only narrow the action down to "
@@ -2244,11 +2306,14 @@ class InvDynAdapter:
                     if not fb:
                         fb.append(
                             "This transition scored imperfectly; make the features cleaner so the "
+                            "next state is predictable and distinguishable from near-miss frames."
+                            if self.no_id else
+                            "This transition scored imperfectly; make the features cleaner so the "
                             "action is recoverable and the next state is predictable."
                         )
 
                     record = {
-                        "Inverse Dynamics": inverse_dynamics,
+                        self._evidence_key: inverse_dynamics,
                         "Forward Prediction": forward_prediction,
                     }
                     if t.get("cfd_ambiguous") and t.get("cfd_tied_decoy"):
@@ -2271,10 +2336,12 @@ class InvDynAdapter:
                         else None
                     )
 
-                    # ---- INVERSE DYNAMICS section ----
+                    # ---- INVERSE DYNAMICS section ---- (TRANSITION under --no-id, where
+                    # a_t is revealed rather than masked and no ID outcome is shown)
                     if win is not None:
                         # The window already contains STATE[t]/STATE[t+1], so no separate pair.
-                        inverse_section = _inverse_transcript(win)
+                        inverse_section = _inverse_transcript(
+                            win, reveal_action=tr.action if self.no_id else None)
                     else:
                         inverse_section = (
                             f"features_state_1 (CURRENT):\n{t['z_t'] or '(empty)'}\n\n"
@@ -2283,8 +2350,8 @@ class InvDynAdapter:
                     inv_fb = []
                     # INVERSE signal: only when the action was actually mis-identified --
                     # otherwise the "chose X but TRUE was X" line is noise (the example may
-                    # be here purely on a FORWARD miss).
-                    if t.get("id_score", 1.0) < 1.0:
+                    # be here purely on a FORWARD miss). Withheld entirely under --no-id.
+                    if not self.no_id and t.get("id_score", 1.0) < 1.0:
                         if self.id_set_loss and t.get("id_hit"):
                             inv_line = (
                                 f"INVERSE: the predictor hedged over {t['pred']!r}; the TRUE "
@@ -2313,13 +2380,19 @@ class InvDynAdapter:
                             + analyses[(comp, ti, "inv")]
                         )
 
-                    inverse_dynamics = {
-                        (
-                            "predicted action set" if self.id_set_loss else "predicted action"
-                        ): repr(t["pred"]),
-                        "TRUE action": repr(tr.action),
-                        "transition (a_t masked as '??? (IDENTIFY THIS)'; TRUE a_t given above)": inverse_section,
-                    }
+                    if self.no_id:
+                        inverse_dynamics = {
+                            "action taken (a_t)": repr(tr.action),
+                            "transition (a_t shown in place)": inverse_section,
+                        }
+                    else:
+                        inverse_dynamics = {
+                            (
+                                "predicted action set" if self.id_set_loss else "predicted action"
+                            ): repr(t["pred"]),
+                            "TRUE action": repr(tr.action),
+                            "transition (a_t masked as '??? (IDENTIFY THIS)'; TRUE a_t given above)": inverse_section,
+                        }
                     # In --image-mode, ADD a rendered image of each state ALONGSIDE the
                     # feature transcript above (the raw observation TEXT is still never shown
                     # to the belief writer -- images are purely additive). Labels line up with
@@ -2405,17 +2478,43 @@ class InvDynAdapter:
                     ):  # selected as imperfect but neither signal is displayable
                         fb.append(
                             "This transition scored imperfectly; refine the world knowledge "
+                            "so its dynamics rules pin down what each action changes."
+                            if self.no_id else
+                            "This transition scored imperfectly; refine the world knowledge "
                             "so feature changes map cleanly to action names and dynamics."
                         )
                     records.append(
                         {
-                            "Inverse Dynamics": inverse_dynamics,
+                            self._evidence_key: inverse_dynamics,
                             "Forward Prediction": forward_prediction,
                             "Feedback": "\n".join(fb),
                         }
                     )
             # a couple of CORRECT cases for contrast (keep what already works)
             for t, _ in corrects[:2]:
+                if self.no_id:
+                    # A "correct" case here scored 1.0 on the forward term(s) only, so the
+                    # contrast to draw is about the features that made the true next state
+                    # identifiable -- not about an action the scorer never looked at.
+                    correct_id = {
+                        "perceive(state_1)": t["z_t"],
+                        "perceive(state_2)": t["z_t1"],
+                        "action taken (a_t)": repr(t["tr"].action),
+                    }
+                    correct_fb = (
+                        f"Scored perfectly on this transition after {t['tr'].action!r} -- the "
+                        f"features carried enough of the state to pin down the true next "
+                        f"observation against near-miss alternatives. Note WHAT made that "
+                        f"work and keep it intact when revising the rest."
+                    )
+                    records.append(
+                        {
+                            self._evidence_key: correct_id,
+                            "Forward Prediction": "(correct case, shown for contrast)",
+                            "Feedback": correct_fb,
+                        }
+                    )
+                    continue
                 if self.id_set_loss:
                     correct_id = {
                         "perceive(state_1)": t["z_t"],
@@ -2442,14 +2541,14 @@ class InvDynAdapter:
                     )
                 records.append(
                     {
-                        "Inverse Dynamics": correct_id,
+                        self._evidence_key: correct_id,
                         "Forward Prediction": "(correct case, shown for contrast)",
                         "Feedback": correct_fb,
                     }
                 )
             dataset[comp] = records or [
                 {
-                    "Inverse Dynamics": "(no failures in this minibatch)",
+                    self._evidence_key: "(no failures in this minibatch)",
                     "Forward Prediction": "(no failures in this minibatch)",
                     "Feedback": "No failures in this minibatch; keep the component as-is or make it more robust.",
                 }
@@ -2801,16 +2900,153 @@ Rewrite the FULL module so its output moves whenever the world moves and makes t
 }
 
 
-def build_reflection_templates(env_name: str | None = None) -> dict:
+# --no-id template surgery. The proposer's OWN INSTRUCTIONS are inverse-dynamics-framed
+# ("identify the action taken", "makes the action recoverable", "map feature changes to
+# action names"), so suppressing the ID signal from the reflective dataset is not enough:
+# the task statement itself has to be restated in terms of the surviving contrastive
+# forward objective, or the proposer keeps optimizing for an objective the scorer no
+# longer measures. Each swap asserts its source string is present, so an edit to
+# REFLECTION_TEMPLATES that moves one of these sentences fails loudly instead of silently
+# leaving the ablation with ID framing.
+_NO_ID_TEMPLATE_SWAPS = {
+    "perception": [
+        (
+            "Its output over a window of consecutive states (several steps before and "
+            "after a transition, when context is available) is consumed WITHOUT the raw "
+            "grid to identify the action taken between the two center states.",
+            "Its output over a window of consecutive states (several steps before and "
+            "after a transition, when context is available) is consumed WITHOUT the raw "
+            "grid to identify which of several candidate observations is the TRUE next "
+            "state, given the history and the action just taken. The decoys are near "
+            "misses drawn from other moments of the same game, so the features must "
+            "preserve exactly what distinguishes this next state from a similar one.",
+        ),
+        (
+            "Execution feedback (each failure shows the predicted vs TRUE action, the "
+            "reasoning of F -- which sees ONLY P's text output, not the frames -- when "
+            "coming up with the predicted action, and whether P emitted IDENTICAL "
+            "features for both states -- read these carefully; if P's output does not "
+            "change between two consecutive states, the abstraction is dropping "
+            "decision-relevant state):",
+            "Execution feedback (each failure shows the transition and the action taken, "
+            "whether the TRUE next observation could be picked out among near-miss "
+            "decoys, whether P rendered the true next state IDENTICALLY to a decoy, and "
+            "whether P emitted IDENTICAL features for both states -- read these "
+            "carefully; if P's output does not change between two consecutive states, "
+            "the abstraction is dropping decision-relevant state):",
+        ),
+        (
+            "Rewrite the FULL module so its output moves whenever the world moves and "
+            "makes the action recoverable from the feature trajectory -- including cases "
+            "where the evidence lies several steps away from the masked action. Provide "
+            "the complete module within ``` blocks.",
+            "Rewrite the FULL module so its output moves whenever the world moves and "
+            "preserves enough of the grid's actual content that the true next state is "
+            "distinguishable from near-miss frames of the same game -- including cases "
+            "where the evidence lies several steps away from the transition. Do not "
+            "abstract away the state details that separate one moment of play from "
+            "another. Provide the complete module within ``` blocks.",
+        ),
+    ],
+    "world_knowledge": [
+        (
+            "Verify against the window first: the predictor sees several steps before and "
+            "after the masked action, and an action's effect may be delayed by several "
+            "steps or may change many cells at once",
+            "Verify against the window first: the predictor sees several steps before and "
+            "after the transition, and an action's effect may be delayed by several "
+            "steps or may change many cells at once",
+        ),
+        (
+            "Step 2 -- TABULATE (plain text, no code fences): for each action label "
+            "appearing anywhere in the windows, note what feature change followed it in "
+            "every instance. State any exceptionless regularity, and flag any action "
+            "whose current rule disagrees with these instances.",
+            "Step 2 -- TABULATE (plain text, no code fences): for each action label "
+            "appearing anywhere in the windows, note exactly what feature change followed "
+            "it in every instance, including what stayed the same. State any exceptionless "
+            "regularity, and flag any action whose current rule disagrees with these "
+            "instances.",
+        ),
+        (
+            "Step 3 -- REWRITE the FULL world knowledge block: concise, general, "
+            "sufficient to map feature changes -- across the whole shown window, not just "
+            "the center pair -- to action names.",
+            "Step 3 -- REWRITE the FULL world knowledge block: concise, general, "
+            "sufficient to PREDICT the next features from the current ones plus the "
+            "action -- across the whole shown window, not just the center pair -- "
+            "precisely enough to tell the true next state apart from a near-miss "
+            "alternative.",
+        ),
+    ],
+    # The OBSERVATION SCHEMA is spliced into the perception template by
+    # observation_schema(); its closing sentence motivates the summary by inverse
+    # dynamics, so it needs the same treatment. Keyed separately because only the autumn
+    # variant carries such a sentence, so the swap is presence-conditional.
+    "_schema": [
+        (
+            "so the action between two states is recoverable from the two summaries.",
+            "so the true next state is distinguishable from a near-miss frame of the "
+            "same game.",
+        ),
+    ],
+}
+
+
+# Backstop for the swaps above: after rewriting, no proposer template may still ask for
+# inverse dynamics. Cheaper to maintain than the per-sentence asserts and catches new ID
+# framing added anywhere in the templates or in a future OBSERVATION SCHEMA.
+_NO_ID_BANNED = re.compile(
+    r"identify the action|action taken between|masked action|recover\w* the action"
+    r"|the action .{0,40}\bis recoverable|action is recoverable|recoverable from the "
+    r"(?:feature|two)|to action names|predicted vs TRUE action|predicted action",
+    re.I,
+)
+
+
+def _apply_no_id_swaps(comp: str, text: str, *, required: bool = True) -> str:
+    for src, dst in _NO_ID_TEMPLATE_SWAPS[comp]:
+        if src not in text:
+            if not required:
+                continue
+            raise RuntimeError(
+                f"--no-id: the {comp} reflection template no longer contains the "
+                f"inverse-dynamics sentence this ablation must replace; update "
+                f"_NO_ID_TEMPLATE_SWAPS. Missing: {src[:80]!r}..."
+            )
+        text = text.replace(src, dst)
+    return text
+
+
+def build_reflection_templates(env_name: str | None = None, no_id: bool = False) -> dict:
     """REFLECTION_TEMPLATES with the OBSERVATION SCHEMA scoped to env_name (autumn/arc_agi ->
     only that grid format; None -> both). Pass the running env to avoid leaking the other
-    env's format/palette into the proposed perception code."""
-    return {
+    env's format/palette into the proposed perception code.
+
+    no_id=True (the --no-id objective ablation) additionally restates the proposer's task
+    in terms of the contrastive forward objective; see _NO_ID_TEMPLATE_SWAPS."""
+    out = {
         "perception": REFLECTION_TEMPLATES["perception"].replace(
             OBSERVATION_SCHEMA, observation_schema(env_name)
         ),
         "world_knowledge": REFLECTION_TEMPLATES["world_knowledge"],
     }
+    if not no_id:
+        return out
+    out = {c: _apply_no_id_swaps(c, t) for c, t in out.items()}
+    # the schema is spliced into perception; only the autumn variant carries an
+    # inverse-dynamics motivation, so this swap is presence-conditional
+    out["perception"] = _apply_no_id_swaps("_schema", out["perception"], required=False)
+    for comp, text in out.items():
+        m = _NO_ID_BANNED.search(text)
+        if m:
+            raise RuntimeError(
+                f"--no-id: inverse-dynamics framing survives in the {comp} reflection "
+                f"template ({m.group(0)!r} at char {m.start()}). Add a swap to "
+                "_NO_ID_TEMPLATE_SWAPS -- leaving it in makes the proposer optimize an "
+                "objective the scorer no longer measures."
+            )
+    return out
 
 
 class RExPureCandidateSelector:
@@ -4020,6 +4256,126 @@ async def eval_fd_on(
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(payload, indent=2, default=str))
     return fd_score, sum(r[1] for r in res)
+
+
+# Held-out contrastive options are baked with a DIFFERENT rng offset from the train
+# ones (rexpure_optimize.build_data uses seed+9173), so the two splits never share a
+# draw. Both the in-run --cfd-test path and the standalone scorer go through
+# bake_test_decoys, so a run's held-out cFD is reproducible from (seed, split) alone
+# and the two paths cannot drift apart.
+CFD_TEST_SEED_OFFSET = 9174
+
+
+def bake_test_decoys(test, transitions, n_decoys, seed, hard=False):
+    """bake_decoys over the TEST split under the fixed held-out convention."""
+    return bake_decoys(test, transitions, n_decoys,
+                       random.Random(seed + CFD_TEST_SEED_OFFSET), hard=hard)
+
+
+async def eval_cfd_on(
+    cfg,
+    code,
+    beliefs,
+    baked,
+    concurrency=16,
+    context_k=0,
+    raw_targets=False,
+    log_path=None,
+):
+    """HELD-OUT contrastive-FD score: on each baked test item, identify the TRUE next
+    observation among that item's baked `cfd_options`.
+
+    The training loop scores cFD only on the train split (bake_decoys is called on
+    `train`), and the end-of-run summary reports only inverse accuracy, so a run trained
+    under `--fd-scorer none` has no held-out forward number at all. That is fine while
+    every arm optimises ID -- test ID is then everyone's own metric -- but it leaves the
+    --no-id ablation with no held-out metric on the objective it actually trained on.
+    This scores exactly the term the training loop uses, on the clean test split.
+
+    Two TARGET RENDERINGS, the same pair the training scorer offers:
+      raw_targets=False (default) -- options shown as P(option), so the score measures
+        whether THIS P preserves what distinguishes the true next state from a decoy.
+        Cross-arm comparison is then slightly apples-to-oranges (each arm answers a
+        question posed in its own feature language), which is exactly why the ablation
+        table should also carry the raw variant.
+      raw_targets=True -- options shown as raw frames, candidate-independent all the way
+        to the prompt, so the chance floor 1/n_options is a constant for ANY P and the
+        arms answer the identical question. A lossy P can still score here on
+        information it does not itself encode; read the two together.
+
+    `baked` items must carry `cfd_options` (bake_decoys). Returns (mean_score, cost).
+    """
+    missing = [i for i, inst in enumerate(baked) if not inst.get("cfd_options")]
+    if missing:
+        raise ValueError(
+            f"eval_cfd_on: {len(missing)} of {len(baked)} items carry no baked "
+            "cfd_options -- run bake_decoys over the split first"
+        )
+    sem = asyncio.Semaphore(concurrency)
+    _popt = {}  # frame -> P(frame), reused across items (pool frames recur as decoys)
+
+    def _render(o):
+        r = _popt.get(o)
+        if r is None:
+            z, e = run_perceive(code, o)
+            r = "(perception error)" if e else (z.strip() or "(empty)")
+            _popt[o] = r
+        return r
+
+    async def one(idx, inst):
+        tr, opts = inst["tr"], inst["cfd_options"]
+        win = None
+        if context_k > 0:
+            win, _ = build_window(code, tr)
+            z_t = win["z_t"]
+        else:
+            z_t = run_perceive(code, tr.x_t)[0]
+        rendered = None if raw_targets else [_render(o) for o in opts]
+        pred_i, cost, prompt, raw = await predict_true_next_frame(
+            cfg, win, z_t, tr.action, beliefs, opts, sem, rendered=rendered
+        )
+        truth_key = (tr.x_t1 or "").strip()
+        score = 1.0 if (
+            pred_i is not None
+            and 1 <= pred_i <= len(opts)
+            and (opts[pred_i - 1] or "").strip() == truth_key
+        ) else 0.0
+        # P collapsed the true option onto a decoy: the question was unanswerable from
+        # the features. Only meaningful in the P-rendered mode.
+        ambiguous = False
+        if rendered is not None:
+            ti = next((i for i, o in enumerate(opts)
+                       if (o or "").strip() == truth_key), None)
+            if ti is not None:
+                ambiguous = any(r == rendered[ti] for i, r in enumerate(rendered)
+                                if i != ti)
+        rec = None
+        if log_path is not None:
+            rec = {
+                "idx": idx, "action": tr.action, "n_options": len(opts),
+                "pred_index": pred_i, "score": score, "ambiguous": ambiguous,
+                "cfd_prompt": prompt, "cfd_response": raw,
+            }
+        return score, cost, rec, ambiguous
+
+    res = await asyncio.gather(*(one(i, inst) for i, inst in enumerate(baked)))
+    n = max(1, len(res))
+    cfd = sum(r[0] for r in res) / n
+    if log_path is not None:
+        p = Path(log_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({
+            "cfd_score": cfd,
+            "n_test": len(res),
+            "targets": "raw" if raw_targets else "perceived",
+            "chance": 1.0 / max(1, len(baked[0]["cfd_options"])),
+            "ambiguous_rate": sum(1 for r in res if r[3]) / n,
+            "context_k": context_k,
+            "perception": code,
+            "beliefs": beliefs,
+            "records": [r[2] for r in res],
+        }, indent=2, default=str))
+    return cfd, sum(r[1] for r in res)
 
 
 def stratified_split(transitions, n_a, n_b, rng):

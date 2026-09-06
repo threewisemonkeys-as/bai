@@ -235,6 +235,22 @@ def build_parser() -> argparse.ArgumentParser:
                          "the search mutates ONLY the world-knowledge block. Mutually "
                          "exclusive with --start-perception (and ignores "
                          "--belief-update-period, which has no other component to cede to)")
+    ap.add_argument("--no-beliefs", action="store_true",
+                    help="ABLATION: do not learn beliefs. The world_knowledge component is "
+                         "dropped from the candidate entirely, so every prompt that would "
+                         "show the learned belief block shows '(empty)' and the search "
+                         "mutates ONLY perception. Mutually exclusive with --start-beliefs "
+                         "and with --no-perception (together they are the raw arm, not an "
+                         "ablation of the method); ignores --belief-update-period")
+    ap.add_argument("--no-id", action="store_true",
+                    help="ABLATION: drop the inverse-dynamics term from the training "
+                         "composite AND from everything the proposer reads (F's predicted "
+                         "action, its decoder reasoning, the INVERSE feedback bullets, the "
+                         "ID diagnosis calls, and the inverse-dynamics framing of the "
+                         "reflection templates). Requires a surviving forward term "
+                         "(--contrastive-fd, or --fd-scorer textdiff|judge|exact). The ID "
+                         "call still runs, so id_score stays logged and the held-out ID "
+                         "test at the end of the run is unchanged and stays comparable")
     ap.add_argument("--fd-scorer", choices=["none", "textdiff", "judge", "exact"], default="exact")
     ap.add_argument("--fd-weight", type=float, default=0.5)
     ap.add_argument("--id-set-loss", action="store_true")
@@ -268,6 +284,17 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--contrastive-fd", action="store_true")
     ap.add_argument("--cfd-decoys", type=int, default=3)
     ap.add_argument("--cfd-hard-decoys", action="store_true")
+    ap.add_argument("--cfd-test", action="store_true",
+                    help="also score HELD-OUT contrastive FD for the shipped candidate: "
+                         "bake decoys over the test split (bake_test_decoys, own rng "
+                         "offset) and identify the true next observation among them, in "
+                         "BOTH target renderings (P-rendered and raw). Without it a run "
+                         "under --fd-scorer none reports no held-out forward number at "
+                         "all, which leaves --no-id with no metric on its own objective. "
+                         "Requires --contrastive-fd. Off by default so existing reference "
+                         "commands stay byte-identical; offline_learning/scripts/"
+                         "eval_heldout_cfd.py computes the same numbers for runs that "
+                         "already finished")
     ap.add_argument("--cfd-raw-targets", action="store_true")
     ap.add_argument("--fd-reflect", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--analyze-mistakes", action="store_true")
@@ -280,6 +307,38 @@ def build_parser() -> argparse.ArgumentParser:
                     "restarting from the seed; test baselines are reloaded, not recomputed")
     ap.add_argument("--out-dir", default=None)
     return ap
+
+
+def validate_args(parser, args) -> None:
+    """Flag-combination checks. Split out of main() so they can be exercised without a
+    dataset on disk (tests/test_ablation_flags.py) -- these are the guards that stop an
+    ablation arm from being launched in a configuration that silently means something
+    other than what its name says."""
+    if args.id_set_loss and (args.image_mode or args.f_image):
+        parser.error("--id-set-loss does not support --image-mode/--f-image")
+    if args.credited_scoring and args.f_image:
+        parser.error("--credited-scoring does not support --f-image")
+    if args.composite in ("min", "softmin") and args.credited_scoring:
+        parser.error(f"--composite {args.composite} and --credited-scoring are mutually exclusive")
+    if args.contrastive_fd and args.f_image:
+        parser.error("--contrastive-fd does not support --f-image")
+    # mirrors InvDynAdapter's own guard: fd_scorer "none" zeroes fd_weight, and the
+    # reference config passes exactly that, so under it --contrastive-fd is the only
+    # forward term available
+    if args.no_id and not (args.contrastive_fd
+                           or (args.fd_scorer != "none" and args.fd_weight > 0)):
+        parser.error("--no-id removes the only term from the composite; add "
+                     "--contrastive-fd or --fd-scorer textdiff|judge|exact")
+    if args.cfd_test and not args.contrastive_fd:
+        parser.error("--cfd-test scores the contrastive term; add --contrastive-fd")
+    if args.no_perception and args.no_beliefs:
+        parser.error("--no-perception with --no-beliefs leaves nothing to learn (that is "
+                     "the raw arm, not an ablation of the method)")
+    if args.no_perception and args.start_perception:
+        parser.error("--no-perception freezes P to the identity module; "
+                     "drop --start-perception")
+    if args.no_beliefs and args.start_beliefs:
+        parser.error("--no-beliefs fixes B to empty; drop --start-beliefs")
 
 
 # ---------------------------------------------------------------------------
@@ -299,14 +358,7 @@ def main():
         os.environ["LLM_HEDGE_DELAY_S"] = str(args.hedge_delay)
     else:
         os.environ.setdefault("LLM_HEDGE_DELAY_S", "30")
-    if args.id_set_loss and (args.image_mode or args.f_image):
-        parser.error("--id-set-loss does not support --image-mode/--f-image")
-    if args.credited_scoring and args.f_image:
-        parser.error("--credited-scoring does not support --f-image")
-    if args.composite in ("min", "softmin") and args.credited_scoring:
-        parser.error(f"--composite {args.composite} and --credited-scoring are mutually exclusive")
-    if args.contrastive_fd and args.f_image:
-        parser.error("--contrastive-fd does not support --f-image")
+    validate_args(parser, args)
 
     rng = random.Random(args.seed)
     task_cfg = make_config(args.task_model, args.client,
@@ -337,10 +389,7 @@ def main():
     # ARC) so the other env's palette never leaks into the proposed perception code.
     env_name = infer_env_name(transitions)
 
-    if args.no_perception:
-        if args.start_perception:
-            parser.error("--no-perception freezes P to the identity module; "
-                         "drop --start-perception")
+    if args.no_perception:  # validate_args already rejected a conflicting --start-perception
         args.start_perception = str(Path(__file__).resolve().parent / "identity_perception.py")
         print(f"[no-perception] ABLATION: P frozen to identity ({args.start_perception}); "
               "prompts show the raw grid and only world_knowledge is learned")
@@ -350,7 +399,17 @@ def main():
     seed_beliefs = Path(args.start_beliefs).read_text() if args.start_beliefs else ""
     if args.start_beliefs:
         print(f"[warm-start] seed beliefs <- {args.start_beliefs}")
-    seed_candidate = {"perception": seed_code, "world_knowledge": seed_beliefs}
+    # --no-beliefs drops the component outright rather than seeding it empty: every read
+    # of the belief text is candidate.get("world_knowledge", ""), so a missing key renders
+    # as "(empty)" everywhere, and the module selector below can then never pick it.
+    seed_candidate = ({"perception": seed_code} if args.no_beliefs
+                      else {"perception": seed_code, "world_knowledge": seed_beliefs})
+    if args.no_beliefs:
+        print("[no-beliefs] ABLATION: world_knowledge dropped from the candidate; every "
+              "prompt shows '(empty)' beliefs and only perception is learned")
+    if args.no_id:
+        print("[no-id] ABLATION: composite drops the ID term; inverse-dynamics signal, "
+              "diagnosis and framing withheld from the proposer (ID still scored + logged)")
 
     if args.out_dir:
         outd = Path(args.out_dir)
@@ -407,15 +466,20 @@ def main():
         credited_scoring=args.credited_scoring, composite=args.composite,
         softmin_tau=args.softmin_tau,
         contrastive_fd=args.contrastive_fd, cfd_raw_targets=args.cfd_raw_targets,
+        no_id=args.no_id,
         analysis_memo=args.analysis_memo,
         reflect_max_failures=args.reflect_max_failures,
         reflect_raw_prefix=args.reflect_raw_prefix,
         image_cls=Image,
     )
-    templates = build_reflection_templates(env_name)
+    templates = build_reflection_templates(env_name, no_id=args.no_id)
     selector = RExPureCandidateSelector(c=args.rex_c, rng=random.Random(args.seed + 7331))
-    module_selector = (SingleComponentSelector("world_knowledge") if args.no_perception
-                       else PerceptionBiasedComponentSelector(args.belief_update_period))
+    if args.no_perception:
+        module_selector = SingleComponentSelector("world_knowledge")
+    elif args.no_beliefs:
+        module_selector = SingleComponentSelector("perception")
+    else:
+        module_selector = PerceptionBiasedComponentSelector(args.belief_update_period)
     refl_log = str(run_dir / "reflection_calls.jsonl") if args.log_reflection else None
     reflection_lm = make_reflection_lm(refl_cfg, log_path=refl_log)
 
@@ -447,6 +511,25 @@ def main():
     cost = adapter.total_cost + _REFLECTION["cost"]
     print(f"[rexpure] CLEAN test acc (inverse) = {test_acc:.2f}")
 
+    cfd_test = None
+    if args.cfd_test:
+        # Held-out cFD for the SHIPPED candidate, in both target renderings. Decoys are
+        # baked here (not in build_data) so the split itself is untouched -- every arm
+        # sees the identical train/test transitions whether or not this flag is on.
+        bake_test_decoys(test, transitions, args.cfd_decoys, args.seed,
+                         hard=args.cfd_hard_decoys)
+        cfd_test = {"n_decoys": args.cfd_decoys, "hard": args.cfd_hard_decoys,
+                    "chance": 1.0 / (args.cfd_decoys + 1)}
+        for mode, raw in (("perceived", False), ("raw", True)):
+            s, c = run_async(eval_cfd_on(
+                task_cfg, best_code, best_beliefs, test, concurrency=args.concurrency,
+                context_k=context_k, raw_targets=raw,
+                log_path=outd / f"test_trace_cfd_{mode}_rexpure_seed{args.seed}.json"))
+            cfd_test[mode] = s
+            cost += c
+            print(f"[rexpure] CLEAN held-out cFD [{mode} targets] = {s:.2f} "
+                  f"(chance {cfd_test['chance']:.2f})")
+
     fd_test = None
     if args.fd_scorer != "none":
         fd_test, fd_cost = run_async(eval_fd_on(
@@ -460,6 +543,17 @@ def main():
         "inverse_accuracy": test_acc,
         "forward_score": fd_test,
         "forward_scorer": args.fd_scorer if args.fd_scorer != "none" else None,
+        "heldout_cfd": cfd_test,
+        # which arm this artifact is, so a downstream report never has to infer it from
+        # the run-dir name (every ablation is one flag away from the reference)
+        "ablation": {
+            "no_id": args.no_id,
+            "no_beliefs": args.no_beliefs,
+            "no_perception": args.no_perception,
+            "contrastive_fd": args.contrastive_fd,
+            "fd_scorer": args.fd_scorer,
+            "composite": args.composite,
+        },
         "n_test": len(test),
         "context_k": context_k,
         "best_train_score": result["best_train_score"],

@@ -144,13 +144,17 @@ Our method is the `lmwm` arm (`offline_learning/rexpure_optimize.py`, search in 
 ## Ablations
 
 ### Objectives
-Ablations by experimenting with different variations of our learning objectives. The shipped objective is min(ID, cFD-hard) (`--composite min`).
-- **[X]** No FD: `--fd-scorer none` (composite reduces to ID).
-- **[ ]** No ID: no flag yet. Needs an `--no-id` switch and a decision on what the min-composite becomes with one term.
+Ablations by experimenting with different variations of our learning objectives. The shipped objective is min(ID-set, cFD-hard) (`--composite min --contrastive-fd --cfd-hard-decoys`), i.e. `terms = [id_score, cfd_score]` in `invdyn_core.py:1631` — note the reference run ALSO passes `--fd-scorer none`, which zeroes the *predictive* FD term; the forward term that is actually live is the contrastive one.
+- **[P]** No FD: **drop `--contrastive-fd --cfd-hard-decoys`** (keeping `--fd-scorer none`), which reduces the composite to ID. No code change needed; wired as `--ablation nofd`. (The earlier "[X] `--fd-scorer none`" entry was wrong: that flag is part of the reference config, not an ablation of it.) Not yet trained.
+- **[P]** No ID: `--no-id` IMPLEMENTED 2026-09-06. Drops `id_score` from the composite, leaving `min([cfd])` = cFD, and — because an ablation of the scorer alone would let the proposer keep optimising ID by hand — also withholds the inverse signal from everything the proposer reads: F's predicted action and decoder reasoning, the `INVERSE` notes/bullets, the ID-framed contrast cases, the `??? (IDENTIFY THIS)` action mask, the inverse diagnosis calls, and the inverse-dynamics framing of the reflection templates themselves (swapped for contrastive framing, with a `_NO_ID_BANNED` regex backstop that raises if any survives). The ID call still runs, so `id_score` stays logged and the held-out ID test is unchanged and comparable. Not yet trained.
 
 ### Representations
-- **[ ]** No Beliefs (only perception): no flag yet. `--start-beliefs ""` + a huge `--belief-update-period` approximates it but the proposer can still write beliefs; needs a real `--no-beliefs` that fixes B to empty.
-- **[X]** No Perception (only beliefs): `--no-perception`.
+- **[P]** No Beliefs (only perception): `--no-beliefs` IMPLEMENTED 2026-09-06 — `world_knowledge` is dropped from the candidate entirely (every read is `.get("world_knowledge", "")`, so prompts render `(empty)`) and the module selector is pinned to perception. Not yet trained.
+- **[P]** No Perception (only beliefs): `--no-perception` exists and was validated on 5 games / `informative_unified` (`logs/2026-08-19/noperc_ablation`, mean test ID ~0.53 vs ~0.85, 4.6x cost, 3.1x wall). It has NOT been run on the 15-game `informative_curated` pools that the paper's NLWM column is trained on, so it must be re-trained.
+
+**Held-out cFD** (added 2026-09-06): the training loop scores the contrastive term on the train split only and the summary reports `"forward_score": null`, which would leave −ID with no held-out metric on its own objective. `offline_learning/scripts/eval_heldout_cfd.py` scores a finished run's shipped P/B on the clean test split — rebuilding the split from the run's own `launch.json` through `build_data()` and fingerprint-checking it against the run's checkpoint before spending anything — in both target renderings (`raw`, candidate-independent, the cross-arm column; `perceived`, P's own feature language). New runs can compute it inline with `--cfd-test`, which shares `eval_cfd_on`/`bake_test_decoys` with the script. Smoke on the reference: colour_lines raw 0.42 / perceived 0.56 vs a 0.25 floor, $0.04.
+
+All four arms run through `launch_human_origin.py --ablation {nofd,noid,noperc,nobeliefs}`, which applies exactly one documented delta to the rebuilt reference command (verified: `--ablation none` reproduces the shipped command byte-for-byte). Full design — flag deltas, the proof that they leave the train/test split untouched, measured cost/wall, the `--seed-from` gotcha, and the reporting path — is in **`notes/ablations-plan.md`**. Code and tests landed 2026-09-06 (`tests/test_ablation_flags.py`, 32 tests); no training run launched yet.
 
 ### LLMs
 The pipeline uses an LLM in three roles that were benchmarked separately and have different winners, so model choices must be stated per role:
@@ -390,8 +394,21 @@ prose sections are still TODO.
   - [ ] Enable the `wc` arm in an online planning run on the 86-problem set, and finish the 11 missing WorldCoder (SL) training runs first if that arm is to be reported.
   - [X] Raw LLM + in-context trajectories — RUN 2026-09-04/05 at both presentations. The paper's ICL column is `logs/2026-09-05/planning_v2_online_icl_full` (`--icl-render full`, all 15 games / 86 rows), macro 0.56 (raw 0.32, NLWM 0.62); `logs/2026-09-04/planning_v2_online_ds_percap_nl_icl` (`diff`) is the second draw at 0.57. The presentation question is closed by measurement (see the caveats under Results); what remains open is per-game variance at 1 attempt per problem.
   - [ ] WorldCoder + LLM planning.
-- [ ] Ablations: add `--no-id` and `--no-beliefs`. Nothing has been run for the paper's ablation table yet;
-  every cell in `paper/main.tex::tab:ablations` is an em-dash.
+- [ ] Ablations: add `--no-id` and `--no-beliefs`, then re-train all four arms on the `informative_curated`
+  pools and re-run the online planning battery for each. Nothing has been run for the paper's ablation table
+  yet; every cell in `paper/main.tex::tab:ablations` is an em-dash. Plan (flag deltas, split-invariance
+  argument, measured cost/wall ≈ $240 and ~3-4 days, reporting path): `notes/ablations-plan.md`.
+  - [X] Code: `--no-beliefs`, `--no-id` (incl. the reflection/template suppression), held-out cFD
+    (`eval_cfd_on` + `--cfd-test` + `scripts/eval_heldout_cfd.py`), and `tests/test_ablation_flags.py`
+    (32 tests; the split-invariance test gates every paid run and passes for all four arms).
+  - [X] `--ablation {nofd,noid,noperc,nobeliefs}` in `launch/launch_human_origin.py`; dry-run diff vs the
+    reference command verified for each arm (and `--ablation none` reproduces it byte-for-byte).
+  - [ ] Train the four arms into `logs/<date>/ablations/<arm>/rexpure/<game>_s1` (15 games, seed 1).
+  - [ ] Online eval per arm: `--arms lmwm` only, reusing NLWM's `problems.per-problem-floors.json`; the Raw
+    column is shared from NLWM. Do NOT `--seed-from` NLWM (its lmwm rollouts would resume as the ablation's).
+  - [ ] Report: mean credited test ID + held-out cFD + planning macro per arm, paired sign test over the 86
+    shared rows, and a `tab:ablations` block builder in `report_planning_v2_online.py` + AUTO markers around
+    `paper/main.tex::tab:ablations`.
 - [P] Paper. `paper/` is an Overleaf checkout with its own remote (not tracked in this repo). The results
   table is auto-generated by `report_planning_v2_online.py --write-tex`; every prose section is TODO.
 - [P] Clean up codebase to get rid of code that is not relevant to our core approach or baselines or the evaluations described in this document. A dead-code sweep and the `offline_learning/` rename happened 2026-08-07. The planning-v2 tooling and eval changes were committed 2026-09-04; `cc_autumn/autumn-code` (its own git remote) and `paper/` (Overleaf) are deliberately not tracked here, and `cc_autumn`'s multi-megabyte bundles/replays/zips are gitignored as regenerable. The restructuring itself has not started.
