@@ -267,23 +267,37 @@ Caveats a reviewer will raise, and the answers:
   detector; `LLM_STALL_TIMEOUT_S` / `LLM_TOTAL_TIMEOUT_S` / `LLM_STREAM=0`), with per-call
   telemetry (`<out>.calls.json`, heartbeat transport-health line).
 
-  The re-run — `logs/2026-09-05/planning_v2_online_icl_full`, the four cheap games
-  (diffusion, colour_lines, va6fq, n2ntd = 28 of the 86 rows) at `--icl-render full`, seeded from
-  `logs/2026-09-03` so raw/lmwm resume bit-identical (verified on all 28 rows) — finds the two
-  presentations **indistinguishable**: micro 0.54 `full` vs 0.50 `diff`, macro 0.55 vs 0.54, and
-  per row 6 up / 5 down / 17 tied (sign test p = 1.00). The per-game swings are large and cancel
-  (diffusion +0.18, va6fq +0.14, colour_lines 0.00, n2ntd −0.29), which is what one attempt per
-  problem on binary outcomes looks like. `diff` is the same 60 transitions and lossless (the test
-  reconstructs s′ from s + diff for every transition), so the published ICL column stands as
-  reported. The earlier smoke evidence was a bad sample and should not be cited: colour_lines
-  scored 0.00 at `full` in the smoke and **0.67 on re-run**, equal to `diff`, and its traces show
-  both arms emitting the identical round-0 plan and diverging only at round 2.
+  The re-run — `logs/2026-09-05/planning_v2_online_icl_full`, **all 15 games / all 86 rows** at
+  `--icl-render full`, seeded from `logs/2026-09-03` so raw/lmwm resume bit-identical (asserted on
+  all 86 rows, action caps too) — finds the two presentations **indistinguishable**: macro 0.56
+  `full` vs 0.57 `diff`, micro 0.51 vs 0.50, and per row 12 up / 11 down / 63 tied (sign test
+  p = 1.00). `diff` is the same 60 transitions and lossless (the test reconstructs s′ from s + diff
+  for every transition), so **the published ICL column stands as reported**.
 
-  Worth carrying: va6fq's slowest `full` call was **577 s** with a 0.7 s worst stream gap — pure
-  generation, 23 s under the old deadline, on one of the games classified as cheap. The old ceiling
-  was live in the tail of the small-block games too; `diff` cleared it by halving the prompt, not
-  because the tail was safe. Over all 419 re-run calls: 0 over 600 s, 3 over 400 s, worst stream gap
-  1.3 s, 0 truncated finishes, 0 retries. $6.53, ~5 h.
+  What the re-run does expose is how much per-game sampling variance one attempt per problem
+  carries. Nine of the fifteen games moved, several by a lot — ice +0.38 (0.38 → 0.75, which at
+  `full` puts the in-context baseline ABOVE NLWM's 0.62 on that game), paint +0.25, diffusion +0.18,
+  waterplug +0.14, against dino −0.33, mario −0.29, ants −0.25, egg −0.20 — and they cancel to
+  nothing in aggregate. Every game that gained had `diff` at 0.25–0.38 and every game that lost had
+  `diff` at 0.75–1.00: regression to the mean under resampling, not a presentation effect. Read
+  per-game ICL numbers on the small-n games (dino n=3, SET n=3, colour_lines n=3, ants n=4, paint
+  n=4) as one draw, not as a measurement; the tier and macro aggregates are the defensible level.
+
+  The earlier smoke evidence was a bad sample and should not be cited: colour_lines scored 0.00 at
+  `full` in the smoke and **0.67 on re-run**, equal to `diff`, and its traces show both arms
+  emitting the identical round-0 plan and diverging only at round 2. Likewise the "icl-full never
+  returned inside 600 s" probe was taken on bt3gb's `nightfall` row — cap 2, one round, the cheapest
+  of its eight problems; bt3gb's 164 `full` calls ran p50 79 s, max 299 s, none over 400 s.
+
+  Transport over the whole 15-game re-run — **1482 streamed calls**: wall p50 99 s, p99 270 s, max
+  577 s, **0 over 600 s**, 3 over 400 s, worst stream gap 1.3 s, 0 truncated finishes, 0 retries,
+  0 failures. Largest prompt served 216k tokens (logic_gates, whose ~158k block plus transcript
+  tokenises well above the 4-chars/token estimate) at ttfb 4.4 s. $10.14 and ~13 h.
+
+  Worth carrying: the slowest call in the battery was va6fq's 577 s with a 0.7 s worst stream gap —
+  pure generation, 23 s under the old deadline, on one of the games classified as CHEAP (a 27k
+  block). The old ceiling was live in the tail of the small-block games, not only the large ones;
+  `diff` cleared it by halving the prompt, not because the tail was safe.
 - *Did it actually use the data?* Yes, visibly: the round-1 reasoning on colour_lines reads
   "Based on the offline data, blue balls are stationary under passive dynamics, while red balls move
   on noop" — it induces a dynamics rule and plans from it. On that problem the rule was wrong.
