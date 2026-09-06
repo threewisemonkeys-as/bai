@@ -345,6 +345,18 @@ the proxy injects `usage.include`. The proxy reads it from a rolling tail of the
 the audit row carries exact per-call tokens and cost; codex's own event parser reports no cost
 at all, which is why `usage.cost` in a run row is 0.00 and `parity.jsonl` is where the money is.
 
+**F18. The turns are long, and the pilot's wall-clock is the binding constraint (measured).**
+Five bt3gb problems through the proxy, all five solved under the online rule: caps 2/6/26/32/30,
+actions used 1/3/17/21/19, 6-14 minutes each. Each problem is ONE `analyze` turn -- the agent
+never needed a second -- but that turn is 30-40 upstream calls, several hundred thousand input
+tokens (781k on `park-cloud`, heavily cached) and 30-85k reasoning tokens, because the agent
+spends it writing Python against `drives/`: it reconstructs the mechanics, simulates all 60
+transitions against its model, and prints its own error table before emitting a plan. That is
+the arm working as designed, and it is slow. A 1200 s per-turn cap killed two working turns on
+`ice-tower`; `launch.py`'s 1800 s default is the right one. Budget the full battery in
+wall-clock, not in calls, and expect to run it in resumable slices -- `launch.py` already skips
+any `task_uid` already in `rows.jsonl`.
+
 ---
 
 ## 3. Findings: the evaluation contract, and what leaks out of the training pool
@@ -474,7 +486,7 @@ run manifest so the arm is reproducible.
 | batch length | 1..remaining budget | §4 |
 | `agent_retries` | 5 | upstream default; covers malformed `actions.json` |
 | `--study-rounds` | 5 | **chosen** — §4; bounds "not yet" rounds |
-| per-call timeout | ≥ 15 min | **chosen** — a medium-effort turn ran >15 min on the pilot workload; too tight a timeout would kill working sessions |
+| per-call timeout | **1800 s** (`launch.py` default) | **measured** — a 1200 s cap killed two working turns on one bt3gb problem (F18); a turn that is grepping 60 transitions and simulating them is not stuck |
 | `log_post_board` | `True` | §4 |
 | codex version | pinned in the sandbox image | 0.151.0 is what every finding here was measured against |
 
