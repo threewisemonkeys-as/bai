@@ -309,6 +309,42 @@ thing touching the body, it is also the right place to normalise every other par
 (`provider.only`, `usage.include`, and the sampling params — the planner sends no `temperature`,
 `top_p`, `seed` or `max_tokens`, so neither should the arm).
 
+**F16. The catalog clone carries a TOOL SURFACE as well as a context window, and
+`gpt-5.6-sol`'s is one this model cannot drive (measured).** F14 fixed the context window by
+cloning a real catalog entry. That entry also sets `tool_mode = "code_mode_only"`, which every
+gpt-5.6 entry sets and which offers the agent exactly one way to act: a **custom** tool whose
+argument is raw JavaScript, evaluated in a V8 isolate (`await tools.exec_command(...)`).
+DeepSeek calls it the ordinary way, with JSON — `{"code": "await tools..."}` — and codex, which
+expects freeform text for a custom tool, **drops the call without an error**: no output item,
+no diagnostic, the turn simply ends having done nothing. The transcript reads as the model
+apologising that "every tool call I make is being aborted".
+
+Measured on a one-line "write this file" task, three runs each through the proxy:
+
+| clone source | `tool_mode` | wrote the file | shell commands run | input tokens/call |
+|---|---|--:|--:|--:|
+| `gpt-5.6-sol` | `code_mode_only` | **1 of 5** | 0 | 73k–107k |
+| `gpt-5.5` | unset | **3 of 3** | 2 | ~27k |
+
+So the arm as first built would have failed nearly every problem, for a reason that looks
+like the model being incapable of planning. The 46k-token difference is the code-mode preamble
+plus a sub-agent (`collaboration`) namespace this arm has no use for, charged on every call
+against the context the corpus needs. `build_catalog` now pins `gpt-5.5`, falls back on the
+*property* (`tool_mode` unset) rather than on `models[0]`, and refuses to build a code-mode
+catalog at all. This is the fourth silent-failure setting, and the worst: the other three
+degrade the arm, this one empties it.
+
+**F17. `/generation` reports zeroes for a streamed responses-API call, so the run's accounting
+must come from the stream (measured).** OpenRouter's `/generation?id=` is the only way to learn
+which provider actually served a call — it is how F15 was measured, and it is how the proxy
+audits the pin. But for a call made with `stream: true` against `/responses`, the record
+returns `provider_name` correctly and `native_tokens_prompt`, `native_tokens_completion`,
+`total_cost` all **0**, permanently — re-queried minutes later, still 0, with `streamed: true`.
+The usage is instead in the terminal `response.completed` frame of the stream itself, because
+the proxy injects `usage.include`. The proxy reads it from a rolling tail of the response, so
+the audit row carries exact per-call tokens and cost; codex's own event parser reports no cost
+at all, which is why `usage.cost` in a run row is 0.00 and `parity.jsonl` is where the money is.
+
 ---
 
 ## 3. Findings: the evaluation contract, and what leaks out of the training pool
@@ -429,6 +465,7 @@ run manifest so the arm is reproducible.
 | provider pin | `parasail/fp8,novita/fp8,alibaba/fp8`, injected into the body by the proxy | **measured** — nothing codex can express pins a provider (F15) |
 | `model_reasoning_effort` | **`"medium"`** | **decided**; unset means zero reasoning (F12) |
 | model metadata | `-c model_catalog_json=<cloned entry>` | **measured** — `-c model_context_window` is ignored (F14) |
+| catalog clone source | **`gpt-5.5`** (`tool_mode` unset), never a gpt-5.6 entry | **measured** — a `code_mode_only` clone gives the model one tool it cannot call: 1/5 success vs 3/3, at 3x the input tokens (F16) |
 | `context_window` | 1,000,000 → 950,000 effective | **measured** — min across the pinned providers, not the 1,048,576 headline (F14) |
 | `max_output_tokens` | 393,216 | **measured** — min across the pin |
 | `auto_compact_token_limit` | 900,000 | **chosen** — headroom under the effective window; compaction mid-problem is a data-loss event, so it should never fire |
@@ -554,7 +591,15 @@ Landed as `research/autumn/`: `rig.py` (imports the evaluators), `env.py`, `acti
 `launch.py`. Dry run passes with zero paid calls — 86/86 starts reproduced, 86/86 reference
 plans reach goal, 86/86 live-vs-replay agreement, 172 study rounds with budgets untouched.
 Covered by `tests/test_autumn_agent_harness.py` (13 tests, scripted agent, no API key).
-Remaining in this phase: the parity proxy itself, which nothing can substitute for (F15).
+
+The parity proxy landed too (`research/autumn/proxy.py`, `proxy_ctl.sh`, 18 tests in
+`tests/test_parity_proxy.py`): a transparent passthrough that injects `provider.only` and
+`usage.include`, strips any sampling parameter the planner did not send, and audits every call
+to `parity.jsonl` by asking `/generation` who served it. Verified live — the injected pin is
+*causal*, not luck: a decoy pin sent straight to OpenRouter routes to the decoy host
+(`atlas-cloud/fp4`), while every call the proxy touched was served in-pin. A pilot of the real
+harness through it reported **69/69 calls on `alibaba/fp8`, 0 off-pin, 0 unaudited**.
+Building it is also what surfaced F16 and F17.
 
 Reuse unchanged (2010 lines, zero ARC deps): `agent/base.py`, `codex_agent.py`,
 `codex_events.py`, `action_queue.py`, `utils/`, `metrics/`.
