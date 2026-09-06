@@ -663,6 +663,32 @@ run. Test in `tests/test_agent_corpus.py`, including a byte-level check that the
 the same 60 transitions `icl_context.build_icl_block` renders for that game — which is what
 makes `agent − icl` a controlled contrast rather than an assertion.
 
+### F20 — codex emits no reasoning, so the proxy has to keep it
+
+Measured on codex 0.151.0: the `--json` event stream carries `command_execution`,
+`file_change` and `agent_message` items and **no `reasoning` item at all**. Setting
+`show_raw_agent_reasoning=true` and `model_reasoning_summary="detailed"` changes nothing
+— both are accepted and neither produces a reasoning event. The reasoning tokens are
+still counted (`turn.completed` usage), so a run looks like it is thinking; the content
+is simply never surfaced.
+
+The raw SSE does carry it, as `response.reasoning_text.done` frames with the completed
+block in `text`, and the parity proxy is the only component that sees the raw SSE. So the
+proxy scans the stream for those frames and appends one row per upstream call to
+`reasoning.jsonl`; the agent brackets a codex turn by that file's byte offsets (calls are
+strictly sequential within a turn, and the launcher runs one problem at a time) and
+interleaves the blocks with the tool calls they asked for.
+
+The interleave is an alignment **by order**, not a hard link — codex does not say which
+model call produced which tool call. Getting it wrong misplaces a block by one action; it
+never invents one. Measured on `bt3gb:nightfall:s0`: 28 upstream calls, reasoning on all
+28, 105k characters, against 19 shell commands.
+
+Two consequences worth stating: the proxy is now load-bearing for the *record*, not only
+for the pin — a run with the proxy started without `--transcript` loses its reasoning
+irrecoverably, so `launch.py` warns once at startup — and `rows.jsonl` deliberately stays
+the online evaluator's row shape, with the detail written to `<out>/traces/<uid>.json`.
+
 ### Phase 3 — scoring and reporting (1 day)
 
 Emit one row per problem in the **online evaluator's `rows` shape** (`task_uid`, `tier`,
@@ -682,6 +708,16 @@ per-problem budgets, as it already does for the NLWM pair.
    agentic session reliably (§8).
 3. Full 15 games / 86 problems.
 4. `agent-nodata`, then `lw25` / `no-log`.
+
+The run writes `<out>/traces/<task_uid>.json` per problem; the replay page is built from
+those and works on a partial run, so it can be watched while the battery is still going:
+
+    uv run python offline_learning/scripts/viz_agent_replay.py \
+        --run-root logs/2026-09-06/agent_full --per-game \
+        --out logs/2026-09-06/agent_full/replay.html
+
+`--per-game` is not optional at full size: one heavy session renders to ~0.18 MB, so 86 of
+them land right on the 16 MB page limit.
 
 ---
 
