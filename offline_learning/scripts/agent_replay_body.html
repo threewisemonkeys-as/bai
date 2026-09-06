@@ -1,0 +1,256 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Agentic planning trajectories</title>
+<style>/*__CSS__*/</style>
+
+<header>
+  <h1 id="page-title"></h1>
+  <p id="page-blurb"></p>
+</header>
+
+<main>
+  <nav class="index" id="index"></nav>
+  <section class="detail" id="detail"></section>
+</main>
+
+<footer id="footer"></footer>
+
+<script type="application/json" id="bundle">/*__DATA__*/</script>
+<script>
+const DATA  = JSON.parse(document.getElementById("bundle").textContent);
+const LINES = DATA.lines;
+const PROBS = DATA.problems;
+const el    = (id) => document.getElementById(id);
+const esc   = (s) => String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const text  = (idx) => idx == null ? "" : idx.map(i => LINES[i]).join("\n");
+const num   = (n) => n == null ? "—" : n.toLocaleString();
+const kt    = (n) => n == null ? "—" : (n >= 1000 ? (n/1000).toFixed(0)+"k" : String(n));
+const secs  = (s) => s == null ? "—" : (s >= 60 ? (s/60).toFixed(1)+"m" : s.toFixed(0)+"s");
+
+/* ------------------------------------------------------------------- boards */
+const colourOf = (ch) => DATA.palette[ch] || "transparent";
+
+/* Frames are stored as one full grid then per-cell edits, so a board is only ever
+   reconstructed by walking forward from the last full frame. */
+function frameAt(p, i) {
+  if (i < 0) return p.startFrame.replace(/\|/g, "");
+  let cur = null;
+  for (let k = 0; k <= i; k++) {
+    const f = p.frames[k];
+    if (f.full !== undefined) { cur = f.full; continue; }
+    if (cur === null) cur = p.startFrame.replace(/\|/g, "");
+    const arr = cur.split("");
+    for (const [pos, ch] of f.d) arr[pos] = ch;
+    cur = arr.join("");
+  }
+  return cur;
+}
+
+function boardHTML(packed, cols) {
+  return `<div class="board" style="grid-template-columns:repeat(${cols},1fr)">` +
+    packed.split("").map(c => `<i style="background:${colourOf(c)}"></i>`).join("") +
+    `</div>`;
+}
+
+/* ------------------------------------------------------------------- events */
+function eventHTML(e) {
+  if (e.k === "cmd") {
+    const bad = e.exit != null && e.exit !== 0;
+    return `<div class="ev cmd">
+      <div class="evh"><span>shell</span>
+        <span class="badge" style="color:${bad ? "var(--bad)" : "var(--dimmer)"}">exit ${e.exit == null ? "?" : e.exit}</span></div>
+      <pre class="c">${esc(text(e.cmd))}</pre>
+      ${e.out ? `<pre class="o">${esc(text(e.out))}</pre>` : ""}
+      ${e.more > 0 ? `<div class="more">… ${num(e.more)} more characters of output (see traces/)</div>` : ""}
+    </div>`;
+  }
+  if (e.k === "file") {
+    const rows = (e.paths || []).map((p, i) =>
+      `${esc(e.types[i] || "edit")}  ${esc(p)}`).join("\n");
+    return `<div class="ev file">
+      <div class="evh"><span>files written</span><span class="badge">${e.n}</span></div>
+      <div class="f">${esc(rows) || "(no paths reported)"}</div></div>`;
+  }
+  const label = {think: "reasoning", say: "message", err: "error"}[e.k] || "event";
+  return `<div class="ev ${esc(e.k)}">
+    <div class="evh"><span>${label}</span></div>
+    <pre>${esc(text(e.text))}</pre>
+    ${e.more > 0 ? `<div class="more">… ${num(e.more)} more characters (see traces/)</div>` : ""}
+  </div>`;
+}
+
+function turnHTML(t, open) {
+  const bits = [];
+  if (t.nthink) bits.push(`${t.nthink} reasoning`);
+  if (t.ncmd)   bits.push(`${t.ncmd} shell`);
+  if (t.nfile)  bits.push(`${t.nfile} file`);
+  const summary = bits.join(" · ") || "no recorded work";
+  const [tin, tcache, tout, treason] = t.tok;
+  return `<div class="turn${open ? " active" : ""}" data-turn="${t.i}">
+    <div class="thead" onclick="toggleTurn(${t.i})">
+      <span class="kind ${esc(t.kind)}">${esc(t.kind)}</span>
+      <span class="grow">turn ${t.i + 1} · ${summary}</span>
+      <span class="meta">${kt(tin)} in · ${kt(tout)} out · ${kt(treason)} think · ${secs(t.wall)}</span>
+    </div>
+    <div class="tbody" ${open ? "" : "hidden"}>
+      ${t.events.length ? t.events.map(eventHTML).join("")
+        : `<div class="empty">No reasoning or tool calls were recorded for this turn.</div>`}
+      ${t.plan.length ? `<div class="planline"><b>plan</b> (${t.plan.length}): ${esc(t.plan.join(", "))}</div>` : ""}
+      ${t.rejected.length ? `<div class="planline rej"><b>rejected</b>: ${esc(t.rejected.join(" | "))}</div>` : ""}
+      <details class="prompt"><summary>the prompt this turn was given</summary>
+        <pre>${esc(text(t.prompt))}</pre></details>
+    </div></div>`;
+}
+
+/* ------------------------------------------------------------------- detail */
+let CUR = null, AT = -1;
+
+function render(p) {
+  CUR = p; AT = p.steps.length ? 0 : -1;
+  const u = p.usage || {};
+  const verdict = p.success ? "solved" : "not solved";
+  const drift = (p.liveSuccess != null && p.liveSuccess !== p.success)
+    ? `<span class="tag lose">live said <b>${p.liveSuccess}</b>, replay is authoritative</span>` : "";
+  el("detail").innerHTML = `
+    <div class="crumbs"><b>${esc(p.human)}</b> · ${esc(p.uid)} · world code ${esc(p.label)}</div>
+    <div class="goal"><div class="lbl">goal</div>${esc(p.goal)}</div>
+    <div class="tags">
+      <span class="tag ${p.success ? "win" : "lose"}">${verdict}${p.reachedAt ? ` at <b>${p.reachedAt}</b>` : ""}</span>
+      <span class="tag">budget <b>${p.cap}</b></span>
+      <span class="tag">actions used <b>${p.used}</b></span>
+      <span class="tag">agent calls <b>${num(u.calls)}</b></span>
+      <span class="tag">study rounds <b>${p.studies}</b></span>
+      ${p.failed ? `<span class="tag">ended <b>${esc(p.failed)}</b></span>` : ""}
+      <span class="tag">tokens <b>${kt(u["in"])}</b> in · <b>${kt(u.out)}</b> out · <b>${kt(u.reasoning)}</b> think</span>
+      <span class="tag">wall <b>${secs(p.wall)}</b></span>
+      ${drift}
+    </div>
+    <div class="split">
+      <div>
+        <div class="boards">
+          <div class="bwrap"><div class="cap2">start</div>${boardHTML(p.startFrame.replace(/\|/g,""), p.cols)}</div>
+          <div class="bwrap"><div class="cap2" id="nowcap">now</div><div id="nowboard"></div></div>
+        </div>
+        <div class="scrub">
+          <button onclick="stepBy(-1)">◀</button>
+          <input type="range" id="slider" min="-1" max="${p.steps.length - 1}" value="${AT}"
+                 oninput="goTo(+this.value)">
+          <button onclick="stepBy(1)">▶</button>
+        </div>
+        <div class="stepline" id="stepline"></div>
+        <div class="strip" id="strip"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="turns" id="turns">
+        <h2>the session</h2>
+        ${p.turns.length ? p.turns.map((t, i) => turnHTML(t, i === 0)).join("")
+          : `<div class="empty">This run recorded no turns — it predates trace capture.</div>`}
+      </div>
+    </div>`;
+  el("legend").innerHTML = Object.entries(DATA.palette).map(([ch, col]) =>
+    `<span><i style="background:${col}"></i>${esc(DATA.names[ch] || ch)}</span>`).join("");
+  drawStrip();
+  goTo(AT);
+}
+
+function drawStrip() {
+  const p = CUR;
+  el("strip").innerHTML = p.steps.map((s, i) =>
+    `<b data-i="${i}" class="${s.r ? "goal" : ""}" onclick="goTo(${i})"
+        title="action ${s.n}${s.pt ? ` · step ${s.pi}/${s.pt} of its plan` : ""}">${esc(s.a)}</b>`
+  ).join("") || `<span class="empty">no actions were executed</span>`;
+}
+
+function goTo(i) {
+  const p = CUR;
+  AT = Math.max(-1, Math.min(i, p.steps.length - 1));
+  el("slider").value = AT;
+  el("nowboard").innerHTML = boardHTML(frameAt(p, AT), p.cols);
+  const s = AT >= 0 ? p.steps[AT] : null;
+  el("nowcap").textContent = s ? `after action ${s.n}` : "start";
+  el("stepline").innerHTML = s
+    ? `action <b>${s.n}</b> of ${p.cap} · <b>${esc(s.a)}</b>` +
+      (s.pt ? ` · step ${s.pi}/${s.pt} of turn ${s.t + 1}'s plan` : "") +
+      ` · ${s.rem} left` +
+      (s.r ? ` · <span class="g">GOAL REACHED</span>` : "") +
+      (s.x ? ` · episode terminated` : "")
+    : `the recorded start state — nothing executed yet`;
+  document.querySelectorAll("#strip b").forEach(b =>
+    b.classList.toggle("at", +b.dataset.i === AT));
+  // the transcript follows the board: open the turn that planned this frame
+  if (s && s.t != null && s.t >= 0) openTurn(s.t);
+}
+
+function stepBy(d) { goTo(AT + d); }
+
+function openTurn(i) {
+  document.querySelectorAll("#turns .turn").forEach(node => {
+    const on = +node.dataset.turn === i;
+    node.classList.toggle("active", on);
+    if (on) node.querySelector(".tbody").hidden = false;
+  });
+  const node = document.querySelector(`#turns .turn[data-turn="${i}"]`);
+  if (node) node.scrollIntoView({block: "nearest"});
+}
+
+function toggleTurn(i) {
+  const body = document.querySelector(`#turns .turn[data-turn="${i}"] .tbody`);
+  if (body) body.hidden = !body.hidden;
+}
+
+/* -------------------------------------------------------------------- index */
+function buildIndex() {
+  const byGame = {};
+  PROBS.forEach((p, i) => (byGame[p.human] = byGame[p.human] || []).push([p, i]));
+  el("index").innerHTML = Object.entries(byGame).map(([g, items]) => {
+    const wins = items.filter(([p]) => p.success).length;
+    return `<div class="gamehead">${esc(g)}<span class="rate">${wins}/${items.length}</span></div>` +
+      items.map(([p, i]) =>
+        `<div class="pitem" data-i="${i}" onclick="pick(${i})">
+           <span class="dot ${p.success ? "win" : "lose"}"></span>
+           <span class="nm" title="${esc(p.uid)}">${esc(p.uid.split(":")[1] || p.uid)}</span>
+           <span class="cap">${p.used}/${p.cap}</span></div>`).join("");
+  }).join("");
+}
+
+function pick(i) {
+  document.querySelectorAll(".pitem").forEach(n =>
+    n.classList.toggle("sel", +n.dataset.i === i));
+  render(PROBS[i]);
+  el("detail").scrollTop = 0;
+}
+
+function summaryHTML() {
+  const S = DATA.summary;
+  const row = (g) => `<tr><td>${esc(g.human)}</td>
+    <td class="n">${g.wins}/${g.n}</td>
+    <td class="n">${g.pass == null ? "—" : g.pass.toFixed(2)}</td>
+    <td class="n">${num(g.calls)}</td>
+    <td class="n">${kt(g["in"])}</td>
+    <td class="n">${kt(g.reasoning)}</td>
+    <td class="n">${secs(g.wall)}</td></tr>`;
+  return `<h2>the run</h2><table class="sum">
+    <tr><th>world</th><th>solved</th><th>pass</th><th>calls</th><th>tokens in</th>
+        <th>reasoning</th><th>wall</th></tr>
+    ${S.games.map(row).join("")}
+    <tr class="tot"><td>all ${S.games.length}</td><td class="n">${S.wins}/${S.n}</td>
+      <td class="n">${S.macro.toFixed(2)}</td><td class="n">${num(S.calls)}</td>
+      <td class="n">${kt(S["in"])}</td><td class="n">${kt(S.reasoning)}</td>
+      <td class="n">${secs(S.wall)}</td></tr></table>
+    <p style="color:var(--dim);max-width:80ch">
+      Macro is the mean over worlds; micro over all ${S.n} problems is
+      ${S.micro.toFixed(2)}. Pick a problem on the left to watch its session.</p>`;
+}
+
+el("page-title").textContent = DATA.page.title;
+el("page-blurb").textContent = DATA.page.blurb;
+el("footer").innerHTML = DATA.page.footer;
+buildIndex();
+el("detail").innerHTML = summaryHTML();
+document.addEventListener("keydown", (e) => {
+  if (!CUR) return;
+  if (e.key === "ArrowLeft")  { stepBy(-1); e.preventDefault(); }
+  if (e.key === "ArrowRight") { stepBy(1);  e.preventDefault(); }
+});
+</script>
