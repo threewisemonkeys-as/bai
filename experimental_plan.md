@@ -195,7 +195,8 @@ written. Re-launch with `launch_human_origin.py --resume` before this arm can be
 
 ### Planning evaluation
 
-Four completed online runs. Only the last two are a matched pair and only they back the paper's table.
+Six completed online runs. The bold labels name the score columns of the paper's table; the last
+two rows are the same ICL arm at its two presentations, and only the `full` one is printed.
 
 | run | goals | budgets | rows | raw | lmwm |
 |---|---|---|---|---|---|
@@ -203,13 +204,16 @@ Four completed online runs. Only the last two are a matched pair and only they b
 | `logs/2026-09-01/planning_v2_online_ds_nl` | NL | flat 50 | 79 | 0.48 | 0.61 |
 | `logs/2026-09-03/planning_v2_online_ds_percap_nl` (**NLWM**) | NL | per-problem | 86 | 0.32 | **0.62** |
 | `logs/2026-09-02/planning_v2_online_opus5_nl` (**NLWM (SL)**) | NL | per-problem | 86 | 0.36 | **0.60** |
-| `logs/2026-09-04/planning_v2_online_ds_percap_nl_icl` (**ICL**) | NL | per-problem | 86 | 0.32 | 0.62 (+ **icl 0.57**) |
+| `logs/2026-09-04/planning_v2_online_ds_percap_nl_icl` (icl `diff`) | NL | per-problem | 86 | 0.32 | 0.62 (+ icl 0.57) |
+| `logs/2026-09-05/planning_v2_online_icl_full` (**ICL**, `full`) | NL | per-problem | 86 | 0.32 | 0.62 (+ **icl 0.56**) |
 
 The first two runs predate the 83→86 promotion and use a flat 50-action budget, so they share neither
-the problem set nor the budgets with the pair below them and must not be pooled with it. The pair is
-matched: 86 shared `task_uid`s, 0 rows with differing budgets, mean random floor 0.06 — they differ
-only in which reflector built the artifacts the planner plans with. Both use the same
-deepseek-v4-flash planner, and the Raw column is that planner with no learned model.
+the problem set nor the budgets with the four below them and must not be pooled with them. Those four
+are matched: 86 shared `task_uid`s, 0 rows with differing budgets, mean random floor 0.06. NLWM and
+NLWM (SL) differ only in which reflector built the artifacts the planner plans with; the two ICL runs
+carry NLWM's own raw/lmwm rollouts, resumed from its checkpoints rather than re-sampled, and differ
+only in how the training data is rendered. All four use the same deepseek-v4-flash planner, and the
+Raw column is that planner with no learned model.
 
 Headline: **the learned world model roughly doubles online planning pass@1 over the raw planner**
 (0.32 → 0.62), and it does so on every tier (L1 0.60→0.93, L2 0.29→0.53, L3 0.20→0.60, L4 0.25→0.33).
@@ -220,37 +224,59 @@ worth reporting rather than a run to repeat.
 
 `offline_learning/scripts/report_planning_v2_online.py` reads the run dirs, checks that
 `replay.html` is level with the results, and writes the LaTeX between the AUTO markers in
-`paper/main.tex` (`--write-tex`). `--check` reports any comparability breach.
+`paper/main.tex` (`--write-tex`). `--check` reports any comparability breach. The exact command
+behind the two tables now in the paper — the ICL column is a third *arm* of its own run, hence
+`@icl`:
+
+```bash
+uv run python offline_learning/scripts/report_planning_v2_online.py \
+  --run "ICL=logs/2026-09-05/planning_v2_online_icl_full@icl" \
+  --run "NLWM=logs/2026-09-03/planning_v2_online_ds_percap_nl" \
+  --run "NLWM (SL)=logs/2026-09-02/planning_v2_online_opus5_nl" \
+  --raw-from NLWM --write-tex
+```
 
 ### In-context baseline (the same data, unlearned) — RUN 2026-09-04/05
 
-`logs/2026-09-04/planning_v2_online_ds_percap_nl_icl` is a third arm on the identical 86 problems:
-the raw planner with all 60 training transitions pasted into its prompt (`--arms raw,lmwm,icl
---icl-render diff`). It answers the question the raw baseline cannot — *does the learned model do
-anything the data alone does not?* — because it and NLWM see the same data, the same problems, the
-same budgets and the same planner, and differ only in how the data is represented.
+A third arm on the identical 86 problems: the raw planner with all 60 training transitions pasted
+into its prompt (`--arms raw,lmwm,icl`). It answers the question the raw baseline cannot — *does the
+learned model do anything the data alone does not?* — because it and NLWM see the same data, the
+same problems, the same budgets and the same planner, and differ only in how the data is represented.
 
-The run was started with `--seed-from logs/2026-09-03/planning_v2_online_ds_percap_nl`, so the raw
-and lmwm columns are the published rollouts resumed from their checkpoints rather than re-sampled.
-**Verified**: 172 raw/lmwm cells across 15 games, zero mismatches in pass-rate or action cap.
+It ran twice, at both presentations: `logs/2026-09-04/planning_v2_online_ds_percap_nl_icl` at
+`--icl-render diff` (next state as the changed cells) and
+`logs/2026-09-05/planning_v2_online_icl_full` at `--icl-render full` (both grids verbatim). **The
+paper prints `full`** (since 2026-09-06) — not because it scores better, it does not, but because it
+is the presentation a reviewer cannot call a handicap. Both were started with `--seed-from
+logs/2026-09-03/planning_v2_online_ds_percap_nl`, so the raw and lmwm columns are the published
+rollouts resumed from their checkpoints rather than re-sampled. **Verified** on the `full` run: all
+86 rows × raw/lmwm, zero mismatches in pass rate or action cap.
 
-| | Raw | ICL | NLWM |
-|---|---|---|---|
-| macro pass@1 | 0.32 | **0.57** | **0.62** |
-| micro (per-problem) | 0.30 | 0.50 | 0.57 |
-| floor-adjusted macro | 0.28 | 0.55 | 0.60 |
-| L1 (n=15) | 0.60 | 0.93 | 0.93 |
-| L2 (n=17) | 0.29 | 0.41 | 0.53 |
-| L3 (n=30) | 0.20 | 0.40 | 0.60 |
-| L4 (n=24) | 0.25 | **0.42** | 0.33 |
+| | Raw | ICL (`full`) | ICL (`diff`) | NLWM |
+|---|---|---|---|---|
+| macro pass@1 | 0.32 | **0.56** | 0.57 | **0.62** |
+| micro (per-problem) | 0.30 | 0.51 | 0.50 | 0.57 |
+| floor-adjusted macro | 0.28 | 0.53 | 0.55 | 0.60 |
+| L1 (n=15) | 0.60 | 1.00 | 0.93 | 0.93 |
+| L2 (n=17) | 0.29 | 0.59 | 0.41 | 0.53 |
+| L3 (n=30) | 0.20 | 0.33 | 0.40 | 0.60 |
+| L4 (n=24) | 0.25 | **0.38** | **0.42** | 0.33 |
 
 **This is a strong baseline and the honest reading is that most of the gain is available from the
-data itself.** ICL recovers 0.25 of NLWM's 0.30 lift over raw. The world model's remaining advantage
-is real but narrow (+0.05 macro) and it is not uniform: it is concentrated at L2/L3 (+0.12, +0.20),
-vanishes at L1 where both saturate at 0.93, and **inverts at L4**, where ICL beats NLWM 0.42 vs 0.33.
-Per game ICL wins outright on egg (0.80/0.60), mario (0.86/0.71), SET (1.00/0.67) and space_invaders
-(0.11/0.00); it loses badly on ice (0.38/0.62), diffusion (0.36/0.73 — below even raw's 0.45),
-disease (0.57/0.71) and ants (0.17/0.33); the rest tie.
+data itself.** ICL recovers 0.24 of NLWM's 0.30 lift over raw (0.25 at `diff`), leaving the world
+model an advantage that is real but narrow: +0.06 macro, +0.06 micro, +0.07 floor-adjusted.
+
+Where that advantage sits is **not** stable across the two draws, and only the claims both support
+should be made. Both agree that it is absent at the extremes — L1 saturates (0.93–1.00 for both
+arms) and L4 **inverts**, ICL over NLWM 0.38 vs 0.33 at `full` and 0.42 vs 0.33 at `diff` — and both
+agree it is largest at L3 (NLWM 0.60 vs 0.33/0.40). At L2 they disagree outright: ICL 0.59 vs NLWM
+0.53 at `full`, 0.41 vs 0.53 at `diff`. Per game the disagreement is worse: the sign of ICL − NLWM
+agrees on only **7 of 15 games**. The stable per-game readings are ICL winning SET (1.00/0.67),
+losing disease (0.57/0.71), ants (0.17/0.33), colour_lines (0.67/1.00) and diffusion (0.55/0.73 and
+0.36/0.73, below even raw's 0.45 at `diff`), and tying grow and logic_gates. Everything else —
+including ice, mario, egg and dino, the four games whose per-game story changed sides — is one draw
+of a coin at 1 attempt per problem over n=3–8 problems. **Cite the macro and the tiers; do not build
+an argument on a single game's ICL cell.**
 
 Caveats a reviewer will raise, and the answers:
 - *Was it handicapped by presentation?* **No — CLOSED 2026-09-05 by measurement, not argument.**
@@ -272,16 +298,19 @@ Caveats a reviewer will raise, and the answers:
   all 86 rows, action caps too) — finds the two presentations **indistinguishable**: macro 0.56
   `full` vs 0.57 `diff`, micro 0.51 vs 0.50, and per row 12 up / 11 down / 63 tied (sign test
   p = 1.00). `diff` is the same 60 transitions and lossless (the test reconstructs s′ from s + diff
-  for every transition), so **the published ICL column stands as reported**.
+  for every transition), so either presentation is defensible as the reported column. **The paper
+  prints `full`** (2026-09-06) — it is the one no reviewer can call a handicap, and it costs 0.01
+  macro to say so.
 
   What the re-run does expose is how much per-game sampling variance one attempt per problem
   carries. Nine of the fifteen games moved, several by a lot — ice +0.38 (0.38 → 0.75, which at
   `full` puts the in-context baseline ABOVE NLWM's 0.62 on that game), paint +0.25, diffusion +0.18,
-  waterplug +0.14, against dino −0.33, mario −0.29, ants −0.25, egg −0.20 — and they cancel to
+  sand +0.14, against dino −0.33, mario −0.29, magnets −0.25, egg −0.20 — and they cancel to
   nothing in aggregate. Every game that gained had `diff` at 0.25–0.38 and every game that lost had
   `diff` at 0.75–1.00: regression to the mean under resampling, not a presentation effect. Read
-  per-game ICL numbers on the small-n games (dino n=3, SET n=3, colour_lines n=3, ants n=4, paint
+  per-game ICL numbers on the small-n games (dino n=3, SET n=3, colour_lines n=3, magnets n=4, paint
   n=4) as one draw, not as a measurement; the tier and macro aggregates are the defensible level.
+  Across the two draws the sign of ICL − NLWM agrees on only 7 of the 15 games.
 
   The earlier smoke evidence was a bad sample and should not be cited: colour_lines scored 0.00 at
   `full` in the smoke and **0.67 on re-run**, equal to `diff`, and its traces show both arms
@@ -356,10 +385,10 @@ prose sections are still TODO.
   - [X] Create natural language problem versions for these curated planning tasks. All 86 v2.2 rows carry both a frame goal and a registered NL checker (68 distinct checker programs in `offline_learning/planning_nl_goals.py`); offline and online evaluators require `--goal-presentation frame` or `nl`. Four full online runs have been scored through the NL path, so the adapter work this item was tracking is finished.
   - [ ] Setup the CD/MFP/Masked Planning tasks from autumn for these games (exist for the 9 benchmark-sourced games incl. paint/magnets; must be authored for the 6 zip games).
   - [X] Thoroughly test the formulations of the planning tasks. The independent wrapper audit (`logs/2026-08-29/planning_v2/validation.json`) passes 86/86 rows and all global checks: raw/wrapper parity, prefix replay, reference success, nontrivial/noop failure, frame- and task-deletion minimality, action substitution, quiescence, reproducible random floors, composite-ID uniqueness, semantic goals for stochastic games, and three-seed stochastic templates. Easy L1/L2 random floors remain recorded rather than hidden.
-- [P] Baselines. The in-context arm is DONE and matched (ICL 0.57 vs NLWM 0.62). The agentic arm has run (Claude Code, 0.895 on 78/86) but is not budget- or row-matched; the `wc` arm is implemented but was disabled in every planning-v2 online run; WorldCoder + LLM planning is not started.
+- [P] Baselines. The in-context arm is DONE and matched (ICL 0.56 vs NLWM 0.62). The agentic arm has run (Claude Code, 0.895 on 78/86) but is not budget- or row-matched; the `wc` arm is implemented but was disabled in every planning-v2 online run; WorldCoder + LLM planning is not started.
   - [ ] Re-run the agentic arm under per-problem action caps on all 86 rows, or re-score the NLWM pair at flat cap 50 on the shared 78, so the Agent column is comparable.
   - [ ] Enable the `wc` arm in an online planning run on the 86-problem set, and finish the 11 missing WorldCoder (SL) training runs first if that arm is to be reported.
-  - [X] Raw LLM + in-context trajectories — RUN 2026-09-04/05, `logs/2026-09-04/planning_v2_online_ds_percap_nl_icl`, macro 0.57 (raw 0.32, NLWM 0.62). In the paper table as the ICL column. Optional follow-up if the presentation is challenged: re-run the cheap games at `--icl-render full` (see the caveats under Results).
+  - [X] Raw LLM + in-context trajectories — RUN 2026-09-04/05 at both presentations. The paper's ICL column is `logs/2026-09-05/planning_v2_online_icl_full` (`--icl-render full`, all 15 games / 86 rows), macro 0.56 (raw 0.32, NLWM 0.62); `logs/2026-09-04/planning_v2_online_ds_percap_nl_icl` (`diff`) is the second draw at 0.57. The presentation question is closed by measurement (see the caveats under Results); what remains open is per-game variance at 1 attempt per problem.
   - [ ] WorldCoder + LLM planning.
 - [ ] Ablations: add `--no-id` and `--no-beliefs`. Nothing has been run for the paper's ablation table yet;
   every cell in `paper/main.tex::tab:ablations` is an em-dash.

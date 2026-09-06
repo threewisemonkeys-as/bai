@@ -185,7 +185,7 @@ def per_game_table(runs: list[dict]) -> list[str]:
     """One block per run: n / cap / floor belong to the run, not to the game."""
     head = ["game"]
     for r in runs:
-        head += [f"{r['label']}:n", "cap", "rand", "raw", "lmwm"]
+        head += [f"{r['label']}:n", "cap", "rand", *LLM_ARMS]
     L = ["  ".join(h.rjust(13) for h in head)]
     for game in PAPER_ORDER:
         cells = [display_name(game)]
