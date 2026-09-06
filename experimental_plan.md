@@ -253,15 +253,37 @@ Per game ICL wins outright on egg (0.80/0.60), mario (0.86/0.71), SET (1.00/0.67
 disease (0.57/0.71) and ants (0.17/0.33); the rest tie.
 
 Caveats a reviewer will raise, and the answers:
-- *Was it handicapped by presentation?* It ran at `--icl-render diff` (next state as the changed
-  cells) rather than `full` (both grids verbatim). `full` was measured and abandoned: the planner is
-  output-bound, so a longer prompt makes it reason longer — bt3gb raw 78s → icl-diff 331s →
-  icl-full never returned inside `llm_call`'s 600s timeout, which would have burned every
-  large-grid game on timeout-and-retry. `diff` is the same 60 transitions, lossless (the test
-  reconstructs s′ from s + diff for every transition). The one direct comparison available — the
-  colour_lines smoke run at `full` scored 0.00 against 0.67 at `diff`, n=3 — points the same way,
-  so if anything `diff` favours the baseline. A `full` re-run on the cheap games is the clean way
-  to close this if it is challenged.
+- *Was it handicapped by presentation?* **No — CLOSED 2026-09-05 by measurement, not argument.**
+  The battery ran at `--icl-render diff` (next state as the changed cells) rather than `full` (both
+  grids verbatim), because `full` tripped a transport bug, not a model limit: `llm_call` posted
+  NON-streamed under a flat `httpx timeout=600`, and OpenRouter sends no bytes on a non-streamed
+  completion until generation finishes, so httpx's PER-READ timeout was acting as a hard TOTAL
+  deadline. Decode is a constant ~133 tok/s on this route regardless of prompt size — the calls are
+  output-bound and prefill is noise — so 600 s was really an ~80k OUTPUT-token cap. Context length
+  was never the constraint (all three pinned endpoints carry ~1M; the largest `full` block is 158k),
+  and neither was money. A trip was not a slow call either: `llm_call` returns `""`, `parse_plan`
+  rejects it, and `llm_rollout_v2` records `failed_reason="invalid-plan"` — an infra zero
+  indistinguishable from a planning failure in the table. Fixed in `f1b31df` (SSE + a stall
+  detector; `LLM_STALL_TIMEOUT_S` / `LLM_TOTAL_TIMEOUT_S` / `LLM_STREAM=0`), with per-call
+  telemetry (`<out>.calls.json`, heartbeat transport-health line).
+
+  The re-run — `logs/2026-09-05/planning_v2_online_icl_full`, the four cheap games
+  (diffusion, colour_lines, va6fq, n2ntd = 28 of the 86 rows) at `--icl-render full`, seeded from
+  `logs/2026-09-03` so raw/lmwm resume bit-identical (verified on all 28 rows) — finds the two
+  presentations **indistinguishable**: micro 0.54 `full` vs 0.50 `diff`, macro 0.55 vs 0.54, and
+  per row 6 up / 5 down / 17 tied (sign test p = 1.00). The per-game swings are large and cancel
+  (diffusion +0.18, va6fq +0.14, colour_lines 0.00, n2ntd −0.29), which is what one attempt per
+  problem on binary outcomes looks like. `diff` is the same 60 transitions and lossless (the test
+  reconstructs s′ from s + diff for every transition), so the published ICL column stands as
+  reported. The earlier smoke evidence was a bad sample and should not be cited: colour_lines
+  scored 0.00 at `full` in the smoke and **0.67 on re-run**, equal to `diff`, and its traces show
+  both arms emitting the identical round-0 plan and diverging only at round 2.
+
+  Worth carrying: va6fq's slowest `full` call was **577 s** with a 0.7 s worst stream gap — pure
+  generation, 23 s under the old deadline, on one of the games classified as cheap. The old ceiling
+  was live in the tail of the small-block games too; `diff` cleared it by halving the prompt, not
+  because the tail was safe. Over all 419 re-run calls: 0 over 600 s, 3 over 400 s, worst stream gap
+  1.3 s, 0 truncated finishes, 0 retries. $6.53, ~5 h.
 - *Did it actually use the data?* Yes, visibly: the round-1 reasoning on colour_lines reads
   "Based on the offline data, blue balls are stationary under passive dynamics, while red balls move
   on noop" — it induces a dynamics rule and plans from it. On that problem the rule was wrong.
