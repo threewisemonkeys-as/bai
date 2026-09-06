@@ -687,23 +687,61 @@ per-problem budgets, as it already does for the NLWM pair.
 
 ## 6. Comparability checklist
 
-- [ ] 86 `task_uid`s identical to `logs/2026-09-03/planning_v2_online_ds_percap_nl`
-- [ ] `--cap-mode per-problem`; 0 rows differing in budget from that run
-- [ ] `--goal-presentation nl`; goal frame absent from the workspace on every row
-- [ ] `--max-floor 0.95`, floors measured at the same budget
+Verified 2026-09-06 against the published runs themselves, not against this document.
+`tests/test_autumn_agent_harness.py::test_*` holds each one, so drift is a test failure
+rather than a discovery made while writing the paper.
+
+- [x] 86 `task_uid`s identical to `logs/2026-09-03/planning_v2_online_ds_percap_nl` —
+      set equality against the run's own rows
+- [x] `--cap-mode per-problem`; **0** rows differing in budget from that run
+- [x] `--goal-presentation nl`; goal frame absent from the workspace on every row
+- [x] `--max-floor 0.95`, floors measured at the same budget — `rig.PROBLEMS` now reads the
+      runs' own `problems.per-problem-floors.json`, where all 86 rows carry a floor measured
+      at the per-problem cap (the previous file measured 24, so the filter was a no-op by
+      luck rather than by measurement)
+- [x] **one attempt per problem in every published run.** Worth its own line: it makes each
+      baseline's `pass_rate` equal to its `pass_any`, so this arm's single attempt is the
+      same statistic and not one sample racing a best-of-N
 - [ ] model `deepseek/deepseek-v4-flash`, **same provider pin**, and an **explicit**
       `model_reasoning_effort` calibrated against the planner's reasoning-token volume —
       unset means zero reasoning (F12); `model_context_window` pinned (F13)
-- [ ] training corpus = the same 60 transitions `icl_context.load_pool_transitions` gives the
-      `icl` arm, byte-identical, leak assertions passing
-- [ ] success = `rig.replay_and_score` — an independent replay under the ONLINE rule, not
-      `execute_and_score`, which enforces quiescence and flips 11 of the 86 rows
+      *(model and pin verified; the reasoning-token volume comparison is still owed)*
+- [x] training corpus = the same 60 transitions `icl_context.load_pool_transitions` gives the
+      `icl` arm, byte-identical, leak assertions passing — all 15 worlds exported,
+      `assert_matches_launch` ok on every one
+- [x] success = `rig.replay_and_score` — **proven, not argued.** See F19: 258 baseline
+      rollouts replayed through it agree on the verdict *and* on `reached_at`, 258/258
 - [ ] study rounds bounded and recorded per problem; no study round ever advanced the engine
 - [ ] agent never reached this repo, the web, or another problem's workspace (audit, not hope —
       `cc_autumn/autumn-code/rig/audit.py` is the precedent worth reusing)
 - [ ] tokens + cost per problem recorded **for all four arms**, since inference compute is the
       one axis that is not matched — and the single phase means the agent re-pays per problem
       what `lmwm` paid once per game
+
+### F19 — the evaluation matches; the *protocol* does not, and that is the disclosure
+
+The scoring rule is shared by import (`rig` calls the evaluator's own `make_goal_test`),
+and shared in behaviour: replaying the published arms' own executed action lists through
+`rig.replay_and_score` reproduces all 258 verdicts and every `reached_at`. The live env
+matches too — same `Branch` budget, a `grid()` render after every step (which the
+occupancy set depends on), the same append-frame-then-test ordering.
+
+What differs is **replanning cadence**, and it is not in this arm's favour:
+
+| | baselines (`raw`/`icl`/`lmwm`) | `agent` |
+|---|---|---|
+| plan granularity | forced MPC: plan ≤ remaining, execute **exactly one** action, replan | agent submits a plan of any length; the runner executes **all of it** before asking again |
+| observation→replan cycles | **17–19 per problem** (measured) | **1** in the bt3gb pilot — fully open-loop |
+| over-budget plan | rejected → one corrective re-ask → `invalid-plan` | truncated to `remaining` |
+
+The agent's affordances are a superset — nothing stops it submitting one action at a time
+and buying exactly the baselines' feedback — but in the pilot it did not, so it planned
+blind where they saw every frame. That is a *harder* regime, and the write-up should say
+so rather than let "same 86 problems, same budgets, same rule" imply same protocol.
+
+The truncate-vs-reject leniency is real but measured at zero: across both reference runs,
+**no baseline rollout ever failed with `invalid-plan`** — every one ended in success or
+`budget-exhausted`. It cost them nothing, so it buys this arm nothing.
 
 ---
 
