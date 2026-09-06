@@ -689,6 +689,43 @@ for the pin — a run with the proxy started without `--transcript` loses its re
 irrecoverably, so `launch.py` warns once at startup — and `rows.jsonl` deliberately stays
 the online evaluator's row shape, with the detail written to `<out>/traces/<uid>.json`.
 
+### F21 — the empty list is overloaded, and `study-rounds-exhausted` misdescribes it
+
+`{"actions": []}` is defined in the prompt as *"not yet — give me another call to study
+the data"*. On `bt3gb:freeze-pool:s0` the agent used it to mean something else entirely:
+**"I am finished."** Twenty-six times in one turn it wrote variants of *"Goal achieved at
+Action 21 — three frozen `lightblue` cells at (15,4-6). No further action needed"*, and
+each empty list burned a study round until the session was cut with 7 of 32 actions
+unspent and `failed_reason: study-rounds-exhausted`.
+
+That label reads as *the agent would not act*. It did act — turns 5, 8, 9 and 11 each
+submitted a plan, interleaved with the studies. What actually happened is that it
+believed it had won.
+
+It had not, and the reason is worth keeping. The checker is
+
+    nverb(actions, "down") == 3 and flat_run(grids[-1], "lightblue", 3)
+
+and the agent satisfied the second clause exactly — its final board is compositionally
+identical to the reference solution (7 gray, 246 black, 3 `lightblue` in a flat run),
+differing only in which columns the pool occupies, which the checker does not care about.
+It failed the *first* clause: it pressed `down` **four** times where the sentence says
+"three drops". So it verified its work against the board and never against its own action
+history, concluded it was done, and spent the rest of the session insisting.
+
+Three things follow:
+
+* the miss is **fair** — "three drops" is in the English sentence — and the checker is the
+  one `raw`, `icl` and `lmwm` were scored under, so nothing here is a comparability
+  problem;
+* `study-rounds-exhausted` should not be read as refusal. At report time, split it by
+  whether the session ever submitted a plan; that is derivable from the trace and needs
+  no change to a running harness;
+* the prompt wording is a **candidate fix for the ablations, not for this battery** —
+  changing it mid-run would make the first twenty problems incomparable with the rest.
+  The fix is to say that an empty list neither ends the episode nor claims success, and
+  that a believed-finished agent should submit `noop`.
+
 ### Phase 3 — scoring and reporting (1 day)
 
 Emit one row per problem in the **online evaluator's `rows` shape** (`task_uid`, `tier`,
