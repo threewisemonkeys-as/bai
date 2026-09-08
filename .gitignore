@@ -269,3 +269,10 @@ cc_autumn/bundle.json
 cc_autumn/curated_bundle.json
 cc_autumn/replay.html
 cc_autumn/curated_replay.html
+
+# cc_humanrl/humanrl-code is the Claude-Code-on-humanRL harness: its own checkout,
+# same arrangement as cc_autumn/autumn-code above. replay.html is the same kind of
+# thing as cc_autumn's: a multi-megabyte viewer, rebuilt from a launch directory by
+# `tools/replay.py` whenever it is wanted.
+cc_humanrl/humanrl-code/
+cc_humanrl/replay.html
