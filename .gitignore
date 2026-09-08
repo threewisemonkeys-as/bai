@@ -276,3 +276,9 @@ cc_autumn/curated_replay.html
 # `tools/replay.py` whenever it is wanted.
 cc_humanrl/humanrl-code/
 cc_humanrl/replay.html
+
+# cc_craftax/craftax-code is the Claude-Code-on-Craftax harness: its own checkout,
+# same arrangement as the two above. Its .env-venv is 776MB of JAX, which is why
+# Craftax is not a dependency of this project.
+cc_craftax/craftax-code/
+cc_craftax/replay.html
