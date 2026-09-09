@@ -145,16 +145,27 @@ And the curve along the way, which is the calibration the budget question needs:
 
 | action | run1 | run2 | run3 | run4 | run5 | run6 | **median** |
 |---|---|---|---|---|---|---|---|
-| 250 | 5.3% | 5.4% | 6.2% | 4.5% | 5.8% | 5.3% | 5.4% |
+| 250 | 5.3% | 5.4% | 6.2% | 3.4% | 5.8% | 5.3% | 5.4% |
 | 1 000 | 19.0% | 19.9% | 7.5% | — | 8.4% | 8.0% | **8.4%** |
-| 2 000 | 27.8% | 23.5% | 14.6% | — | 13.8% | 20.8% | 20.8% |
-| **3 000** | 28.3% | 31.3% | 17.2% | — | 26.5% | 21.7% | **26.5%** |
-| 5 000 | 30.5% | 57.7% | — | — | — | — | |
-| 10 000 | 59.5% | 73.0% | — | — | — | — | |
+| 2 000 | 27.8% | 23.5% | 14.6% | — | 9.7% | 18.6% | 18.6% |
+| **3 000** | 28.4% | 31.4% | 17.3% | — | 17.2% | 18.6% | **18.6%** |
+| 5 000 | 30.6% | 58.0% | — | — | — | — | |
+| 10 000 | 59.5% | 73.1% | — | — | — | — | |
+| 23 225 | 98.2% | — | — | — | — | — | |
 
-Three readings. **3000 actions is where the median human (26.5%) clears the best published
-RL number** — PPO-GTrXL's 18.3% after a billion training steps — while the weakest run
-still going at that point is at 17.2%, level with it. At 1000 only the two experts are
+**Corrected 2026-09-09.** These are now **best single life so far**, which is the unit
+the paper reports and the only one comparable across runs that died different numbers of
+times. The earlier version of this table was cumulative *session* return, which
+double-counts: a new life re-earns every achievement (F12), so run5 read 31.9% where its
+best life is 22.6%, and our own seven-life pilot would read 99% of 226 against a best
+life of 17.7%. The medians move: **3000 actions is 18.6%, not 26.5%**, and 2000 is 18.6%
+rather than 20.8%.
+
+Three readings. **3000 actions is where the median human (18.6%) just reaches the best
+published RL number** — PPO-GTrXL's 18.3% after a billion training steps — while the
+weakest runs still going at that point are at 17.2–17.3%, just under it. (On the
+session-sum numbers this read as a clear pass at 26.5%; on the honest best-life figure it
+is a dead heat, which is a better calibration point and not a worse one.) At 1000 only the two experts are
 there (19–20%); the median human is at 8.4%, well below PPO. Second, **four of the six
 sessions are 3300–3800 actions long**, so ~3000 is roughly what a person actually spends
 on this in a sitting. Third, the two expert runs are a *single life* — dying is a novice's
