@@ -248,6 +248,25 @@ The handover is the workspace and nothing else, which makes `notes.md` load-bear
 rather than advised: PROMPT.md now says so, and says the budget belongs to the run
 rather than to the session holding it.
 
+**F16 — The stored login refreshes itself, and the launcher was throwing the refresh
+away.**
+No `ANT_API_KEY` here, so sessions use the CLI's own login. Two clocks: the **access**
+token lasts ~8h, the **refresh** token ~a month (measured 2026-09-09: access +1.3h,
+refresh 28.9 days). A session *does* refresh mid-run — the pilot's config dir holds a
+`.credentials.json` dated 02:06 where the launcher seeded a symlink at 01:36 — and in
+doing so replaces the symlink with a regular file.
+
+Which of the two to keep has been wrong in both directions. Leaving the copy alone
+expires it where the operator's file does not, and a launch resumed the next day failed
+to authenticate in every session that had ever refreshed. Re-linking unconditionally
+fails the other way, and only on a run long enough to need several sessions: nothing
+refreshes the operator's file while a chain is running, so from session two on the
+copy is the *newer* one and relinking hands the next session an expired token.
+
+Rule: **keep whichever expires later.** A chain then sustains itself for the life of
+the refresh token — a month — rather than one access token's eight hours. `--dry-run`
+now prints both clocks, so the preflight costs nothing.
+
 ---
 
 ## 1. The decisions
