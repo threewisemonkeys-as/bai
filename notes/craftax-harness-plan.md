@@ -350,6 +350,21 @@ only ever asks for what the run is configured to give.
 **`act.py`** — same contract; the daemon holds a JAX process. Batch stops on death and on
 budget.
 
+**`tools/readout.py`** — the score at *every* action, which nothing on disk holds
+(`result.json` is rewritten in place after each one), recovered by replaying the recorded
+history through a fresh engine and checked against the record. Plus the agent side from
+the stream: actions per tool call, context per turn, cost apportioned by depth (F13).
+
+**`tools/replay.py`** — the page. Same shape as `cc_humanrl`'s — pick a run, scrub it,
+and every action carries the plan its batch was given, the actions in it and the work
+done in the workspace before playing them — with two differences forced by the game.
+The pictures cannot be inlined as deltas, because the view scrolls with the player
+(292,365 of 585,728 pixels change per action, measured), so the default writes a
+directory of WebP beside the page and `--inline` builds a single publishable file that
+thins only runs of plain movement, never a moment that paid, unlocked, descended or
+died. And the page carries the replayed score, level and condition, so the transport
+shows where the curve moved rather than only where the actions were.
+
 **`GAME.md`** — the brief. Unlike the humanRL games there is nothing to withhold, so it
 says what the environment is: an open-ended survival and crafting world, 43 actions listed
 by name, reward arrives when you achieve something, you die of damage or hunger or thirst,

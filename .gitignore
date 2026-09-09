@@ -282,3 +282,6 @@ cc_humanrl/replay.html
 # Craftax is not a dependency of this project.
 cc_craftax/craftax-code/
 cc_craftax/replay.html
+# ...and the frames beside it: a step scrolls the whole view in Craftax, so each
+# frame is its own picture rather than an edit, and 3000 of them do not inline.
+cc_craftax/replay_frames/
