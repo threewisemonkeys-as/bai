@@ -27,10 +27,12 @@ per-game evaluator pass. The rows are the evaluator's own row shape, so they fol
 same aggregates; `--no-agent` puts both columns back to em-dashes.
 
 The two agent columns are the same harness under one difference: `--agent-wm` is the run
-whose workspaces also held the beliefs and perception module the NLWM column plans with.
-Agent vs Agent+WM is therefore what the learned world model is worth to an agent that can
-compute over the data it was learned from, and Agent+WM vs NLWM is what the agent loop is
-worth given the same world model.
+whose workspaces also held the beliefs and perception module the NLWM column plans with,
+and it prints as `NLWM (Agentic)` at the far end of the table because that is what it is --
+the same world model, planned with by an agent instead of by a single call. Agent vs
+NLWM (Agentic) is therefore what the world model is worth to an agent that can compute over
+the data it was learned from, and NLWM (Agentic) vs NLWM is what the agent loop is worth
+given the same world model.
 
 The default pair IS a matched comparison as of 2026-09-04: both runs score the same 86
 problems under the same per-problem action budgets, and differ only in which reflector
@@ -76,8 +78,11 @@ DISPLAY = {"colour_lines": "Colour Lines", "SET": "SET", "logic_gates": "Logic G
 
 DEFAULT_RUNS = [("NLWM", "logs/2026-09-03/planning_v2_online_ds_percap_nl"),
                 ("NLWM (SL)", "logs/2026-09-02/planning_v2_online_opus5_nl")]
-DEFAULT_AGENT = ("Agent", "logs/2026-09-06/agent_full")
-DEFAULT_AGENT_WM = ("Agent+WM", "logs/2026-09-08/agent_wm_full")
+# label, run dir, and whether the column prints AFTER the --run columns. `Agent` is a
+# baseline and sits with Raw; the agent holding NLWM's artifacts is a variant of NLWM and
+# reads as one, so it sits at the far end beside the other NLWM columns.
+DEFAULT_AGENT = ("Agent", "logs/2026-09-06/agent_full", False)
+DEFAULT_AGENT_WM = ("NLWM (Agentic)", "logs/2026-09-08/agent_wm_full", True)
 
 def display_name(game: str) -> str:
     """The paper's name for a game: the English name, title-cased, with overrides."""
@@ -182,7 +187,8 @@ def load_run(label: str, root: Path, arm: str = DEFAULT_COLUMN_ARM) -> dict:
     }
 
 
-def load_agent_run(label: str, root: Path, reference: dict) -> dict:
+def load_agent_run(label: str, root: Path, reference: dict, *,
+                   trailing: bool = False) -> dict:
     """The agent arm folded into the shape the tables already read.
 
     `research.autumn.launch` writes ONE `rows.jsonl` for the whole run instead of a
@@ -227,6 +233,7 @@ def load_agent_run(label: str, root: Path, reference: dict) -> dict:
     mine = {r["task_uid"]: r.get("action_cap")
             for rows in by_game.values() for r in rows}
     return {"label": label, "root": root, "arm": AGENT_ARM, "games": games,
+            "trailing": trailing,
             "order": [g for g in GAME_ORDER if g in games],
             "pending": [g for g in GAME_ORDER if g not in games],
             "shared": len(set(mine) & set(ref_caps)),
@@ -467,24 +474,33 @@ def tex_results(runs: list[dict], raw_from: dict, agents: list[dict] = ()) -> st
     complete = [g for g in PAPER_ORDER
                 if scored(raw_from, g) and all(scored(r, g) for r in runs)
                 and all(scored(a, g) for a in agents)]
+    lead = [a for a in agents if not a.get("trailing")]
+    trail = [a for a in agents if a.get("trailing")]
     L = [r"    \toprule",
-         r"    Environment & Raw & " + " & ".join([a["label"] for a in agents]
-                                          + [r["label"] for r in runs]) + r" \\",
+         r"    Environment & Raw & " + " & ".join([a["label"] for a in lead]
+                                                 + [r["label"] for r in runs]
+                                                 + [a["label"] for a in trail])
+         + r" \\",
          r"    \midrule"]
+
+    def agent_cell(a, game):
+        ga = scored(a, game)
+        return tex(ga["arms"][AGENT_ARM]["pass1"]) if ga else r"\textemdash"
+
     for game in PAPER_ORDER:
         g = scored(raw_from, game)
         cells = [tex(g["arms"]["raw"]["pass1"]) if g else r"\textemdash"]
-        for a in agents:
-            ga = scored(a, game)
-            cells.append(tex(ga["arms"][AGENT_ARM]["pass1"]) if ga else r"\textemdash")
+        cells += [agent_cell(a, game) for a in lead]
         for r in runs:
             gr = scored(r, game)
             cells.append(tex(gr["arms"][r["arm"]]["pass1"]) if gr else r"\textemdash")
+        cells += [agent_cell(a, game) for a in trail]
         L.append(f"    {display_name(game):<14} & " + " & ".join(cells) + r" \\")
     L.append(r"    \midrule")
     means = [tex(run_totals(raw_from, "raw", complete)["macro"])]
-    means += [tex(run_totals(a, AGENT_ARM, complete)["macro"]) for a in agents]
+    means += [tex(run_totals(a, AGENT_ARM, complete)["macro"]) for a in lead]
     means += [tex(run_totals(r, r["arm"], complete)["macro"]) for r in runs]
+    means += [tex(run_totals(a, AGENT_ARM, complete)["macro"]) for a in trail]
     L.append(r"    \textbf{Mean} & " + " & ".join(means) + r" \\")
     L.append(r"    \bottomrule")
     L.append(f"    % complete-case mean over {len(complete)} games: "
@@ -600,7 +616,8 @@ def main() -> None:
                          f"column (default {DEFAULT_AGENT[1]})")
     ap.add_argument("--agent-wm", metavar="PATH", default=DEFAULT_AGENT_WM[1],
                     help="the same harness with the NLWM world model in each workspace; "
-                         f"fills the Agent+WM column (default {DEFAULT_AGENT_WM[1]})")
+                         f"fills the {DEFAULT_AGENT_WM[0]} column "
+                         f"(default {DEFAULT_AGENT_WM[1]})")
     ap.add_argument("--no-agent", action="store_true",
                     help="leave both Agent columns em-dashed")
     ap.add_argument("--check", action="store_true",
@@ -623,7 +640,8 @@ def main() -> None:
 
     agents = []
     if not a.no_agent:
-        for label, path in ((DEFAULT_AGENT[0], a.agent), (DEFAULT_AGENT_WM[0], a.agent_wm)):
+        for (label, _d, trailing), path in ((DEFAULT_AGENT, a.agent),
+                                            (DEFAULT_AGENT_WM, a.agent_wm)):
             if not path:
                 continue
             root = Path(path) if Path(path).is_absolute() else REPO / path
@@ -635,7 +653,7 @@ def main() -> None:
                 # tightens as the run lands.
                 print(f"note: nothing recorded at {root} yet; {label} stays em-dashed")
                 continue
-            agents.append(load_agent_run(label, root, raw_from))
+            agents.append(load_agent_run(label, root, raw_from, trailing=trailing))
 
     if a.check:
         print("\n".join(checks(runs, agents)).lstrip("\n"))
