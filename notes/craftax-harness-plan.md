@@ -129,29 +129,37 @@ hundred MB each and no accelerator. A 3000-action session is ~6 s of environment
 
 **F10 — What a human spends, from the six trajectories the README links.**
 The dataset is a Drive link off the README (*"run1 is the only trajectory to complete the
-game"*), and it is the only record of skilled play in existence for this environment. Two
-loaded so far:
+game"*), and it is the only record of human play in existence for this environment. All
+six, and the README's "mixed-skill" is not a hedge — the spread is enormous:
 
-| run | actions | deaths before the end | final | % of 226 |
-|---|---|---|---|---|
-| run1 | 23 209, in **one life** | 0 | 222.0 | **98.2%** |
-| run2 | 13 471, in one life | 0 | 196.1 | **86.8%** |
+| run | actions | deaths | first life | final | % of 226 |
+|---|---|---|---|---|---|
+| run1 | 23 225 | 1 | **23 209** | 222.0 | **98.2%** |
+| run2 | 13 471 | 1 | 13 471 | 196.1 | 86.8% |
+| run5 | 3 805 | 2 | 1 851 | 72.2 | 31.9% |
+| run6 | 3 644 | 2 | 1 819 | 48.2 | 21.3% |
+| run3 | 3 337 | 1 | 3 336 | 44.1 | 19.5% |
+| run4 | 766 | 3 | 203 | 14.3 | 6.3% |
 
 And the curve along the way, which is the calibration the budget question needs:
 
-| action | run1 | run2 |
-|---|---|---|
-| 250 | 5.3% | 5.4% |
-| 1 000 | 19.0% | 19.9% |
-| 2 000 | 27.8% | 23.5% |
-| **3 000** | **28.3%** | **31.3%** |
-| 5 000 | 30.5% | 57.7% |
-| 10 000 | 59.5% | 73.0% |
+| action | run1 | run2 | run3 | run4 | run5 | run6 | **median** |
+|---|---|---|---|---|---|---|---|
+| 250 | 5.3% | 5.4% | 6.2% | 4.5% | 5.8% | 5.3% | 5.4% |
+| 1 000 | 19.0% | 19.9% | 7.5% | — | 8.4% | 8.0% | **8.4%** |
+| 2 000 | 27.8% | 23.5% | 14.6% | — | 13.8% | 20.8% | 20.8% |
+| **3 000** | 28.3% | 31.3% | 17.2% | — | 26.5% | 21.7% | **26.5%** |
+| 5 000 | 30.5% | 57.7% | — | — | — | — | |
+| 10 000 | 59.5% | 73.0% | — | — | — | — | |
 
-Two readings. **At 1000 actions a skilled human is level with a billion training steps of
-PPO-GTrXL** (18.3%); at 3000 they are at 28–31%, about 1.6x the best published RL number.
-And a skilled human does not die: both runs are a single life, so the multi-life budget is
-a concession to the agent rather than a property of the game.
+Three readings. **3000 actions is where the median human (26.5%) clears the best published
+RL number** — PPO-GTrXL's 18.3% after a billion training steps — while the weakest run
+still going at that point is at 17.2%, level with it. At 1000 only the two experts are
+there (19–20%); the median human is at 8.4%, well below PPO. Second, **four of the six
+sessions are 3300–3800 actions long**, so ~3000 is roughly what a person actually spends
+on this in a sitting. Third, the two expert runs are a *single life* — dying is a novice's
+problem here, which makes the multi-life budget a concession to the agent rather than a
+property of the game.
 
 Reading the dataset needs two shims, and one of them matters. It predates the package
 layout, so its pickles name `craftax.craftax_state`; it predates this jax, so its stored
@@ -239,12 +247,12 @@ to be chosen for the write-up. What the budget buys is how far along that curve 
 goes, and what it costs.
 
 Proposed: **3000 actions** on full Craftax, 1500 on Classic — and the human curve (F10) is
-what makes that number a choice rather than a guess. At 3000 a skilled human sits at
-28–31% of the 226, comfortably clear of the 18.3% that is the best a billion training steps
-buys, and 1000 is where a human is merely *level* with it. So 3000 is the smallest budget
-at which beating the published state of the art is a real result rather than a coin flip,
-and it is 13% of the 23 209 actions the completed human run took: it buys the early and
-middle tree, not the game. Random dies every ~236 actions (median over 61 complete lives,
+what makes that number a choice rather than a guess. At 3000 the median human sits at
+26.5% of the 226, clear of the 18.3% that a billion training steps buys, and the weakest
+run still going is level with it; at 1000 the median human is at 8.4%, *below* PPO, so a
+shorter budget would be measuring the wrong end of the curve. 3000 is also about what four
+of the six people actually played in a sitting. And it is 13% of the 23 209 actions the
+completed run took: it buys the early and middle tree, not the game. Random dies every ~236 actions (median over 61 complete lives,
 5 seeds), so it is also roughly a dozen lives — enough for a curve across several of them. Environment cost is nothing
 (F9); the bill is the agent. From the `cc_humanrl` pilot — 1623 actions over six sessions
 for $37.04 — the rate is **$0.023 per action** at 3.6 actions per tool call, which puts a
