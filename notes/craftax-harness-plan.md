@@ -176,6 +176,34 @@ not a flaw to be engineered around here — it is a property of the thing being 
 it belongs in the write-up rather than in the design. What the harness must prevent is the
 session *fetching* the source or the wiki mid-run, which the existing audit already covers.
 
+**F12 — The environment's reward is per episode, and a new life re-earns all of it.**
+`craftax_step` computes `achievement_reward` as `(state.achievements - init_achievements)
+* ACHIEVEMENT_REWARD_MAP`, where `init_achievements` is the vector at the *start of the
+step* and the vector itself is part of the episode's state. So a fresh episode starts with
+nothing unlocked and every achievement pays again. Summed across episodes, reward counts
+one achievement once per life, which makes a run-cumulative total meaningless — and, if
+shown to a session, actively harmful: the first pilot found that `reset left do` paid +1
+every three actions and spent 2200 actions on it (M5). The quantity the benchmark reports
+is return on *one* episode, and that is the only aggregate a session should ever see.
+
+**F13 — What a turn costs, measured.**
+From the first pilot's 153 turns over 2757 actions, obs `pixels`:
+
+| | |
+|---|---|
+| actions per turn, genuine play | **4.2** (life 1: 557 actions in ~132 turns) |
+| context per turn | **25k → 235k** cache-read tokens, still climbing |
+| compactions | **0** — a 1M window and it never got close |
+| seconds per turn | 12 early → **29** at 235k |
+| cost, input side, at list price | **$11.6** for 18.0M cache reads |
+
+Two things the stream will not tell you. One API response arrives as several `assistant`
+events sharing a `message.id`, all carrying the same usage, and their `output_tokens` is a
+pre-completion stub — over one finished session they sum to 297 where the result event
+reports 33,784. And thinking reaches the stream as a *signature* with zero characters of
+text (422KB of signature over 119 blocks), while being 69% of the output tokens in the one
+session that reported a total. So per-turn output is not measurable, only apportionable.
+
 ---
 
 ## 1. The decisions
@@ -403,9 +431,72 @@ caught by `fetching packages`. The agent's `.agent-venv` gets numpy and Pillow a
   dies eleven to fourteen times over a 3000-action budget** — thirst does not care whether
   you move — so a session that merely fails to drink will lose everything it has unlocked,
   repeatedly.
-* **M5** — pilot: one session on full Craftax, budget 3000, plus one on Classic. Read the
-  per-episode curve and set the real budget.
-* **M6** — the matrix: N seeds on Craftax, N on Classic, and the results table.
+* **M5** — pilot: one session on full Craftax at budget 3000. *Classic dropped from the
+  pilot — the main variant is the one being evaluated.*
+
+  **The first attempt (`20260909-043025`, workspace 8E3WG) is not a result; it is the
+  reason the interface changed.** It played 2757 actions and then stopped being about
+  Craftax. What it did before that was good: `look.py` for cell segmentation and sprite
+  prototypes, `nav.py`, `world.py`, a `./go` wrapper, and **17 achievements by action
+  247 in one unbroken life** — the whole stone-tool chain by action 53 where the
+  scripted route needs 115, then drink, cow, coal, a survived night (`wake_up` at 223),
+  furnace and torches. That is 7.5% of 226 in 247 actions, above the human median at 250
+  (5.3%, F10) and above the route's ceiling.
+
+  | action | union | % | life | depth |
+  |---|---|---|---|---|
+  | 100 | 12 | 5.3 | 1 | 0 |
+  | **247** | **17** | **7.5** | 1 | 0 |
+  | 300–557 | 17 | 7.5 | 1 | 0 |
+  | 700–2757 | 18 | 8.0 | 30 → 715 | 0 |
+
+  Then it plateaued for 310 actions, and at action 558 it began pressing `reset left do`.
+  Its notes call this a decisive finding and every word is true (F12): a new life
+  re-earns everything, `reset` cost one action, so wood paid +1 every three actions. It
+  spent 226 resets and 715 lives on it while the union score sat at 18 and `max_level`
+  never left 0.
+
+  **Three defects, all ours.**
+  1. **`reset` was a forty-fourth action.** Craftax has 43 and none of them abandons a
+     life; the scope of this port is the game as shipped, so offering one was an
+     addition to the interface. Removed — a life now ends only when the world ends it.
+  2. **The only aggregate a session could see was the farmable one.** `./act status`
+     totalled reward over the whole run, and nothing said what the run was for. `status`
+     now shows the *current life's* return, the run total is kept for analysis and no
+     longer written to `state.json`, and the brief says the run is judged on its best
+     single life — which is the unit the paper reports and gives away nothing about the
+     world. `PROMPT.md` gained one clause: repeating the shortest thing that paid is a
+     diagnosis, not a plan.
+  3. **A hung-up client killed the daemon, and the dead daemon destroyed the report.**
+     `sendall` raised `BrokenPipeError` out of the accept loop, so `act stop` failed, the
+     exception left `run.py`'s `finally`, and the report of a 2757-action run was never
+     written. Both halves fixed, both tested.
+
+  Also found: `mean_episode_pct` — the number the plan names as sitting beside
+  PPO-RNN@1B's 15.3% — was never computed. It is now, over the lives the world ended,
+  with its n printed beside it, because on a 3000-action run n is often 1 or 2.
+
+  **What the curve actually says about budget — and it is not "spend more".** All 18
+  achievements it unlocked are one-pointers, 18 of the 25 that exist. The seven it
+  missed are the iron chain (`collect_iron`, `make_iron_pickaxe`, `make_iron_sword`),
+  `collect_diamond`, `eat_plant`, and the two combat ones. Everything else — **201 of
+  the 226 points** — is in the 3/5/8 tiers, and reading those tiers by name shows they
+  are almost entirely underground: `enter_gnomish_mines` and `enter_dungeon` are 5 points
+  *each*, and they gate the mobs, chests, potions, bow, enchanting, diamond gear, the
+  spells and the four deeper realms.
+
+  So **the highest-value action in this game is going down a level**, and a single one of
+  those two is worth more than a quarter of everything this session scored in 2757
+  actions. `max_level` was 0 for all of them. That reframes the axis: the question is not
+  whether 3000 actions is enough surface time, it is whether a session descends at all.
+  3000 stands (it is not what bound this run), and depth is the first thing to read off
+  the second attempt.
+
+  *Second attempt: `20260909-053629`, workspace DLT8F, on the fixed interface.*
+* **M6** — the matrix: N seeds on Craftax, and the results table. Sizing from F13: a
+  genuine 3000-action session is ~710 turns at 4.2 actions/turn, and since context was
+  still climbing at 235k with no compaction, **$100–250 and 4–6 hours per seed** — with
+  compaction behaviour the dominant uncertainty in that range.
 
 ### Risks
 
