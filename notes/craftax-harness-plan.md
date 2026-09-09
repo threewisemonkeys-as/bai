@@ -372,6 +372,13 @@ caught by `fetching packages`. The agent's `.agent-venv` gets numpy and Pillow a
   at a time. `--obs` is threaded through `init`/`serve`, and `restart` rotates
   `frames/`, `text/` and `symbolic/` together with the log.
 * **M3** — `GAME.md`, `PROMPT.md`, launcher wiring, audit table and `tests/test_audit.py`.
+  *Done 2026-09-09, 31 tests, 87 in the suite.* The audit's line moved: it grades
+  reaching outside and never knowledge, and `named_the_game` records recognition as a
+  measurement (F11). Two false positives are pinned — a session's own launch paths, and
+  a session printing its own `act` shim, which names `<harness>/.env-venv`; both roots
+  are scrubbed before any pattern runs, and before `named_the_game` too. `GAME.md`'s
+  first paragraph is generated from `--obs`. The dry run builds workspaces, starts both
+  variants and records the label mapping under `.rig/`.
 * **M4** — floors and a **ceiling**. `cc_humanrl` had a 199-action reference solution that
   wins on all five games and was the regression test for the whole port; the analogue is a
   scripted route that reliably reaches iron on a fixed seed, written greedily against the
