@@ -70,11 +70,7 @@ from offline_learning.human_replay import GAMES as HGAMES  # noqa: E402
 sys.path.insert(0, str(REPO / "offline_learning/launch"))
 from launch_planning_v2_online import GAME_ORDER  # noqa: E402
 
-# The paper's figures share one palette: a method wears the same colour in every panel it
-# appears in. `analyze_planning_difficulty.py` is where that palette was chosen, so it is
-# imported rather than restated -- two copies drift, and the drift is silent.
 sys.path.insert(0, str(HERE))
-from analyze_planning_difficulty import COLOR, GRID, INK2, INK3, SURFACE  # noqa: E402
 
 LLM_ARMS = ["raw", "lmwm", "icl"]
 ARMS = LLM_ARMS + ["wc"]
@@ -639,6 +635,17 @@ def figure(pool: dict, order: list[str], path: Path, png: Path | None = None) ->
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
+    # The paper's figures share one palette: a method wears the same colour in every panel
+    # it appears in. `analyze_planning_difficulty.py` is where that palette was chosen, so
+    # it is imported rather than restated -- two copies drift, and the drift is silent.
+    # Imported here rather than at module scope because only the figure needs it: the
+    # tables and the checks still run in a checkout that does not have that file.
+    try:
+        from analyze_planning_difficulty import COLOR, GRID, INK2, INK3, SURFACE
+    except ImportError as exc:                                  # pragma: no cover
+        raise SystemExit(f"--write-fig needs the shared palette from "
+                         f"{HERE}/analyze_planning_difficulty.py: {exc}")
 
     cols = [(label, *pool[label]) for label in order if label in pool]
     if not cols:
