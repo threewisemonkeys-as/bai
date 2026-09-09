@@ -273,6 +273,16 @@ caught by `fetching packages`. The agent's `.agent-venv` gets numpy and Pillow a
   a known unlock; frame size and orientation; every `--obs` combination parses and writes
   what it claims; **the same action sequence yields an identical state under every channel
   combination**; both variants.
+  *Done 2026-09-08 (`3fc3f81`), 27 tests, 39 in the suite.* Settled while building it:
+  the world key and the step keys come from two independent splits of the seed, so what a
+  seed *draws* and what it *plays out* cannot be confused; a restart deals the same world
+  by default (`fresh_world=True` is the generalisation setting); the jitted engine is
+  cached per variant, since a `CraftaxGame` that compiled its own would pay 9 s for `step`
+  and 7 s for the renderer every time one was made; observations are written to files per
+  channel rather than inlined, because 1.8 KB of text render per action would put five
+  megabytes of world into the one file `PROMPT.md` tells the session to read back; and the
+  package's "Loading Craftax textures" chatter is swallowed, since `./act` is a command
+  whose stdout the agent reads.
 * **M2** — `act.py` and its tests, mirroring `tests/test_act.py`.
 * **M3** — `GAME.md`, `PROMPT.md`, launcher wiring, audit table and `tests/test_audit.py`.
 * **M4** — floors and a **ceiling**. `cc_humanrl` had a 199-action reference solution that
