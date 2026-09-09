@@ -13,6 +13,9 @@ still queued simply have no file yet, which is why it is safe to run against a l
     # regenerate the LaTeX between the AUTO markers in paper/main.tex
     uv run python offline_learning/scripts/report_planning_v2_online.py --write-tex
 
+    # and the bar chart the body prints in place of that table
+    uv run python offline_learning/scripts/report_planning_v2_online.py --write-fig
+
     # only the things that would make a number wrong
     uv run python offline_learning/scripts/report_planning_v2_online.py --check
 
@@ -22,6 +25,10 @@ main table's columns in order and `SL_COLUMNS` the appendix's, so a loaded run i
 between tables by editing a list rather than by re-running anything. NLWM (SL) lives in
 the appendix that way, still loaded, still checked, just not in the headline table. `--raw-from LABEL` picks which run supplies the shared Raw column (each run has
 its own raw rollouts and the table has one Raw column).
+
+The body of the paper prints `MAIN_COLUMNS` as a figure and the appendix prints the same
+columns as a table: `--write-fig` draws the one, `--write-tex` writes the other, both from
+the same run dirs in the same pass, so the bar and the number under it cannot drift apart.
 
 The Agent columns come from `--agent PATH` and `--agent-wm PATH`, `research.autumn.launch`
 run dirs, which are a different shape: one `rows.jsonl` for the whole run rather than a
@@ -48,6 +55,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import statistics
 import sys
 import time
 from pathlib import Path
@@ -60,6 +69,12 @@ from offline_learning.human_replay import GAMES as HGAMES  # noqa: E402
 
 sys.path.insert(0, str(REPO / "offline_learning/launch"))
 from launch_planning_v2_online import GAME_ORDER  # noqa: E402
+
+# The paper's figures share one palette: a method wears the same colour in every panel it
+# appears in. `analyze_planning_difficulty.py` is where that palette was chosen, so it is
+# imported rather than restated -- two copies drift, and the drift is silent.
+sys.path.insert(0, str(HERE))
+from analyze_planning_difficulty import COLOR, GRID, INK2, INK3, SURFACE  # noqa: E402
 
 LLM_ARMS = ["raw", "lmwm", "icl"]
 ARMS = LLM_ARMS + ["wc"]
@@ -587,6 +602,112 @@ BLOCKS = {
 }
 
 
+# ------------------------------------------------------------------ figure
+FIG_PATH = "paper/figures/autumn_results.pdf"
+
+
+def sem(xs) -> float | None:
+    """Standard error of the mean OVER ENVIRONMENTS -- the Mean bar's error bar.
+
+    The Mean the paper reports is a macro average over environments, so the uncertainty
+    that belongs beside it is the spread of the per-environment scores: $n$ is 15, one per
+    environment, not 86, one per problem. A micro SE would be answering a different
+    question (how well this arm does on another problem drawn from these worlds) than the
+    Mean is asking (how well it does on another world)."""
+    xs = [x for x in xs if x is not None]
+    if len(xs) < 2:
+        return None
+    return statistics.stdev(xs) / math.sqrt(len(xs))
+
+
+def figure(pool: dict, order: list[str], path: Path, png: Path | None = None) -> Path:
+    """The results bar chart: a group of bars per environment, then a Mean panel.
+
+    The same numbers as `tex_table`, over the same columns, read from the same run dirs --
+    so the figure in the body and the table in the appendix cannot disagree, because
+    neither is typed by hand.
+
+    Mean gets its own panel rather than a sixteenth group. It is a summary of the fifteen
+    to its left, not another world, and at the width one group buys, five labelled bars
+    with error bars do not fit -- the panel is what makes the number readable and says
+    what it is in the same stroke.
+
+    Only Mean carries error bars, because it is the only bar that estimates anything: a
+    per-environment bar IS that environment's pass@1 over its own problems, not a sample
+    from a population of environments. It is the complete-case macro average the table
+    prints, so every column is averaged over the same environments."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    cols = [(label, *pool[label]) for label in order if label in pool]
+    if not cols:
+        raise SystemExit("no columns to plot")
+    complete = [g for g in PAPER_ORDER if all(scored(run, g) for _l, run, _a in cols)]
+
+    def value(run, arm, game):
+        g = scored(run, game)
+        return g["arms"][arm]["pass1"] if g else None
+
+    xs = list(range(len(PAPER_ORDER)))
+    width = 0.8 / len(cols)
+    fig, (ax, axm) = plt.subplots(
+        1, 2, figsize=(5.5, 2.75), facecolor=SURFACE, sharey=True,
+        gridspec_kw={"width_ratios": [len(PAPER_ORDER), 2.6], "wspace": 0.07})
+
+    for i, (label, run, arm) in enumerate(cols):
+        off = (i - (len(cols) - 1) / 2) * width
+        colour = COLOR.get(label, INK3)
+        ys = [value(run, arm, g) for g in PAPER_ORDER]
+        ax.bar([x + off for x, y in zip(xs, ys) if y is not None],
+               [y for y in ys if y is not None], width=width * 0.92,
+               color=colour, linewidth=0, zorder=3, label=label)
+        m, e = mean([value(run, arm, g) for g in complete]), \
+               sem([value(run, arm, g) for g in complete])
+        if m is None:
+            continue
+        axm.bar([i], [m], width=0.82, color=colour, linewidth=0, zorder=3)
+        if e:
+            axm.errorbar([i], [m], yerr=[e], fmt="none", ecolor=INK3, elinewidth=0.7,
+                         capsize=1.6, capthick=0.7, zorder=4)
+        axm.annotate(f"{m:.2f}", (i, m + (e or 0) + 0.03), ha="center", va="bottom",
+                     fontsize=5.6, color=INK2, zorder=4)
+
+    for a in (ax, axm):
+        a.set_facecolor(SURFACE)
+        a.set_ylim(0, 1.13)
+        a.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+        a.grid(axis="y", color=GRID, linewidth=0.8, zorder=0)
+        a.set_axisbelow(True)
+        for side in ("top", "right"):
+            a.spines[side].set_visible(False)
+        for side in ("left", "bottom"):
+            a.spines[side].set_color(GRID)
+        a.tick_params(colors=INK2, length=0, labelsize=7)
+    ax.set_ylabel("pass@1", color=INK2, fontsize=8.5)
+    ax.set_xlim(-0.75, len(PAPER_ORDER) - 0.25)
+    ax.set_xticks(xs)
+    ax.set_xticklabels([display_name(g) for g in PAPER_ORDER],
+                       rotation=45, ha="right", va="top", rotation_mode="anchor")
+    axm.set_xlim(-0.7, len(cols) - 0.3)
+    axm.set_xticks([(len(cols) - 1) / 2])
+    axm.set_xticklabels(["Mean"], fontweight="bold")
+    axm.tick_params(labelleft=False, labelsize=7.5)
+    axm.spines["left"].set_visible(False)
+
+    leg = ax.legend(loc="lower center", bbox_to_anchor=(0.57, 1.0), ncol=len(cols),
+                    frameon=False, fontsize=7.2, handlelength=1.1, handletextpad=0.45,
+                    columnspacing=1.1, borderpad=0.0)
+    for t in leg.get_texts():
+        t.set_color(INK2)
+    fig.tight_layout()
+    for out in [path] + ([png] if png else []):
+        out.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out, dpi=220, facecolor=SURFACE, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
 def comment_prefix(line: str, marker: str) -> str:
     """The `% ` a wholesale-commented-out table carries in front of every one of its lines.
 
@@ -658,6 +779,11 @@ def main() -> None:
                          f"(default {DEFAULT_AGENT_WM[1]})")
     ap.add_argument("--no-agent", action="store_true",
                     help="leave both Agent columns em-dashed")
+    ap.add_argument("--write-fig", nargs="?", const=FIG_PATH, metavar="PATH",
+                    help="write the results bar chart -- the same columns as the main "
+                         f"table, as a figure (default {FIG_PATH})")
+    ap.add_argument("--fig-png", metavar="PATH",
+                    help="also write the chart as a PNG, for looking at outside LaTeX")
     ap.add_argument("--check", action="store_true",
                     help="only the staleness/completeness checks")
     ap.add_argument("--json", metavar="PATH", help="dump the aggregates as JSON")
@@ -706,6 +832,12 @@ def main() -> None:
         moved = write_tex(p, runs, raw_from, agents)
         print(f"\n{('updated ' + ', '.join(moved)) if moved else 'unchanged'} in {p}"
               f"  (Raw column from {raw_from['label']})")
+    if a.write_fig:
+        def _abs(x):
+            return Path(x) if Path(x).is_absolute() else REPO / x
+        out = figure(column_pool(runs, raw_from, agents), MAIN_COLUMNS,
+                     _abs(a.write_fig), _abs(a.fig_png) if a.fig_png else None)
+        print(f"wrote {out}")
     if a.json:
         out = {r["label"]: {
             "root": str(r["root"]), "config": r["config"],

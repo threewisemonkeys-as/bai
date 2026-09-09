@@ -228,8 +228,9 @@ worth reporting rather than a run to repeat.
 
 `offline_learning/scripts/report_planning_v2_online.py` reads the run dirs, checks that
 `replay.html` is level with the results, and writes the LaTeX between the AUTO markers in
-`paper/main.tex` (`--write-tex`). `--check` reports any comparability breach. The exact command
-behind the two tables now in the paper — the ICL column is a third *arm* of its own run, hence
+`paper/main.tex` (`--write-tex`). `--check` reports any comparability breach, and `--write-fig`
+draws the results bar chart the body prints in place of the per-environment table (which
+moved to the appendix). The exact command behind the figure and the tables now in the paper — the ICL column is a third *arm* of its own run, hence
 `@icl`:
 
 ```bash
@@ -237,7 +238,7 @@ uv run python offline_learning/scripts/report_planning_v2_online.py \
   --run "ICL=logs/2026-09-05/planning_v2_online_icl_full@icl" \
   --run "NLWM (Plain)=logs/2026-09-03/planning_v2_online_ds_percap_nl" \
   --run "NLWM (SL)=logs/2026-09-02/planning_v2_online_opus5_nl" \
-  --raw-from "NLWM (Plain)" --write-tex
+  --raw-from "NLWM (Plain)" --write-tex --write-fig
 ```
 
 ### In-context baseline (the same data, unlearned) — RUN 2026-09-04/05
