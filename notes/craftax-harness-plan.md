@@ -127,7 +127,41 @@ standing still. Random survives ~250 actions a life. Staying alive is part of th
 hundred MB each and no accelerator. A 3000-action session is ~6 s of environment time and
 ~140 s of rendering; the wall clock is entirely the agent's.
 
-**F10 — The model has read about this game.**
+**F10 — What a human spends, from the six trajectories the README links.**
+The dataset is a Drive link off the README (*"run1 is the only trajectory to complete the
+game"*), and it is the only record of skilled play in existence for this environment. Two
+loaded so far:
+
+| run | actions | deaths before the end | final | % of 226 |
+|---|---|---|---|---|
+| run1 | 23 209, in **one life** | 0 | 222.0 | **98.2%** |
+| run2 | 13 471, in one life | 0 | 196.1 | **86.8%** |
+
+And the curve along the way, which is the calibration the budget question needs:
+
+| action | run1 | run2 |
+|---|---|---|
+| 250 | 5.3% | 5.4% |
+| 1 000 | 19.0% | 19.9% |
+| 2 000 | 27.8% | 23.5% |
+| **3 000** | **28.3%** | **31.3%** |
+| 5 000 | 30.5% | 57.7% |
+| 10 000 | 59.5% | 73.0% |
+
+Two readings. **At 1000 actions a skilled human is level with a billion training steps of
+PPO-GTrXL** (18.3%); at 3000 they are at 28–31%, about 1.6x the best published RL number.
+And a skilled human does not die: both runs are a single life, so the multi-life budget is
+a concession to the agent rather than a property of the game.
+
+Reading the dataset needs two shims, and one of them matters. It predates the package
+layout, so its pickles name `craftax.craftax_state`; it predates this jax, so its stored
+avals carry a `named_shape` that `ShapedArray.update` no longer takes. And — the one that
+would silently corrupt an analysis — **its achievement indices are an older enum**:
+decoded against 1.6.1's, `defeat_necromancer` appears to fire at action 863, before the
+graveyard is entered. Only the reward channel is index-independent, so every number above
+is cumulative reward.
+
+**F11 — The model has read about this game.**
 The assets are Crafter's, the tech tree is in every model's training data, and
 `pip install craftax` ships a constants file listing all 67 achievements by name. That is
 not a flaw to be engineered around here — it is a property of the thing being measured, and
@@ -183,9 +217,40 @@ episodes-within-a-session are the closest thing it has to learning, which makes 
 per-episode curve across a run interesting in its own right — episode 1 versus episode 10
 is the agent's learning curve, and it is a curve no RL baseline has an analogue for.
 
-Budget: **3000 actions** on full Craftax, 1500 on Classic. Random dies every ~250 actions,
-so 3000 is roughly a dozen lives — enough for a curve, and enough to reach the mines. The
-constraint is agent tokens, not environment steps (F9), so the pilot sets the final number.
+**What the benchmark prescribes, and what it does not.** One number, in Appendix D:
+*"The maximum episode length is 100,000 at which the episode is truncated"* (10 000 for
+Classic). That is a truncation limit, not a play budget, and nothing reaches it. The
+1B and 1M in Craftax-1B / Craftax-1M are *training* budgets for a learner — *"a budget of
+1 billion environment interactions is permitted"* — and have no analogue for an agent that
+is not trained. So there is no play budget to inherit; ours has to be justified on its own
+terms.
+
+Two more things the paper settles while we are here. The challenges are defined on
+**Craftax-Symbolic** (*"we also limit the benchmarks to considering symbolic
+observations"*), so PPO-RNN's 15.3% is a symbolic-observation number and a pixel run is a
+different condition — sayable in a table, not ignorable. And the prose says 65
+achievements where 1.6.1 ships 67; both normalise by 226, and the M0 pin is on the
+package's own map.
+
+**The budget is a spending decision, not a reporting one.** The actuator records the score
+after every action, so a 3000-action run *contains* the 1000-action result: the
+achievements-against-actions curve comes out of any run for free, and no single number has
+to be chosen for the write-up. What the budget buys is how far along that curve the run
+goes, and what it costs.
+
+Proposed: **3000 actions** on full Craftax, 1500 on Classic — and the human curve (F10) is
+what makes that number a choice rather than a guess. At 3000 a skilled human sits at
+28–31% of the 226, comfortably clear of the 18.3% that is the best a billion training steps
+buys, and 1000 is where a human is merely *level* with it. So 3000 is the smallest budget
+at which beating the published state of the art is a real result rather than a coin flip,
+and it is 13% of the 23 209 actions the completed human run took: it buys the early and
+middle tree, not the game. Random dies every ~236 actions (median over 61 complete lives,
+5 seeds), so it is also roughly a dozen lives — enough for a curve across several of them. Environment cost is nothing
+(F9); the bill is the agent. From the `cc_humanrl` pilot — 1623 actions over six sessions
+for $37.04 — the rate is **$0.023 per action** at 3.6 actions per tool call, which puts a
+3000-action session at $60–90 and a six-seed matrix at $400–550. Craftax should batch
+harder than those games did (walking twenty steps is one plan), which is the main thing
+that could move it, and the main thing to read off the pilot.
 
 ### Decision C — what the log carries
 
