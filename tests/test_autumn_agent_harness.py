@@ -32,6 +32,7 @@ rig = pytest.importorskip("research.autumn.rig")
 from research.autumn.actions import parse_actions_json  # noqa: E402
 from research.autumn.env import AutumnPlanningEnv  # noqa: E402
 from research.autumn.runner import AutumnRunner  # noqa: E402
+from research.autumn import launch  # noqa: E402
 
 logging.disable(logging.INFO)
 
@@ -277,3 +278,126 @@ def test_the_agents_env_plays_the_same_branch_the_scorer_replays():
     import inspect
     src = inspect.getsource(rig.replay_and_score)
     assert "_eval_action_cap" in src
+
+
+# ------------------------------------------------- the world-model condition (F22)
+#
+# The `agent+wm` arm hands each session the artifacts the `lmwm` arm plans with. Two
+# things have to hold for that to mean anything: the session must actually receive the
+# bytes the published arm was scored with, and the arm WITHOUT the flag must be the run
+# already on disk -- an accidental prompt change would silently make the comparison a
+# comparison of two different agents.
+
+NLWM_ROOT = REPO / "logs/2026-08-24/human_curated"
+
+needs_artifacts = pytest.mark.skipif(
+    not (NLWM_ROOT / "rexpure").is_dir(), reason="needs the seed-1 rexpure artifacts")
+
+
+@needs_artifacts
+def test_every_world_has_the_artifacts_the_lmwm_arm_used(problems):
+    launch.check_world_model(NLWM_ROOT, problems)      # raises SystemExit if not
+
+
+@needs_artifacts
+def test_the_world_model_lands_in_the_workspace(problem, tmp_path):
+    ws = launch.build_workspace(problem, REPO / "corpora", tmp_path,
+                                study_rounds=5, nlwm_root=NLWM_ROOT)
+    src = launch.nlwm_dir(NLWM_ROOT, problem["game"])
+    for dst, source in launch.NLWM_FILES.items():
+        assert (ws / "nlwm" / dst).read_bytes() == (src / source).read_bytes()
+    assert (ws / "nlwm" / "README.md").is_file()
+    assert "nlwm/" in (ws / "AGENTS.md").read_text()
+    assert (ws / "drives").is_dir(), "the world model does not replace the evidence"
+
+
+def test_without_the_flag_the_prompt_is_the_one_the_run_on_disk_used(problem, tmp_path):
+    ws = launch.build_workspace(problem, REPO / "corpora", tmp_path, study_rounds=5)
+    assert not (ws / "nlwm").exists()
+    text = (ws / "AGENTS.md").read_text()
+    assert "nlwm" not in text
+    shipped = REPO / ("logs/2026-09-06/agent_full/N2NTD/"
+                      + problem["task_uid"].replace(":", "_") + "/AGENTS.md")
+    if shipped.is_file():                       # the completed arm, byte for byte
+        assert text == shipped.read_text()
+
+
+@needs_artifacts
+def test_every_perception_module_runs_on_its_own_start_grids(problems):
+    """`compile_perceive` swallows exceptions and returns ("", err); an agent calling
+    the module directly sees the traceback instead. So the modules are checked here
+    against every start state they will be handed."""
+    by_game: dict[str, list] = {}
+    for p in problems:
+        by_game.setdefault(p["game"], []).append(p)
+    for game, rows in by_game.items():
+        code = (launch.nlwm_dir(NLWM_ROOT, game)
+                / launch.NLWM_FILES["perception.py"]).read_text()
+        ns: dict = {}
+        exec(code, ns)                                              # noqa: S102
+        perceive = ns.get("perceive")
+        assert callable(perceive), f"{game}: no perceive()"
+        for p in rows:
+            out = perceive([p["start_grid"]])
+            assert isinstance(out, str) and out.strip(), f"{game}/{p['task_uid']}: empty"
+
+
+# ------------------------------------------------------------- parallel scheduling
+#
+# Parallelism is a scheduling change only -- the sessions were independent already. The
+# one thing it adds that can corrupt a result is two workers playing the same problem
+# and both writing a row, so the claim is tested rather than assumed.
+
+def test_two_workers_cannot_take_the_same_problem(tmp_path):
+    claims = tmp_path / "claims"
+    claims.mkdir()
+    assert launch.claim(claims, "n2ntd:platform:s0") is True
+    assert launch.claim(claims, "n2ntd:platform:s0") is False
+    assert launch.claim(claims, "n2ntd:high-ground:s0") is True
+
+
+def test_merging_the_workers_rows_keeps_one_row_per_problem(tmp_path):
+    (tmp_path / "rows.w0.jsonl").write_text(
+        '{"task_uid": "a"}\n{"task_uid": "b"}\n')
+    (tmp_path / "rows.w1.jsonl").write_text(
+        '{"task_uid": "b"}\n{"task_uid": "c"}\nnot json\n')
+    assert launch.merge_rows(tmp_path) == 3
+    uids = [json.loads(l)["task_uid"]
+            for l in (tmp_path / "rows.jsonl").read_text().splitlines()]
+    assert sorted(uids) == ["a", "b", "c"]
+    assert launch.recorded(tmp_path) == {"a", "b", "c"}
+
+
+def test_the_long_problems_are_handed_out_first(problems, tmp_path):
+    traces = tmp_path / "traces"
+    traces.mkdir()
+    slow, fast = problems[-1], problems[0]
+    for p, wall in ((slow, 9000.0), (fast, 10.0)):
+        (traces / (p["task_uid"].replace(":", "_") + ".json")).write_text(
+            json.dumps({"task_uid": p["task_uid"], "wall_s": wall}))
+    order = launch.order_longest_first(list(problems), str(tmp_path))
+    assert order[0]["task_uid"] == slow["task_uid"]
+    assert order[-1]["task_uid"] == fast["task_uid"]
+    assert len(order) == len(problems), "scheduling must not drop a problem"
+
+
+def test_each_worker_gets_its_own_proxy_and_reasoning_log():
+    """A turn's reasoning is read back by byte offset into the proxy transcript, so two
+    sessions sharing one transcript cross-contaminate every turn. The supervisor must
+    therefore hand each worker a proxy of its own."""
+    class A:
+        proxy_port_base = 8790
+        proxy_log_root = "logs/parity_proxy"
+        base_url = "http://127.0.0.1:8788/v1"
+        transcript = "logs/parity_proxy/reasoning.jsonl"
+
+    routes = [launch.worker_routing(A, i) for i in range(6)]
+    urls = [r[r.index("--base-url") + 1] for r in routes]
+    logs = [r[r.index("--transcript") + 1] for r in routes]
+    assert len(set(urls)) == 6 and len(set(logs)) == 6
+    assert urls[0].endswith(":8790/v1") and urls[5].endswith(":8795/v1")
+    assert logs[3] == "logs/parity_proxy/w3/reasoning.jsonl"
+
+    A.proxy_port_base = 0                       # unset: the single-session default
+    assert launch.worker_routing(A, 2) == [
+        "--base-url", A.base_url, "--transcript", A.transcript]
