@@ -383,7 +383,26 @@ caught by `fetching packages`. The agent's `.agent-venv` gets numpy and Pillow a
   wins on all five games and was the regression test for the whole port; the analogue is a
   scripted route that reliably reaches iron on a fixed seed, written greedily against the
   symbolic state (harness-side only) and then frozen as a `(seed, actions, achievements)`
-  golden triple. Fallback: record one route by hand through `play_craftax` and freeze that.
+  golden triple.
+  *Done 2026-09-09, 7 tests, 94 in the suite.* The route could not be a recording — the
+  world moves while you plan against it — so `tools/route.py` re-plans from the block grid
+  after every step, verifies each move happened, tunnels through rock when the pickaxe
+  allows it (seed 0's iron has no walkable neighbour), drinks before thirst kills it, and
+  hits whatever walks up at night. Over ten seeds: **iron pickaxe on nine, all ten alive,
+  median 13 achievements in 184 actions**. Seed 0's 115 actions are frozen as a fixed list
+  so a router change cannot quietly become the environment's regression test.
+
+  | policy | actions | best life | union | lives | deaths |
+  |---|---|---|---|---|---|
+  | random | 3000 | 3–5 (1.3–2.2%) | 4–6 | 10–16 | 9–15 |
+  | noop | 3000 | 0 | 0 | 12–15 | 11–14 |
+  | route | 115–214 | 12–14 (5.3–6.2%) | 12–14 | 1 | 0 |
+
+  Two things this settles. The route sits at roughly where a human is at 250 actions
+  (5.3%, F10), so it is a competence floor rather than a ceiling for the game. And **noop
+  dies eleven to fourteen times over a 3000-action budget** — thirst does not care whether
+  you move — so a session that merely fails to drink will lose everything it has unlocked,
+  repeatedly.
 * **M5** — pilot: one session on full Craftax, budget 3000, plus one on Classic. Read the
   per-episode curve and set the real budget.
 * **M6** — the matrix: N seeds on Craftax, N on Classic, and the results table.
