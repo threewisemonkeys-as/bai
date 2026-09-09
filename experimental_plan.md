@@ -235,9 +235,9 @@ behind the two tables now in the paper — the ICL column is a third *arm* of it
 ```bash
 uv run python offline_learning/scripts/report_planning_v2_online.py \
   --run "ICL=logs/2026-09-05/planning_v2_online_icl_full@icl" \
-  --run "NLWM=logs/2026-09-03/planning_v2_online_ds_percap_nl" \
+  --run "NLWM (Plain)=logs/2026-09-03/planning_v2_online_ds_percap_nl" \
   --run "NLWM (SL)=logs/2026-09-02/planning_v2_online_opus5_nl" \
-  --raw-from NLWM --write-tex
+  --raw-from "NLWM (Plain)" --write-tex
 ```
 
 ### In-context baseline (the same data, unlearned) — RUN 2026-09-04/05

@@ -17,7 +17,10 @@ still queued simply have no file yet, which is why it is safe to run against a l
     uv run python offline_learning/scripts/report_planning_v2_online.py --check
 
 `--run LABEL=PATH` replaces the default pair; the LABEL is what the LaTeX column is
-called. `--raw-from LABEL` picks which run supplies the shared Raw column (each run has
+called, and also what decides where -- or whether -- it prints: `MAIN_COLUMNS` names the
+main table's columns in order and `SL_COLUMNS` the appendix's, so a loaded run is moved
+between tables by editing a list rather than by re-running anything. NLWM (SL) lives in
+the appendix that way, still loaded, still checked, just not in the headline table. `--raw-from LABEL` picks which run supplies the shared Raw column (each run has
 its own raw rollouts and the table has one Raw column).
 
 The Agent columns come from `--agent PATH` and `--agent-wm PATH`, `research.autumn.launch`
@@ -76,7 +79,7 @@ PAPER_ORDER = ["eahcw", "egg", "bt3gb", "dq8gc", "7xf97", "n2ntd", "va6fq", "s2k
 DISPLAY = {"colour_lines": "Colour Lines", "SET": "SET", "logic_gates": "Logic Gates",
            "f5w3n": "Space Invaders"}
 
-DEFAULT_RUNS = [("NLWM", "logs/2026-09-03/planning_v2_online_ds_percap_nl"),
+DEFAULT_RUNS = [("NLWM (Plain)", "logs/2026-09-03/planning_v2_online_ds_percap_nl"),
                 ("NLWM (SL)", "logs/2026-09-02/planning_v2_online_opus5_nl")]
 # label, run dir, and whether the column prints AFTER the --run columns. `Agent` is a
 # baseline and sits with Raw; the agent holding NLWM's artifacts is a variant of NLWM and
@@ -463,44 +466,66 @@ def scored(run: dict, game: str) -> dict | None:
     return g if g and g["complete"] else None
 
 
-def tex_results(runs: list[dict], raw_from: dict, agents: list[dict] = ()) -> str:
-    """tab:autumn-results -- one row per game, Raw from the single designated run.
+# The main table's columns, in order, named by the label each carries. A run or agent
+# whose label is not listed here does not print in that table -- which is how NLWM (SL)
+# lives in the appendix without being dropped from the run, and how the column order stops
+# being a consequence of the order the flags were typed in.
+MAIN_COLUMNS = ["Raw", "ICL", "NLWM (Plain)", "Agent", "NLWM (Agentic)"]
+# The appendix's supervised-reflector comparison: same method, same 86 problems, same
+# budgets, differing only in which model built the artifacts being planned with.
+SL_COLUMNS = ["NLWM (Plain)", "NLWM (SL)"]
+# Printed grey. Raw is the reference that says what a problem is worth with no world model
+# at all; it sets the floor the other columns are read against rather than competing with
+# them, and it should not draw the eye first.
+GREY_COLUMNS = {"Raw"}
 
-    A game still playing prints an em-dash, so the table is publishable mid-run and
-    tightens as games land. The Mean row is a complete-case macro average: only games
-    that have a number in every column, so no column is averaged over a different set --
-    which is why an unfinished agent run narrows the mean for every column, rather than
-    quietly giving the Agent column an easier set of games than the others."""
-    complete = [g for g in PAPER_ORDER
-                if scored(raw_from, g) and all(scored(r, g) for r in runs)
-                and all(scored(a, g) for a in agents)]
-    lead = [a for a in agents if not a.get("trailing")]
-    trail = [a for a in agents if a.get("trailing")]
+
+def column_pool(runs: list[dict], raw_from: dict, agents: list[dict]) -> dict:
+    """Every column that could print, label -> (the run holding it, which arm to read)."""
+    pool = {"Raw": (raw_from, "raw")}
+    for r in runs:
+        pool[r["label"]] = (r, r["arm"])
+    for a in agents:
+        pool[a["label"]] = (a, AGENT_ARM)
+    return pool
+
+
+def grey(cell: str) -> str:
+    return r"\textcolor{black!55}{" + cell + "}"
+
+
+def tex_table(pool: dict, order: list[str]) -> str:
+    """One row per game over the named columns, in the order named.
+
+    A game still playing prints an em-dash, so a table is publishable mid-run and tightens
+    as games land. The Mean row is a complete-case macro average over the games that have
+    a number in every column of THIS table -- so no column is ever averaged over a
+    different set of games than the column beside it, and a table that drops a column
+    (the appendix one does) gets the mean its own columns earn rather than the main
+    table's.
+    """
+    cols = [(label, *pool[label]) for label in order if label in pool]
+    if not cols:
+        return "    % no columns to print"
+    complete = [g for g in PAPER_ORDER if all(scored(run, g) for _l, run, _a in cols)]
+
+    def cell(label, run, arm, game):
+        g = scored(run, game)
+        out = tex(g["arms"][arm]["pass1"]) if g else r"\textemdash"
+        return grey(out) if label in GREY_COLUMNS else out
+
+    head = [grey(l) if l in GREY_COLUMNS else l for l, _r, _a in cols]
     L = [r"    \toprule",
-         r"    Environment & Raw & " + " & ".join([a["label"] for a in lead]
-                                                 + [r["label"] for r in runs]
-                                                 + [a["label"] for a in trail])
-         + r" \\",
+         r"    Environment & " + " & ".join(head) + r" \\",
          r"    \midrule"]
-
-    def agent_cell(a, game):
-        ga = scored(a, game)
-        return tex(ga["arms"][AGENT_ARM]["pass1"]) if ga else r"\textemdash"
-
     for game in PAPER_ORDER:
-        g = scored(raw_from, game)
-        cells = [tex(g["arms"]["raw"]["pass1"]) if g else r"\textemdash"]
-        cells += [agent_cell(a, game) for a in lead]
-        for r in runs:
-            gr = scored(r, game)
-            cells.append(tex(gr["arms"][r["arm"]]["pass1"]) if gr else r"\textemdash")
-        cells += [agent_cell(a, game) for a in trail]
-        L.append(f"    {display_name(game):<14} & " + " & ".join(cells) + r" \\")
+        L.append(f"    {display_name(game):<14} & "
+                 + " & ".join(cell(*c, game) for c in cols) + r" \\")
     L.append(r"    \midrule")
-    means = [tex(run_totals(raw_from, "raw", complete)["macro"])]
-    means += [tex(run_totals(a, AGENT_ARM, complete)["macro"]) for a in lead]
-    means += [tex(run_totals(r, r["arm"], complete)["macro"]) for r in runs]
-    means += [tex(run_totals(a, AGENT_ARM, complete)["macro"]) for a in trail]
+    means = []
+    for label, run, arm in cols:
+        m = tex(run_totals(run, arm, complete)["macro"])
+        means.append(grey(m) if label in GREY_COLUMNS else m)
     L.append(r"    \textbf{Mean} & " + " & ".join(means) + r" \\")
     L.append(r"    \bottomrule")
     L.append(f"    % complete-case mean over {len(complete)} games: "
@@ -541,10 +566,24 @@ def tex_protocol(runs: list[dict]) -> str:
 
 
 # label -> (body builder, column spec for the number of runs)
+def _score_block(order):
+    """A results-shaped block: the named columns, and a tabular wide enough for the ones
+    that actually exist -- a column whose run has not landed is absent, not empty."""
+    def build(pool, runs):
+        return (tex_table(pool, order),
+                "@{}l" + "c" * len([l for l in order if l in pool]) + "@{}")
+    return build
+
+
+def _protocol_block(pool, runs):
+    return tex_protocol(runs), "@{}l" + "r" * (5 * len(runs)) + "@{}"
+
+
+# label -> build(pool, runs) -> (body, column spec)
 BLOCKS = {
-    "tab:autumn-results": (tex_results,
-                           lambda n, k: "@{}l" + "c" * (1 + k + n) + "@{}"),
-    "tab:autumn-protocol": (tex_protocol, lambda n, k: "@{}l" + "r" * (5 * n) + "@{}"),
+    "tab:autumn-results": _score_block(MAIN_COLUMNS),
+    "tab:nlwm-sl": _score_block(SL_COLUMNS),
+    "tab:autumn-protocol": _protocol_block,
 }
 
 
@@ -569,7 +608,8 @@ def write_tex(path: Path, runs: list[dict], raw_from: dict,
     been commented out is rewritten commented out, prefix intact."""
     lines = path.read_text().split("\n")
     changed = []
-    for label, (build, colspec) in BLOCKS.items():
+    pool = column_pool(runs, raw_from, agents)
+    for label, build in BLOCKS.items():
         begin, end = f"% BEGIN AUTO {label}", f"% END AUTO {label}"
         bi = next((i for i, l in enumerate(lines) if l.rstrip().endswith(begin)), None)
         if bi is None:
@@ -584,10 +624,8 @@ def write_tex(path: Path, runs: list[dict], raw_from: dict,
         # the column spec itself contains `}` (`@{}lccc@{}`), so keep only what follows
         # the line's LAST brace -- that is the tabular's own closing one
         head, _, tail = lines[bi - 1].partition(r"\begin{tabular}{")
-        opener = (head + r"\begin{tabular}{" + colspec(len(runs), len(agents))
-                  + tail[tail.rindex("}"):])
-        body = (build(runs, raw_from, agents) if label == "tab:autumn-results"
-                else build(runs))
+        body, colspec = build(pool, runs)
+        opener = head + r"\begin{tabular}{" + colspec + tail[tail.rindex("}"):]
         block = [pfx + l for l in [f"    {begin}", *body.split("\n"), f"    {end}"]]
         if [opener] + block != lines[bi - 1:ei + 1]:
             changed.append(label)
@@ -660,8 +698,9 @@ def main() -> None:
     else:
         print(console(runs, agents), end="")
     if a.tex:
-        print("\n% " + "tab:autumn-results\n" + tex_results(runs, raw_from, agents))
-        print("\n% " + "tab:autumn-protocol\n" + tex_protocol(runs))
+        pool = column_pool(runs, raw_from, agents)
+        for label, build in BLOCKS.items():
+            print(f"\n% {label}\n" + build(pool, runs)[0])
     if a.write_tex:
         p = Path(a.write_tex) if Path(a.write_tex).is_absolute() else REPO / a.write_tex
         moved = write_tex(p, runs, raw_from, agents)
