@@ -616,6 +616,20 @@ def sem(xs) -> float | None:
     return statistics.stdev(xs) / math.sqrt(len(xs))
 
 
+def pastel(colour: str, toward_white: float = 0.45) -> str:
+    """The shared palette, lightened for areas rather than lines.
+
+    A hue is chosen at the weight it will be read at, and the analysis figure reads its
+    palette as 2px strokes. The same weight across a filled bar is much more ink, and
+    fifteen groups of it fights the numbers for attention -- so the bars carry the same
+    hues mixed toward the page. Lightened here rather than in the palette itself, because
+    a pastel 2px line on a near-white surface is exactly what that palette rejected."""
+    import matplotlib.colors as mc
+    r, g, b = mc.to_rgb(colour)
+    m = 1 - toward_white
+    return mc.to_hex((1 - m + m * r, 1 - m + m * g, 1 - m + m * b))
+
+
 def figure(pool: dict, order: list[str], path: Path, png: Path | None = None) -> Path:
     """The results bar chart: a group of bars per environment, then a Mean panel.
 
@@ -665,15 +679,16 @@ def figure(pool: dict, order: list[str], path: Path, png: Path | None = None) ->
     for i, (label, run, arm) in enumerate(cols):
         off = (i - (len(cols) - 1) / 2) * width
         colour = COLOR.get(label, INK3)
+        face = dict(color=pastel(colour), edgecolor=colour, linewidth=0.3)
         ys = [value(run, arm, g) for g in PAPER_ORDER]
         ax.bar([x + off for x, y in zip(xs, ys) if y is not None],
                [y for y in ys if y is not None], width=width * 0.92,
-               color=colour, linewidth=0, zorder=3, label=label)
+               zorder=3, label=label, **face)
         m, e = mean([value(run, arm, g) for g in complete]), \
                sem([value(run, arm, g) for g in complete])
         if m is None:
             continue
-        axm.bar([i], [m], width=0.82, color=colour, linewidth=0, zorder=3)
+        axm.bar([i], [m], width=0.82, zorder=3, **face)
         if e:
             axm.errorbar([i], [m], yerr=[e], fmt="none", ecolor=INK3, elinewidth=0.7,
                          capsize=1.6, capthick=0.7, zorder=4)
