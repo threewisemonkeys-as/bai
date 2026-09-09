@@ -100,6 +100,13 @@ before the first `./act do` returns, as `cc_humanrl`'s does.
 * **Text.** `render_craftax_text(state)` returns ~1.8 KB naming every visible cell
   (`"0, 3: tree"`) and every inventory count — the symbolic content in readable form.
 
+They do not cost the same, which matters for the arm that is off. Per action, jitted:
+the 64 px render **25 ms**, the symbolic vector **0.2 ms**, the text render **381 ms** —
+it returns a Python string, so it cannot be jitted and re-dispatches its jax work every
+call. On a 3000-action run that is nineteen minutes of wall clock. It stays upstream's
+function anyway: a faster re-implementation would stop being the package's own, which is
+the only reason the channel is worth having.
+
 **F7 — Partial observability is doubled.**
 The view is a window centred on the player, *and* a light map darkens everything outside a
 radius at night and underground. The world is 48×48 × 9 levels. The agent has to build a
@@ -284,6 +291,13 @@ caught by `fetching packages`. The agent's `.agent-venv` gets numpy and Pillow a
   package's "Loading Craftax textures" chatter is swallowed, since `./act` is a command
   whose stdout the agent reads.
 * **M2** — `act.py` and its tests, mirroring `tests/test_act.py`.
+  *Done 2026-09-08, 17 tests, 56 in the suite.* A life ending is not the run ending:
+  the batch stops, the block holds the state the life ended in and then the state the
+  next life began in, and the budget carries on. The reward goes in the block header —
+  it is the channel a policy is given — while the achievement set stays in `result.json`
+  beside the environment, because naming what fired would hand over the tech tree a rung
+  at a time. `--obs` is threaded through `init`/`serve`, and `restart` rotates
+  `frames/`, `text/` and `symbolic/` together with the log.
 * **M3** — `GAME.md`, `PROMPT.md`, launcher wiring, audit table and `tests/test_audit.py`.
 * **M4** — floors and a **ceiling**. `cc_humanrl` had a 199-action reference solution that
   wins on all five games and was the regression test for the whole port; the analogue is a
