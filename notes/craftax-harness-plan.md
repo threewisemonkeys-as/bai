@@ -215,6 +215,39 @@ reports 33,784. And thinking reaches the stream as a *signature* with zero chara
 text (422KB of signature over 119 blocks), while being 69% of the output tokens in the one
 session that reported a total. So per-turn output is not measurable, only apportionable.
 
+**F14 — The world is never saved, and never has to be.**
+Craftax state is a pure function of `(seed, actions)`: the world key is
+`fold_in(world_root, 0)` and the key for step *t* of a life is `fold_in(step_root, t)`,
+both derived from `PRNGKey(seed)` at construction. So a run is fully recoverable from
+the token history `state.json` already keeps — replay it into a fresh engine and you are
+in the state the last action left, exactly.
+
+Measured on the M5 pilot's 3000 actions: **34 s cold** (≈25 s of that JAX compile, so
+≈3 ms an action after), union score 46 both ways, and the symbolic observation at the
+resume point byte-identical to the one written when that action was first played. A
+whole `--continue` launch — build, replay, hand to a session — is **44 s** at 3000
+actions, and scales at ~3 ms an action after the fixed compile.
+
+This is what makes a run longer than a session possible, and it is cheaper than
+checkpointing the pytree would be to maintain.
+
+**F15 — A run of 30k actions is a run played by several sessions.**
+At the pilot's rate 30,000 actions is ≈21.5 h and ≈$1,050, which no single `claude -p`
+process should be asked to hold. `--stint N` divides the budget: a session plays N
+actions, is told its stint is spent (not that the run is over), and the launcher stops
+the daemon, rebuilds from history and starts the next one.
+
+The daemon is *not* held open between sessions, and that is deliberate. Granting a
+stint is something only a launcher starting a daemon can do, so there is no `./act
+next` in the workspace for a session to call on itself — the first pilot's `reset`
+grind is the standing argument against putting a lever in the workspace that the game
+does not have. The replay it costs is ~2.4% of a 30k run's wall clock, and it buys a
+clean process at every handover.
+
+The handover is the workspace and nothing else, which makes `notes.md` load-bearing
+rather than advised: PROMPT.md now says so, and says the budget belongs to the run
+rather than to the session holding it.
+
 ---
 
 ## 1. The decisions
@@ -359,7 +392,10 @@ warm-up on construction (F5). Channel selection lives here and nowhere else, so 
 only ever asks for what the run is configured to give.
 
 **`act.py`** — same contract; the daemon holds a JAX process. Batch stops on death and on
-budget.
+budget. `--stint N` also ends a *session* without ending the run, and `--resume` rebuilds
+a part-played run by replaying its recorded history into a fresh engine — the two halves
+of a run longer than one session (F14, F15). `run.py --continue LAUNCH_DIR --budget N`
+does that to a launch that has already finished.
 
 **`tools/readout.py`** — the score at *every* action, which nothing on disk holds
 (`result.json` is rewritten in place after each one), recovered by replaying the recorded
