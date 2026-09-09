@@ -20,6 +20,12 @@ still queued simply have no file yet, which is why it is safe to run against a l
 called. `--raw-from LABEL` picks which run supplies the shared Raw column (each run has
 its own raw rollouts and the table has one Raw column).
 
+The Agent column comes from `--agent PATH`, a `research.autumn.launch` run dir, which is
+a different shape: one `rows.jsonl` for the whole run rather than a per-game
+`online.json`, because the agent plays one session per problem and never has a per-game
+evaluator pass. The rows are the evaluator's own row shape, so they fold into the same
+aggregates; `--no-agent` puts the column back to em-dashes.
+
 The default pair IS a matched comparison as of 2026-09-04: both runs score the same 86
 problems under the same per-problem action budgets, and differ only in which reflector
 built the artifacts they plan with (DeepSeek vs Opus-5). The superseded DeepSeek run
@@ -49,6 +55,10 @@ ARMS = LLM_ARMS + ["wc"]
 DEFAULT_COLUMN_ARM = "lmwm"
 # how an arm prints in a table header (the internal names are not paper words)
 ARM_DISPLAY = {"raw": "Raw", "lmwm": "NLWM", "icl": "ICL", "wc": "WorldCoder"}
+# The agent arm is not an arm of this evaluator: it is its own run, written by
+# `research.autumn.launch` as a single rows.jsonl in the evaluator's row shape. It is
+# named here because the results table has always reserved a column for it.
+AGENT_ARM = "agent"
 TIERS = ["L1", "L2", "L3", "L4"]
 
 # the paper's row order, and the display name each benchmark id prints as
@@ -60,6 +70,7 @@ DISPLAY = {"colour_lines": "Colour Lines", "SET": "SET", "logic_gates": "Logic G
 
 DEFAULT_RUNS = [("NLWM", "logs/2026-09-03/planning_v2_online_ds_percap_nl"),
                 ("NLWM (SL)", "logs/2026-09-02/planning_v2_online_opus5_nl")]
+DEFAULT_AGENT = ("Agent", "logs/2026-09-06/agent_full")
 
 def display_name(game: str) -> str:
     """The paper's name for a game: the English name, title-cased, with overrides."""
@@ -164,6 +175,55 @@ def load_run(label: str, root: Path, arm: str = DEFAULT_COLUMN_ARM) -> dict:
     }
 
 
+def load_agent_run(label: str, root: Path, reference: dict) -> dict:
+    """The agent arm folded into the shape the tables already read.
+
+    `research.autumn.launch` writes ONE `rows.jsonl` for the whole run instead of a
+    per-game `online.json`, because its unit is a session per problem and it has no
+    per-game evaluator pass -- but it writes the evaluator's row shape, so the same
+    `arm_scores` reads it and the same `scored`/`run_totals` fold it.
+
+    A game is complete when it has a row for every problem the Raw column scores. That
+    is the only definition under which the columns are comparable, so `reference` is the
+    run supplying Raw rather than the agent run's own idea of its size -- and the same
+    reference answers the two questions that would silently invalidate the column: did
+    this arm score the SAME problems, and under the SAME per-problem budgets?
+    """
+    f = root / "rows.jsonl"
+    if not f.is_file():
+        raise SystemExit(f"no rows.jsonl in {root}")
+    by_game: dict[str, list[dict]] = {}
+    for line in f.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:                 # a torn last line on a live run
+            continue
+        if row.get("game"):
+            by_game.setdefault(row["game"], []).append(row)
+    expected = {g: len(v["rows"]) for g, v in reference["games"].items()}
+    games = {g: {"rows": rows,
+                 "arms": {AGENT_ARM: arm_scores(rows, AGENT_ARM)},
+                 "expected": expected.get(g),
+                 "complete": expected.get(g) is not None and len(rows) >= expected[g]}
+             for g, rows in by_game.items()}
+    ref_caps = {r["task_uid"]: r["_cap"]
+                for v in reference["games"].values() for r in v["rows"]}
+    mine = {r["task_uid"]: r.get("action_cap")
+            for rows in by_game.values() for r in rows}
+    return {"label": label, "root": root, "arm": AGENT_ARM, "games": games,
+            "order": [g for g in GAME_ORDER if g in games],
+            "pending": [g for g in GAME_ORDER if g not in games],
+            "shared": len(set(mine) & set(ref_caps)),
+            "only_mine": sorted(set(mine) - set(ref_caps)),
+            "only_ref": sorted(set(ref_caps) - set(mine)),
+            "cap_diff": sorted(u for u in set(mine) & set(ref_caps)
+                               if mine[u] != ref_caps[u]),
+            "reference": reference["label"],
+            "mtime": f.stat().st_mtime}
+
+
 def run_totals(run: dict, arm: str, games: list[str] | None = None) -> dict:
     """Macro (per-game) and micro (per-problem) means over the games that have landed."""
     keys = [g for g in (games or run["order"]) if g in run["games"]]
@@ -251,7 +311,7 @@ def tiers(runs: list[dict]) -> list[str]:
     return L
 
 
-def checks(runs: list[dict]) -> list[str]:
+def checks(runs: list[dict], agent: dict | None = None) -> list[str]:
     """Everything that would make a reported number wrong or stale."""
     L = ["", "CHECKS", "-" * 6]
     ok = True
@@ -293,12 +353,43 @@ def checks(runs: list[dict]) -> list[str]:
                      "min behind the newest online.json (re-run watch_plan_replay.py)")
         else:
             L.append("    replay.html is level with the results")
+    if agent is not None:
+        L.append(f"  {agent['label']}  ({agent['root']})")
+        if agent["pending"]:
+            ok = False
+            L.append(f"    ! {len(agent['pending'])} games have no rows yet: "
+                     + ", ".join(agent["pending"]))
+        if agent["only_mine"] or agent["only_ref"]:
+            ok = False
+            L.append(f"    ! problem set differs from {agent['reference']}: "
+                     f"{agent['shared']} shared, {len(agent['only_mine'])} agent-only, "
+                     f"{len(agent['only_ref'])} {agent['reference']}-only "
+                     f"({', '.join((agent['only_mine'] + agent['only_ref'])[:3])})")
+        if agent["cap_diff"]:
+            ok = False
+            L.append(f"    ! action budgets differ from {agent['reference']} on "
+                     f"{len(agent['cap_diff'])} problems: "
+                     f"{', '.join(agent['cap_diff'][:3])}")
+        for game, g in sorted(agent["games"].items()):
+            if not g["complete"]:
+                ok = False
+                L.append(f"    ! {game}: {len(g['rows'])}/{g['expected']} problems "
+                         "recorded -- partial scores")
+            # a session that died is not a miss; scoring it as one would understate the
+            # arm, so it is called out rather than folded into the pass rate
+            bad = {r["task_uid"]: r[AGENT_ARM].get("status") for r in g["rows"]
+                   if isinstance(r.get(AGENT_ARM), dict)
+                   and r[AGENT_ARM].get("status") not in (None, "done")}
+            if bad:
+                ok = False
+                L.append(f"    ! {game}/agent: {len(bad)} sessions did not finish "
+                         f"({sorted(set(bad.values()))}): {', '.join(sorted(bad)[:3])}")
     if ok:
         L.append("  no problems found")
     return L
 
 
-def console(runs: list[dict]) -> str:
+def console(runs: list[dict], agent: dict | None = None) -> str:
     L = ["PLANNING v2 ONLINE -- results behind replay.html", "=" * 47, ""]
     for run in runs:
         cfg = run["config"]
@@ -315,6 +406,14 @@ def console(runs: list[dict]) -> str:
                      f"(micro {fmt(t['micro'])}, n={t['n']})   "
                      f"floor-adjusted macro {fmt(t['macro_adj'])}")
         L.append("")
+    if agent is not None:
+        t = run_totals(agent, AGENT_ARM)
+        L.append(f"{agent['label']}: {agent['root']}")
+        L.append(f"  {len(agent['games'])}/{len(GAME_ORDER)} games landed | "
+                 f"{sum(len(g['rows']) for g in agent['games'].values())} problems")
+        L.append(f"    {AGENT_ARM:>5}: pass@1 macro {fmt(t['macro'])} "
+                 f"(micro {fmt(t['micro'])}, n={t['n']})")
+        L.append("")
     common = [g for g in PAPER_ORDER if all(scored(r, g) for r in runs)]
     if len(runs) > 1 and common:
         L += [f"COMPLETE-CASE MEAN over the {len(common)} games every run has finished "
@@ -328,7 +427,7 @@ def console(runs: list[dict]) -> str:
     L += per_game_table(runs)
     L += tiers(runs)
     L += paired(runs)
-    L += checks(runs)
+    L += checks(runs, agent)
     return "\n".join(L) + "\n"
 
 
@@ -343,26 +442,33 @@ def scored(run: dict, game: str) -> dict | None:
     return g if g and g["complete"] else None
 
 
-def tex_results(runs: list[dict], raw_from: dict) -> str:
+def tex_results(runs: list[dict], raw_from: dict, agent: dict | None = None) -> str:
     """tab:autumn-results -- one row per game, Raw from the single designated run.
 
     A game still playing prints an em-dash, so the table is publishable mid-run and
     tightens as games land. The Mean row is a complete-case macro average: only games
-    that have a number in every column, so no column is averaged over a different set."""
+    that have a number in every column, so no column is averaged over a different set --
+    which is why an unfinished agent run narrows the mean for every column, rather than
+    quietly giving the Agent column an easier set of games than the others."""
     complete = [g for g in PAPER_ORDER
-                if scored(raw_from, g) and all(scored(r, g) for r in runs)]
+                if scored(raw_from, g) and all(scored(r, g) for r in runs)
+                and (agent is None or scored(agent, g))]
     L = [r"    \toprule",
          r"    Game & Raw & Agent & " + " & ".join(r["label"] for r in runs) + r" \\",
          r"    \midrule"]
     for game in PAPER_ORDER:
         g = scored(raw_from, game)
-        cells = [tex(g["arms"]["raw"]["pass1"]) if g else r"\textemdash", r"\textemdash"]
+        ga = scored(agent, game) if agent else None
+        cells = [tex(g["arms"]["raw"]["pass1"]) if g else r"\textemdash",
+                 tex(ga["arms"][AGENT_ARM]["pass1"]) if ga else r"\textemdash"]
         for r in runs:
             gr = scored(r, game)
             cells.append(tex(gr["arms"][r["arm"]]["pass1"]) if gr else r"\textemdash")
         L.append(f"    {display_name(game):<14} & " + " & ".join(cells) + r" \\")
     L.append(r"    \midrule")
-    means = [tex(run_totals(raw_from, "raw", complete)["macro"]), r"\textemdash"]
+    means = [tex(run_totals(raw_from, "raw", complete)["macro"]),
+             tex(run_totals(agent, AGENT_ARM, complete)["macro"]) if agent
+             else r"\textemdash"]
     means += [tex(run_totals(r, r["arm"], complete)["macro"]) for r in runs]
     L.append(r"    \textbf{Mean} & " + " & ".join(means) + r" \\")
     L.append(r"    \bottomrule")
@@ -422,7 +528,8 @@ def comment_prefix(line: str, marker: str) -> str:
     return "% " if head.lstrip().startswith("%") else ""
 
 
-def write_tex(path: Path, runs: list[dict], raw_from: dict) -> list[str]:
+def write_tex(path: Path, runs: list[dict], raw_from: dict,
+              agent: dict | None = None) -> list[str]:
     """Replace each `% BEGIN AUTO <label>` .. `% END AUTO <label>` block in place.
 
     The `\\begin{tabular}` line that opens the block is rewritten too, so a table stays
@@ -447,7 +554,8 @@ def write_tex(path: Path, runs: list[dict], raw_from: dict) -> list[str]:
         head, _, tail = lines[bi - 1].partition(r"\begin{tabular}{")
         opener = (head + r"\begin{tabular}{" + colspec(len(runs))
                   + tail[tail.rindex("}"):])
-        body = build(runs, raw_from) if label == "tab:autumn-results" else build(runs)
+        body = (build(runs, raw_from, agent) if label == "tab:autumn-results"
+                else build(runs))
         block = [pfx + l for l in [f"    {begin}", *body.split("\n"), f"    {end}"]]
         if [opener] + block != lines[bi - 1:ei + 1]:
             changed.append(label)
@@ -471,6 +579,11 @@ def main() -> None:
     ap.add_argument("--tex", action="store_true", help="print the LaTeX table body")
     ap.add_argument("--write-tex", nargs="?", const="paper/main.tex", metavar="PATH",
                     help="rewrite the AUTO block of that .tex in place")
+    ap.add_argument("--agent", metavar="PATH", default=DEFAULT_AGENT[1],
+                    help="the agent arm's run dir; its rows.jsonl fills the Agent "
+                         f"column (default {DEFAULT_AGENT[1]})")
+    ap.add_argument("--no-agent", action="store_true",
+                    help="leave the Agent column em-dashed")
     ap.add_argument("--check", action="store_true",
                     help="only the staleness/completeness checks")
     ap.add_argument("--json", metavar="PATH", help="dump the aggregates as JSON")
@@ -489,16 +602,23 @@ def main() -> None:
         runs.append(load_run(label, root, arm))
     raw_from = next((r for r in runs if r["label"] == a.raw_from), runs[0])
 
+    agent = None
+    if a.agent and not a.no_agent:
+        root = Path(a.agent) if Path(a.agent).is_absolute() else REPO / a.agent
+        if not root.is_dir():
+            raise SystemExit(f"no such agent run dir: {root}")
+        agent = load_agent_run(DEFAULT_AGENT[0], root, raw_from)
+
     if a.check:
-        print("\n".join(checks(runs)).lstrip("\n"))
+        print("\n".join(checks(runs, agent)).lstrip("\n"))
     else:
-        print(console(runs), end="")
+        print(console(runs, agent), end="")
     if a.tex:
-        print("\n% " + "tab:autumn-results\n" + tex_results(runs, raw_from))
+        print("\n% " + "tab:autumn-results\n" + tex_results(runs, raw_from, agent))
         print("\n% " + "tab:autumn-protocol\n" + tex_protocol(runs))
     if a.write_tex:
         p = Path(a.write_tex) if Path(a.write_tex).is_absolute() else REPO / a.write_tex
-        moved = write_tex(p, runs, raw_from)
+        moved = write_tex(p, runs, raw_from, agent)
         print(f"\n{('updated ' + ', '.join(moved)) if moved else 'unchanged'} in {p}"
               f"  (Raw column from {raw_from['label']})")
     if a.json:
