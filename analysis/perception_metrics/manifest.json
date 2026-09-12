@@ -1,0 +1,167 @@
+{
+ "arms": {
+  "Plain": {
+   "train_root": "logs/2026-08-24/human_curated/rexpure",
+   "evaluated_by": [
+    "logs/2026-09-03/planning_v2_online_ds_percap_nl",
+    "logs/2026-09-08/agent_wm_full"
+   ]
+  }
+ },
+ "games": [
+  "7www9",
+  "7xf97",
+  "SET",
+  "bt3gb",
+  "colour_lines",
+  "diffusion",
+  "dino",
+  "dq8gc",
+  "eahcw",
+  "egg",
+  "f5w3n",
+  "logic_gates",
+  "n2ntd",
+  "s2kt7",
+  "va6fq"
+ ],
+ "n_rows": 900,
+ "gate_failures": [],
+ "runs": [
+  {
+   "arm": "Plain",
+   "game": "7www9",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/7www9_s1",
+   "ship_idx": 14,
+   "best_perception_sha256": "ec0cee072335d2a7e7b2cb880b8ecacfcece126b7152313481fb8de1f6faffea",
+   "train_fingerprint": "c9880fb3e7193432",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "7xf97",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/7xf97_s1",
+   "ship_idx": 23,
+   "best_perception_sha256": "4fc34a65164c48e659b7d3a55e90d62776cdb7226acfa3eb1bbe6000b4f6792f",
+   "train_fingerprint": "2ab85016b5ae5a60",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "SET",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/SET_s1",
+   "ship_idx": 12,
+   "best_perception_sha256": "98ac8118d5bdb52e9b9e469f1dc327f7769f772ff7eb4b7c6d88d73b36107934",
+   "train_fingerprint": "c29eb6ce3e3341f3",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "bt3gb",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/bt3gb_s1",
+   "ship_idx": 12,
+   "best_perception_sha256": "e302d82cdabee854b37e845293af07b9e4111f03132f19f093ad9e7823bd188e",
+   "train_fingerprint": "8f247d2d671c0892",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "colour_lines",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/colour_lines_s1",
+   "ship_idx": 12,
+   "best_perception_sha256": "d333baa32ef6d52714cee450b5509baa5d363e721c3fe36710ce83ecd22eb7c5",
+   "train_fingerprint": "e2f1e5984df0da69",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "diffusion",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/diffusion_s1",
+   "ship_idx": 28,
+   "best_perception_sha256": "85dd1e26097271e7e7f0683f3bef6f4a3b23e063b9ce77f45b0454baaf9cb2e1",
+   "train_fingerprint": "d5ad222d5459f31d",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "dino",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/dino_s1",
+   "ship_idx": 18,
+   "best_perception_sha256": "ccf8de43980d504a7b981b3503e7270a9371f44a914a995f0184836c35d9bbf1",
+   "train_fingerprint": "bbd589e923c4ef2a",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "dq8gc",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/dq8gc_s1",
+   "ship_idx": 29,
+   "best_perception_sha256": "3d834596ef43fb214b6241b8126a7af6f33b6ec1a6f64b9323f9e8fe56af938e",
+   "train_fingerprint": "342cb38673011732",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "eahcw",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/eahcw_s1",
+   "ship_idx": 28,
+   "best_perception_sha256": "682318fe7e3d030fe86dff0135fd7385dc155dcbc7171810b0d479d065a520a6",
+   "train_fingerprint": "598fcd4a36a1785b",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "egg",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/egg_s1",
+   "ship_idx": 8,
+   "best_perception_sha256": "abb16b19d3148e8b51e57045898e0fa47c57280a6f4cb76cf1db31e2660249af",
+   "train_fingerprint": "4773181a264f6b64",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "f5w3n",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/f5w3n_s1",
+   "ship_idx": 20,
+   "best_perception_sha256": "eec1f283811871f8e1c413c8a1b76809389374423ac462fe67e0061eef9c54db",
+   "train_fingerprint": "3adc9eb6077dc12e",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "logic_gates",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/logic_gates_s1",
+   "ship_idx": 17,
+   "best_perception_sha256": "d4a0079c395fe3cfd89d31c9dcfc0b2cd6fea34f6dc359d0d86f0a4a64af3501",
+   "train_fingerprint": "b8852f89cdc489b8",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "n2ntd",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/n2ntd_s1",
+   "ship_idx": 16,
+   "best_perception_sha256": "fd486d60f782721cc180f38578e6852c3b18d8e2dc018ef710da9469af0ff1e3",
+   "train_fingerprint": "01659d2b048c6e2a",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "s2kt7",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/s2kt7_s1",
+   "ship_idx": 23,
+   "best_perception_sha256": "212cff8e6d092650b2fc3b9f346ad3c8699bdcff85e67233024661c7386efeaf",
+   "train_fingerprint": "a20b87efb140f1e6",
+   "n_nodes": 30
+  },
+  {
+   "arm": "Plain",
+   "game": "va6fq",
+   "run_dir": "logs/2026-08-24/human_curated/rexpure/va6fq_s1",
+   "ship_idx": 24,
+   "best_perception_sha256": "b35a55f7b7161451d0c423985d70874361e4665f654c2d8ec205c7ab1529a7cf",
+   "train_fingerprint": "4a29a8ab4be55052",
+   "n_nodes": 30
+  }
+ ]
+}
