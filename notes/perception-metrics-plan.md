@@ -102,6 +102,17 @@ Per `(arm, game, node)`, on the train corpus and again on the held-out test corp
 * `code_chars`, `code_lines`, `sloc` — reported alongside, because they are what a reader
   expects and they let anyone check `ast_nodes` is not doing something strange.
 
+*Size of `K`* — the world knowledge, i.e. the paper's **dynamics model**, added after the
+first pass; `P` is only half of what a run learns
+* `k_chars` — the headline. `K` is prose, so there is no AST to fall back on.
+* `k_sentences` — terminators followed by whitespace: roughly how many things it asserts, and
+  the most even structural unit across these texts (~80–160 chars a sentence, against 84–544
+  a bullet, because some games' `K` is a list and others' is paragraphs).
+* `k_claims`, `k_lines`, `k_words` — bullet/numbered lines, non-blank lines, whitespace
+  tokens; kept as the sanity check on `k_sentences` the way `sloc` is on `ast_nodes`.
+* `k_gzip_bytes`, `k_norm_bytes` — `gz(K)`, alone and over `gz([X for all X])`: the only
+  measure here that compares across games, since it is priced against that game's own frames.
+
 *Compression*
 * `set_ratio` = `|{P(X)}| / |{X}|` — as asked, kept, and read as the collapse indicator.
 * `decoy_collapse` — the same quantity over each instance's `{true next frame} ∪ hard decoys`;
@@ -205,13 +216,23 @@ Each is an assertion in the script, not a thing to remember to check:
   features do not), and a dual axis would hide that behind an arbitrary alignment.
   `--metric named` (the default) draws the three named scores; `all` adds the two
   uncompressed-numerator companions.
+* `offline_learning/scripts/wm_panel_grid.py` -- the 15-panel grid itself, shared by both
+  per-game families so a layout change reaches both. The metric-specific parts (column,
+  colour, titles, unit scale, reference line, the paragraph in the key) are arguments.
+* `offline_learning/scripts/fig_dynamics_size_per_game.py` -- the same treatment for `K`,
+  the dynamics model. One figure, `k_chars`; `k_sentences`, `k_gzip_bytes`, `k_words`,
+  `k_claims`, `k_lines` and `k_norm_bytes` are measured into `metrics.csv` and drawable with
+  `--metric <name>`, but within a game they mostly trace the same staircase. Violet, because
+  in this family the colour marks the PARAMETER rather than the score.
 * Outputs: `analysis/perception_metrics/{metrics.csv, manifest.json, REPORT.md, cache/}` and
   `analysis/wm_quant/perception_metrics.{pdf,png}`. The figure is six cells: A size, B bytes
   emitted, C bytes after compression, D dead nodes by failure mode, E compression against
   train score, F the key; `analysis/wm_quant/perception_{diversity,norm_diversity,info_extraction}_per_game`
   are the 15-panel companions (`--metric all` adds `perception_dl_per_game` and
-  `perception_pf_dl_gz_per_game`). `REPORT.md` carries the per-arm medians, the per-game shipped
-  nodes, and the rank-correlation table behind the paragraph above.
+  `perception_pf_dl_gz_per_game`), and `analysis/wm_quant/dynamics_chars_per_game` the same
+  for the dynamics model. `REPORT.md` carries the per-arm medians, the per-game
+  shipped nodes, the rank-correlation table behind the paragraph above, and the dynamics-model
+  section behind §7b.
 
 ### 7a. The three named scores
 
@@ -260,6 +281,39 @@ Two cautions on reading any of them:
   bytes per frame, not fewer. Six scores were tested against one outcome with no correction,
   so that is a hint, not a result. First-incumbent to ship, the per-frame ratio rises on 8 of
   15 games and falls on 7.
+
+### 7b. The dynamics model K
+
+A run learns two parameters and the first pass measured one. `K` — the English rules the
+planner reads alongside `P`'s features — is now measured node by node from the same
+`candidates.jsonl`, and drawn by `fig_dynamics_size_per_game.py`. The columns are
+node-level, so they are identical on a node's train and test rows; `k_norm_bytes` is the
+exception, its denominator being the split's own frames.
+
+**The seed `K` is the empty string**, exactly as the seed `P` emits one, so every curve
+starts at 0 and the first proposal that writes anything is a jump from nothing rather than a
+growth step. Nothing about `K` should be read without that split in mind:
+
+* The incumbent writes its first `K` at iteration 4 (median), at 1262 characters, and ships
+  1696 — a 1.28x median growth after the first write, over 2 distinct sizes (median). Three
+  games (Colour Lines, Egg, Ants) never change `K` again after writing it once.
+* It is not monotone: 8 shrink events across the 15 runs, concentrated in Diffusion (3) and
+  Space Invaders (2) — a better-scoring node arriving with a SHORTER dynamics model than the
+  incumbent's, which is the closest thing in these runs to a retraction.
+* **Length correlates with score only because presence does.** Over all nodes that ran,
+  `k_chars` vs `train_score` is median rho +0.595, positive on 15/15 games — the strongest
+  relation in this whole analysis. But 93 of those 388 nodes have an empty `K`, at median
+  train score 0.183 against 0.485 for the ones with a dynamics model; drop them and it falls
+  to +0.305, positive on 10/15 (sign p = 0.30). Writing the rules down is worth a great
+  deal; writing more of them, past that, is not something these runs grade.
+* `P` and `K` grow largely independently: `k_chars` vs `ast_nodes` within a game is median
+  rho +0.262, positive on 12/15.
+
+The caution that applies to every count here: `k_sentences` and `k_claims` measure writing
+style as much as content — one reflector's `K` is a bulleted list, another's is four long
+paragraphs — so read the trajectory within a game and not the level across games. `gz(K)`
+is the exception that partly escapes it, and `k_norm_bytes` the only one meant to be
+compared across games at all.
 
 ## 8. What this cannot say
 

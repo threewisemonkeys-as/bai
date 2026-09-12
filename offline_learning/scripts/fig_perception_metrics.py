@@ -76,12 +76,13 @@ def load(split: str = "train") -> list[dict]:
         if r["split"] != split:
             continue
         for k in ("idx", "iteration", "depth", "ast_nodes", "is_ship", "on_ship_lineage",
-                  "n_unique_outputs", "out_vocab", "diversity_bytes",
-                  "raw_gzip_bytes"):
+                  "n_unique_outputs", "out_vocab", "diversity_bytes", "raw_gzip_bytes",
+                  "k_chars", "k_lines", "k_sentences", "k_claims", "k_words",
+                  "k_gzip_bytes"):
             r[k] = int(r[k]) if r[k] not in ("", "None") else None
         for k in ("train_score", "set_ratio", "dl_ratio", "norm_diversity", "lzma_ratio",
                   "twopart_ratio", "pf_dl_gz_ratio", "info_extraction_ratio", "static_rate",
-                  "change_ratio", "decoy_collapse", "err_rate"):
+                  "change_ratio", "decoy_collapse", "err_rate", "k_norm_bytes"):
             r[k] = float(r[k]) if r[k] not in ("", "None") else None
         rows.append(r)
     return rows
@@ -296,6 +297,70 @@ def spearman(xs, ys):
     return num / den if den else float("nan")
 
 
+def dynamics_section(rows) -> list[str]:
+    """K -- the world knowledge, the paper's dynamics model -- over the same runs.
+
+    Drawn by `fig_dynamics_size_per_game.py`. The seed K is the empty string, so the first
+    proposal that writes anything is a jump from nothing; everything here separates that
+    jump from the growth that follows it, because they are not the same event and only the
+    first one is clearly worth score.
+    """
+    out = ["", "## The dynamics model K", "",
+           "K is the run's other learned parameter: the English rules the planner reads "
+           "alongside P's features. The seed is EMPTY, so `first` below is the first "
+           "incumbent that had any dynamics model at all and `growth` is what happened to "
+           "it afterwards.", "",
+           "| game | first written at | first chars | ship chars | growth | ship sentences "
+           "| ship gz(K) B | gz(K)/gz(all X) | distinct sizes | shrinks |",
+           "|---|---|---|---|---|---|---|---|---|---|"]
+    agg = []
+    for (arm, game), rs in sorted(group(rows).items()):
+        seq, best = [], -1.0
+        for r in sorted((r for r in rs if r["iteration"] is not None),
+                        key=lambda r: r["iteration"]):
+            if r["train_score"] > best:
+                best, _ = r["train_score"], seq.append(r)
+        ks = [r["k_chars"] for r in seq]
+        nz = next((r for r in seq if r["k_chars"] > 0), None)
+        ship = next(r for r in rs if r["is_ship"])
+        if nz is None:
+            continue
+        grow = ship["k_chars"] / nz["k_chars"]
+        sizes = len({k for k in ks if k > 0})
+        dips = sum(1 for a, b in zip(ks, ks[1:]) if b < a)
+        agg.append((nz["iteration"], nz["k_chars"], ship["k_chars"], grow, sizes, dips))
+        out.append(f"| {game} | it {nz['iteration']} | {nz['k_chars']} | {ship['k_chars']} | "
+                   f"{grow:.2f}x | {ship['k_sentences']} | {ship['k_gzip_bytes']} | "
+                   f"{ship['k_norm_bytes']:.3f} | {sizes} | {dips} |")
+    m = [st.median(c) for c in zip(*agg)]
+    out.append(f"| **median** | it {m[0]:.0f} | {m[1]:.0f} | {m[2]:.0f} | {m[3]:.2f}x | -- | "
+               f"-- | -- | {m[4]:.0f} | {sum(a[5] for a in agg)} total |")
+
+    empty = [r for r in rows if r["status"] == "ok" and r["k_chars"] == 0]
+    ok = [r for r in rows if r["status"] == "ok"]
+    ce, cn = [], []
+    for _key, rs in group(rows).items():
+        a = [r for r in rs if r["status"] == "ok"]
+        b = [r for r in a if r["k_chars"] > 0]
+        ce.append(spearman([r["k_chars"] for r in a], [r["train_score"] for r in a]))
+        if len(b) >= 4:
+            cn.append(spearman([r["k_chars"] for r in b], [r["train_score"] for r in b]))
+    med_e = st.median(r["train_score"] for r in empty)
+    med_f = st.median(r["train_score"] for r in ok if r["k_chars"] > 0)
+    out += ["", "**Does a longer dynamics model score better?** Only in the sense that "
+            f"having one does. Over all nodes that ran, `k_chars` correlates with "
+            f"`train_score` at median rho {st.median(ce):+.3f}, positive on "
+            f"{sum(c > 0 for c in ce)}/{len(ce)} games -- the strongest relation anywhere in "
+            "this analysis. But "
+            f"{len(empty)}/{len(ok)} of those nodes have an EMPTY K, and they sit at median "
+            f"train score {med_e:.3f} against {med_f:.3f} for the ones with a dynamics "
+            "model. Drop them and the correlation falls to median rho "
+            f"{st.median(cn):+.3f}, positive on {sum(c > 0 for c in cn)}/{len(cn)} games. "
+            "Writing down the rules is worth a great deal; writing MORE of them, past that, "
+            "is not something these runs grade."]
+    return out
+
+
 def report(rows):
     """The numbers the panels show, printed AND written to REPORT.md, so a caption is
     quoted from the data rather than read off the picture."""
@@ -306,8 +371,9 @@ def report(rows):
              "## Per arm (medians across the 15 games)", "",
              "| arm | games | nodes | ran | dead | ship AST | pool max AST | ship dl_ratio "
              "| ship gz(P) B | ship norm_diversity | ship lzma_ratio | ship two-part | "
-             "ship pf_dl_gz | ship info_extr | ship train score |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+             "ship pf_dl_gz | ship info_extr | ship K chars | ship gz(K) B | "
+             "ship train score |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for arm in ARM_COLOR:
         rs = [r for r in rows if r["arm"] == arm]
         if not rs:
@@ -325,6 +391,8 @@ def report(rows):
             f"{st.median(r['twopart_ratio'] for r in ships):.3f} | "
             f"{st.median(r['pf_dl_gz_ratio'] for r in ships):.3f} | "
             f"{st.median(r['info_extraction_ratio'] for r in ships):.3f} | "
+            f"{st.median(r['k_chars'] for r in ships):.0f} | "
+            f"{st.median(r['k_gzip_bytes'] for r in ships):.0f} | "
             f"{st.median(r['train_score'] for r in ships):.3f} |")
 
     lines += ["", "`dead` = collapsed + runtime + syntax. `set_ratio` = |{P(X)}|/|{X}|; every "
@@ -383,19 +451,21 @@ def report(rows):
               "bytes per frame, not fewer. Six scores were tested against one outcome with "
               "no correction, so read p=0.035 as a hint and not a result; what it is NOT is "
               "evidence that the search compresses."]
+    lines += dynamics_section(rows)
     lines += ["",
               "## Shipped node per game", "",
               "| game | arm | node | iteration | AST | dl_ratio | gz(P) B | "
-              "norm_diversity | pf_dl_gz | info_extr | static_rate | change_ratio | "
-              "train score |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "norm_diversity | pf_dl_gz | info_extr | K chars | K sent | gz(K) B | "
+              "static_rate | change_ratio | train score |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in sorted((r for r in rows if r["is_ship"]), key=lambda r: (r["game"], r["arm"])):
         cr = f"{r['change_ratio']:.2f}" if r["change_ratio"] is not None else "--"
         lines.append(
             f"| {r['game']} | {r['arm']} | #{r['idx']} | {r['iteration']} | {r['ast_nodes']} | "
             f"{r['dl_ratio']:.4f} | {r['diversity_bytes']} | "
             f"{r['norm_diversity']:.4f} | {r['pf_dl_gz_ratio']:.3f} | "
-            f"{r['info_extraction_ratio']:.3f} | {r['static_rate']:.3f} | {cr} | "
+            f"{r['info_extraction_ratio']:.3f} | {r['k_chars']} | {r['k_sentences']} | "
+            f"{r['k_gzip_bytes']} | {r['static_rate']:.3f} | {cr} | "
             f"{r['train_score']:.3f} |")
 
     lines += ["", "## Selection against size", ""]

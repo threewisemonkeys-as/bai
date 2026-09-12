@@ -45,6 +45,15 @@ The metrics, and what each is for:
 
   size          `ast_nodes` (headline -- immune to comments and formatting, which the
                 reflector varies freely), plus chars / lines / sloc as a sanity check.
+  dynamics      The run's OTHER learned parameter: the world knowledge K, which the paper
+                calls the dynamics model -- the English rules the planner reads alongside
+                P's features. `k_chars` is its literal size, `k_sentences` its assertion
+                count (more even across games than bullets: ~80-160 chars a sentence against
+                84-544 a bullet, because some games' K is written as paragraphs), and
+                `k_gzip_bytes` / `k_norm_bytes` its compressed size, alone and against what
+                the observations themselves cost. K is one text per node, so these columns
+                are identical on a node's train and test rows -- except `k_norm_bytes`,
+                whose denominator is the split's.
   compression   `set_ratio` = |{P(X)}|/|{X}|, the quantity as originally posed. It is a
                 COLLAPSE INDICATOR, not a learning curve: raw frames are essentially all
                 distinct and any P that lists non-background cells is injective, so a
@@ -80,6 +89,7 @@ import json
 import lzma
 import os
 import random
+import re
 import signal
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -111,6 +121,8 @@ FIELDS = [
     "arm", "game", "idx", "iteration", "parents", "depth", "train_score", "is_ship",
     "on_ship_lineage", "status", "err_rate", "split",
     "code_chars", "code_lines", "sloc", "ast_nodes",
+    "k_chars", "k_lines", "k_sentences", "k_claims", "k_words", "k_gzip_bytes",
+    "k_norm_bytes",
     "n_frames", "n_unique_outputs", "set_ratio", "decoy_collapse",
     "mean_raw_chars", "mean_out_chars", "dl_ratio",
     "diversity_bytes", "raw_gzip_bytes", "norm_diversity", "info_extraction_ratio",
@@ -307,6 +319,30 @@ def code_shape(code: str) -> dict:
     }
 
 
+# A line that opens with a bullet or a number, i.e. one item of a list of rules.
+_BULLET = re.compile(r"^\s*(?:[-*\u2022\u00b7]|\d+[.)])\s+")
+# Sentence ends: a terminator followed by whitespace or the end of the text. An approximation
+# -- "e.g." would split -- but a far more even unit than a bullet across these 15 texts.
+_SENTENCE = re.compile(r"[.!?](?:\s|$)")
+
+
+def belief_shape(k: str) -> dict:
+    """Size of one node's world knowledge K -- the dynamics model, in the paper's words.
+
+    Unlike P, K is prose: there is no AST to fall back on, so `k_chars` is the headline and
+    the structural counts are approximations of how many rules it asserts. The seed K is the
+    empty string, so a run starts every one of these at 0.
+    """
+    lines = [ln for ln in k.splitlines() if ln.strip()]
+    return {
+        "k_chars": len(k), "k_lines": len(lines),
+        "k_sentences": len(_SENTENCE.findall(k)),
+        "k_claims": sum(1 for ln in lines if _BULLET.match(ln)),
+        "k_words": len(k.split()),
+        "k_gzip_bytes": gzip_len([k]) if k else 0,
+    }
+
+
 def node_metrics(code: str, corpus: dict, split: str) -> dict:
     """Every metric for one perception module against one split of one game's corpus."""
     frames = corpus["frames"]
@@ -437,9 +473,12 @@ def score_run(arm: str, game: str) -> tuple[list[dict], dict]:
                     iteration=run["iters"].get(c["idx"]), parents=";".join(map(str, c["parents"])),
                     depth=run["depth"][c["idx"]], train_score=c["train_score"],
                     is_ship=int(c["idx"] == run["ship"]),
-                    on_ship_lineage=int(c["idx"] in run["lineage"]))
+                    on_ship_lineage=int(c["idx"] in run["lineage"]),
+                    **belief_shape(c["world_knowledge"]))
         for split in ("train", "test"):
-            rows.append({**base, **node_metrics(c["perception"], corpus, split)})
+            m = node_metrics(c["perception"], corpus, split)
+            rows.append({**base, **m,
+                         "k_norm_bytes": base["k_gzip_bytes"] / m["raw_gzip_bytes"]})
     return rows, {"run_dir": str(run["dir"].relative_to(REPO)), "ship_idx": run["ship"],
                   "best_perception_sha256": run["best_p_sha"],
                   "train_fingerprint": corpus["fingerprint"], "n_nodes": len(run["pool"])}
@@ -458,6 +497,7 @@ def gates(rows: list[dict], runs: dict) -> list[str]:
         # the shipped node's metrics must equal the artifact file's own, metric for metric
         corpus = build_corpus(game)
         art = node_metrics((d / "best_perception_rexpure_seed1.py").read_text(), corpus, "train")
+        art |= belief_shape((d / "best_beliefs_rexpure_seed1.txt").read_text())
         ship = next(r for r in rows if r["arm"] == arm and r["game"] == game
                     and r["is_ship"] and r["split"] == "train")
         for k, v in art.items():
