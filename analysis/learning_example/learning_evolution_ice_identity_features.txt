@@ -1,0 +1,118 @@
+Ice: every P(X) and B in learning_evolution_ice_identity.pdf
+Frames: train_d0/episode_0/trajectory.csv, steps 205–208.
+Actions: down → noop → down.
+Iteration is the learning proposal index; node is its candidate-pool ID.
+Perception is evaluated on one frame at a time, exactly as during training.
+Figure quotes reflow whitespace and use … for omitted source text.
+
+================================================================================
+Iteration 3; node 3; score 0.100092199
+
+P(X0), game step 205:
+bg=black; gray(0,0), gray(0,1), gray(0,2), gray(0,3), gray(0,4), gray(1,0), gray(1,1), lightblue(5,4), lightblue(7,4), lightblue(11,5), lightblue(13,5), lightblue(13,12), lightblue(13,14), lightblue(14,6), lightblue(14,7), lightblue(14,8), lightblue(14,12), lightblue(14,13), lightblue(14,14), lightblue(15,6), lightblue(15,7), lightblue(15,8), lightblue(15,10), lightblue(15,11), lightblue(15,12), lightblue(15,13), lightblue(15,14)
+
+P(X1), game step 206:
+bg=black; gray(0,0), gray(0,1), gray(0,2), gray(0,3), gray(0,4), gray(1,0), gray(1,1), lightblue(1,3), lightblue(5,4), lightblue(7,4), lightblue(11,5), lightblue(13,5), lightblue(13,12), lightblue(13,14), lightblue(14,6), lightblue(14,7), lightblue(14,8), lightblue(14,12), lightblue(14,13), lightblue(14,14), lightblue(15,6), lightblue(15,7), lightblue(15,8), lightblue(15,10), lightblue(15,11), lightblue(15,12), lightblue(15,13), lightblue(15,14)
+
+P(X2), game step 207:
+bg=black; gray(0,0), gray(0,1), gray(0,2), gray(0,3), gray(0,4), gray(1,0), gray(1,1), lightblue(2,3), lightblue(6,4), lightblue(8,4), lightblue(12,5), lightblue(13,12), lightblue(13,14), lightblue(14,5), lightblue(14,6), lightblue(14,7), lightblue(14,8), lightblue(14,12), lightblue(14,13), lightblue(14,14), lightblue(15,6), lightblue(15,7), lightblue(15,8), lightblue(15,10), lightblue(15,11), lightblue(15,12), lightblue(15,13), lightblue(15,14)
+
+P(X3), game step 208:
+bg=black; gray(0,0), gray(0,1), gray(0,2), gray(0,3), gray(0,4), gray(1,0), gray(1,1), lightblue(1,3), lightblue(2,3), lightblue(6,4), lightblue(8,4), lightblue(12,5), lightblue(13,12), lightblue(13,14), lightblue(14,5), lightblue(14,6), lightblue(14,7), lightblue(14,8), lightblue(14,12), lightblue(14,13), lightblue(14,14), lightblue(15,6), lightblue(15,7), lightblue(15,8), lightblue(15,10), lightblue(15,11), lightblue(15,12), lightblue(15,13), lightblue(15,14)
+
+B / world_knowledge (complete, verbatim):
+(empty)
+
+================================================================================
+Iteration 8; node 6; score 0.582557092
+
+P(X0), game step 205:
+bg=black; gray(0,0), gray(0,1), gray(0,2), gray(0,3), gray(0,4), gray(1,0), gray(1,1), lightblue(5,4), lightblue(7,4), lightblue(11,5), lightblue(13,5), lightblue(13,12), lightblue(13,14), lightblue(14,6), lightblue(14,7), lightblue(14,8), lightblue(14,12), lightblue(14,13), lightblue(14,14), lightblue(15,6), lightblue(15,7), lightblue(15,8), lightblue(15,10), lightblue(15,11), lightblue(15,12), lightblue(15,13), lightblue(15,14)
+
+P(X1), game step 206:
+bg=black; gray(0,0), gray(0,1), gray(0,2), gray(0,3), gray(0,4), gray(1,0), gray(1,1), lightblue(1,3), lightblue(5,4), lightblue(7,4), lightblue(11,5), lightblue(13,5), lightblue(13,12), lightblue(13,14), lightblue(14,6), lightblue(14,7), lightblue(14,8), lightblue(14,12), lightblue(14,13), lightblue(14,14), lightblue(15,6), lightblue(15,7), lightblue(15,8), lightblue(15,10), lightblue(15,11), lightblue(15,12), lightblue(15,13), lightblue(15,14)
+
+P(X2), game step 207:
+bg=black; gray(0,0), gray(0,1), gray(0,2), gray(0,3), gray(0,4), gray(1,0), gray(1,1), lightblue(2,3), lightblue(6,4), lightblue(8,4), lightblue(12,5), lightblue(13,12), lightblue(13,14), lightblue(14,5), lightblue(14,6), lightblue(14,7), lightblue(14,8), lightblue(14,12), lightblue(14,13), lightblue(14,14), lightblue(15,6), lightblue(15,7), lightblue(15,8), lightblue(15,10), lightblue(15,11), lightblue(15,12), lightblue(15,13), lightblue(15,14)
+
+P(X3), game step 208:
+bg=black; gray(0,0), gray(0,1), gray(0,2), gray(0,3), gray(0,4), gray(1,0), gray(1,1), lightblue(1,3), lightblue(2,3), lightblue(6,4), lightblue(8,4), lightblue(12,5), lightblue(13,12), lightblue(13,14), lightblue(14,5), lightblue(14,6), lightblue(14,7), lightblue(14,8), lightblue(14,12), lightblue(14,13), lightblue(14,14), lightblue(15,6), lightblue(15,7), lightblue(15,8), lightblue(15,10), lightblue(15,11), lightblue(15,12), lightblue(15,13), lightblue(15,14)
+
+B / world_knowledge (complete, verbatim):
+world knowledge
+- Grid is 16x16 (rows 0-15, cols 0-15), background black.
+- Cell types: gold, gray, blue, lightblue.
+- There is a fixed 2x2 block at cells (0,0),(0,1),(1,0),(1,1). These cells are either gold or gray. Their color persists even when covered by the movable block; they are visible only when not covered.
+- There is a movable block: three contiguous gray cells on row 0. It moves left/right with left/right actions. Left/right are possible only if the three target cells are within [0,15] and contain no blue/lightblue cells. The movable block can overwrite fixed block cells (which are not obstacles). When the movable block moves, it leaves its previous cells empty; if those were fixed block cells, the fixed block's stored color reappears.
+- There is a bottom block: a contiguous block of blue or lightblue cells on row 15. Its color toggles on clicks outside the top-left 2x2. Its width varies as new cells arrive.
+- On noop: every blue/lightblue cell not on row 15 attemps to move down one row. If the cell directly below is empty (no other cell), it moves; otherwise it stays. Cells on row 15 do not move.
+- On left: the movable block shifts one column left (decrements column of all three cells) if possible.
+- On right: the movable block shifts one column right (increments column) if possible.
+- On down: if the cell (1, c) is empty (no cell of any type), where c is the middle column of the movable block (the second of its three cells), a new blue/lightblue cell appears at (1, c) with color equal to the current color of the bottom block. If (1, c) is occupied, nothing happens.
+- On click ROW COL:
+   - If ROW in {0,1} and COL in {0,1} (i.e. clicked inside the top-left 2x2 block), then the fixed 2x2 block toggles: all four cells become gold if they were gray, or gray if they were gold. (The toggled state applies to the stored color; if any of these cells are covered by the movable block, they are not visible until uncovered.)
+   - Else (click outside the top-left 2x2 block), then both of the following occur simultaneuously: the fixed 2x2 block toggles (as above), and every blue/lightblue cell on the grid toggles (blue<->lightblue).
+- Up action: no visible effect.
+
+================================================================================
+Iteration 14; node 8; score 0.602050000
+
+P(X0), game step 205:
+bg=black; fixed:gray(0,0),gray(0,1),gray(1,0),gray(1,1); movable:gray_row0:0,1,2,3,4; other:gray_row0:2-4; lightblue_row5:4; lightblue_row7:4; lightblue_row11:5; lightblue_row13:5,12,14; lightblue_row14:6-8,12-14; lightblue_row15:6-8,10-14
+
+P(X1), game step 206:
+bg=black; fixed:gray(0,0),gray(0,1),gray(1,0),gray(1,1); movable:gray_row0:0,1,2,3,4; other:gray_row0:2-4; lightblue_row1:3; lightblue_row5:4; lightblue_row7:4; lightblue_row11:5; lightblue_row13:5,12,14; lightblue_row14:6-8,12-14; lightblue_row15:6-8,10-14
+
+P(X2), game step 207:
+bg=black; fixed:gray(0,0),gray(0,1),gray(1,0),gray(1,1); movable:gray_row0:0,1,2,3,4; other:gray_row0:2-4; lightblue_row2:3; lightblue_row6:4; lightblue_row8:4; lightblue_row12:5; lightblue_row13:12,14; lightblue_row14:5-8,12-14; lightblue_row15:6-8,10-14
+
+P(X3), game step 208:
+bg=black; fixed:gray(0,0),gray(0,1),gray(1,0),gray(1,1); movable:gray_row0:0,1,2,3,4; other:gray_row0:2-4; lightblue_row1:3; lightblue_row2:3; lightblue_row6:4; lightblue_row8:4; lightblue_row12:5; lightblue_row13:12,14; lightblue_row14:5-8,12-14; lightblue_row15:6-8,10-14
+
+B / world_knowledge (complete, verbatim):
+world knowledge
+- Grid is 16x16 (rows 0-15, cols 0-15), background black.
+- Cell types: gold, gray, blue, lightblue.
+- There is a fixed 2x2 block at cells (0,0),(0,1),(1,0),(1,1). These cells are either gold or gray. Their color persists even when covered by the movable block; they are visible only when not covered.
+- There is a movable block: three contiguous gray cells on row 0. It moves left/right with left/right actions. Left/right are possible only if the three target cells are within [0,15] and contain no blue/lightblue cells. The movable block can overwrite fixed block cells (which are not obstacles). When the movable block moves, it leaves its previous cells empty; if those were fixed block cells, the fixed block's stored color reappears.
+- There is a bottom block: a contiguous block of blue or lightblue cells on row 15. Its color toggles on clicks outside the top-left 2x2. Its width varies as new cells arrive.
+- On noop: every blue/lightblue cell not on row 15 attemps to move down one row. If the cell directly below is empty (no other cell), it moves; otherwise it stays. Cells on row 15 do not move.
+- On left: the movable block shifts one column left (decrements column of all three cells) if possible.
+- On right: the movable block shifts one column right (increments column) if possible.
+- On down: if the cell (1, c) is empty (no cell of any type), where c is the middle column of the movable block (the second of its three cells), a new blue/lightblue cell appears at (1, c) with color equal to the current color of the bottom block. If (1, c) is occupied, nothing happens.
+- On click ROW COL:
+   - If ROW in {0,1} and COL in {0,1} (i.e. clicked inside the top-left 2x2 block), then the fixed 2x2 block toggles: all four cells become gold if they were gray, or gray if they were gold. (The toggled state applies to the stored color; if any of these cells are covered by the movable block, they are not visible until uncovered.)
+   - Else (click outside the top-left 2x2 block), then both of the following occur simultaneuously: the fixed 2x2 block toggles (as above), and every blue/lightblue cell on the grid toggles (blue<->lightblue).
+- Up action: no visible effect.
+
+================================================================================
+Iteration 22; node 12; score 0.725060284
+
+P(X0), game step 205:
+step=0; bg=black; fixed:gray(0,0),gray(0,1),gray(1,0),gray(1,1); movable:gray_row0:2-4; other:lightblue_row5:4; lightblue_row7:4; lightblue_row11:5; lightblue_row13:5,12,14; lightblue_row14:6-8,12-14; lightblue_row15:6-8,10-14
+
+P(X1), game step 206:
+step=0; bg=black; fixed:gray(0,0),gray(0,1),gray(1,0),gray(1,1); movable:gray_row0:2-4; other:lightblue_row1:3; lightblue_row5:4; lightblue_row7:4; lightblue_row11:5; lightblue_row13:5,12,14; lightblue_row14:6-8,12-14; lightblue_row15:6-8,10-14
+
+P(X2), game step 207:
+step=0; bg=black; fixed:gray(0,0),gray(0,1),gray(1,0),gray(1,1); movable:gray_row0:2-4; other:lightblue_row2:3; lightblue_row6:4; lightblue_row8:4; lightblue_row12:5; lightblue_row13:12,14; lightblue_row14:5-8,12-14; lightblue_row15:6-8,10-14
+
+P(X3), game step 208:
+step=0; bg=black; fixed:gray(0,0),gray(0,1),gray(1,0),gray(1,1); movable:gray_row0:2-4; other:lightblue_row1:3; lightblue_row2:3; lightblue_row6:4; lightblue_row8:4; lightblue_row12:5; lightblue_row13:12,14; lightblue_row14:5-8,12-14; lightblue_row15:6-8,10-14
+
+B / world_knowledge (complete, verbatim):
+world knowledge
+- Grid is 16x16 (rows 0-15, cols 0-15), background black.
+- Cell types: gold, gray, blue, lightblue.
+- There is a fixed 2x2 block at cells (0,0),(0,1),(1,0),(1,1). These cells are either gold or gray. Their color persists even when covered by the movable block; they are visible only when not covered.
+- There is a movable block: three contiguous gray cells on row 0. It moves left/right with left/right actions. Left/right are possible only if the three target cells are within [0,15] and contain no blue/lightblue cells. The movable block can overwrite fixed block cells (which are not obstacles). When the movable block moves, it leaves its previous cells empty; if those were fixed block cells, the fixed block's stored color reappears.
+- There is a bottom block: a contiguous block of blue or lightblue cells on row 15. Its color toggles on clicks outside the top-left 2x2. Its width varies as new cells arrive.
+- On noop: every blue/lightblue cell not on row 15 attemps to move down one row. If the cell directly below is empty (no other cell), it moves; otherwise it stays. Cells on row 15 do not move.
+- On left: the movable block shifts one column left (decrements column of all three cells) if possible.
+- On right: the movable block shifts one column right (increments column) if possible.
+- On down: if the cell (1, c) is empty (no cell of any type), where c is the middle column of the movable block (the second of its three cells), a new blue/lightblue cell appears at (1, c) with color equal to the current color of the bottom block. If (1, c) is occupied, nothing happens.
+- On click ROW COL:
+   - If ROW in {0,1} and COL in {0,1} (i.e. clicked inside the top-left 2x2 block), then the fixed 2x2 block toggles: all four cells become gold if they were gray, or gray if they were gold. (The toggled state applies to the stored color; if any of these cells are covered by the movable block, they are not visible until uncovered.)
+   - Else (click outside the top-left 2x2 block), then both of the following occur simultaneuously: the fixed 2x2 block toggles (as above), and every blue/lightblue cell on the grid toggles (blue<->lightblue).
+- Up action: no visible effect.
+

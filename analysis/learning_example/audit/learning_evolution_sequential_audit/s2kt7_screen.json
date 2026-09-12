@@ -1,0 +1,349 @@
+{
+  "game": "s2kt7",
+  "classification": "No qualifying semantic perception change.",
+  "findings": [
+    "Every active P change is cell serialization, color abbreviation, dimensions, or grid fingerprints; no live ant direction, neighborhood, or collision predicate appears.",
+    "P6 introduces id as grid hash; B8 explicitly uses state ID as a hidden mapping input. This is direct vocabulary uptake but not semantic understanding.",
+    "P19 temporal differences are empty and P23 calls every current cell added because evaluation supplies one observation; neither tracks changes.",
+    "B updates hypothesize movement and click rules using plain coordinates or hidden mappings; they do not adopt an active semantic feature."
+  ],
+  "saved_node": 23,
+  "saved_lineage": [
+    0,
+    1,
+    2,
+    4,
+    19,
+    23
+  ],
+  "candidate_path": "logs/2026-08-24/human_curated/rexpure/s2kt7_s1/rexpure_run_seed1/candidates.jsonl",
+  "process_path": "logs/2026-08-24/human_curated/rexpure/s2kt7_s1/rexpure_run_seed1/process_log.jsonl",
+  "candidates_reviewed": 30,
+  "candidates": [
+    {
+      "node": 0,
+      "parents": [],
+      "iteration": null,
+      "candidate_line": 1,
+      "process_line": null,
+      "train_score": 0.0
+    },
+    {
+      "node": 1,
+      "parents": [
+        0
+      ],
+      "iteration": 2,
+      "candidate_line": 2,
+      "process_line": 3,
+      "train_score": 0.09006194180351484
+    },
+    {
+      "node": 2,
+      "parents": [
+        1
+      ],
+      "iteration": 6,
+      "candidate_line": 3,
+      "process_line": 6,
+      "train_score": 0.033362143474503024
+    },
+    {
+      "node": 3,
+      "parents": [
+        1
+      ],
+      "iteration": 11,
+      "candidate_line": 4,
+      "process_line": 11,
+      "train_score": 0.08336214347450303
+    },
+    {
+      "node": 4,
+      "parents": [
+        2
+      ],
+      "iteration": 12,
+      "candidate_line": 5,
+      "process_line": 12,
+      "train_score": 0.34511019878997407
+    },
+    {
+      "node": 5,
+      "parents": [
+        4
+      ],
+      "iteration": 13,
+      "candidate_line": 6,
+      "process_line": 13,
+      "train_score": 0.2734745030250648
+    },
+    {
+      "node": 6,
+      "parents": [
+        4
+      ],
+      "iteration": 14,
+      "candidate_line": 7,
+      "process_line": 14,
+      "train_score": 0.29264729184673005
+    },
+    {
+      "node": 7,
+      "parents": [
+        1
+      ],
+      "iteration": 15,
+      "candidate_line": 8,
+      "process_line": 15,
+      "train_score": 0.06673148948429848
+    },
+    {
+      "node": 8,
+      "parents": [
+        6
+      ],
+      "iteration": 16,
+      "candidate_line": 9,
+      "process_line": 17,
+      "train_score": 0.30598206568712183
+    },
+    {
+      "node": 9,
+      "parents": [
+        7
+      ],
+      "iteration": 17,
+      "candidate_line": 10,
+      "process_line": 18,
+      "train_score": 0.023380870066263323
+    },
+    {
+      "node": 10,
+      "parents": [
+        4
+      ],
+      "iteration": 19,
+      "candidate_line": 11,
+      "process_line": 20,
+      "train_score": 0.17677758571017
+    },
+    {
+      "node": 11,
+      "parents": [
+        5
+      ],
+      "iteration": 21,
+      "candidate_line": 12,
+      "process_line": 21,
+      "train_score": 0.07007778738115818
+    },
+    {
+      "node": 12,
+      "parents": [
+        10
+      ],
+      "iteration": 22,
+      "candidate_line": 13,
+      "process_line": 22,
+      "train_score": 0.09425561797752809
+    },
+    {
+      "node": 13,
+      "parents": [
+        3
+      ],
+      "iteration": 23,
+      "candidate_line": 14,
+      "process_line": 23,
+      "train_score": 0.036694036300777874
+    },
+    {
+      "node": 14,
+      "parents": [
+        4
+      ],
+      "iteration": 24,
+      "candidate_line": 15,
+      "process_line": 24,
+      "train_score": 0.3117696629213483
+    },
+    {
+      "node": 15,
+      "parents": [
+        8
+      ],
+      "iteration": 25,
+      "candidate_line": 16,
+      "process_line": 25,
+      "train_score": 0.04847090175741861
+    },
+    {
+      "node": 16,
+      "parents": [
+        14
+      ],
+      "iteration": 26,
+      "candidate_line": 17,
+      "process_line": 26,
+      "train_score": 0.18341256122154997
+    },
+    {
+      "node": 17,
+      "parents": [
+        14
+      ],
+      "iteration": 27,
+      "candidate_line": 18,
+      "process_line": 27,
+      "train_score": 0.22014261019878997
+    },
+    {
+      "node": 18,
+      "parents": [
+        17
+      ],
+      "iteration": 28,
+      "candidate_line": 19,
+      "process_line": 28,
+      "train_score": 0.10011524056467877
+    },
+    {
+      "node": 19,
+      "parents": [
+        4
+      ],
+      "iteration": 29,
+      "candidate_line": 20,
+      "process_line": 29,
+      "train_score": 0.2368020743301642
+    },
+    {
+      "node": 20,
+      "parents": [
+        12
+      ],
+      "iteration": 30,
+      "candidate_line": 21,
+      "process_line": 30,
+      "train_score": 0.07014261019878996
+    },
+    {
+      "node": 21,
+      "parents": [
+        6
+      ],
+      "iteration": 32,
+      "candidate_line": 22,
+      "process_line": 33,
+      "train_score": 0.3401051570152694
+    },
+    {
+      "node": 22,
+      "parents": [
+        16
+      ],
+      "iteration": 34,
+      "candidate_line": 23,
+      "process_line": 34,
+      "train_score": 0.30428730913281477
+    },
+    {
+      "node": 23,
+      "parents": [
+        19
+      ],
+      "iteration": 35,
+      "candidate_line": 24,
+      "process_line": 35,
+      "train_score": 0.3768063958513397
+    },
+    {
+      "node": 24,
+      "parents": [
+        5
+      ],
+      "iteration": 36,
+      "candidate_line": 25,
+      "process_line": 36,
+      "train_score": 0.3651519734946701
+    },
+    {
+      "node": 25,
+      "parents": [
+        24
+      ],
+      "iteration": 37,
+      "candidate_line": 26,
+      "process_line": 37,
+      "train_score": 0.3001296456352636
+    },
+    {
+      "node": 26,
+      "parents": [
+        15
+      ],
+      "iteration": 38,
+      "candidate_line": 27,
+      "process_line": 38,
+      "train_score": 0.12348170556035724
+    },
+    {
+      "node": 27,
+      "parents": [
+        19
+      ],
+      "iteration": 39,
+      "candidate_line": 28,
+      "process_line": 39,
+      "train_score": 0.0700849899164506
+    },
+    {
+      "node": 28,
+      "parents": [
+        24
+      ],
+      "iteration": 40,
+      "candidate_line": 29,
+      "process_line": 40,
+      "train_score": 0.24597918467300492
+    },
+    {
+      "node": 29,
+      "parents": [
+        16
+      ],
+      "iteration": 41,
+      "candidate_line": 30,
+      "process_line": 41,
+      "train_score": 0.2667819072313454
+    }
+  ],
+  "selected_records": [
+    {
+      "node": 6,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nOutputs a concise (<2000 char) summary of decision-relevant features, including\na unique state id (hash of the full grid) to make every state distinguishable,\nand delta from the previous state if available.\n\"\"\"\n\nimport json\nimport hashlib\nfrom collections import Counter\nfrom typing import Optional, List, Tuple\n\n\ndef _parse_grid(obs: str) -> Optional[List[List[str]]]:\n    \"\"\"Extract the 2D colour grid as list[list[str]].\n\n    Anchor on the generic '[[' / ']]' so it works regardless of the header text.\n    Returns None on failure.\n    \"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid: List[List[str]]) -> str:\n    \"\"\"Return the most frequent colour in the grid (assumed background).\"\"\"\n    flat = [cell for row in grid for cell in row]\n    if not flat:\n        return \"black\"\n    count = Counter(flat)\n    background, _ = count.most_common(1)[0]\n    return background\n\n\ndef _grid_hash(grid: List[List[str]]) -> str:\n    \"\"\"Compute a short hash of the full grid string.\"\"\"\n    # re-serialize the grid to a canonical string\n    grid_str = json.dumps(grid, separators=(\",\", \":\"), sort_keys=False)\n    h = hashlib.md5(grid_str.encode()).hexdigest()[:16]  # 16 hex chars\n    return h\n\n\ndef _non_bg_cells(grid: List[List[str]], background: str) -> List[Tuple[int, int, str]]:\n    \"\"\"Return sorted list of (row, col, colour) for cells not background.\"\"\"\n    cells = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != background:\n                cells.append((r, c, colour))\n    cells.sort(key=lambda x: (x[0], x[1]))\n    return cells\n\n\ndef _format_cells(cells: List[Tuple[int, int, str]]) -> str:\n    \"\"\"Format a list of cells as a compact string: (r,c,colour), ...\"\"\"\n    return \", \".join(f\"({r},{c},{colour})\" for r, c, colour in cells)\n\n\ndef _compute_delta(prev_cells: List[Tuple[int, int, str]],\n                   cur_cells: List[Tuple[int, int, str]]) -> Tuple[\n                       List[Tuple[int, int, str]],  # added\n                       List[Tuple[int, int, str]],  # removed\n                       List[Tuple[int, int, str, str]]  # changed (r,c,old,new)\n                   ]:\n    \"\"\"Return (added, removed, changed) between two cell lists.\"\"\"\n    prev_map = {(r, c): colour for r, c, colour in prev_cells}\n    cur_map = {(r, c): colour for r, c, colour in cur_cells}\n\n    added = []\n    removed = []\n    changed = []\n\n    # check cur cells\n    for (r, c, colour) in cur_cells:\n        prev_colour = prev_map.get((r, c))\n        if prev_colour is None:\n            added.append((r, c, colour))\n        elif prev_colour != colour:\n            changed.append((r, c, prev_colour, colour))\n\n    # check prev cells that are gone\n    for (r, c, colour) in prev_cells:\n        if (r, c) not in cur_map:\n            removed.append((r, c, colour))\n\n    return added, removed, changed\n\n\ndef perceive(observation_history: list[str]) -> str:\n    # Ensure we have at least one observation\n    if not observation_history:\n        return \"empty\"\n\n    # Parse current grid\n    cur_obs = observation_history[-1]\n    cur_grid = _parse_grid(cur_obs)\n    if cur_grid is None:\n        return \"no_grid\"\n\n    # Determine background and hash\n    background = _determine_background(cur_grid)\n    state_id = _grid_hash(cur_grid)\n    rows = len(cur_grid)\n    cols = len(cur_grid[0]) if rows > 0 else 0\n\n    # Get current non-background cells\n    cur_non_bg = _non_bg_cells(cur_grid, background)\n\n    # Try to get previous state for delta\n    prev_non_bg = None\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_bg = _determine_background(prev_grid)\n            prev_non_bg = _non_bg_cells(prev_grid, prev_bg)\n\n    # Compute deltas if possible\n    added = []\n    removed = []\n    changed = []\n    if prev_non_bg is not None:\n        added, removed, changed = _compute_delta(prev_non_bg, cur_non_bg)\n\n    # Build output parts\n    parts = []\n\n    # Background, dimensions, and state id\n    parts.append(f\"bg:{background}; rows:{rows}; cols:{cols}; id:{state_id}\")\n\n    # Current cells\n    if cur_non_bg:\n        parts.append(\"cells:\" + _format_cells(cur_non_bg))\n    else:\n        parts.append(\"cells:empty\")\n\n    # Deltas\n    if added:\n        parts.append(\"added:\" + _format_cells(added))\n    if removed:\n        parts.append(\"removed:\" + _format_cells(removed))\n    if changed:\n        changed_str = \", \".join(f\"({r},{c},{old}->{new})\" for r, c, old, new in changed)\n        parts.append(\"changed:\" + changed_str)\n\n    # Combine\n    result = \"; \".join(parts)\n\n    # Truncate if necessary (should be rare for sparse grids)\n    if len(result) > 1999:\n        # Fallback: keep only bg, dimensions, id, counts, and a sample of cells\n        result = f\"bg:{background}; rows:{rows}; cols:{cols}; id:{state_id}; cells_count={len(cur_non_bg)}\"\n        if cur_non_bg:\n            first = _format_cells(cur_non_bg[:5])\n            last = _format_cells(cur_non_bg[-5:])\n            result += f\"; first5:{first}; last5:{last}\"\n        if added:\n            result += f\"; added_count={len(added)}\"\n        if removed:\n            result += f\"; removed_count={len(removed)}\"\n        if changed:\n            result += f\"; changed_count={len(changed)}\"\n\n    # Never return empty\n    return result if result else \"empty\"",
+      "belief": "world knowledge block\n- The grid contains two types of cells: gray and red.\n- During a noop action, every gray cell moves one step towards the nearest red cell (Manhattan distance, with ties broken in a consistent but unspecified order). If no red cells exist, gray cells do not move.\n- The action of clicking a cell (r,c) produces a transformation that depends on the entire current configuration. The transformation may create or remove red cells and may move gray cells. The same transformation can often be produced by many different click coordinates. Therefore, when identifying the action from state change, any click that could have produced the observed change (including noop if the change is consistent with gray drift) should be considered a candidate.\n- The transformation itself is deterministic given the state and the click coordinates, but its effect cannot be summarized by a simple local rule."
+    },
+    {
+      "node": 8,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nOutputs a concise (<2000 char) summary of decision-relevant features, including\na unique state id (hash of the full grid) to make every state distinguishable,\nand delta from the previous state if available.\n\"\"\"\n\nimport json\nimport hashlib\nfrom collections import Counter\nfrom typing import Optional, List, Tuple\n\n\ndef _parse_grid(obs: str) -> Optional[List[List[str]]]:\n    \"\"\"Extract the 2D colour grid as list[list[str]].\n\n    Anchor on the generic '[[' / ']]' so it works regardless of the header text.\n    Returns None on failure.\n    \"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid: List[List[str]]) -> str:\n    \"\"\"Return the most frequent colour in the grid (assumed background).\"\"\"\n    flat = [cell for row in grid for cell in row]\n    if not flat:\n        return \"black\"\n    count = Counter(flat)\n    background, _ = count.most_common(1)[0]\n    return background\n\n\ndef _grid_hash(grid: List[List[str]]) -> str:\n    \"\"\"Compute a short hash of the full grid string.\"\"\"\n    # re-serialize the grid to a canonical string\n    grid_str = json.dumps(grid, separators=(\",\", \":\"), sort_keys=False)\n    h = hashlib.md5(grid_str.encode()).hexdigest()[:16]  # 16 hex chars\n    return h\n\n\ndef _non_bg_cells(grid: List[List[str]], background: str) -> List[Tuple[int, int, str]]:\n    \"\"\"Return sorted list of (row, col, colour) for cells not background.\"\"\"\n    cells = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != background:\n                cells.append((r, c, colour))\n    cells.sort(key=lambda x: (x[0], x[1]))\n    return cells\n\n\ndef _format_cells(cells: List[Tuple[int, int, str]]) -> str:\n    \"\"\"Format a list of cells as a compact string: (r,c,colour), ...\"\"\"\n    return \", \".join(f\"({r},{c},{colour})\" for r, c, colour in cells)\n\n\ndef _compute_delta(prev_cells: List[Tuple[int, int, str]],\n                   cur_cells: List[Tuple[int, int, str]]) -> Tuple[\n                       List[Tuple[int, int, str]],  # added\n                       List[Tuple[int, int, str]],  # removed\n                       List[Tuple[int, int, str, str]]  # changed (r,c,old,new)\n                   ]:\n    \"\"\"Return (added, removed, changed) between two cell lists.\"\"\"\n    prev_map = {(r, c): colour for r, c, colour in prev_cells}\n    cur_map = {(r, c): colour for r, c, colour in cur_cells}\n\n    added = []\n    removed = []\n    changed = []\n\n    # check cur cells\n    for (r, c, colour) in cur_cells:\n        prev_colour = prev_map.get((r, c))\n        if prev_colour is None:\n            added.append((r, c, colour))\n        elif prev_colour != colour:\n            changed.append((r, c, prev_colour, colour))\n\n    # check prev cells that are gone\n    for (r, c, colour) in prev_cells:\n        if (r, c) not in cur_map:\n            removed.append((r, c, colour))\n\n    return added, removed, changed\n\n\ndef perceive(observation_history: list[str]) -> str:\n    # Ensure we have at least one observation\n    if not observation_history:\n        return \"empty\"\n\n    # Parse current grid\n    cur_obs = observation_history[-1]\n    cur_grid = _parse_grid(cur_obs)\n    if cur_grid is None:\n        return \"no_grid\"\n\n    # Determine background and hash\n    background = _determine_background(cur_grid)\n    state_id = _grid_hash(cur_grid)\n    rows = len(cur_grid)\n    cols = len(cur_grid[0]) if rows > 0 else 0\n\n    # Get current non-background cells\n    cur_non_bg = _non_bg_cells(cur_grid, background)\n\n    # Try to get previous state for delta\n    prev_non_bg = None\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_bg = _determine_background(prev_grid)\n            prev_non_bg = _non_bg_cells(prev_grid, prev_bg)\n\n    # Compute deltas if possible\n    added = []\n    removed = []\n    changed = []\n    if prev_non_bg is not None:\n        added, removed, changed = _compute_delta(prev_non_bg, cur_non_bg)\n\n    # Build output parts\n    parts = []\n\n    # Background, dimensions, and state id\n    parts.append(f\"bg:{background}; rows:{rows}; cols:{cols}; id:{state_id}\")\n\n    # Current cells\n    if cur_non_bg:\n        parts.append(\"cells:\" + _format_cells(cur_non_bg))\n    else:\n        parts.append(\"cells:empty\")\n\n    # Deltas\n    if added:\n        parts.append(\"added:\" + _format_cells(added))\n    if removed:\n        parts.append(\"removed:\" + _format_cells(removed))\n    if changed:\n        changed_str = \", \".join(f\"({r},{c},{old}->{new})\" for r, c, old, new in changed)\n        parts.append(\"changed:\" + changed_str)\n\n    # Combine\n    result = \"; \".join(parts)\n\n    # Truncate if necessary (should be rare for sparse grids)\n    if len(result) > 1999:\n        # Fallback: keep only bg, dimensions, id, counts, and a sample of cells\n        result = f\"bg:{background}; rows:{rows}; cols:{cols}; id:{state_id}; cells_count={len(cur_non_bg)}\"\n        if cur_non_bg:\n            first = _format_cells(cur_non_bg[:5])\n            last = _format_cells(cur_non_bg[-5:])\n            result += f\"; first5:{first}; last5:{last}\"\n        if added:\n            result += f\"; added_count={len(added)}\"\n        if removed:\n            result += f\"; removed_count={len(removed)}\"\n        if changed:\n            result += f\"; changed_count={len(changed)}\"\n\n    # Never return empty\n    return result if result else \"empty\"",
+      "belief": "world knowledge block\n- The grid contains two types of cells: gray and red.\n- During a noop action, every gray cell moves one step towards the nearest red cell (Manhattan distance, with ties broken in a consistent but unspecified order). If no red cells exist, gray cells do not move.\n- The action of clicking a cell (r,c) produces a transformation that depends on the entire current configuration, including the state's unique ID. The transformation is deterministic given the state ID and the click coordinates, but its effect cannot be summarized by a simple local rule. Consequently, the same (state ID, click) pair always yields the same next state, which can be identified by consulting the trajectory history.\n- When identifying the action from state change, any click that could have produced the observed change (including noop if the change is consistent with gray drift) should be considered a candidate."
+    },
+    {
+      "node": 19,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nOutputs a concise (<2000 char) summary of decision-relevant features, including\nan explicit step counter, the current non\u2011background cells, and the delta from\nthe previous state.  The step counter makes every output unique within the\ntrajectory, solving contrastive forward failures.  The delta is always shown\nso that no\u2011change periods are explicit.\n\"\"\"\n\nimport json\nfrom collections import Counter\nfrom typing import Optional, List, Tuple\n\n\ndef _parse_grid(obs: str) -> Optional[List[List[str]]]:\n    \"\"\"Extract the 2D colour grid as list[list[str]].\n\n    Anchor on the generic '[[' / ']]' so it works regardless of the header text.\n    Returns None on failure.\n    \"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid: List[List[str]]) -> str:\n    \"\"\"Return the most frequent colour in the grid (assumed background).\"\"\"\n    flat = [cell for row in grid for cell in row]\n    if not flat:\n        return \"black\"\n    count = Counter(flat)\n    background, _ = count.most_common(1)[0]\n    return background\n\n\ndef _non_bg_cells(grid: List[List[str]], background: str) -> List[Tuple[int, int, str]]:\n    \"\"\"Return sorted list of (row, col, colour) for cells not background.\"\"\"\n    cells = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != background:\n                cells.append((r, c, colour))\n    cells.sort(key=lambda x: (x[0], x[1]))\n    return cells\n\n\ndef _format_cells(cells: List[Tuple[int, int, str]]) -> str:\n    \"\"\"Format a list of cells as a compact string: (r,c,colour), ...\"\"\"\n    return \", \".join(f\"({r},{c},{colour})\" for r, c, colour in cells)\n\n\ndef perceive(observation_history: list[str]) -> str:\n    # Ensure we have at least one observation\n    if not observation_history:\n        return \"empty\"\n\n    # Step counter (0\u2011based)\n    step = len(observation_history) - 1\n\n    # Parse current grid\n    cur_obs = observation_history[-1]\n    cur_grid = _parse_grid(cur_obs)\n    if cur_grid is None:\n        return f\"step:{step}; no_grid\"\n\n    # Determine background\n    background = _determine_background(cur_grid)\n    rows = len(cur_grid)\n    cols = len(cur_grid[0]) if rows > 0 else 0\n\n    # Get current non\u2011background cells\n    cur_non_bg = _non_bg_cells(cur_grid, background)\n\n    # Try to get previous state for delta\n    prev_non_bg = None\n    if step >= 1:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_bg = _determine_background(prev_grid)\n            prev_non_bg = _non_bg_cells(prev_grid, prev_bg)\n\n    # Compute deltas (always present, may be empty)\n    added = []\n    removed = []\n    changed = []  # (r, c, from_colour, to_colour)\n    if prev_non_bg is not None:\n        # Build sets for fast lookup\n        cur_set = set((r, c, colour) for r, c, colour in cur_non_bg)\n        prev_set = set((r, c, colour) for r, c, colour in prev_non_bg)\n\n        # Cells in current but not in previous -> added or changed\n        for cell in cur_non_bg:\n            r, c, colour = cell\n            in_prev = any(pr == r and pc == c for pr, pc, _ in prev_non_bg)\n            if not in_prev:\n                added.append(cell)\n            else:\n                # Check colour change\n                old_colour = None\n                for (pr, pc, pc_col) in prev_non_bg:\n                    if pr == r and pc == c:\n                        old_colour = pc_col\n                        break\n                if old_colour is not None and old_colour != colour:\n                    changed.append((r, c, old_colour, colour))\n\n        # Cells in previous but not in current -> removed\n        for cell in prev_non_bg:\n            r, c, colour = cell\n            in_cur = any(pr == r and pc == c for pr, pc, _ in cur_non_bg)\n            if not in_cur:\n                removed.append(cell)\n\n    # Build output parts (maintain length <2000)\n    parts = []\n\n    # Always include step, background, dimensions\n    parts.append(f\"step:{step}\")\n    parts.append(f\"bg:{background}\")\n    parts.append(f\"rows:{rows}\")\n    parts.append(f\"cols:{cols}\")\n\n    # Current cells\n    if cur_non_bg:\n        parts.append(\"cells:\" + _format_cells(cur_non_bg))\n    else:\n        parts.append(\"cells:empty\")\n\n    # Deltas \u2013 always present, even if empty\n    parts.append(\"added:\" + (_format_cells(added) if added else \"empty\"))\n    parts.append(\"removed:\" + (_format_cells(removed) if removed else \"empty\"))\n    if changed:\n        changed_str = \", \".join(f\"({r},{c},{old}->{new})\" for r, c, old, new in changed)\n        parts.append(\"changed:\" + changed_str)\n    else:\n        parts.append(\"changed:empty\")\n\n    # Combine\n    result = \"; \".join(parts)\n\n    # Truncate if necessary (should be extremely rare with our compact format)\n    if len(result) > 1999:\n        # Fallback: very minimal summary\n        result = f\"step:{step}; bg:{background}; rows:{rows}; cols:{cols}; cells_count={len(cur_non_bg)}\"\n        if added:\n            result += f\"; added_count={len(added)}\"\n        if removed:\n            result += f\"; removed_count={len(removed)}\"\n        if changed:\n            result += f\"; changed_count={len(changed)}\"\n\n    return result if result else \"empty\"",
+      "belief": "world knowledge block\n- The grid contains two types of cells: gray and red.\n- During a noop action, every gray cell moves one step towards the nearest red cell (Manhattan distance, with ties broken in a consistent but unspecified order). If no red cells exist, gray cells do not move.\n- The action of clicking a cell (r,c) produces a transformation that depends on the entire current configuration. The transformation may create or remove red cells and may move gray cells. The same transformation can often be produced by many different click coordinates. Therefore, when identifying the action from state change, any click that could have produced the observed change (including noop if the change is consistent with gray drift) should be considered a candidate.\n- The transformation itself is deterministic given the state and the click coordinates, but its effect cannot be summarized by a simple local rule."
+    },
+    {
+      "node": 23,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nOutputs a concise (<2000 char) summary of decision-relevant features, including\na unique state ID (hash of non\u2011background cells), step counter (from history length),\nand correct delta (added/removed/changed) between consecutive states.\n\"\"\"\n\nimport json\nfrom collections import Counter\nfrom hashlib import sha256\nfrom typing import Optional, List, Tuple\n\n\ndef _parse_grid(obs: str) -> Optional[List[List[str]]]:\n    \"\"\"Extract the 2D colour grid as list[list[str]].\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid: List[List[str]]) -> str:\n    \"\"\"Most frequent colour in the grid (assumed background).\"\"\"\n    flat = [cell for row in grid for cell in row]\n    if not flat:\n        return \"black\"\n    count = Counter(flat)\n    background, _ = count.most_common(1)[0]\n    return background\n\n\ndef _non_bg_cells(grid: List[List[str]], background: str) -> List[Tuple[int, int, str]]:\n    \"\"\"Sorted list of (row, col, colour) for cells not background.\"\"\"\n    cells = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != background:\n                cells.append((r, c, colour))\n    cells.sort(key=lambda x: (x[0], x[1]))\n    return cells\n\n\ndef _format_cells(cells: List[Tuple[int, int, str]]) -> str:\n    \"\"\"Compact string: (r,c,colour), ...\"\"\"\n    return \", \".join(f\"({r},{c},{colour})\" for r, c, colour in cells)\n\n\ndef _state_id(cur_non_bg: List[Tuple[int, int, str]], background: str, rows: int, cols: int) -> str:\n    \"\"\"Short hash that (almost always) differs for different grid configurations.\"\"\"\n    data = f\"{background}:{rows}x{cols}:\" + str(cur_non_bg)\n    return sha256(data.encode()).hexdigest()[:8]\n\n\ndef perceive(observation_history: list[str]) -> str:\n    # --------- - step and parsing ----------\n    if not observation_history:\n        return \"empty\"\n\n    step = len(observation_history) - 1   # 0\u2011based\n\n    cur_obs = observation_history[-1]\n    cur_grid = _parse_grid(cur_obs)\n    if cur_grid is None:\n        return f\"step:{step}; parse_error\"\n\n    background = _determine_background(cur_grid)\n    rows = len(cur_grid)\n    cols = len(cur_grid[0]) if rows > 0 else 0\n\n    cur_non_bg = _non_bg_cells(cur_grid, background)\n    cur_set = set(cur_non_bg)\n\n    # --------- - previous state for delta ----------\n    prev_non_bg = None\n    prev_set = set()\n    if step >= 1:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_bg = _determine_background(prev_grid)\n            prev_non_bg = _non_bg_cells(prev_grid, prev_bg)\n            prev_set = set(prev_non_bg)\n\n    # --------- - compute deltas ----------\n    added = list(cur_set - prev_set)\n    removed = list(prev_set - cur_set)\n    # cells that stayed at the same coordinates but changed colour\n    changed: List[Tuple[int, int, str, str]] = []\n    if prev_non_bg:\n        prev_by_pos = {(r, c): colour for r, c, colour in prev_non_bg}\n        cur_by_pos = {(r, c): colour for r, c, colour in cur_non_bg}\n        for (r, c), old in prev_by_pos.items():\n            new = cur_by_pos.get((r, c))\n            if new is not None and new != old:\n                changed.append((r, c, old, new))\n\n    # sort consistently\n    added.sort(key=lambda x: (x[0], x[1]))\n    removed.sort(key=lambda x: (x[0], x[1]))\n    changed.sort(key=lambda x: (x[0], x[1]))\n\n    # --------- - build output ----------\n    sid = _state_id(cur_non_bg, background, rows, cols)\n    parts = [\n        f\"step:{step}\",\n        f\"sid:{sid}\",\n        f\"bg:{background}\",\n        f\"rows:{rows}\",\n        f\"cols:{cols}\",\n        \"cells:\" + (_format_cells(cur_non_bg) if cur_non_bg else \"empty\"),\n        \"added:\" + (_format_cells(added) if added else \"empty\"),\n        \"removed:\" + (_format_cells(removed) if removed else \"empty\"),\n    ]\n    if changed:\n        changed_str = \", \".join(f\"({r},{c},{old}->{new})\" for r, c, old, new in changed)\n        parts.append(\"changed:\" + changed_str)\n    else:\n        parts.append(\"changed:empty\")\n\n    result = \"; \".join(parts)\n\n    # --------- - guarantee length <2000 ----------\n    if len(result) > 1999:\n        # very compact fallback\n        result = (\n            f\"step:{step};sid:{sid};bg:{background};\"\n            f\"rows:{rows};cols:{cols};\"\n            f\"cells_cnt={len(cur_non_bg)}\"\n        )\n        if added:\n            result += f\";add_cnt={len(added)}\"\n        if removed:\n            result += f\";rem_cnt={len(removed)}\"\n        if changed:\n            result += f\";chg_cnt={len(changed)}\"\n\n    return result if result else \"empty\"",
+      "belief": "world knowledge block\n- The grid contains two types of cells: gray and red.\n- During a noop action, every gray cell moves one step towards the nearest red cell (Manhattan distance, with ties broken in a consistent but unspecified order). If no red cells exist, gray cells do not move.\n- The action of clicking a cell (r,c) produces a transformation that depends on the entire current configuration. The transformation may create or remove red cells and may move gray cells. The same transformation can often be produced by many different click coordinates. Therefore, when identifying the action from state change, any click that could have produced the observed change (including noop if the change is consistent with gray drift) should be considered a candidate.\n- The transformation itself is deterministic given the state and the click coordinates, but its effect cannot be summarized by a simple local rule."
+    },
+    {
+      "node": 28,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nOutputs a concise (<2000 char) summary of decision-relevant features, including\ndelta from the previous state if available, to make both inverse and forward\nprediction reliable.\n\"\"\"\n\nimport json\nfrom collections import Counter\nfrom typing import Optional, List, Tuple, Dict\n\n# ---------------------------------------------------------------------\n#  Internal helpers\n# ---------------------------------------------------------------------\n\ndef _parse_grid(obs: str) -> Optional[List[List[str]]]:\n    \"\"\"Extract the 2D colour grid as list[list[str]].\n\n    Anchor on the generic '[[' / ']]' so it works regardless of the header text.\n    Returns None on failure.\n    \"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid: List[List[str]]) -> str:\n    \"\"\"Return the most frequent colour in the grid (assumed background).\"\"\"\n    flat = [cell for row in grid for cell in row]\n    if not flat:\n        return \"black\"\n    count = Counter(flat)\n    background, _ = count.most_common(1)[0]\n    return background\n\n\ndef _non_bg_cells(grid: List[List[str]], background: str) -> List[Tuple[int, int, str]]:\n    \"\"\"Return sorted list of (row, col, colour) for cells not background.\"\"\"\n    cells = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != background:\n                cells.append((r, c, colour))\n    cells.sort(key=lambda x: (x[0], x[1]))\n    return cells\n\n\ndef _format_cells_compact(cells: List[Tuple[int, int, str]]) -> str:\n    \"\"\"Compact: (r,c,colour)(r,c,colour) ... No spaces.\"\"\"\n    return \"\".join(f\"({r},{c},{colour})\" for r, c, colour in cells)\n\n\ndef _format_delta(added: List[Tuple[int, int, str]],\n                  removed: List[Tuple[int, int, str]],\n                  changed: List[Tuple[int, int, str, str]]) -> str:\n    \"\"\"Return compact delta string, e.g. '+:(8,8,red)(9,8,red);-:(8,9,gray);~:(11,9,old->new)'.\"\"\"\n    parts = []\n    if added:\n        parts.append(\"+:\" + _format_cells_compact(added))\n    if removed:\n        parts.append(\"-:\" + _format_cells_compact(removed))\n    if changed:\n        chg_str = \"\".join(f\"({r},{c},{old}->{new})\" for r, c, old, new in changed)\n        parts.append(\"~:\" + chg_str)\n    return \";\".join(parts)\n\n\n# ---------------------------------------------------------------------\n#  Main perceive function\n# ---------------------------------------------------------------------\n\ndef perceive(observation_history: list[str]) -> str:\n    # Ensure we have at least one observation\n    if not observation_history:\n        return \"empty\"\n\n    # Parse current grid\n    cur_obs = observation_history[-1]\n    cur_grid = _parse_grid(cur_obs)\n    if cur_grid is None:\n        return \"no_grid\"\n\n    # Determine background\n    background = _determine_background(cur_grid)\n    rows = len(cur_grid)\n    cols = len(cur_grid[0]) if rows > 0 else 0\n\n    # Get current non-background cells\n    cur_non_bg = _non_bg_cells(cur_grid, background)\n\n    # Try to get previous state for delta\n    prev_non_bg = None\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_bg = _determine_background(prev_grid)\n            prev_non_bg = _non_bg_cells(prev_grid, prev_bg)\n\n    # Compute deltas if possible\n    added: List[Tuple[int, int, str]] = []\n    removed: List[Tuple[int, int, str]] = []\n    changed: List[Tuple[int, int, str, str]] = []  # (r,c,old,new)\n\n    if prev_non_bg is not None:\n        # Build dicts from (r,c) to colour for fast lookup\n        prev_pos = {(r, c): colour for r, c, colour in prev_non_bg}\n        cur_pos = {(r, c): colour for r, c, colour in cur_non_bg}\n\n        # Handle same position with different colour -> changed\n        for (r, c), cur_col in cur_pos.items():\n            if (r, c) in prev_pos:\n                prev_col = prev_pos[(r, c)]\n                if prev_col != cur_col:\n                    changed.append((r, c, prev_col, cur_col))\n            else:\n                added.append((r, c, cur_col))\n\n        # Positions that were in previous but are not in current -> removed\n        for (r, c), prev_col in prev_pos.items():\n            if (r, c) not in cur_pos:\n                removed.append((r, c, prev_col))\n\n    # Build output parts (compact, no spaces)\n    parts: List[str] = []\n    parts.append(f\"bg:{background};r{rows};c{cols}\")\n\n    if cur_non_bg:\n        parts.append(\"cells:\" + _format_cells_compact(cur_non_bg))\n    else:\n        parts.append(\"cells:empty\")\n\n    if prev_non_bg is not None:\n        delta_str = _format_delta(added, removed, changed)\n        if delta_str:\n            parts.append(\"delta:\" + delta_str)\n\n    result = \";\".join(parts)\n\n    # Ensure length <2000 characters. If over, use a compact fallback that\n    # preserves the full cell list but maybe with abbreviated color codes.\n    # Here we simply fallback to a summary if result exceeds 1999 (should be rare).\n    if len(result) > 1999:\n        # Use one-letter codes for common colors to compress\n        color_map = {\n            \"black\": \"k\", \"white\": \"w\", \"gray\": \"g\", \"grey\": \"g\",\n            \"skyblue\": \"s\", \"lightblue\": \"l\", \"blue\": \"b\", \"darkblue\": \"d\",\n            \"red\": \"r\", \"green\": \"n\", \"darkgreen\": \"dg\", \"limegreen\": \"lg\",\n            \"gold\": \"go\", \"yellow\": \"y\", \"orange\": \"o\", \"brown\": \"br\",\n            \"tan\": \"t\", \"pink\": \"p\", \"mediumpurple\": \"mp\", \"purple\": \"pu\"\n        }\n        def short_col(c: str) -> str:\n            return color_map.get(c, c[:3])  # fallback to first 3 chars\n\n        bg_short = short_col(background)\n        cells_short = \"\".join(f\"({r},{c},{short_col(col)})\" for r, c, col in cur_non_bg)\n\n        parts2 = [f\"bg:{bg_short};r{rows};c{cols}\"]\n        if cur_non_bg:\n            parts2.append(\"cells:\" + cells_short)\n        else:\n            parts2.append(\"cells:empty\")\n        # Add counts from delta if any\n        if prev_non_bg is not None:\n            dc = f\"+{len(added)}-{len(removed)}~{len(changed)}\"\n            parts2.append(\"delcnt:\" + dc)\n        result = \";\".join(parts2)\n        # Final safety truncation \u2013 should not happen\n        if len(result) > 1999:\n            result = result[:1995] + \"...\"\n    # Never return empty\n    return result if result else \"empty\"",
+      "belief": "world knowledge block\n- The grid contains two types of cells: gray and red.\n- During a noop action, every gray cell moves one step towards the nearest red cell (Manhattan distance, with ties broken in a consistent but unspecified order). If no red cells exist, gray cells do not move. If there are no gray cells, all red cells become gray. When a gray cell moves onto a red cell, the gray cell disappears.\n- Click actions produce a transformation that is a deterministic function of the entire current visible configuration together with a hidden latent state that is not directly observable. Consequently, the next visible state cannot be predicted from the visible state and the click action alone. The same click coordinates can produce different visible changes at different times because the hidden state changes. A click can affect cells at any distance; the location of the click does not constrain which cells change. No consistent pattern (e.g., offsets, repeated effects) exists across different occurrences of the same click coordinate \u2013 each transformation is context\u2011dependent and depends on the hidden state."
+    }
+  ]
+}

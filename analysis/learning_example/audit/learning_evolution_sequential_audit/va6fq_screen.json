@@ -1,0 +1,350 @@
+{
+  "game": "va6fq",
+  "classification": "No qualifying semantic perception change.",
+  "findings": [
+    "All active P changes are cell encodings, grouping by color/row, dimensions, or step counters; no support, surface, material, or neighbor predicate appears.",
+    "P22 before saved B24 changes a step counter, but fresh evaluation makes step1 constant; it does not learn falling/support semantics.",
+    "B24 describes falling active solid/tan cells and blockage using retained cell coordinates, not a newly learned P feature; it incorrectly treats sandybrown as stationary.",
+    "P18 delta is first_frame; later programs remove delta machinery or change serialization."
+  ],
+  "saved_node": 24,
+  "saved_lineage": [
+    0,
+    2,
+    4,
+    7,
+    14,
+    22,
+    24
+  ],
+  "candidate_path": "logs/2026-08-24/human_curated/rexpure/va6fq_s1/rexpure_run_seed1/candidates.jsonl",
+  "process_path": "logs/2026-08-24/human_curated/rexpure/va6fq_s1/rexpure_run_seed1/process_log.jsonl",
+  "candidates_reviewed": 30,
+  "candidates": [
+    {
+      "node": 0,
+      "parents": [],
+      "iteration": null,
+      "candidate_line": 1,
+      "process_line": null,
+      "train_score": 0.0
+    },
+    {
+      "node": 1,
+      "parents": [
+        0
+      ],
+      "iteration": 1,
+      "candidate_line": 2,
+      "process_line": 1,
+      "train_score": 0.36004395604395606
+    },
+    {
+      "node": 2,
+      "parents": [
+        0
+      ],
+      "iteration": 2,
+      "candidate_line": 3,
+      "process_line": 2,
+      "train_score": 0.3667032967032967
+    },
+    {
+      "node": 3,
+      "parents": [
+        0
+      ],
+      "iteration": 3,
+      "candidate_line": 4,
+      "process_line": 3,
+      "train_score": 0.3200695970695971
+    },
+    {
+      "node": 4,
+      "parents": [
+        2
+      ],
+      "iteration": 4,
+      "candidate_line": 5,
+      "process_line": 5,
+      "train_score": 0.35007326007326006
+    },
+    {
+      "node": 5,
+      "parents": [
+        1
+      ],
+      "iteration": 5,
+      "candidate_line": 6,
+      "process_line": 6,
+      "train_score": 0.25097893772893776
+    },
+    {
+      "node": 6,
+      "parents": [
+        1
+      ],
+      "iteration": 8,
+      "candidate_line": 7,
+      "process_line": 8,
+      "train_score": 0.2984084249084249
+    },
+    {
+      "node": 7,
+      "parents": [
+        4
+      ],
+      "iteration": 9,
+      "candidate_line": 8,
+      "process_line": 9,
+      "train_score": 0.46668498168498174
+    },
+    {
+      "node": 8,
+      "parents": [
+        4
+      ],
+      "iteration": 10,
+      "candidate_line": 9,
+      "process_line": 11,
+      "train_score": 0.0
+    },
+    {
+      "node": 9,
+      "parents": [
+        7
+      ],
+      "iteration": 11,
+      "candidate_line": 10,
+      "process_line": 12,
+      "train_score": 0.4034029304029304
+    },
+    {
+      "node": 10,
+      "parents": [
+        3
+      ],
+      "iteration": 14,
+      "candidate_line": 11,
+      "process_line": 14,
+      "train_score": 0.0
+    },
+    {
+      "node": 11,
+      "parents": [
+        9
+      ],
+      "iteration": 15,
+      "candidate_line": 12,
+      "process_line": 15,
+      "train_score": 0.0
+    },
+    {
+      "node": 12,
+      "parents": [
+        4
+      ],
+      "iteration": 17,
+      "candidate_line": 13,
+      "process_line": 17,
+      "train_score": 0.10023809523809524
+    },
+    {
+      "node": 13,
+      "parents": [
+        7
+      ],
+      "iteration": 18,
+      "candidate_line": 14,
+      "process_line": 18,
+      "train_score": 0.08357142857142857
+    },
+    {
+      "node": 14,
+      "parents": [
+        7
+      ],
+      "iteration": 21,
+      "candidate_line": 15,
+      "process_line": 21,
+      "train_score": 0.35347619047619044
+    },
+    {
+      "node": 15,
+      "parents": [
+        9
+      ],
+      "iteration": 22,
+      "candidate_line": 16,
+      "process_line": 22,
+      "train_score": 0.0
+    },
+    {
+      "node": 16,
+      "parents": [
+        1
+      ],
+      "iteration": 23,
+      "candidate_line": 17,
+      "process_line": 23,
+      "train_score": 0.13344322344322343
+    },
+    {
+      "node": 17,
+      "parents": [
+        3
+      ],
+      "iteration": 24,
+      "candidate_line": 18,
+      "process_line": 24,
+      "train_score": 0.42504578754578753
+    },
+    {
+      "node": 18,
+      "parents": [
+        4
+      ],
+      "iteration": 26,
+      "candidate_line": 19,
+      "process_line": 26,
+      "train_score": 0.4000549450549451
+    },
+    {
+      "node": 19,
+      "parents": [
+        12
+      ],
+      "iteration": 27,
+      "candidate_line": 20,
+      "process_line": 27,
+      "train_score": 0.18680952380952381
+    },
+    {
+      "node": 20,
+      "parents": [
+        17
+      ],
+      "iteration": 28,
+      "candidate_line": 21,
+      "process_line": 28,
+      "train_score": 0.32506410256410256
+    },
+    {
+      "node": 21,
+      "parents": [
+        6
+      ],
+      "iteration": 29,
+      "candidate_line": 22,
+      "process_line": 29,
+      "train_score": 0.2617271062271062
+    },
+    {
+      "node": 22,
+      "parents": [
+        14
+      ],
+      "iteration": 30,
+      "candidate_line": 23,
+      "process_line": 30,
+      "train_score": 0.43677289377289374
+    },
+    {
+      "node": 23,
+      "parents": [
+        14
+      ],
+      "iteration": 31,
+      "candidate_line": 24,
+      "process_line": 31,
+      "train_score": 0.43673626373626373
+    },
+    {
+      "node": 24,
+      "parents": [
+        22
+      ],
+      "iteration": 32,
+      "candidate_line": 25,
+      "process_line": 32,
+      "train_score": 0.47003296703296704
+    },
+    {
+      "node": 25,
+      "parents": [
+        22
+      ],
+      "iteration": 33,
+      "candidate_line": 26,
+      "process_line": 33,
+      "train_score": 0.4167582417582418
+    },
+    {
+      "node": 26,
+      "parents": [
+        17
+      ],
+      "iteration": 34,
+      "candidate_line": 27,
+      "process_line": 35,
+      "train_score": 0.14098992673992675
+    },
+    {
+      "node": 27,
+      "parents": [
+        18
+      ],
+      "iteration": 35,
+      "candidate_line": 28,
+      "process_line": 36,
+      "train_score": 0.43673626373626373
+    },
+    {
+      "node": 28,
+      "parents": [
+        19
+      ],
+      "iteration": 37,
+      "candidate_line": 29,
+      "process_line": 37,
+      "train_score": 0.2667582417582418
+    },
+    {
+      "node": 29,
+      "parents": [
+        27
+      ],
+      "iteration": 38,
+      "candidate_line": 30,
+      "process_line": 38,
+      "train_score": 0.38673626373626374
+    }
+  ],
+  "selected_records": [
+    {
+      "node": 7,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise.\nOutput a concise (<2000 char) text summary of decision-relevant features.\nParse the grid from the last observation, detect background colour, and\nlist all non-background cells in a compact format.  Also compute the\ndifference (delta) from the previous observation if available, making\nthe action directly recoverable.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] (rows of colour-name strings).\n\n    Anchor on the generic '[[' / ']]' so it works regardless of the header text.\n    Returns None on failure (caller degrades gracefully, never raises).\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start: end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid):\n    \"\"\"Return the colour that appears most frequently in the grid.\"\"\"\n    if not grid or not grid[0]:\n        return None\n    counter = Counter()\n    for row in grid:\n        counter.update(row)\n    return counter.most_common(1)[0][0]\n\n\ndef _cells_set(grid, bg):\n    \"\"\"Return a set of (colour, row, col) tuples for non-background cells.\"\"\"\n    cells = set()\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                cells.add((colour, r, c))\n    return cells\n\n\ndef _format_cells(cells):\n    \"\"\"Format a set of (colour, row, col) tuples into a compact string.\n\n    Group by colour, then list coordinates.\n    \"\"\"\n    by_colour = {}\n    for colour, r, c in cells:\n        by_colour.setdefault(colour, []).append((r, c))\n    parts = []\n    for colour in sorted(by_colour.keys()):\n        coords = \";\".join(f\"{r},{c}\" for r, c in sorted(by_colour[colour]))\n        parts.append(f\"{colour}:{coords}\")\n    return \"; \".join(parts)\n\n\ndef perceive(observation_history: list[str]) -> str:\n    # Get current observation\n    if not observation_history:\n        return \"error: empty history\"\n\n    current_obs = observation_history[-1]\n    current_grid = _parse_grid(current_obs)\n    if current_grid is None:\n        return \"error: current grid parse failed\"\n\n    bg = _determine_background(current_grid)\n    if bg is None:\n        return \"error: empty grid\"\n\n    rows = len(current_grid)\n    cols = len(current_grid[0]) if rows > 0 else 0\n    dims = f\"{rows}x{cols}\"\n\n    current_cells = _cells_set(current_grid, bg)\n\n    # Compute delta if we have a previous observation\n    delta_parts = []\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_bg = _determine_background(prev_grid)\n            if prev_bg is not None:\n                prev_cells = _cells_set(prev_grid, prev_bg)\n                added = current_cells - prev_cells\n                removed = prev_cells - current_cells\n                if added or removed:\n                    add_str = _format_cells(added) if added else \"\"\n                    rem_str = _format_cells(removed) if removed else \"\"\n                    d = \"delta:\"\n                    if add_str:\n                        d += f\"added:{add_str}\"\n                    if add_str and rem_str:\n                        d += \" \"\n                    if rem_str:\n                        d += f\"removed:{rem_str}\"\n                    delta_parts.append(d)\n\n    # Build\u8c64 current state summary\n    if current_cells:\n        cells_str = _format_cells(current_cells)\n    else:\n        cells_str = \"none\"\n\n    # Combine parts\n    parts = [f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [f\"cells:{cells_str}\"]\n    output = \" \".join(parts)\n\n    # Ensure it is never empty (should be impossible)\n    if not output:\n        output = f\"bg={bg} dims={dims} cells:none\"\n\n    # Truncate if needed, preferring to keep delta and background info\n    if len(output) > 1999:\n        # Collapse current cells to a count to save space\n        count = len(current_cells)\n        short_cells = f\"cells:{count}_non_bg\"\n        short_parts = [f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [short_cells]\n        output = \" \".join(short_parts)\n        # If still too long, further trim delta parts\n        if len(output) > 1999:\n            # Keep only the first delta part if multiple\n            if len(delta_parts) > 1:\n                delta_parts = delta_parts[:1]\n            output = \" \".join([f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [short_cells])\n            if len(output) > 1999:\n                output = f\"bg={bg} dims={dims} cells:{count}_non_bg\"\n    return output",
+      "belief": "- The grid has a background color (bg) which is either black or tan.  \n- The state includes cells of colors: green (fixed at (0,7)), red (fixed at (0,2)), tan, black, sandybrown, skyblue.  \n- When bg=black, tan cells are the \"active\" solid cells; when bg=tan, black cells are the active solid cells.  \n- Clicking on an active solid cell removes it (turns to background).  \n- Clicking on a background cell that is orthogonally adjacent to an active solid cell adds an active solid cell at that location.  \n- Clicking on a background cell that is orthogonally adjacent to a sandybrown cell adds a sandybrown cell at that location.  \n- Clicking on a background cell that is orthogonally adjacent to a skyblue cell adds a skyblue cell at that location.  \n- A click on a cell that is orthogonally adjacent to both an active solid cell and a sandybrown cell causes the background to flip (black<->tan) and the active solid cells to swap color accordingly.  \n- Autonomous evolution (noop):  \n  - Skyblue cells move downward by one row each step. If the cell below is occupied, they move left by one column instead.  \n  - The active solid cells (tan when bg=black, black when bg=tan) undergo a deterministic transformation each step: the set of solid cells contracts by removing the cell with the smallest row and then smallest column, and simultaneously adds a new solid cell at the bottommost row and rightmost column of the region, maintaining connectivity. The exact rule can be derived from the observed transitions.  \n  - Sandybrown cells do not move autonomously.  \n- Green and red cells never change."
+    },
+    {
+      "node": 14,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise.\nOutput a concise (<2000 char) text summary of decision-relevant features.\nParse the grid from the last observation, detect background colour, and\nlist all non-background cells in a compact format.  Also compute the\ndifference (delta) from the previous observation if available, making\nthe action directly recoverable.  Include a step counter to disambiguate\nidentical grid configurations at different times.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] (rows of colour-name strings).\n\n    Anchor on the generic '[[' / ']]' so it works regardless of the header text.\n    Returns None on failure (caller degrades gracefully, never raises).\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start: end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid):\n    \"\"\"Return the colour that appears most frequently in the grid.\"\"\"\n    if not grid or not grid[0]:\n        return None\n    counter = Counter()\n    for row in grid:\n        counter.update(row)\n    return counter.most_common(1)[0][0]\n\n\ndef _cells_set(grid, bg):\n    \"\"\"Return a set of (colour, row, col) tuples for non-background cells.\"\"\"\n    cells = set()\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                cells.add((colour, r, c))\n    return cells\n\n\ndef _format_cells(cells):\n    \"\"\"Format a set of (colour, row, col) tuples into a compact string.\n\n    Group by colour, then list coordinates.\n    \"\"\"\n    by_colour = {}\n    for colour, r, c in cells:\n        by_colour.setdefault(colour, []).append((r, c))\n    parts = []\n    for colour in sorted(by_colour.keys()):\n        coords = \";\".join(f\"{r},{c}\" for r, c in sorted(by_colour[colour]))\n        parts.append(f\"{colour}:{coords}\")\n    return \"; \".join(parts)\n\n\ndef perceive(observation_history: list[str]) -> str:\n    # Get current observation\n    if not observation_history:\n        return \"error: empty history\"\n\n    step = len(observation_history)  # 1\u2011based step counter\n    current_obs = observation_history[-1]\n    current_grid = _parse_grid(current_obs)\n    if current_grid is None:\n        return f\"step={step} error: current grid parse failed\"\n\n    bg = _determine_background(current_grid)\n    if bg is None:\n        return f\"step={step} error: empty grid\"\n\n    rows = len(current_grid)\n    cols = len(current_grid[0]) if rows > 0 else 0\n    dims = f\"{rows}x{cols}\"\n\n    current_cells = _cells_set(current_grid, bg)\n\n    # Compute delta if we have a previous observation\n    delta_parts = []\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_bg = _determine_background(prev_grid)\n            if prev_bg is not None:\n                prev_cells = _cells_set(prev_grid, prev_bg)\n                added = current_cells - prev_cells\n                removed = prev_cells - current_cells\n                if added or removed:\n                    add_str = _format_cells(added) if added else \"\"\n                    rem_str = _format_cells(removed) if removed else \"\"\n                    d = \"delta:\"\n                    if add_str:\n                        d += f\"added:{add_str}\"\n                    if add_str and rem_str:\n                        d += \" \"\n                    if rem_str:\n                        d += f\"removed:{rem_str}\"\n                    delta_parts.append(d)\n\n    # Build current state summary\n    if current_cells:\n        cells_str = _format_cells(current_cells)\n    else:\n        cells_str = \"none\"\n\n    # Combine parts\n    parts = [f\"step={step}\", f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [f\"cells:{cells_str}\"]\n    output = \" \".join(parts)\n\n    # Ensure it is never empty (should be impossible)\n    if not output:\n        output = f\"step={step} bg={bg} dims={dims} cells:none\"\n\n    # Truncate if needed, preferring to keep step, bg, dims, delta and a compact cell count\n    if len(output) > 1999:\n        count = len(current_cells)\n        short_cells = f\"cells:{count}_non_bg\"\n        short_parts = [f\"step={step}\", f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [short_cells]\n        output = \" \".join(short_parts)\n        # If still too long, further trim delta parts\n        if len(output) > 1999:\n            if len(delta_parts) > 1:\n                delta_parts = delta_parts[:1]\n            output = \" \".join([f\"step={step}\", f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [short_cells])\n            if len(output) > 1999:\n                output = f\"step={step} bg={bg} dims={dims} cells:{count}_non_bg\"\n    return output",
+      "belief": "- The grid has a background color (bg) which is either black or tan.  \n- The state includes cells of colors: green (fixed at (0,7)), red (fixed at (0,2)), tan, black, sandybrown, skyblue.  \n- When bg=black, tan cells are the \"active\" solid cells; when bg=tan, black cells are the active solid cells.  \n- Clicking on an active solid cell removes it (turns to background).  \n- Clicking on a background cell that is orthogonally adjacent to an active solid cell adds an active solid cell at that location.  \n- Clicking on a background cell that is orthogonally adjacent to a sandybrown cell adds a sandybrown cell at that location.  \n- Clicking on a background cell that is orthogonally adjacent to a skyblue cell adds a skyblue cell at that location.  \n- A click on a cell that is orthogonally adjacent to both an active solid cell and a sandybrown cell causes the background to flip (black<->tan) and the active solid cells to swap color accordingly.  \n- Autonomous evolution (noop):  \n  - Skyblue cells move downward by one row each step. If the cell below is occupied, they move left by one column instead.  \n  - The active solid cells (tan when bg=black, black when bg=tan) undergo a deterministic transformation each step: the set of solid cells contracts by removing the cell with the smallest row and then smallest column, and simultaneously adds a new solid cell at the bottommost row and rightmost column of the region, maintaining connectivity. The exact rule can be derived from the observed transitions.  \n  - Sandybrown cells do not move autonomously.  \n- Green and red cells never change."
+    },
+    {
+      "node": 18,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise.\nOutput a concise (<2000 char) text summary of decision-relevant features.\nParses the grid from the last observation, determines background colour,\nand outputs a compact absolute representation (run\u2011length encoded) plus\nthe set of cells that changed compared to the previous observation (if any).\nEach call also includes a step counter to make every state unique.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] (rows of colour\u2011name strings).\n\n    Anchors on the generic '[[' / ']]' so it works regardless of header text.\n    Returns None on failure (caller degrades gracefully, never raises).\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start: end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid):\n    \"\"\"Return the colour that appears most frequently in the grid.\"\"\"\n    if not grid:\n        return None\n    counter = Counter()\n    for row in grid:\n        counter.update(row)\n    # Most common (if tie, arbitrary but deterministic)\n    return counter.most_common(1)[0][0]\n\n\ndef _compact_abs(grid, bg):\n    \"\"\"Return a compact string representation of non\u2011background cells.\n\n    Format: bg=<bg> <colour>:<row>,<col_start>-<col_end>  [...]\n    Runs are per row, per colour. Example:\n        bg=black tan:4,0-5;5,0-5 red:0,2\n    \"\"\"\n    # group by colour, then by row, then collect runs\n    groups = {}      # colour -> list of (row, start, end)\n    for r, row in enumerate(grid):\n        # find runs of non-bg cells in this row\n        c = 0\n        while c < len(row):\n            colour = row[c]\n            if colour == bg:\n                c += 1\n                continue\n            # start of a run\n            start = c\n            while c < len(row) and row[c] == colour:\n                c += 1\n            end = c - 1\n            groups.setdefault(colour, []).append((r, start, end))\n\n    parts = []\n    for colour in sorted(groups.keys()):\n        runs = groups[colour]\n        # sort runs by row, then start column\n        runs.sort(key=lambda x: (x[0], x[1]))\n        # encode: \"row,start-end\" or \"row,col\" if start==end\n        run_strs = []\n        for r, s, e in runs:\n            if s == e:\n                run_strs.append(f\"{r},{s}\")\n            else:\n                run_strs.append(f\"{r},{s}-{e}\")\n        parts.append(f\"{colour}:{';'.join(run_strs)}\")\n    if not parts:\n        return f\"bg={bg} abs:none\"\n    return f\"bg={bg} {' '.join(parts)}\"\n\n\ndef _cell_set(grid, bg):\n    \"\"\"Return a set of tuples (r, c, colour) for all non\u2011background cells.\"\"\"\n    cells = set()\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                cells.add((r, c, colour))\n    return cells\n\n\ndef _format_diff(added, removed):\n    \"\"\"Compact string: '+colour:r,c;... -colour:r,c;...'.\"\"\"\n    parts = []\n    if added:\n        # sort for determinism\n        sorted_add = sorted(added, key=lambda x: (x[2], x[0], x[1]))\n        add_str = \";\".join(f\"{colour}:{r},{c}\" for r, c, colour in sorted_add)\n        parts.append(f\"+{add_str}\")\n    if removed:\n        sorted_rem = sorted(removed, key=lambda x: (x[2], x[0], x[1]))\n        rem_str = \";\".join(f\"{colour}:{r},{c}\" for r, c, colour in sorted_rem)\n        parts.append(f\"-{rem_str}\")\n    return \" diff:\" + \" \".join(parts) if parts else \" diff:none\"\n\n\ndef perceive(observation_history: list[str]) -> str:\n    if not observation_history:\n        return \"step=0 error:empty\"\n\n    # step counter (makes every state unique)\n    step = len(observation_history)\n\n    # parse current grid\n    obs = observation_history[-1]\n    grid = _parse_grid(obs)\n    if grid is None:\n        return f\"step={step} error:grid_parse_failed\"\n\n    bg = _determine_background(grid)\n    if bg is None:\n        return f\"step={step} error:empty_grid\"\n\n    # compact absolute representation\n    abs_str = _compact_abs(grid, bg)\n\n    # compute difference with previous observation (if available)\n    diff_str = \"\"\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_bg = _determine_background(prev_grid)\n            if prev_bg is not None:\n                current_set = _cell_set(grid, bg)\n                prev_set = _cell_set(prev_grid, prev_bg)\n                added = current_set - prev_set\n                removed = prev_set - current_set\n                diff_str = _format_diff(added, removed)\n            else:\n                diff_str = \" diff:prev_bg_unknown\"\n        else:\n            diff_str = \" diff:prev_grid_parse_failed\"\n    else:\n        diff_str = \" diff:first_frame\"\n\n    features = f\"step={step} {abs_str}{diff_str}\"\n\n    # enforce length < 2000 (if too long, shorten absolute part)\n    if len(features) > 1999:\n        # keep only background, step, and diff; drop the absolute runs\n        # but we still need some absolute info \u2013 we can provide a count by colour\n        from collections import defaultdict\n        colour_counts = defaultdict(int)\n        for row in grid:\n            for cell in row:\n                if cell != bg:\n                    colour_counts[cell] += 1\n        count_str = \" \".join(f\"{c}:{n}\" for c, n in sorted(colour_counts.items()))\n        features = f\"step={step} bg={bg} counts:{count_str}{diff_str}\"\n        # if still too long, impossible, but we never raise \u2013 just drop diff\n        if len(features) > 1999:\n            features = features[:1996] + \"...\"\n\n    return features",
+      "belief": "- The grid has a background color (bg) which is either black or tan.  \n- The state includes cells of colors: green (fixed at (0,7)), red (fixed at (0,2)), tan, black, sandybrown, skyblue.  \n- When bg=black, tan cells are the \"active\" solid cells; when bg=tan, black cells are the active solid cells.  \n- Clicking on an active solid cell removes it (turns to background).  \n- Clicking on a background cell that is orthogonally adjacent to an active solid cell adds an active solid cell at that location.  \n- Clicking on a background cell that is orthogonally adjacent to a sandybrown cell adds a sandybrown cell at that location.  \n- Clicking on a background cell that is orthogonally adjacent to a skyblue cell adds a skyblue cell at that location.  \n- A click on a cell that is orthogonally adjacent to both an active solid cell and a sandybrown cell causes the background to flip (black<->tan) and the active solid cells to swap color accordingly.  \n- Autonomous evolution (noop):  \n  - Skyblue cells move downward by one row each step. If the cell below is occupied, they move left by one column instead.  \n  - The active solid cells (tan when bg=black, black when bg=tan) undergo a deterministic transformation each step: the set of solid cells contracts by removing the cell with the smallest row and then smallest column, and simultaneously adds a new solid cell at the bottommost row and rightmost column of the region, maintaining connectivity. The exact rule can be derived from the observed transitions.  \n  - Sandybrown cells do not move autonomously.  \n- Green and red cells never change."
+    },
+    {
+      "node": 22,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise.\nOutput a concise (<2000 char) text summary of decision-relevant features.\nParse the grid from the last observation, detect background colour, and\nlist all non-background cells in a compact format.  Also compute the\ndifference (delta) from the previous observation if available, making\nthe action directly recoverable.  Include a monotonically increasing\nstep counter to disambiguate identical grid configurations at different times.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n# Global step counter to provide a unique id for each call within the same process.\n_step_counter = 0\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] (rows of colour-name strings).\n\n    Anchor on the generic '[[' / ']]' so it works regardless of the header text.\n    Returns None on failure (caller degrades gracefully, never raises).\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start: end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\ndef _determine_background(grid):\n    \"\"\"Return the colour that appears most frequently in the grid.\"\"\"\n    if not grid or not grid[0]:\n        return None\n    counter = Counter()\n    for row in grid:\n        counter.update(row)\n    return counter.most_common(1)[0][0]\n\ndef _cells_set(grid, bg):\n    \"\"\"Return a set of (colour, row, col) tuples for non-background cells.\"\"\"\n    cells = set()\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                cells.add((colour, r, c))\n    return cells\n\ndef _format_cells(cells):\n    \"\"\"Format a set of (colour, row, col) tuples into a compact string.\n\n    Group by colour, then list coordinates.\n    \"\"\"\n    by_colour = {}\n    for colour, r, c in cells:\n        by_colour.setdefault(colour, []).append((r, c))\n    parts = []\n    for colour in sorted(by_colour.keys()):\n        coords = \";\".join(f\"{r},{c}\" for r, c in sorted(by_colour[colour]))\n        parts.append(f\"{colour}:{coords}\")\n    return \"; \".join(parts)\n\ndef perceive(observation_history: list[str]) -> str:\n    global _step_counter\n    _step_counter += 1\n    step = _step_counter  # use the global counter as a unique step id\n\n    # Get current observation\n    if not observation_history:\n        return f\"step={step} error: empty history\"\n\n    current_obs = observation_history[-1]\n    current_grid = _parse_grid(current_obs)\n    if current_grid is None:\n        return f\"step={step} error: current grid parse failed\"\n\n    bg = _determine_background(current_grid)\n    if bg is None:\n        return f\"step={step} error: empty grid\"\n\n    rows = len(current_grid)\n    cols = len(current_grid[0]) if rows > 0 else 0\n    dims = f\"{rows}x{cols}\"\n\n    current_cells = _cells_set(current_grid, bg)\n\n    # Compute delta if we have a previous observation\n    delta_parts = []\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_bg = _determine_background(prev_grid)\n            if prev_bg is not None:\n                prev_cells = _cells_set(prev_grid, prev_bg)\n                added = current_cells - prev_cells\n                removed = prev_cells - current_cells\n                if added or removed:\n                    add_str = _format_cells(added) if added else \"\"\n                    rem_str = _format_cells(removed) if removed else \"\"\n                    d = \"delta:\"\n                    if add_str:\n                        d += f\"added:{add_str}\"\n                    if add_str and rem_str:\n                        d += \" \"\n                    if rem_str:\n                        d += f\"removed:{rem_str}\"\n                    delta_parts.append(d)\n\n    # Build current state summary\n    if current_cells:\n        cells_str = _format_cells(current_cells)\n    else:\n        cells_str = \"none\"\n\n    # Combine parts\n    parts = [f\"step={step}\", f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [f\"cells:{cells_str}\"]\n    output = \" \".join(parts)\n\n    # Ensure it is never empty (should be impossible)\n    if not output:\n        output = f\"step={step} bg={bg} dims={dims} cells:none\"\n\n    # Truncate if needed, preferring to keep step, bg, dims, delta and a compact cell count\n    if len(output) > 1999:\n        count = len(current_cells)\n        short_cells = f\"cells:{count}_non_bg\"\n        short_parts = [f\"step={step}\", f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [short_cells]\n        output = \" \".join(short_parts)\n        # If still too long, further trim delta parts\n        if len(output) > 1999:\n            if len(delta_parts) > 1:\n                delta_parts = delta_parts[:1]\n            output = \" \".join([f\"step={step}\", f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [short_cells])\n            if len(output) > 1999:\n                output = f\"step={step} bg={bg} dims={dims} cells:{count}_non_bg\"\n    return output",
+      "belief": "- The grid has a background color (bg) which is either black or tan.  \n- The state includes cells of colors: green (fixed at (0,7)), red (fixed at (0,2)), tan, black, sandybrown, skyblue.  \n- When bg=black, tan cells are the \"active\" solid cells; when bg=tan, black cells are the active solid cells.  \n- Clicking on an active solid cell removes it (turns to background).  \n- Clicking on a background cell that is orthogonally adjacent to an active solid cell adds an active solid cell at that location.  \n- Clicking on a background cell that is orthogonally adjacent to a sandybrown cell adds a sandybrown cell at that location.  \n- Clicking on a background cell that is orthogonally adjacent to a skyblue cell adds a skyblue cell at that location.  \n- A click on a cell that is orthogonally adjacent to both an active solid cell and a sandybrown cell causes the background to flip (black<->tan) and the active solid cells to swap color accordingly.  \n- Autonomous evolution (noop):  \n  - Skyblue cells move downward by one row each step. If the cell below is occupied, they move left by one column instead.  \n  - The active solid cells (tan when bg=black, black when bg=tan) undergo a deterministic transformation each step: the set of solid cells contracts by removing the cell with the smallest row and then smallest column, and simultaneously adds a new solid cell at the bottommost row and rightmost column of the region, maintaining connectivity. The exact rule can be derived from the observed transitions.  \n  - Sandybrown cells do not move autonomously.  \n- Green and red cells never change."
+    },
+    {
+      "node": 24,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise.\nOutput a concise (<2000 char) text summary of decision-relevant features.\nParse the grid from the last observation, detect background colour, and\nlist all non-background cells in a compact format.  Also compute the\ndifference (delta) from the previous observation if available, making\nthe action directly recoverable.  Include a monotonically increasing\nstep counter to disambiguate identical grid configurations at different times.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n# Global step counter to provide a unique id for each call within the same process.\n_step_counter = 0\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] (rows of colour-name strings).\n\n    Anchor on the generic '[[' / ']]' so it works regardless of the header text.\n    Returns None on failure (caller degrades gracefully, never raises).\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start: end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\ndef _determine_background(grid):\n    \"\"\"Return the colour that appears most frequently in the grid.\"\"\"\n    if not grid or not grid[0]:\n        return None\n    counter = Counter()\n    for row in grid:\n        counter.update(row)\n    return counter.most_common(1)[0][0]\n\ndef _cells_set(grid, bg):\n    \"\"\"Return a set of (colour, row, col) tuples for non-background cells.\"\"\"\n    cells = set()\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                cells.add((colour, r, c))\n    return cells\n\ndef _format_cells(cells):\n    \"\"\"Format a set of (colour, row, col) tuples into a compact string.\n\n    Group by colour, then list coordinates.\n    \"\"\"\n    by_colour = {}\n    for colour, r, c in cells:\n        by_colour.setdefault(colour, []).append((r, c))\n    parts = []\n    for colour in sorted(by_colour.keys()):\n        coords = \";\".join(f\"{r},{c}\" for r, c in sorted(by_colour[colour]))\n        parts.append(f\"{colour}:{coords}\")\n    return \"; \".join(parts)\n\ndef perceive(observation_history: list[str]) -> str:\n    global _step_counter\n    _step_counter += 1\n    step = _step_counter  # use the global counter as a unique step id\n\n    # Get current observation\n    if not observation_history:\n        return f\"step={step} error: empty history\"\n\n    current_obs = observation_history[-1]\n    current_grid = _parse_grid(current_obs)\n    if current_grid is None:\n        return f\"step={step} error: current grid parse failed\"\n\n    bg = _determine_background(current_grid)\n    if bg is None:\n        return f\"step={step} error: empty grid\"\n\n    rows = len(current_grid)\n    cols = len(current_grid[0]) if rows > 0 else 0\n    dims = f\"{rows}x{cols}\"\n\n    current_cells = _cells_set(current_grid, bg)\n\n    # Compute delta if we have a previous observation\n    delta_parts = []\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_bg = _determine_background(prev_grid)\n            if prev_bg is not None:\n                prev_cells = _cells_set(prev_grid, prev_bg)\n                added = current_cells - prev_cells\n                removed = prev_cells - current_cells\n                if added or removed:\n                    add_str = _format_cells(added) if added else \"\"\n                    rem_str = _format_cells(removed) if removed else \"\"\n                    d = \"delta:\"\n                    if add_str:\n                        d += f\"added:{add_str}\"\n                    if add_str and rem_str:\n                        d += \" \"\n                    if rem_str:\n                        d += f\"removed:{rem_str}\"\n                    delta_parts.append(d)\n\n    # Build current state summary\n    if current_cells:\n        cells_str = _format_cells(current_cells)\n    else:\n        cells_str = \"none\"\n\n    # Combine parts\n    parts = [f\"step={step}\", f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [f\"cells:{cells_str}\"]\n    output = \" \".join(parts)\n\n    # Ensure it is never empty (should be impossible)\n    if not output:\n        output = f\"step={step} bg={bg} dims={dims} cells:none\"\n\n    # Truncate if needed, preferring to keep step, bg, dims, delta and a compact cell count\n    if len(output) > 1999:\n        count = len(current_cells)\n        short_cells = f\"cells:{count}_non_bg\"\n        short_parts = [f\"step={step}\", f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [short_cells]\n        output = \" \".join(short_parts)\n        # If still too long, further trim delta parts\n        if len(output) > 1999:\n            if len(delta_parts) > 1:\n                delta_parts = delta_parts[:1]\n            output = \" \".join([f\"step={step}\", f\"bg={bg}\", f\"dims={dims}\"] + delta_parts + [short_cells])\n            if len(output) > 1999:\n                output = f\"step={step} bg={bg} dims={dims} cells:{count}_non_bg\"\n    return output",
+      "belief": "- The grid has a background color (bg) which is either black or tan.  \n- Cells are of colors: green (fixed at (0,7)), red (fixed at (0,2)), tan, black, sandybrown, skyblue.  \n- When bg=black, tan cells are the \"active solid\" cells; when bg=tan, black cells are the active solid cells.  \n- Green and red cells never change.  \n- Autonomous evolution (noop):  \n  - Skyblue cells: move downward by one row each step. If the cell directly below is occupied by any non-background cell, they instead move left by one column.  \n  - Active solid cells: each step, if the cell directly below is background, that cell moves down one row (its previous cell becomes background). This is applied simultaneously. (Thus active solid cells fall like sand; no movement when the cell below is occupied or out of bounds.)  \n  - Sandybrown cells: do not move autonomously.  \n- Click actions:  \n  - If the clicked cell is an active solid cell:  \n    - If it is orthogonally adjacent to at least one sandybrown cell, it becomes sandybrown.  \n    - Otherwise, it becomes background.  \n  - If the clicked cell is a background cell:  \n    - If it is orthogonally adjacent to an active solid cell, it becomes an active solid cell.  \n    - Else if it is orthogonally adjacent to a sandybrown cell, it becomes sandybrown.  \n    - Else if it is orthogonally adjacent to a skyblue cell, it becomes skyblue.  \n    - Else (no orthogonal adjacency to any of the three types), consider the column of the clicked cell. Find the non\u2011background cell in that column with the largest row index (the bottommost cell). If such a cell exists, the clicked cell becomes that cell\u2019s color. If the column contains no non\u2011background cells, the click has no effect.  \n  - Clicks on cells that are not background and not active solid (e.g., sandybrown or skyblue) have no effect (not observed, but assumed).  \n- The background color never flips."
+    }
+  ]
+}

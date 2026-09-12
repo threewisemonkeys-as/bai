@@ -1,0 +1,52 @@
+{
+  "format": "Sketch 146, official schema @sketch-hq/sketch-file-format 6.5.0",
+  "figma_import_tested": false,
+  "checks": [
+    "Official JSON schema validation",
+    "Archive integrity and page-reference round trip",
+    "Every text fragment retained as a native text layer",
+    "Every game grid cell verified against source observations",
+    "Native geometry preview rendered from exported layer coordinates/styles"
+  ],
+  "figures": [
+    {
+      "game": "magnets",
+      "iterations": [
+        0,
+        4,
+        8
+      ],
+      "text_layers": 189,
+      "vector_layers": 210,
+      "grid_cells": [
+        42,
+        42,
+        42,
+        42
+      ],
+      "frame_width": 1188.0,
+      "frame_height": 1343.52,
+      "source_sha256": "72cb0f81ad074e6d7cf927e2afee4b870442eeea7cb73b496742cd4913c7e153"
+    },
+    {
+      "game": "grow",
+      "iterations": [
+        3,
+        12,
+        13,
+        27
+      ],
+      "text_layers": 175,
+      "vector_layers": 1066,
+      "grid_cells": [
+        256,
+        256,
+        256,
+        256
+      ],
+      "frame_width": 1188.0,
+      "frame_height": 1554.768,
+      "source_sha256": "c6fe20bbca3217ebc4e7b381dc9f58c6096f5f1c8cee0777a709d134bf399ea1"
+    }
+  ]
+}

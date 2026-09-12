@@ -1,0 +1,352 @@
+{
+  "game": "f5w3n",
+  "classification": "No clean qualifying case.",
+  "findings": [
+    "P1 labels orange as agent; later B updates repeatedly say gray is action-controlled while orange drifts. The useful agent role is not reliably recovered.",
+    "P13 off-screen last position needs history and returns agent unknown on empty single-frame observations.",
+    "P14 ap is active visibility, but no descendant B adopts ap as an improved mechanism; its B5 has false wrap and alternation rules.",
+    "P28 tags blue S=static and red F=fall down, despite blue motion and upward red projectiles; this is an active but incorrect semantic label, not useful learned mechanics.",
+    "Other changes are color counts/encodings, or inactive deltas."
+  ],
+  "saved_node": 20,
+  "saved_lineage": [
+    0,
+    1,
+    2,
+    5,
+    9,
+    13,
+    15,
+    20
+  ],
+  "candidate_path": "logs/2026-08-24/human_curated/rexpure/f5w3n_s1/rexpure_run_seed1/candidates.jsonl",
+  "process_path": "logs/2026-08-24/human_curated/rexpure/f5w3n_s1/rexpure_run_seed1/process_log.jsonl",
+  "candidates_reviewed": 30,
+  "candidates": [
+    {
+      "node": 0,
+      "parents": [],
+      "iteration": null,
+      "candidate_line": 1,
+      "process_line": null,
+      "train_score": 0.0
+    },
+    {
+      "node": 1,
+      "parents": [
+        0
+      ],
+      "iteration": 3,
+      "candidate_line": 2,
+      "process_line": 3,
+      "train_score": 0.03558558558558558
+    },
+    {
+      "node": 2,
+      "parents": [
+        1
+      ],
+      "iteration": 4,
+      "candidate_line": 3,
+      "process_line": 5,
+      "train_score": 0.39414414414414417
+    },
+    {
+      "node": 3,
+      "parents": [
+        1
+      ],
+      "iteration": 6,
+      "candidate_line": 4,
+      "process_line": 6,
+      "train_score": 0.0
+    },
+    {
+      "node": 4,
+      "parents": [
+        0
+      ],
+      "iteration": 7,
+      "candidate_line": 5,
+      "process_line": 8,
+      "train_score": 0.10765765765765765
+    },
+    {
+      "node": 5,
+      "parents": [
+        2
+      ],
+      "iteration": 8,
+      "candidate_line": 6,
+      "process_line": 9,
+      "train_score": 0.4702702702702703
+    },
+    {
+      "node": 6,
+      "parents": [
+        5
+      ],
+      "iteration": 10,
+      "candidate_line": 7,
+      "process_line": 10,
+      "train_score": 0.4689189189189189
+    },
+    {
+      "node": 7,
+      "parents": [
+        4
+      ],
+      "iteration": 11,
+      "candidate_line": 8,
+      "process_line": 11,
+      "train_score": 0.12072072072072072
+    },
+    {
+      "node": 8,
+      "parents": [
+        2
+      ],
+      "iteration": 12,
+      "candidate_line": 9,
+      "process_line": 12,
+      "train_score": 0.4725225225225225
+    },
+    {
+      "node": 9,
+      "parents": [
+        5
+      ],
+      "iteration": 16,
+      "candidate_line": 10,
+      "process_line": 17,
+      "train_score": 0.41486486486486485
+    },
+    {
+      "node": 10,
+      "parents": [
+        8
+      ],
+      "iteration": 18,
+      "candidate_line": 11,
+      "process_line": 18,
+      "train_score": 0.48693693693693696
+    },
+    {
+      "node": 11,
+      "parents": [
+        6
+      ],
+      "iteration": 19,
+      "candidate_line": 12,
+      "process_line": 19,
+      "train_score": 0.49504504504504504
+    },
+    {
+      "node": 12,
+      "parents": [
+        10
+      ],
+      "iteration": 20,
+      "candidate_line": 13,
+      "process_line": 20,
+      "train_score": 0.5468468468468468
+    },
+    {
+      "node": 13,
+      "parents": [
+        9
+      ],
+      "iteration": 21,
+      "candidate_line": 14,
+      "process_line": 21,
+      "train_score": 0.4594594594594595
+    },
+    {
+      "node": 14,
+      "parents": [
+        11
+      ],
+      "iteration": 23,
+      "candidate_line": 15,
+      "process_line": 23,
+      "train_score": 0.5675675675675677
+    },
+    {
+      "node": 15,
+      "parents": [
+        13
+      ],
+      "iteration": 24,
+      "candidate_line": 16,
+      "process_line": 24,
+      "train_score": 0.4846846846846847
+    },
+    {
+      "node": 16,
+      "parents": [
+        12
+      ],
+      "iteration": 25,
+      "candidate_line": 17,
+      "process_line": 26,
+      "train_score": 0.5711711711711711
+    },
+    {
+      "node": 17,
+      "parents": [
+        10
+      ],
+      "iteration": 26,
+      "candidate_line": 18,
+      "process_line": 27,
+      "train_score": 0.5346846846846847
+    },
+    {
+      "node": 18,
+      "parents": [
+        10
+      ],
+      "iteration": 28,
+      "candidate_line": 19,
+      "process_line": 28,
+      "train_score": 0.24324324324324326
+    },
+    {
+      "node": 19,
+      "parents": [
+        16
+      ],
+      "iteration": 29,
+      "candidate_line": 20,
+      "process_line": 29,
+      "train_score": 0.0
+    },
+    {
+      "node": 20,
+      "parents": [
+        15
+      ],
+      "iteration": 30,
+      "candidate_line": 21,
+      "process_line": 30,
+      "train_score": 0.5824324324324324
+    },
+    {
+      "node": 21,
+      "parents": [
+        17
+      ],
+      "iteration": 34,
+      "candidate_line": 22,
+      "process_line": 34,
+      "train_score": 0.33558558558558554
+    },
+    {
+      "node": 22,
+      "parents": [
+        14
+      ],
+      "iteration": 35,
+      "candidate_line": 23,
+      "process_line": 35,
+      "train_score": 0.5306306306306307
+    },
+    {
+      "node": 23,
+      "parents": [
+        13
+      ],
+      "iteration": 36,
+      "candidate_line": 24,
+      "process_line": 36,
+      "train_score": 0.5148648648648648
+    },
+    {
+      "node": 24,
+      "parents": [
+        15
+      ],
+      "iteration": 37,
+      "candidate_line": 25,
+      "process_line": 38,
+      "train_score": 0.4666666666666667
+    },
+    {
+      "node": 25,
+      "parents": [
+        18
+      ],
+      "iteration": 39,
+      "candidate_line": 26,
+      "process_line": 39,
+      "train_score": 0.0
+    },
+    {
+      "node": 26,
+      "parents": [
+        6
+      ],
+      "iteration": 40,
+      "candidate_line": 27,
+      "process_line": 41,
+      "train_score": 0.4666666666666667
+    },
+    {
+      "node": 27,
+      "parents": [
+        20
+      ],
+      "iteration": 42,
+      "candidate_line": 28,
+      "process_line": 42,
+      "train_score": 0.0
+    },
+    {
+      "node": 28,
+      "parents": [
+        22
+      ],
+      "iteration": 43,
+      "candidate_line": 29,
+      "process_line": 43,
+      "train_score": 0.4306306306306306
+    },
+    {
+      "node": 29,
+      "parents": [
+        26
+      ],
+      "iteration": 44,
+      "candidate_line": 30,
+      "process_line": 44,
+      "train_score": 0.5180180180180181
+    }
+  ],
+  "selected_records": [
+    {
+      "node": 1,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise.\nOutputs a compact summary of non-background cells and the agent's row/col,\nenabling action recovery from consecutive states.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] (rows of colour-name strings).\n\n    Anchor on the generic '[[' / ']]' so it works regardless of header text.\n    Returns None on failure (caller degrades gracefully).\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid):\n    \"\"\"Return the most frequent colour in the grid (the background).\"\"\"\n    # Flatten grid into a single list of colour names\n    colours = [cell for row in grid for cell in row]\n    if not colours:\n        return \"black\"  # fallback\n    counter = Counter(colours)\n    # Most common colour is the background\n    return counter.most_common(1)[0][0]\n\n\ndef perceive(observation_history: list[str]) -> str:\n    obs = observation_history[-1] if observation_history else \"\"\n    grid = _parse_grid(obs)\n    if grid is None:\n        return \"parse error, could not extract grid\"\n\n    try:\n        background = _determine_background(grid)\n    except Exception:\n        # If we can't determine background, treat as 'black' as last resort\n        background = \"black\"\n\n    agent_pos = None          # (row, col) of the \"orange\" cell (assumed agent)\n    other_cells = []          # list of (row, col, colour) for non-background, non-orange\n\n    try:\n        for r, row in enumerate(grid):\n            for c, colour in enumerate(row):\n                if colour == background:\n                    continue\n                if colour == \"orange\":\n                    # There should be only one orange cell; keep last one found\n                    agent_pos = (r, c)\n                else:\n                    other_cells.append((r, c, colour))\n    except Exception:\n        # defensive: if iteration fails, return a minimal summary\n        return \"grid error\"\n\n    # Sort other cells by row then col for deterministic output\n    other_cells.sort(key=lambda x: (x[0], x[1]))\n\n    # Build the output string, keeping it under 2000 characters\n    parts = []\n    if agent_pos is not None:\n        parts.append(f\"agent row={agent_pos[0]} col={agent_pos[1]}\")\n    if other_cells:\n        # Format other cells compactly\n        cell_strs = [f\"({r},{c},{col})\" for r, c, col in other_cells]\n        # If too long, truncate and indicate count\n        combined = \"; \".join(cell_strs)\n        if len(combined) > 1900:  # leave some room for the rest\n            # Show first few and note the total number\n            max_shown = 50\n            truncated = cell_strs[:max_shown]\n            truncated_str = \"; \".join(truncated)\n            parts.append(f\"others ({len(cell_strs)} total, first {max_shown}): {truncated_str}\")\n        else:\n            parts.append(f\"others: {combined}\")\n\n    # If nothing was found (all background or only orange, etc.)\n    if not parts:\n        return f\"background only: {background}\"\n\n    result = \" | \".join(parts)\n    # Final safety: ensure not too long\n    if len(result) > 2000:\n        result = result[:1997] + \"...\"\n    # Never return empty \u2013 the above should always produce something\n    return result if result else \"no features\"",
+      "belief": ""
+    },
+    {
+      "node": 13,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise.\nOutputs a compact summary of non-background cells and the agent's position,\nincluding when the agent is off-grid (using history to recover last known location).\nThis enables reliable action recovery from consecutive states.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] (rows of colour-name strings).\n\n    Anchor on the generic '[[' / ']]' so it works regardless of header text.\n    Returns None on failure (caller degrades gracefully).\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start: end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid):\n    \"\"\"Return the most frequent colour in the grid (the background).\"\"\"\n    colours = [cell for row in grid for cell in row]\n    if not colours:\n        return \"black\"  # fallback\n    counter = Counter(colours)\n    return counter.most_common(1)[0][0]\n\n\ndef _find_agent(grid):\n    \"\"\"Return (row, col) of the orange cell, or None if not present.\"\"\"\n    for r, row in enumerate(grid):\n        for c, col in enumerate(row):\n            if col == \"orange\":\n                return (r, c)\n    return None\n\n\ndef perceive(observation_history: list[str]) -> str:\n    # Always take the current observation\n    obs = observation_history[-1] if observation_history else \"\"\n    grid = _parse_grid(obs)\n    if grid is None:\n        return \"parse error, could not extract grid\"\n\n    try:\n        background = _determine_background(grid)\n    except Exception:\n        background = \"black\"\n\n    agent_pos = None  # (r, c) if on grid\n    # Look for orange in current grid\n    agent_pos = _find_agent(grid)\n\n    other_cells = []\n    try:\n        for r, row in enumerate(grid):\n            for c, colour in enumerate(row):\n                if colour == background:\n                    continue\n                if colour == \"orange\":\n                    continue  # already handled\n                other_cells.append((r, c, colour))\n    except Exception:\n        return \"grid error\"\n\n    # If agent is off-grid, recover its last known position from history\n    if agent_pos is None:\n        # Search backwards through history for the most recent orange\n        for i in range(len(observation_history) - 2, -1, -1):\n            prev_obs = observation_history[i]\n            prev_grid = _parse_grid(prev_obs)\n            if prev_grid is not None:\n                prev_agent = _find_agent(prev_grid)\n                if prev_agent is not None:\n                    agent_pos = (\"off\", prev_agent[0], prev_agent[1])\n                    break\n        # If still not found, leave as None (unknown)\n        # In practice, game always starts with agent visible, so this is safe.\n\n    # Sort other cells deterministically\n    other_cells.sort(key=lambda x: (x[0], x[1]))\n\n    # Build output\n    parts = []\n    if agent_pos is not None:\n        if isinstance(agent_pos, tuple) and agent_pos[0] != \"off\":\n            r, c = agent_pos\n            parts.append(f\"agent row={r} col={c}\")\n        else:\n            # agent off : stored as (\"off\", r, c)\n            parts.append(f\"agent off last row={agent_pos[1]} col={agent_pos[2]}\")\n    else:\n        # Truly unknown - this shouldn't happen in practice, but be safe\n        parts.append(\"agent unknown\")\n\n    if other_cells:\n        cell_strs = [f\"({r},{c},{col})\" for r, c, col in other_cells]\n        combined = \"; \".join(cell_strs)\n        if len(combined) > 1900:  # leave room for rest\n            max_shown = 50\n            truncated = cell_strs[:max_shown]\n            truncated_str = \"; \".join(truncated)\n            parts.append(f\"others ({len(cell_strs)} total, first {max_shown}): {truncated_str}\")\n        else:\n            parts.append(f\"others: {combined}\")\n\n    # Ensure result is never empty\n    result = \" | \".join(parts)\n    if not result:\n        result = \"grid error\"\n    elif len(result) > 2000:\n        result = result[:1997] + \"...\"\n    return result",
+      "belief": "- The agent's row increases by exactly 1 each timestep regardless of action. When the agent's row is 15, the next row and column depend on the action: \n  - `up`: row becomes 3, column unchanged.\n  - `right`: row becomes 1, column decreases by 1.\n  - `left`: row becomes 3, column unchanged.\n  - `noop`: the agent becomes off\u2011grid (not shown) and reappears at row=1 after two subsequent timesteps (the exact re\u2011entry point varies with the environment; when re\u2011entering, the agent's column is the same as the column it had before going off\u2011grid).\n  - `down` and `click` follow the standard rules (down would increase row further, but this case is not observed; click teleports instantly).\n- Red objects (any non\u2011blue, non\u2011gray object) always have their row decreased by exactly 1 each timestep, independent of the action taken. If the resulting row would be < 0, the object disappears.\n- Blue objects alternate between two fixed sets of positions, switching each timestep (the set depends on the parity of the step number or agent row). Additionally, if the agent occupies a cell that currently contains a blue object, that blue object is not visible (removed) while the agent is on that cell and reappears when the agent moves away.\n- Gray objects move according to the action:\n  - `up`: gray's row decreases by 1 (if < 0, disappears)\n  - `down`: gray's row increases by 1 (if > 15, disappears)\n  - `left`: gray's column decreases by 1 (if < 0, disappears)\n  - `right`: gray's column increases by 1 (if > 15, disappears)\n  - `noop`: gray's position does not change\n  - `click ROW COL`: gray's position is unaffected\n- Additionally, when the agent executes an `up` action, any gray object present at that timestep turns into a red object at the same cell. This transformation happens immediately (the gray disappears and a red appears in its place) and the new red then follows the normal red\u2011object movement rule on subsequent steps."
+    },
+    {
+      "node": 14,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise.\nOutputs a compact but discriminative summary of all non\u2011background cells,\nthe agent\u2019s presence/position, and the delta from the previous state.\nThe output is designed so that consecutive states uniquely determine the action.\n\nOutput format (|\u2011separated), total <2000 chars:\n  bg=<colour>|a(r,c) or a(none)|ap=T/F|er=<expected_row> (if applicable)|others=<list>|delta=<list>\nwhere <list> uses (r,c,colour) and delta uses +/\u2011/~ prefixes.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] (rows of colour-name strings).\n    Returns None on any parse failure.\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start: end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\ndef _determine_background(grid):\n    \"\"\"Return the most frequent colour in the grid (the background).\"\"\"\n    colours = [cell for row in grid for cell in row]\n    if not colours:\n        return \"black\"\n    counter = Counter(colours)\n    return counter.most_common(1)[0][0]\n\ndef _extract_cells(grid, background):\n    \"\"\"Return a dict {(r,c): colour, ...} for all non\u2011background cells.\"\"\"\n    cells = {}\n    try:\n        for r, row in enumerate(grid):\n            for c, colour in enumerate(row):\n                if colour != background:\n                    cells[(r, c)] = colour\n    except Exception:\n        pass\n    return cells\n\ndef _format_cell_list(cells_dict):\n    \"\"\"Format a dict of non\u2011agent cells into a compact string.\n    Returns 'none' if empty.\"\"\"\n    if not cells_dict:\n        return \"none\"\n    items = sorted(cells_dict.items(), key=lambda x: (x[0][0], x[0][1]))\n    parts = [f\"({r},{c},{col})\" for (r, c), col in items]\n    return \";\".join(parts)\n\ndef _format_delta(added, removed, changed):\n    \"\"\"Format delta changes into a compact string.\n    added : dict (r,c)->colour\n    removed : dict (r,c)->colour\n    changed : dict (r,c)->(old,new)\n    Returns string like '+(...);~(...);-(...)' or 'none'.\"\"\"\n    parts = []\n    for (r, c), col in sorted(removed.items(), key=lambda x: (x[0][0], x[0][1])):\n        parts.append(f\"-({r},{c},{col})\")\n    for (r, c), (old, new) in sorted(changed.items(), key=lambda x: (x[0][0], x[0][1])):\n        parts.append(f\"~({r},{c},{old}->{new})\")\n    for (r, c), col in sorted(added.items(), key=lambda x: (x[0][0], x[0][1])):\n        parts.append(f\"+({r},{c},{col})\")\n    return \";\".join(parts) if parts else \"none\"\n\ndef perceive(observation_history: list[str]) -> str:\n    # ---------- parse current observation ----------\n    obs_cur = observation_history[-1] if observation_history else \"\"\n    grid_cur = _parse_grid(obs_cur)\n    if grid_cur is None:\n        return \"bg=unknown|a(none)|ap=F|others=none|delta=none\"\n\n    try:\n        bg = _determine_background(grid_cur)\n    except Exception:\n        bg = \"black\"\n\n    cells_cur = _extract_cells(grid_cur, bg)\n\n    # Separate agent (orange)\n    agent_cur = None\n    others_cur = {}\n    for (r, c), col in cells_cur.items():\n        if col == \"orange\":\n            agent_cur = (r, c)\n        else:\n            others_cur[(r, c)] = col\n\n    # ---------- build current state string ----------\n    agent_str = f\"a({agent_cur[0]},{agent_cur[1]})\" if agent_cur is not None else \"a(none)\"\n    ap_str = \"ap=T\" if agent_cur is not None else \"ap=F\"\n    others_str = _format_cell_list(others_cur)\n\n    # Expected row (if previous state had an agent)\n    er_str = \"\"\n    if len(observation_history) >= 2:\n        obs_prev = observation_history[-2]\n        grid_prev = _parse_grid(obs_prev)\n        if grid_prev is not None:\n            try:\n                bg_prev = _determine_background(grid_prev)\n            except Exception:\n                bg_prev = bg\n            cells_prev = _extract_cells(grid_prev, bg_prev)\n            # find agent in previous\n            prev_agent = None\n            for (r, c), col in cells_prev.items():\n                if col == \"orange\":\n                    prev_agent = (r, c)\n                    break\n            if prev_agent is not None:\n                if prev_agent[0] == 15:\n                    expected_row = 1\n                else:\n                    expected_row = prev_agent[0] + 1\n                er_str = f\"er={expected_row}\"\n\n    cur_part = f\"bg={bg}|{agent_str}|{ap_str}\"\n    if er_str:\n        cur_part += f\"|{er_str}\"\n    cur_part += f\"|others={others_str}\"\n\n    # ---------- compute delta ----------\n    delta_str = \"delta=none\"\n    if len(observation_history) >= 2:\n        obs_prev = observation_history[-2]\n        grid_prev = _parse_grid(obs_prev)\n        if grid_prev is not None:\n            try:\n                bg_prev = _determine_background(grid_prev)\n            except Exception:\n                bg_prev = bg\n            cells_prev = _extract_cells(grid_prev, bg_prev)\n\n            added = {}\n            removed = {}\n            changed = {}\n            keys_cur = set(cells_cur.keys())\n            keys_prev = set(cells_prev.keys())\n            for k in keys_cur - keys_prev:\n                added[k] = cells_cur[k]\n            for k in keys_prev - keys_cur:\n                removed[k] = cells_prev[k]\n            for k in keys_cur & keys_prev:\n                if cells_cur[k] != cells_prev[k]:\n                    changed[k] = (cells_prev[k], cells_cur[k])\n            d = _format_delta(added, removed, changed)\n            if d != \"none\":\n                delta_str = f\"delta={d}\"\n\n    result = f\"{cur_part}|{delta_str}\"\n\n    # ---------- length safety ----------\n    if len(result) > 2000:\n        # Truncate the \"others\" part first\n        # Rebuild without others, then add a hash or truncated version\n        base = f\"bg={bg}|{agent_str}|{ap_str}\"\n        if er_str:\n            base += f\"|{er_str}\"\n        base += \"|others=\"\n        # Keep delta intact\n        tail = f\"|{delta_str}\"\n        max_others = 2000 - len(base) - len(tail) - 5  # margin\n        if max_others > 0:\n            truncated_others = others_str[:max_others] + \"...\"\n            result = base + truncated_others + tail\n        else:\n            # Drop others entirely\n            result = f\"{base}TRUNC|{tail}\"\n    if not result:\n        result = \"bg=unknown|a(none)|ap=F|others=none|delta=none\"\n    return result",
+      "belief": "- The agent's row increases by exactly 1 each timestep regardless of action. When the agent's row is 15, the next row becomes 1 and the column decreases by 1 (this column change only occurs on that wrap transition). The agent's column is otherwise unchanged by up, down, left, right, or noop; click instantly moves the agent to the given (row, col).\n- Red objects (any non\u2011blue, non\u2011gray object) always have their row decreased by exactly 1 each timestep, independent of the action taken. If the resulting row would be < 0, the object disappears.\n- Blue objects follow a periodic pattern: they alternate each timestep between two fixed sets of positions. Which set appears depends solely on the parity of the agent's row (or equivalently, step number mod 2). Blue objects are not affected by any action.\n- Gray objects are the only objects whose position changes depend on the action:\n  - `up`: gray's row decreases by 1 (if < 0, disappears)\n  - `down`: gray's row increases by 1 (if > 15, disappears)\n  - `left`: gray's column decreases by 1 (if < 0, disappears)\n  - `right`: gray's column increases by 1 (if > 15, disappears)\n  - `noop`: gray's position does not change\n  - `click ROW COL`: gray's position is unaffected"
+    },
+    {
+      "node": 28,
+      "perception": "\"\"\"\nPerception module for grid environments.\nOutputs a compact but fully discriminative summary of all non\u2011background cells,\nthe agent's presence/position, the delta from the previous observation, and\na behavioural type label for each colour (where known) to assist inverse dynamics.\nThe output is designed so that consecutive states (with delta) uniquely determine\nthe action taken, even when evidence lies several steps away.\n\nOutput format (|\u2011separated), total <2000 chars:\n  bg=<colour>|a(r,c) or a(none)|ap=T/F|others=<list>|delta=<list>\nwhere <list> uses (r,c,colour:type) and delta uses +/\u2011/~ prefixes.\nType abbreviations:\n  S = static (blue)\n  F = fall (red) \u2013 moves down each step\n  M = move (gray) \u2013 moves on directional actions\n  A = agent (orange) \u2013 moves one row down each step, reacts to actions\n  U = unknown (other colours)\nIf a colour is not recognised, the type is omitted (just colour name).\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n# Known colour-to-behaviour mapping (can be extended)\nCOLOUR_BEHAVIOUR = {\n    \"blue\": \"S\",\n    \"red\": \"F\",\n    \"gray\": \"M\",\n    \"grey\": \"M\",\n    \"orange\": \"A\",\n}\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] (rows of colour-name strings).\n    Returns None on any parse failure.\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start: end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\ndef _determine_background(grid):\n    \"\"\"Return the most frequent colour in the grid (the background).\"\"\"\n    colours = [cell for row in grid for cell in row]\n    if not colours:\n        return \"black\"\n    counter = Counter(colours)\n    return counter.most_common(1)[0][0]\n\ndef _extract_cells(grid, background):\n    \"\"\"Return a dict {(r,c): colour, ...} for all non\u2011background cells.\"\"\"\n    cells = {}\n    try:\n        for r, row in enumerate(grid):\n            for c, colour in enumerate(row):\n                if colour != background:\n                    cells[(r, c)] = colour\n    except Exception:\n        pass\n    return cells\n\ndef _cell_tag(colour):\n    \"\"\"Return a compact tag for a colour (e.g. 'blue:S', 'orange:A').\"\"\"\n    tag = COLOUR_BEHAVIOUR.get(colour.lower())\n    return f\"{colour}:{tag}\" if tag else colour\n\ndef _format_cell_list(cells_dict):\n    \"\"\"Format a dict of cells into a compact string with behavioural tags.\n    Returns 'none' if empty.\"\"\"\n    if not cells_dict:\n        return \"none\"\n    items = sorted(cells_dict.items(), key=lambda x: (x[0][0], x[0][1]))\n    parts = [f\"({r},{c},{_cell_tag(col)})\" for (r, c), col in items]\n    return \";\".join(parts)\n\ndef _format_delta(added, removed, changed):\n    \"\"\"Format delta changes into a compact string.\n    added : dict (r,c)->colour\n    removed : dict (r,c)->colour\n    changed : dict (r,c)->(old,new)\n    Returns string like '+(...);~(...);-(...)' or 'none'.\"\"\"\n    parts = []\n    for (r, c), col in sorted(removed.items(), key=lambda x: (x[0][0], x[0][1])):\n        parts.append(f\"-({r},{c},{_cell_tag(col)})\")\n    for (r, c), (old, new) in sorted(changed.items(), key=lambda x: (x[0][0], x[0][1])):\n        parts.append(f\"~({r},{c},{_cell_tag(old)}->{_cell_tag(new)})\")\n    for (r, c), col in sorted(added.items(), key=lambda x: (x[0][0], x[0][1])):\n        parts.append(f\"+({r},{c},{_cell_tag(col)})\")\n    return \";\".join(parts) if parts else \"none\"\n\ndef perceive(observation_history: list[str]) -> str:\n    # --- parse current observation ---\n    obs_cur = observation_history[-1] if observation_history else \"\"\n    grid_cur = _parse_grid(obs_cur)\n    if grid_cur is None:\n        return \"bg=unknown|a(none)|ap=F|others=none|delta=none\"\n\n    try:\n        bg = _determine_background(grid_cur)\n    except Exception:\n        bg = \"black\"\n\n    cells_cur = _extract_cells(grid_cur, bg)\n\n    # separate agent (orange) from others\n    agent_cur = None\n    others_cur = {}\n    for (r, c), col in cells_cur.items():\n        if col.lower() == \"orange\":\n            agent_cur = (r, c)\n        else:\n            others_cur[(r, c)] = col\n\n    agent_str = f\"a({agent_cur[0]},{agent_cur[1]})\" if agent_cur is not None else \"a(none)\"\n    ap_str = \"ap=T\" if agent_cur is not None else \"ap=F\"\n    others_str = _format_cell_list(others_cur)\n\n    # --- compute delta from previous observation (if available) ---\n    delta_str = \"delta=none\"\n    if len(observation_history) >= 2:\n        obs_prev = observation_history[-2]\n        grid_prev = _parse_grid(obs_prev)\n        if grid_prev is not None:\n            try:\n                bg_prev = _determine_background(grid_prev)\n            except Exception:\n                bg_prev = bg\n            cells_prev = _extract_cells(grid_prev, bg_prev)\n\n            # delta over all cells (including agent)\n            added = {}\n            removed = {}\n            changed = {}\n            keys_cur = set(cells_cur.keys())\n            keys_prev = set(cells_prev.keys())\n            for k in keys_cur - keys_prev:\n                added[k] = cells_cur[k]\n            for k in keys_prev - keys_cur:\n                removed[k] = cells_prev[k]\n            for k in keys_cur & keys_prev:\n                if cells_cur[k] != cells_prev[k]:\n                    changed[k] = (cells_prev[k], cells_cur[k])\n            d = _format_delta(added, removed, changed)\n            if d != \"none\":\n                delta_str = f\"delta={d}\"\n\n    result = f\"bg={bg}|{agent_str}|{ap_str}|others={others_str}|{delta_str}\"\n\n    # --- length safety (truncate others if needed) ---\n    if len(result) > 2000:\n        # keep everything except others, truncate others\n        base = f\"bg={bg}|{agent_str}|{ap_str}|others=\"\n        tail = f\"|{delta_str}\"\n        max_others = 2000 - len(base) - len(tail) - 5  # margin for \"...\"\n        if max_others > 0:\n            truncated_others = others_str[:max_others] + \"...\"\n            result = base + truncated_others + tail\n        else:\n            # fallback: drop others completely\n            result = base + \"TRUNC\" + tail\n\n    if not result:\n        result = \"bg=unknown|a(none)|ap=F|others=none|delta=none\"\n    return result",
+      "belief": "- The agent's row increases by exactly 1 each timestep regardless of action. When the agent's row is 15, the next row becomes 1 and the column decreases by 1 (this column change only occurs on that wrap transition). The agent's column is otherwise unchanged by up, down, left, right, or noop; click instantly moves the agent to the given (row, col).\n- Red objects (any non\u2011blue, non\u2011gray object) always have their row decreased by exactly 1 each timestep, independent of the action taken. If the resulting row would be < 0, the object disappears.\n- Blue objects follow a periodic pattern: they alternate each timestep between two fixed sets of positions. Which set appears depends solely on the parity of the agent's row (or equivalently, step number mod 2). Blue objects are not affected by any action.\n- Gray objects are the only objects whose position changes depend on the action:\n  - `up`: gray's row decreases by 1 (if < 0, disappears)\n  - `down`: gray's row increases by 1 (if > 15, disappears)\n  - `left`: gray's column decreases by 1 (if < 0, disappears)\n  - `right`: gray's column increases by 1 (if > 15, disappears)\n  - `noop`: gray's position does not change\n  - `click ROW COL`: gray's position is unaffected"
+    },
+    {
+      "node": 29,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise.\nOutputs a compact but lossless summary of all non-background cells (including agent)\nso that consecutive states uniquely determine the action taken.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] (rows of colour-name strings).\n\n    Anchor on the generic '[[ ... ]]' so it works regardless of header text.\n    Returns None on failure (caller degrades gracefully).\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start: end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _determine_background(grid):\n    \"\"\"Return the most frequent colour in the grid (the background).\"\"\"\n    colours = [cell for row in grid for cell in row]\n    if not colours:\n        return \"black\"  # fallback\n    counter = Counter(colours)\n    return counter.most_common(1)[0][0]\n\n\ndef perceive(observation_history: list[str]) -> str:\n    obs = observation_history[-1] if observation_history else \"\"\n    grid = _parse_grid(obs)\n    if grid is None:\n        return \"bg=unknown; agent=none\"   # graceful fallback\n\n    try:\n        background = _determine_background(grid)\n    except Exception:\n        background = \"black\"\n\n    agent_pos = None          # (row, col) of the \"orange\" cell\n    other_cells = []          # list of (row, col, colour)\n\n    try:\n        for r, row in enumerate(grid):\n            for c, colour in enumerate(row):\n                if colour == background:\n                    continue\n                if colour == \"orange\":\n                    agent_pos = (r, c)   # there should be only one, but keep last\n                else:\n                    other_cells.append((r, c, colour))\n    except Exception:\n        return \"bg=unknown; agent=error; others=parse_fail\"\n\n    # Sort other cells deterministically\n    other_cells.sort(key=lambda x: (x[0], x[1]))\n\n    # Build output string \u2013 compact but complete, <2000 chars\n    parts = [f\"bg={background}\"]\n\n    # Agent field (always present, even if None)\n    if agent_pos is not None:\n        parts.append(f\"a({agent_pos[0]},{agent_pos[1]})\")\n    else:\n        parts.append(\"a(none)\")\n\n    # Other cells \u2013 add them all, no truncation unless absolutely necessary\n    if other_cells:\n        # Format: c(r,c,col); ...  (no spaces after semicolon)\n        cell_strs = [f\"c({r},{c},{col})\" for r, c, col in other_cells]\n        combined = \";\".join(cell_strs)\n        # Check length; if it would exceed 2000 chars (including parts and separators),\n        # we need to truncate, but first try to compress a bit more:\n        # we can drop the \"c\" prefix (\"(r,c,col)\" alone is still unique)\n        if len(combined) > 1800:   # leave room for header and separators\n            # Fallback: use minimal format without 'c'\n            alt_cell_strs = [f\"({r},{c},{col})\" for r, c, col in other_cells]\n            combined = \";\".join(alt_cell_strs)\n        if len(combined) > 1900:\n            # Still too long \u2013 truncate but keep the count\n            max_cells = 80   # arbitrary, likely enough\n            truncated = alt_cell_strs[:max_cells]\n            combined = \";\".join(truncated) + f\";...({len(other_cells)} total)\"\n        parts.append(f\"others:{combined}\")\n    else:\n        parts.append(\"others:none\")\n\n    result = \"|\".join(parts)\n\n    # Final safety: ensure not too long and never empty\n    if len(result) > 2000:\n        # Last resort: truncate whole string at character level\n        result = result[:1997] + \"...\"\n    return result if result else \"bg=unknown; agent=none; others=none\"",
+      "belief": "- The agent's row increases by exactly 1 each timestep regardless of action, except when the agent's row is 15. At row 15, the transition depends on the action and involves a wrap to row 1 with a column change that depends on the action and an internal step counter: 'right' -> new row = 1, new column = current column - 1; 'up' -> new row = 1, new column = current column + 1? (observed (15,13)->(1,14) and (15,14)->(1,13)); 'left' -> not observed from row 15 but from row 14 left moves to row 15; 'down' -> not observed; 'noop' -> the agent disappears for one or more steps, then reappears at row 1 with column determined by the step counter.\n- Red objects (any non\u2011blue, non\u2011gray object) always have their row decreased by exactly 1 each timestep, independent of the action. If the resulting row would be < 0, the object disappears.\n- Blue objects form two fixed patterns: Pattern A: row 1 at columns 1,4,7,10,13; row 3 at columns 2,5,8,11,14. Pattern B: row 1 at columns 2,5,8,11,14; row 3 at columns 1,4,7,10,13. The pattern switches to the other pattern whenever the agent is absent (i.e., there is no a(...) in the state). When the agent occupies a cell that would be a blue object in the current pattern, that blue object is not reported in the observation.\n- Gray objects are the only objects whose position changes depend on the action:\n  * 'up'   -> gray's row decreases by 1. If the gray is at row 15, it becomes a red object at the same location and the gray disappears.\n  * 'down' -> gray's row increases by 1 (if row > 15, disappears)\n  * 'left' -> gray's column decreases by 1 (if column < 0, disappears)\n  * 'right'-> gray's column increases by 1 (if column > 15, disappears)\n  * 'noop' -> gray's position does not change\n  * 'click ROW COL' -> gray's position is unaffected\n- A gray object can appear at (15, something) when a left action is taken and no gray is currently present (observed from Example 2). The exact column is determined by the action and the current state.\n- When a gray object moves out of bounds, it disappears.\n- The agent disappears (becomes absent) when it is at row 15 and a noop action is taken. It may also disappear under other conditions not yet observed.\n\n<changes>\n- Revised blue pattern rule: replaced \"blue objects form two fixed patterns; they remain constant ... until the agent's row wraps from 15\" with \"Blue objects form two fixed patterns ... The pattern switches to the other pattern whenever the agent is absent.\" (motivated by Example 6 inverse mistake and contrastive feedback).\n- Added rule for gray becoming red: \"'up' -> ... If the gray is at row 15, it becomes a red object at the same location and the gray disappears.\" (motivated by Example 4 inverse mistake and contrastive feedback).\n- Added explicit note about blue objects not being reported when the agent occupies their cell, based on observed states (e.g., Example 8 where blue at (3,13) missing when agent at (3,13)).\n- Removed the previous vague \"noop may disappear for one or more steps\" and replaced with specific condition: agent disappears when at row 15 and noop is taken (observed in Example 3).\n- Added observation about gray appearing on left action (from Example 2).\n</changes>"
+    }
+  ]
+}

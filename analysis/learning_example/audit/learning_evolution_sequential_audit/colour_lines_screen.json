@@ -1,0 +1,342 @@
+{
+  "game": "colour_lines",
+  "classification": "No qualifying semantic feature-to-rule case.",
+  "findings": [
+    "P3/4/11/12/16/18/28 motion/identity features require prior observations; under actual evaluation velocities are zero, every object is new, and IDs are reassigned.",
+    "P24 introduces n/m/s status but every visible cell is n with one-frame history.",
+    "Descendant B29 mentions compact tokens Un and en but mistakes them for uncolored and colored states: U is purple, e is green, n is new. This is erroneous decoding, not semantic learning.",
+    "P20/23 color counts are active but not followed by a B update using them; no row/line completion or reachability feature is learned."
+  ],
+  "saved_node": 12,
+  "saved_lineage": [
+    0,
+    1,
+    9,
+    12
+  ],
+  "candidate_path": "logs/2026-08-24/human_curated/rexpure/colour_lines_s1/rexpure_run_seed1/candidates.jsonl",
+  "process_path": "logs/2026-08-24/human_curated/rexpure/colour_lines_s1/rexpure_run_seed1/process_log.jsonl",
+  "candidates_reviewed": 30,
+  "candidates": [
+    {
+      "node": 0,
+      "parents": [],
+      "iteration": null,
+      "candidate_line": 1,
+      "process_line": null,
+      "train_score": 0.0
+    },
+    {
+      "node": 1,
+      "parents": [
+        0
+      ],
+      "iteration": 1,
+      "candidate_line": 2,
+      "process_line": 2,
+      "train_score": 0.07003296703296703
+    },
+    {
+      "node": 2,
+      "parents": [
+        0
+      ],
+      "iteration": 2,
+      "candidate_line": 3,
+      "process_line": 3,
+      "train_score": 0.0
+    },
+    {
+      "node": 3,
+      "parents": [
+        1
+      ],
+      "iteration": 6,
+      "candidate_line": 4,
+      "process_line": 6,
+      "train_score": 0.05671428571428572
+    },
+    {
+      "node": 4,
+      "parents": [
+        3
+      ],
+      "iteration": 7,
+      "candidate_line": 5,
+      "process_line": 8,
+      "train_score": 0.05007326007326007
+    },
+    {
+      "node": 5,
+      "parents": [
+        0
+      ],
+      "iteration": 9,
+      "candidate_line": 6,
+      "process_line": 9,
+      "train_score": 0.07005128205128204
+    },
+    {
+      "node": 6,
+      "parents": [
+        4
+      ],
+      "iteration": 10,
+      "candidate_line": 7,
+      "process_line": 12,
+      "train_score": 0.0
+    },
+    {
+      "node": 7,
+      "parents": [
+        6
+      ],
+      "iteration": 13,
+      "candidate_line": 8,
+      "process_line": 14,
+      "train_score": 0.033351648351648354
+    },
+    {
+      "node": 8,
+      "parents": [
+        0
+      ],
+      "iteration": 14,
+      "candidate_line": 9,
+      "process_line": 15,
+      "train_score": 0.0366996336996337
+    },
+    {
+      "node": 9,
+      "parents": [
+        1
+      ],
+      "iteration": 16,
+      "candidate_line": 10,
+      "process_line": 16,
+      "train_score": 0.36690476190476196
+    },
+    {
+      "node": 10,
+      "parents": [
+        1
+      ],
+      "iteration": 17,
+      "candidate_line": 11,
+      "process_line": 17,
+      "train_score": 0.07341758241758242
+    },
+    {
+      "node": 11,
+      "parents": [
+        6
+      ],
+      "iteration": 18,
+      "candidate_line": 12,
+      "process_line": 18,
+      "train_score": 0.033424908424908424
+    },
+    {
+      "node": 12,
+      "parents": [
+        9
+      ],
+      "iteration": 19,
+      "candidate_line": 13,
+      "process_line": 19,
+      "train_score": 0.46684981684981686
+    },
+    {
+      "node": 13,
+      "parents": [
+        9
+      ],
+      "iteration": 20,
+      "candidate_line": 14,
+      "process_line": 20,
+      "train_score": 0.29417032967032963
+    },
+    {
+      "node": 14,
+      "parents": [
+        3
+      ],
+      "iteration": 21,
+      "candidate_line": 15,
+      "process_line": 21,
+      "train_score": 0.06339194139194139
+    },
+    {
+      "node": 15,
+      "parents": [
+        13
+      ],
+      "iteration": 22,
+      "candidate_line": 16,
+      "process_line": 22,
+      "train_score": 0.3369010989010989
+    },
+    {
+      "node": 16,
+      "parents": [
+        12
+      ],
+      "iteration": 23,
+      "candidate_line": 17,
+      "process_line": 23,
+      "train_score": 0.3585805860805861
+    },
+    {
+      "node": 17,
+      "parents": [
+        13
+      ],
+      "iteration": 24,
+      "candidate_line": 18,
+      "process_line": 24,
+      "train_score": 0.25358608058608056
+    },
+    {
+      "node": 18,
+      "parents": [
+        10
+      ],
+      "iteration": 26,
+      "candidate_line": 19,
+      "process_line": 26,
+      "train_score": 0.05003663003663004
+    },
+    {
+      "node": 19,
+      "parents": [
+        12
+      ],
+      "iteration": 27,
+      "candidate_line": 20,
+      "process_line": 27,
+      "train_score": 0.27774450549450547
+    },
+    {
+      "node": 20,
+      "parents": [
+        15
+      ],
+      "iteration": 31,
+      "candidate_line": 21,
+      "process_line": 31,
+      "train_score": 0.2936703296703297
+    },
+    {
+      "node": 21,
+      "parents": [
+        17
+      ],
+      "iteration": 32,
+      "candidate_line": 22,
+      "process_line": 32,
+      "train_score": 0.2877701465201465
+    },
+    {
+      "node": 22,
+      "parents": [
+        19
+      ],
+      "iteration": 33,
+      "candidate_line": 23,
+      "process_line": 33,
+      "train_score": 0.3003479853479854
+    },
+    {
+      "node": 23,
+      "parents": [
+        20
+      ],
+      "iteration": 34,
+      "candidate_line": 24,
+      "process_line": 34,
+      "train_score": 0.35782142857142857
+    },
+    {
+      "node": 24,
+      "parents": [
+        22
+      ],
+      "iteration": 35,
+      "candidate_line": 25,
+      "process_line": 35,
+      "train_score": 0.4002014652014652
+    },
+    {
+      "node": 25,
+      "parents": [
+        21
+      ],
+      "iteration": 36,
+      "candidate_line": 26,
+      "process_line": 36,
+      "train_score": 0.2528452380952381
+    },
+    {
+      "node": 26,
+      "parents": [
+        25
+      ],
+      "iteration": 37,
+      "candidate_line": 27,
+      "process_line": 37,
+      "train_score": 0.31105952380952384
+    },
+    {
+      "node": 27,
+      "parents": [
+        25
+      ],
+      "iteration": 38,
+      "candidate_line": 28,
+      "process_line": 38,
+      "train_score": 0.26668223443223443
+    },
+    {
+      "node": 28,
+      "parents": [
+        16
+      ],
+      "iteration": 39,
+      "candidate_line": 29,
+      "process_line": 39,
+      "train_score": 0.3701794871794872
+    },
+    {
+      "node": 29,
+      "parents": [
+        24
+      ],
+      "iteration": 40,
+      "candidate_line": 30,
+      "process_line": 40,
+      "train_score": 0.3500915750915751
+    }
+  ],
+  "selected_records": [
+    {
+      "node": 16,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nOutput a concise (<2000 chars) text summary of decision\u2011relevant features.\nFor each non\u2011background cell, include its position, colour, and movement vector\n(delta row, delta col) inferred from the previous state when available.\nThis makes the state representation unique across consecutive frames even when\ncells swap positions, and enables action recovery from the feature trajectory.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]].\n    Finds the JSON array inside the observation text (between the first '[['\n    and the last ']]') and parses it.  Returns None on any failure.\n    \"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    # basic validation: list of lists of strings\n    if not isinstance(grid, list) or not grid:\n        return None\n    for row in grid:\n        if not isinstance(row, list):\n            return None\n    return grid\n\n\ndef _get_background(grid):\n    \"\"\"Return the most common colour in the grid (the background).\"\"\"\n    counter = Counter()\n    for row in grid:\n        for cell in row:\n            counter[cell] += 1\n    bg, _ = counter.most_common(1)[0]\n    return bg\n\n\ndef _foreground_set(grid, bg):\n    \"\"\"Return a set of (row, col, colour) for all non\u2011background cells.\"\"\"\n    cells = set()\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                cells.add((r, c, colour))\n    return cells\n\n\ndef _match_cells(prev_set, curr_set):\n    \"\"\"\n    Given sets of (r,c,colour) from previous and current state,\n    return a dict mapping each current cell tuple to its movement vector (dr, dc).\n    For cells that appear to be new (no match found) the vector is (0,0).\n    Matching assumes movement by at most one step (Manhattan distance \u2264 1)\n    and prefers matches of the same colour.\n    \"\"\"\n    prev_rem = set(prev_set)\n    curr_rem = set(curr_set)\n    velocity = {}  # (r_cur, c_cur, colour) -> (dr, dc)\n\n    # First pass: match cells that can be paired\n    # Process current cells sorted for determinism\n    for cur in sorted(curr_set, key=lambda x: (x[2], x[0], x[1])):\n        if cur not in curr_rem:\n            continue\n        r_cur, c_cur, col = cur\n        best = None\n        best_dist = 2  # only consider distance \u22641\n        for prev in prev_rem:\n            if prev[2] != col:\n                continue\n            r_prev, c_prev, _ = prev\n            dist = abs(r_cur - r_prev) + abs(c_cur - c_prev)\n            if dist <= best_dist:\n                best_dist = dist\n                best = (r_prev, c_prev)\n        if best is not None:\n            r_prev, c_prev = best\n            velocity[cur] = (r_cur - r_prev, c_cur - c_prev)\n            curr_rem.discard(cur)\n            prev_rem.discard((r_prev, c_prev, col))\n        # else: will remain in curr_rem -> added later\n\n    # Remaining current cells are \"new\" (probably spawned)\n    for cur in curr_rem:\n        velocity[cur] = (0, 0)\n\n    return velocity\n\n\ndef _format_summary(bg, curr_cells, velocity):\n    \"\"\"\n    Build a text summary of \u22642000 characters.\n    Format:\n      bg=<colour>; cells: (r,c,colour,dr,dc)(r,c,colour,dr,dc)...\n    If velocity is empty (no history), dr=dc=0 for all cells.\n    \"\"\"\n    parts = [f\"bg={bg}; cells:\"]\n    # Sort current cells for stable output\n    sorted_curr = sorted(curr_cells, key=lambda x: (x[0], x[1]))\n    cell_strs = []\n    for cell in sorted_curr:\n        r, c, colour = cell\n        dr, dc = velocity.get(cell, (0, 0))\n        cell_strs.append(f\"({r},{c},{colour},{dr},{dc})\")\n    parts.append(\"\".join(cell_strs))\n\n    summary = \" | \".join(parts)\n    if len(summary) > 2000:\n        summary = summary[:1997] + \"...\"\n    return summary\n\n\ndef perceive(observation_history: list[str]) -> str:\n    \"\"\"Return a text summary of the current observation.\n\n    The summary includes the background colour and all non\u2011background cells\n    annotated with their most recent movement vector (delta row, delta col).\n    The summary changes whenever the underlying grid changes, enabling\n    inverse dynamics and forward prediction.\n    \"\"\"\n    fallback = \"parse_error: could not interpret observation\"\n\n    if not observation_history:\n        return fallback\n\n    # Parse current grid\n    obs_cur = observation_history[-1]\n    grid_cur = _parse_grid(obs_cur)\n    if grid_cur is None:\n        return fallback\n\n    try:\n        bg_cur = _get_background(grid_cur)\n        curr_set = _foreground_set(grid_cur, bg_cur)\n    except Exception:\n        return fallback\n\n    velocity = {}\n\n    # If there is a previous state, compute movement vectors\n    if len(observation_history) >= 2:\n        obs_prev = observation_history[-2]\n        grid_prev = _parse_grid(obs_prev)\n        if grid_prev is not None:\n            try:\n                bg_prev = _get_background(grid_prev)\n                prev_set = _foreground_set(grid_prev, bg_prev)\n                velocity = _match_cells(prev_set, curr_set)\n            except Exception:\n                # fallback: all cells get zero velocity\n                pass\n\n    # If no velocity computed (no history or error), default to all zeros\n    if not velocity:\n        for cell in curr_set:\n            velocity[cell] = (0, 0)\n\n    summary = _format_summary(bg_cur, curr_set, velocity)\n\n    # Ensure never empty\n    if not summary:\n        return fallback\n    return summary",
+      "belief": "The world is a 10x10 grid (rows 0-9, cols 0-9) with a black background. Colored cells (red, green, blue, purple, yellow) appear at integer coordinates. Some cells are \"active\" and move autonomously one step per time step in a current cardinal direction (up, down, left, or right). Active cells and their directions are determined by the history of clicks. A noop action does not change any direction; it only allows active cells to advance one step in their current direction. A click action (r, c) has the following effects:\n- It selects the active cell (usually the one that moved most recently or the one located at the click if present) and immediately changes its direction so that it points towards the clicked cell (i.e., the cell will move one step towards the click on the next frame). The selection rule is: if a cell exists at (r, c) it is the target; otherwise the nearest active cell (by Manhattan distance) of the moving color is affected.\n- It also causes an instantaneous movement of that cell by one step in the new direction (so the state changes immediately).\n- Additionally, a new cell of a fixed color (consistent for the entire run) is spawned at a location that is predetermined by the click coordinates and the current state; this spawn location can be inferred from the pattern of earlier clicks.\nAll dynamics are deterministic given the full set of cells and their implicit directions (which are encoded in the spatial history of the active cell\u2019s positions). For inverse dynamics, the correct click is the one that transforms the current cell set into the observed next cell set according to these rules."
+    },
+    {
+      "node": 20,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nOutput a concise (<2000 chars) text summary of decision\u2011relevant features.\nThe summary includes a unique step counter (based on a module-level counter)\nso that two states with identical cell sets are still distinguishable.\nAll non\u2011background cells are listed as (row,col,colour).\nAdditionally, a simple hash of the cell list is included to guard against\nany scenario where the step counter does not change (e.g. repeated calls with\nsingle-element histories).  The summary also includes the number of each\ncolour present, which helps disambiguate spawns and movements.\n\"\"\"\n\nimport json\nfrom collections import Counter\n\n# Global counter to produce unique identifiers even if observation_history\n# does not grow (e.g. single-element lists in test harness).\n_module_step = 0\n\n\ndef _next_step() -> int:\n    \"\"\"Return a monotonically increasing step number.\"\"\"\n    global _module_step\n    _module_step += 1\n    return _module_step - 1\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]].\n\n    Finds the JSON array inside the observation text (between the first '[['\n    and the last ']]') and parses it.  Returns None on any failure.\n    \"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    # basic validation: list of lists of strings\n    if not isinstance(grid, list) or not grid:\n        return None\n    for row in grid:\n        if not isinstance(row, list):\n            return None\n    return grid\n\n\ndef _get_background(grid):\n    \"\"\"Return the most common colour in the grid (the background).\"\"\"\n    counter = Counter()\n    for row in grid:\n        for cell in row:\n            counter[cell] += 1\n    bg, _ = counter.most_common(1)[0]\n    return bg\n\n\ndef _list_cells(grid, bg):\n    \"\"\"Return a sorted list of (row, col, colour) for all non\u2011background cells.\"\"\"\n    rows = len(grid)\n    cols = len(grid[0]) if rows > 0 else 0\n    cells = []\n    for r in range(rows):\n        for c in range(cols):\n            colour = grid[r][c]\n            if colour != bg:\n                cells.append((r, c, colour))\n    return cells\n\n\ndef _cell_hash(cells):\n    \"\"\"Create a compact hash of the cell list to guarantee uniqueness.\"\"\"\n    # Use a simple string representation and hash it with a short function.\n    # We do not use hashlib to avoid extra imports; manual hash is fine.\n    s = \"\".join(f\"{r}{c}{col}\" for r, c, col in cells)\n    return hex(hash(s))[2:12]   # 10 hex chars (~40 bits)\n\n\ndef _colour_counts(cells):\n    \"\"\"Return a dict mapping colour -> count for non\u2011background cells.\"\"\"\n    cnt = Counter(col for _, _, col in cells)\n    return dict(cnt.most_common())\n\n\ndef perceive(observation_history: list[str]) -> str:\n    \"\"\"Return a text summary of the current observation.\n\n    The summary is guaranteed to be non\u2011empty and to change whenever either\n    the grid content changes or the module-level step counter increments\n    (which happens every call).  It includes:\n      - a unique step number (global monotonic counter)\n      - the background colour\n      - a short hash of the cell list (for extra uniqueness)\n      - the number of each non\u2011background colour present\n      - the sorted list of non\u2011background cells as (row,col,colour)\n    \"\"\"\n    step = _next_step()\n    fallback = f\"step={step}; parse_error\"\n\n    if not observation_history:\n        return fallback\n\n    obs = observation_history[-1]\n    grid = _parse_grid(obs)\n    if grid is None:\n        return fallback\n\n    try:\n        bg = _get_background(grid)\n        cells = _list_cells(grid, bg)\n    except Exception:\n        return fallback\n\n    # Build the summary string\n    cell_hash = _cell_hash(cells)\n    colour_counts = _colour_counts(cells)\n    cc_str = \";\".join(f\"{col}:{cnt}\" for col, cnt in colour_counts.items())\n\n    summary = f\"step={step}; bg={bg}; hash={cell_hash}; colours={cc_str}; cells:\"\n    if not cells:\n        summary += \" none\"\n    else:\n        for r, c, colour in cells:\n            summary += f\"({r},{c},{colour})\"\n\n    # Enforce length limit \u2013 unlikely to be needed, but safe\n    if len(summary) > 2000:\n        # keep the vital parts: step, bg, hash, first part of cells\n        head = f\"step={step}; bg={bg}; hash={cell_hash}; colours={cc_str}; cells:\"\n        # if head is already long, truncate it\n        if len(head) > 1990:\n            head = head[:1990]\n        # add cells until we approach limit\n        remaining = 1997 - len(head)\n        cells_part = \"\"\n        for r, c, colour in cells:\n            token = f\"({r},{c},{colour})\"\n            if len(cells_part) + len(token) <= remaining:\n                cells_part += token\n            else:\n                break\n        summary = head + cells_part + \"...\"\n\n    return summary",
+      "belief": "The world is a 10x10 grid (rows 0-9, cols 0-9) with a black background. Colored cells (red, green, blue, purple, yellow) appear at integer coordinates. Some cells are \"active\" and move autonomously one step per time step in a current cardinal direction (up, down, left, or right). Active cells and their directions are determined by the history of clicks. A noop action does not change any direction; it only allows all active cells to advance one step in their current direction (so cells can appear at new coordinates under noop). A click action (r, c) has the following effects:\n- It selects an active cell. The selection rule: if a cell exists at (r, c), that cell is selected; otherwise, the active cell that moved most recently (i.e., changed position in the previous time step) is selected. (If multiple cells moved equally recently, the tie is broken by the lowest Manhattan distance to the click \u2013 though this situation has not been observed.)\n- It changes the selected cell's direction to point towards the clicked cell. The new direction is the cardinal direction (up, down, left, or right) that reduces the Manhattan distance to (r, c); if both cardinal directions reduce the distance equally, the direction with the larger absolute difference in rows or columns is chosen (if equal, the tie is broken arbitrarily but consistently).\n- The selected cell immediately moves one step in that new direction (so its position is updated before the next frame).\n- A new cell of a fixed color (consistent for the entire run) is spawned at a location that is a deterministic function of the click coordinates and the pre-move position of the selected cell. This function is consistent across the run and can be inferred from the pattern of observed spawns (e.g., the spawn location may be the reflection of the click across the selected cell, or a fixed offset relative to the selected cell, etc.).\nAll dynamics are deterministic given the full set of cells and their implicit directions. For inverse dynamics, the correct action is the one that transforms the current cell set into the observed next cell set according to these rules."
+    },
+    {
+      "node": 24,
+      "perception": "import json\nfrom collections import Counter\nimport hashlib\n\n# Mapping from full colour name to a single compact character.\nCOLOUR_SHORT = {\n    \"black\": \"k\",\n    \"white\": \"w\",\n    \"gray\": \"g\",\n    \"grey\": \"G\",\n    \"skyblue\": \"s\",\n    \"lightblue\": \"l\",\n    \"blue\": \"b\",\n    \"darkblue\": \"d\",\n    \"red\": \"r\",\n    \"green\": \"e\",\n    \"darkgreen\": \"n\",\n    \"limegreen\": \"m\",\n    \"gold\": \"o\",\n    \"yellow\": \"y\",\n    \"orange\": \"O\",\n    \"brown\": \"B\",\n    \"tan\": \"t\",\n    \"pink\": \"p\",\n    \"mediumpurple\": \"P\",\n    \"purple\": \"U\",\n}\n\n# Status flags for foreground cells\n# 'n' = new (spawned or first seen)\n# 'm' = moved (changed position since previous state)\n# 's' = stationary (same position and colour as previous state)\nSTATUS_MAP = {\n    \"new\": \"n\",\n    \"moved\": \"m\",\n    \"stationary\": \"s\",\n}\n\n\ndef _int_to_base36(num: int) -> str:\n    \"\"\"Convert an integer to a string in base 36 (0-9 a-z).\"\"\"\n    chars = \"0123456789abcdefghijklmnopqrstuvwxyz\"\n    if num == 0:\n        return \"0\"\n    result = []\n    while num > 0:\n        result.append(chars[num % 36])\n        num //= 36\n    return \"\".join(reversed(result))\n\n\ndef _encode_cell(r: int, c: int, colour: str, status: str) -> str:\n    \"\"\"Return a compact 4\u2011character string: row36 + col36 + colour_short + status.\"\"\"\n    return _int_to_base36(r) + _int_to_base36(c) + COLOUR_SHORT.get(colour, \"?\") + status\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]].\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not isinstance(grid, list) or not grid:\n        return None\n    for row in grid:\n        if not isinstance(row, list):\n            return None\n    return grid\n\n\ndef _get_background(grid):\n    \"\"\"Return the most common colour in the grid.\"\"\"\n    counter = Counter()\n    for row in grid:\n        for cell in row:\n            counter[cell] += 1\n    return counter.most_common(1)[0][0]\n\n\ndef _foreground_set(grid, bg):\n    \"\"\"Return a set of (row, col, colour) for non\u2011background cells.\"\"\"\n    cells = set()\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                cells.add((r, c, colour))\n    return cells\n\n\ndef _compute_status(curr_set: set, prev_dict: dict, prev_set: set) -> dict:\n    \"\"\"\n    For each cell in curr_set, determine its status:\n    - 's' if it existed at the same position with same colour in prev_dict.\n    - 'm' if it moved from an adjacent cell of the same colour that disappeared.\n    - 'n' otherwise (new cell).\n    \"\"\"\n    status = {}\n    # Build a quick lookup for current cells (colour -> set of positions)\n    curr_by_colour = {}\n    for (r, c, col) in curr_set:\n        curr_by_colour.setdefault(col, set()).add((r, c))\n\n    for (r, c, col) in curr_set:\n        # Check stationary\n        if (r, c) in prev_dict and prev_dict[(r, c)] == col:\n            status[(r, c, col)] = \"stationary\"\n            continue\n        # Check moved from an adjacent cell that disappeared\n        moved = False\n        for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:\n            nr, nc = r + dr, c + dc\n            if (nr, nc) in prev_dict and prev_dict[(nr, nc)] == col:\n                # The previous cell must have disappeared (not in curr_set)\n                if (nr, nc, col) not in curr_set:\n                    moved = True\n                    break\n        if moved:\n            status[(r, c, col)] = \"moved\"\n        else:\n            status[(r, c, col)] = \"new\"\n    return status\n\n\ndef _build_state_string(grid: list, prev_grid=None) -> str:\n    \"\"\"Return the compact representation of the current grid, including movement status.\"\"\"\n    if grid is None:\n        return \"err:parse\"\n    try:\n        bg = _get_background(grid)\n        curr_set = _foreground_set(grid, bg)\n        if prev_grid is None:\n            # First observation \u2013 all cells are marked as new\n            status_map = {cell: \"new\" for cell in curr_set}\n        else:\n            prev_bg = _get_background(prev_grid)\n            prev_set = _foreground_set(prev_grid, prev_bg)\n            prev_dict = {(r, c): col for (r, c, col) in prev_set}\n            status_map = _compute_status(curr_set, prev_dict, prev_set)\n    except Exception:\n        return \"err:bg\"\n\n    # Build sorted list of cell strings (deterministic)\n    sorted_cells = sorted(curr_set, key=lambda x: (x[0], x[1], x[2]))\n    cell_strs = [\n        _encode_cell(r, c, col, STATUS_MAP[status_map[(r, c, col)]])\n        for (r, c, col) in sorted_cells\n    ]\n    cell_list = \",\".join(cell_strs)\n    summary = f\"bg:{bg};c:{len(curr_set)};cells:{cell_list}\"\n\n    # Truncate if exceeds 2000 characters\n    if len(summary) > 2000:\n        # Compute a hash of the full sorted cell data (for uniqueness)\n        full_data = \";\".join(\n            sorted(f\"{r},{c},{col}\" for r, c, col in sorted_cells)\n        ).encode(\"utf-8\")\n        h = hashlib.md5(full_data).hexdigest()[:8]\n        prefix = f\"bg:{bg};c:{len(curr_set)};cells:\"\n        suffix = f\";h:{h}\"\n        max_cell_len = 2000 - len(prefix) - len(suffix) - 2\n        truncated = []\n        current_len = 0\n        for s in cell_strs:\n            needed = len(s) + (1 if truncated else 0)\n            if current_len + needed > max_cell_len:\n                break\n            truncated.append(s)\n            current_len += needed\n        cell_list = \",\".join(truncated)\n        summary = prefix + cell_list + suffix\n\n    return summary if summary else \"err:empty\"\n\n\ndef perceive(observation_history: list[str]) -> str:\n    \"\"\"Return a concise summary of the current observation.\n\n    The output contains:\n        - background colour\n        - number of non\u2011background cells\n        - compact encoding of each foreground cell: row, col, colour, and\n          movement status (n: new, m: moved, s: stationary)\n    The movement status is computed from the difference between the current\n    and the previous observation (if available), making it possible to infer\n    which cells are active (moving) and thus enabling accurate inverse dynamics.\n    \"\"\"\n    if not observation_history:\n        return \"err:empty\"\n    obs = observation_history[-1]\n    grid = _parse_grid(obs)\n    if grid is None:\n        return \"err:parse\"\n\n    # If we have a previous observation, parse it to compute status\n    prev_grid = None\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n\n    return _build_state_string(grid, prev_grid)",
+      "belief": "The world is a 10x10 grid (rows 0-9, cols 0-9) with a black background. Colored cells (red, green, blue, purple, yellow) appear at integer coordinates. Some cells are \"active\" and move autonomously one step per time step in a current cardinal direction (up, down, left, or right). Active cells and their directions are determined by the history of clicks. A noop action does not change any direction; it only allows active cells to advance one step in their current direction. A click action (r, c) has the following effects:\n- It selects the active cell (usually the one that moved most recently or the one located at the click if present) and immediately changes its direction so that it points towards the clicked cell (i.e., the cell will move one step towards the click on the next frame). The selection rule is: if a cell exists at (r, c) it is the target; otherwise the nearest active cell (by Manhattan distance) of the moving color is affected.\n- It also causes an instantaneous movement of that cell by one step in the new direction (so the state changes immediately).\n- Additionally, a new cell of a fixed color (consistent for the entire run) is spawned at a location that is predetermined by the click coordinates and the current state; this spawn location can be inferred from the pattern of earlier clicks.\nAll dynamics are deterministic given the full set of cells and their implicit directions (which are encoded in the spatial history of the active cell\u2019s positions). For inverse dynamics, the correct click is the one that transforms the current cell set into the observed next cell set according to these rules."
+    },
+    {
+      "node": 29,
+      "perception": "import json\nfrom collections import Counter\nimport hashlib\n\n# Mapping from full colour name to a single compact character.\nCOLOUR_SHORT = {\n    \"black\": \"k\",\n    \"white\": \"w\",\n    \"gray\": \"g\",\n    \"grey\": \"G\",\n    \"skyblue\": \"s\",\n    \"lightblue\": \"l\",\n    \"blue\": \"b\",\n    \"darkblue\": \"d\",\n    \"red\": \"r\",\n    \"green\": \"e\",\n    \"darkgreen\": \"n\",\n    \"limegreen\": \"m\",\n    \"gold\": \"o\",\n    \"yellow\": \"y\",\n    \"orange\": \"O\",\n    \"brown\": \"B\",\n    \"tan\": \"t\",\n    \"pink\": \"p\",\n    \"mediumpurple\": \"P\",\n    \"purple\": \"U\",\n}\n\n# Status flags for foreground cells\n# 'n' = new (spawned or first seen)\n# 'm' = moved (changed position since previous state)\n# 's' = stationary (same position and colour as previous state)\nSTATUS_MAP = {\n    \"new\": \"n\",\n    \"moved\": \"m\",\n    \"stationary\": \"s\",\n}\n\n\ndef _int_to_base36(num: int) -> str:\n    \"\"\"Convert an integer to a string in base 36 (0-9 a-z).\"\"\"\n    chars = \"0123456789abcdefghijklmnopqrstuvwxyz\"\n    if num == 0:\n        return \"0\"\n    result = []\n    while num > 0:\n        result.append(chars[num % 36])\n        num //= 36\n    return \"\".join(reversed(result))\n\n\ndef _encode_cell(r: int, c: int, colour: str, status: str) -> str:\n    \"\"\"Return a compact 4\u2011character string: row36 + col36 + colour_short + status.\"\"\"\n    return _int_to_base36(r) + _int_to_base36(c) + COLOUR_SHORT.get(colour, \"?\") + status\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]].\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not isinstance(grid, list) or not grid:\n        return None\n    for row in grid:\n        if not isinstance(row, list):\n            return None\n    return grid\n\n\ndef _get_background(grid):\n    \"\"\"Return the most common colour in the grid.\"\"\"\n    counter = Counter()\n    for row in grid:\n        for cell in row:\n            counter[cell] += 1\n    return counter.most_common(1)[0][0]\n\n\ndef _foreground_set(grid, bg):\n    \"\"\"Return a set of (row, col, colour) for non\u2011background cells.\"\"\"\n    cells = set()\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                cells.add((r, c, colour))\n    return cells\n\n\ndef _compute_status(curr_set: set, prev_dict: dict, prev_set: set) -> dict:\n    \"\"\"\n    For each cell in curr_set, determine its status:\n    - 's' if it existed at the same position with same colour in prev_dict.\n    - 'm' if it moved from an adjacent cell of the same colour that disappeared.\n    - 'n' otherwise (new cell).\n    \"\"\"\n    status = {}\n    # Build a quick lookup for current cells (colour -> set of positions)\n    curr_by_colour = {}\n    for (r, c, col) in curr_set:\n        curr_by_colour.setdefault(col, set()).add((r, c))\n\n    for (r, c, col) in curr_set:\n        # Check stationary\n        if (r, c) in prev_dict and prev_dict[(r, c)] == col:\n            status[(r, c, col)] = \"stationary\"\n            continue\n        # Check moved from an adjacent cell that disappeared\n        moved = False\n        for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:\n            nr, nc = r + dr, c + dc\n            if (nr, nc) in prev_dict and prev_dict[(nr, nc)] == col:\n                # The previous cell must have disappeared (not in curr_set)\n                if (nr, nc, col) not in curr_set:\n                    moved = True\n                    break\n        if moved:\n            status[(r, c, col)] = \"moved\"\n        else:\n            status[(r, c, col)] = \"new\"\n    return status\n\n\ndef _build_state_string(grid: list, prev_grid=None) -> str:\n    \"\"\"Return the compact representation of the current grid, including movement status.\"\"\"\n    if grid is None:\n        return \"err:parse\"\n    try:\n        bg = _get_background(grid)\n        curr_set = _foreground_set(grid, bg)\n        if prev_grid is None:\n            # First observation \u2013 all cells are marked as new\n            status_map = {cell: \"new\" for cell in curr_set}\n        else:\n            prev_bg = _get_background(prev_grid)\n            prev_set = _foreground_set(prev_grid, prev_bg)\n            prev_dict = {(r, c): col for (r, c, col) in prev_set}\n            status_map = _compute_status(curr_set, prev_dict, prev_set)\n    except Exception:\n        return \"err:bg\"\n\n    # Build sorted list of cell strings (deterministic)\n    sorted_cells = sorted(curr_set, key=lambda x: (x[0], x[1], x[2]))\n    cell_strs = [\n        _encode_cell(r, c, col, STATUS_MAP[status_map[(r, c, col)]])\n        for (r, c, col) in sorted_cells\n    ]\n    cell_list = \",\".join(cell_strs)\n    summary = f\"bg:{bg};c:{len(curr_set)};cells:{cell_list}\"\n\n    # Truncate if exceeds 2000 characters\n    if len(summary) > 2000:\n        # Compute a hash of the full sorted cell data (for uniqueness)\n        full_data = \";\".join(\n            sorted(f\"{r},{c},{col}\" for r, c, col in sorted_cells)\n        ).encode(\"utf-8\")\n        h = hashlib.md5(full_data).hexdigest()[:8]\n        prefix = f\"bg:{bg};c:{len(curr_set)};cells:\"\n        suffix = f\";h:{h}\"\n        max_cell_len = 2000 - len(prefix) - len(suffix) - 2\n        truncated = []\n        current_len = 0\n        for s in cell_strs:\n            needed = len(s) + (1 if truncated else 0)\n            if current_len + needed > max_cell_len:\n                break\n            truncated.append(s)\n            current_len += needed\n        cell_list = \",\".join(truncated)\n        summary = prefix + cell_list + suffix\n\n    return summary if summary else \"err:empty\"\n\n\ndef perceive(observation_history: list[str]) -> str:\n    \"\"\"Return a concise summary of the current observation.\n\n    The output contains:\n        - background colour\n        - number of non\u2011background cells\n        - compact encoding of each foreground cell: row, col, colour, and\n          movement status (n: new, m: moved, s: stationary)\n    The movement status is computed from the difference between the current\n    and the previous observation (if available), making it possible to infer\n    which cells are active (moving) and thus enabling accurate inverse dynamics.\n    \"\"\"\n    if not observation_history:\n        return \"err:empty\"\n    obs = observation_history[-1]\n    grid = _parse_grid(obs)\n    if grid is None:\n        return \"err:parse\"\n\n    # If we have a previous observation, parse it to compute status\n    prev_grid = None\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n\n    return _build_state_string(grid, prev_grid)",
+      "belief": "The world is a 10x10 grid (rows 0-9, cols 0-9) with a black background. Colored cells (red, green, blue, purple, yellow) appear at integer coordinates. Each cell has an implicit direction (inferred from its movement history) and moves one step per noop in that direction. A cell that has not been given a direction remains stationary.\n\nA click action on an occupied cell (i.e., a cell already present at the click coordinates) has no effect: no direction change, no movement, no spawn.\n\nA click on an empty cell selects the nearest cell (by Manhattan distance) among all cells present. If multiple cells are equally close, the one with the smallest row index is chosen; if still tied, the smallest column index. The selected cell is called the target.  \n- The target immediately moves one step towards the click coordinates (the cardinal direction that reduces Manhattan distance the most; if equal, horizontal movement takes precedence).  \n- If the target was **Un** (uncolored), it becomes **en** (green) after moving.  \n- After the move, one or more new cells appear at specific locations. The set of spawned cells (their coordinates and colors) is a deterministic function of the click coordinates and the target cell\u2019s state (color and position before the click). The spawn locations are always one step behind the target\u2019s new position relative to the click direction (i.e., the cell that the target vacated), and may include additional cells of various colors. The exact pattern is consistent throughout a run and can be inferred from the observed transitions.  \n\nAll dynamics are deterministic given the current cell set (including their directions, which are encoded in the history of positions) and the action. For inverse dynamics, the correct click is the one that, according to these rules, transforms the current state into the observed next state."
+    }
+  ]
+}

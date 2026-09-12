@@ -1,0 +1,164 @@
+P(X) and K for every node in learning_evolution_ice_click.pdf
+==========================================================================
+
+game       bt3gb   drive train_d0   steps 62-65
+artifacts  logs/2026-08-24/human_curated/rexpure/bt3gb_s1/rexpure_run_seed1/candidates.jsonl
+frames     train_d0/episode_0/trajectory.csv
+
+Every P(X) below is that node's own perception() run over that step's
+observation, and every K is that node's world_knowledge field verbatim --
+the same material the figure draws from, nothing transcribed. Each K is
+followed by a condensed form, one line per rule, tagged [new] / [revised] /
+[kept] / [dropped] against the previous K on the lineage. The tags and the
+quoted edits under a [revised] line are computed from the two texts; the
+short lines are hand-written and hash-bound to the rule they summarise.
+
+  X0 = step 62  --click 1 1-->
+  X1 = step 63  --noop-->
+  X2 = step 64  --noop-->
+  X3 = step 65
+
+==========================================================================
+node 0  (seed)   min(ID, cFD) = 0.000
+--------------------------------------------------------------------------
+P(X0) [step 62] = (empty string)
+P(X1) [step 63] = (empty string)
+P(X2) [step 64] = (empty string)
+P(X3) [step 65] = (empty string)
+
+--------------------------------------------------------------------------
+K [node 0]
+--------------------------------------------------------------------------
+(empty -- no world knowledge yet)
+
+==========================================================================
+node 3  (iter 3 · P)   min(ID, cFD) = 0.100
+--------------------------------------------------------------------------
+P(X0) [step 62] = bg=black; gray(0,0), gray(0,1), gray(0,10), gray(0,11), gray(0,12), gray(1,0), gray(1,1), lightblue(11,10), lightblue(13,10)
+P(X1) [step 63] = bg=black; gold(0,0), gold(0,1), gray(0,10), gray(0,11), gray(0,12), gold(1,0), gold(1,1), blue(11,10), blue(13,10)
+P(X2) [step 64] = bg=black; gold(0,0), gold(0,1), gray(0,10), gray(0,11), gray(0,12), gold(1,0), gold(1,1), blue(12,10), blue(14,10)
+P(X3) [step 65] = bg=black; gold(0,0), gold(0,1), gray(0,10), gray(0,11), gray(0,12), gold(1,0), gold(1,1), blue(13,10), blue(15,10)
+
+--------------------------------------------------------------------------
+K [node 3]   [identical to node 0]
+--------------------------------------------------------------------------
+(empty -- no world knowledge yet)
+
+==========================================================================
+node 4  (iter 4 · K)   min(ID, cFD) = 0.535   [P identical to node 3]
+--------------------------------------------------------------------------
+P(X0) [step 62] = bg=black; gray(0,0), gray(0,1), gray(0,10), gray(0,11), gray(0,12), gray(1,0), gray(1,1), lightblue(11,10), lightblue(13,10)
+P(X1) [step 63] = bg=black; gold(0,0), gold(0,1), gray(0,10), gray(0,11), gray(0,12), gold(1,0), gold(1,1), blue(11,10), blue(13,10)
+P(X2) [step 64] = bg=black; gold(0,0), gold(0,1), gray(0,10), gray(0,11), gray(0,12), gold(1,0), gold(1,1), blue(12,10), blue(14,10)
+P(X3) [step 65] = bg=black; gold(0,0), gold(0,1), gray(0,10), gray(0,11), gray(0,12), gold(1,0), gold(1,1), blue(13,10), blue(15,10)
+
+--------------------------------------------------------------------------
+K [node 4]
+--------------------------------------------------------------------------
+world knowledge
+- Grid is 16x16 (rows 0-15, columns 0-15), background black.
+- Object types: gold, gray, blue, lightblue cells.
+- There is a fixed 2x2 block at (0,0),(0,1),(1,0),(1,1) that toggles between gold and gray.
+- There is a contiguous block of three gray cells on row 0 (the "movable block") that moves left/right with the corresponding direction actions, provided the target cells are empty. This block is not affected by clicks.
+- There is a contiguous block of blue or lightblue cells on row 15 (the "bottom block") whose color toggles with clicks; its width varies.
+- On noop: every blue/lightblue cell not on row 15 attempts to move down one row. If the cell directly below is empty, it moves; otherwise, it stays. Cells on row 15 do not move.
+- On left: the movable block shifts one column left (if possible).
+- On right: the movable block shifts one column right (if possible).
+- On down: if the cell (1, c) is empty, where c is the middle column of the movable block (the second of the three cells), then a new blue/lightblue cell is created at (1, c). Its color matches the current color of the bottom block. If (1, c) is occupied, nothing happens.
+- On click (any ROW COL): all cells in the top-left 2x2 block toggle gold↔gray; all blue/lightblue cells anywhere on the grid toggle blue↔lightblue. The movable gray block remains unchanged.
+- Up action is not observed; assume it has no visible effect.
+
+--------------------------------------------------------------------------
+K [node 4], condensed -- one line per rule (the first K on this lineage)
+--------------------------------------------------------------------------
+ 1 [new]     16x16, rows and columns 0-15, black background
+ 2 [new]     four cell types: gold, gray, blue, lightblue
+ 3 [new]     a fixed 2x2 at (0,0)-(1,1) toggling gold/gray
+ 4 [new]     a movable block of three gray cells on row 0, shifted by
+             left/right when the target cells are empty; clicks do not
+             affect it
+ 5 [new]     a bottom block of contiguous blue/lightblue on row 15, colour
+             toggled by clicks, width varying
+ 6 [new]     noop: every blue/lightblue off row 15 falls one row if the
+             cell below is empty; row 15 never moves
+ 7 [new]     left: the movable block shifts one column left if possible
+ 8 [new]     right: the movable block shifts one column right if possible
+ 9 [new]     down: spawns a blue/lightblue at (1,c) under the movable
+             block's middle column if that cell is empty, coloured like
+             the bottom block
+10 [new]     click, any ROW COL: the 2x2 toggles gold/gray and every
+             blue/lightblue toggles; the movable block is untouched
+11 [new]     up: unobserved, assumed to do nothing
+
+==========================================================================
+node 12  (iter 22 · P)   min(ID, cFD) = 0.725
+--------------------------------------------------------------------------
+P(X0) [step 62] = step=0; bg=black; fixed:gray(0,0),gray(0,1),gray(1,0),gray(1,1); movable:gray_row0:10-12; other:lightblue_row11:10; lightblue_row13:10
+P(X1) [step 63] = step=0; bg=black; fixed:gold(0,0),gold(0,1),gold(1,0),gold(1,1); movable:gray_row0:10-12; other:blue_row11:10; blue_row13:10
+P(X2) [step 64] = step=0; bg=black; fixed:gold(0,0),gold(0,1),gold(1,0),gold(1,1); movable:gray_row0:10-12; other:blue_row12:10; blue_row14:10
+P(X3) [step 65] = step=0; bg=black; fixed:gold(0,0),gold(0,1),gold(1,0),gold(1,1); movable:gray_row0:10-12; other:blue_row13:10; blue_row15:10
+
+--------------------------------------------------------------------------
+K [node 12]
+--------------------------------------------------------------------------
+world knowledge
+- Grid is 16x16 (rows 0-15, cols 0-15), background black.
+- Cell types: gold, gray, blue, lightblue.
+- There is a fixed 2x2 block at cells (0,0),(0,1),(1,0),(1,1). These cells are either gold or gray. Their color persists even when covered by the movable block; they are visible only when not covered.
+- There is a movable block: three contiguous gray cells on row 0. It moves left/right with left/right actions. Left/right are possible only if the three target cells are within [0,15] and contain no blue/lightblue cells. The movable block can overwrite fixed block cells (which are not obstacles). When the movable block moves, it leaves its previous cells empty; if those were fixed block cells, the fixed block's stored color reappears.
+- There is a bottom block: a contiguous block of blue or lightblue cells on row 15. Its color toggles on clicks outside the top-left 2x2. Its width varies as new cells arrive.
+- On noop: every blue/lightblue cell not on row 15 attemps to move down one row. If the cell directly below is empty (no other cell), it moves; otherwise it stays. Cells on row 15 do not move.
+- On left: the movable block shifts one column left (decrements column of all three cells) if possible.
+- On right: the movable block shifts one column right (increments column) if possible.
+- On down: if the cell (1, c) is empty (no cell of any type), where c is the middle column of the movable block (the second of its three cells), a new blue/lightblue cell appears at (1, c) with color equal to the current color of the bottom block. If (1, c) is occupied, nothing happens.
+- On click ROW COL:
+   - If ROW in {0,1} and COL in {0,1} (i.e. clicked inside the top-left 2x2 block), then the fixed 2x2 block toggles: all four cells become gold if they were gray, or gray if they were gold. (The toggled state applies to the stored color; if any of these cells are covered by the movable block, they are not visible until uncovered.)
+   - Else (click outside the top-left 2x2 block), then both of the following occur simultaneuously: the fixed 2x2 block toggles (as above), and every blue/lightblue cell on the grid toggles (blue<->lightblue).
+- Up action: no visible effect.
+
+--------------------------------------------------------------------------
+K [node 12], condensed -- one line per rule, against node 4
+--------------------------------------------------------------------------
+ 1 [revised] 16x16, rows and columns 0-15, black background
+              (reworded; no term added or dropped)
+ 2 [revised] four cell types: gold, gray, blue, lightblue
+              (reworded; no term added or dropped)
+ 3 [revised] a fixed 2x2 at (0,0)-(1,1), gold or gray, whose colour
+             persists while covered and reappears when uncovered
+              + “Their color persists even when covered by the movable
+                 block; they are visible only when not covered.”
+              − “(0,0),(0,1),(1,0),(1,1) that toggles between”
+ 4 [revised] the movable block moves only within bounds and only if no
+             blue/lightblue blocks it; it overwrites the fixed 2x2, which
+             resurfaces when it leaves
+              + “obstacles). When the movable block moves, it leaves its
+                 previous cells empty; if those were fixed block cells, the
+                 fixed block's stored color reappears.”
+              + “within [0,15] and contain no blue/lightblue cells. The
+                 movable”
+              + “left/right actions. Left/right are possible only if”
+              + (and 1 shorter edit)
+              − “corresponding direction actions, provided the”
+              − “affected by clicks.”
+ 5 [revised] a bottom block of contiguous blue/lightblue on row 15, colour
+             toggled by clicks outside the 2x2, growing as cells arrive
+              + “on clicks outside the top-left 2x2. Its”
+              + “varies as new cells arrive.”
+ 6 [revised] noop: every blue/lightblue off row 15 falls one row if the
+             cell below is empty; row 15 never moves
+              (reworded; no term added or dropped)
+ 7 [revised] left: the movable block shifts one column left if possible
+              + “(decrements column of all three cells) if possible.”
+ 8 [revised] right: the movable block shifts one column right if possible
+              + “(increments column) if possible.”
+ 9 [revised] down: spawns a blue/lightblue at (1,c) under the movable
+             block's middle column if that cell is empty, coloured like
+             the bottom block
+              + “empty (no cell of any type),”
+10 [new]     click ROW COL: inside the top-left 2x2, only the fixed block
+             toggles (stored colour, possibly hidden); outside, the 2x2
+             and every blue/lightblue toggle together
+11 [revised] up: no visible effect
+              (reworded; no term added or dropped)
+ - [dropped] click, any ROW COL: the 2x2 toggles gold/gray and every
+             blue/lightblue toggles; the movable block is untouched

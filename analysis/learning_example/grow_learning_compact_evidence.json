@@ -1,0 +1,205 @@
+{
+  "native_text_layers": 165,
+  "grid_cells": 1024,
+  "perception_panels": 16,
+  "belief_panels": 4,
+  "all_blob_and_parent_references_valid": true,
+  "all_original_nodes_preserved": null,
+  "figma_application_import_tested": false,
+  "reference": "analysis/learning_example/learning_evolution_fig.fig",
+  "reference_sha256": "e6dfa81b40aafd1bc201c53ad523d610f14ef75fdb94ca9b6325647b8b847240",
+  "reference_frame": "magnets_learning_compact",
+  "size": {
+    "width": 1829,
+    "height": 1050
+  },
+  "iterations": [
+    3,
+    12,
+    13,
+    27
+  ],
+  "perception_reexecutions": 16,
+  "source_checkpoints_verified": 4,
+  "state_observations_verified": 4,
+  "excerpt_checks": [
+    {
+      "label": "Iteration 3, P(X0)",
+      "text": [
+        "0,0:gold|0,1:gold|",
+        "0,2:gold|0,5:gray|",
+        "0,6:gray|0,7:gray|",
+        "0,8:gray|\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 3, P(X1)",
+      "text": [
+        "0,0:gold|0,1:gold|",
+        "0,2:gold|0,4:gray|",
+        "0,5:gray|0,6:gray|",
+        "0,7:gray|\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 3, P(X2)",
+      "text": [
+        "0,0:gold|0,1:gold|",
+        "0,2:gold|0,3:gray|",
+        "0,4:gray|0,5:gray|",
+        "0,6:gray|\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 3, P(X3)",
+      "text": [
+        "0,0:gold|0,1:gold|",
+        "0,2:gray|0,3:gray|",
+        "0,4:gray|0,5:gray|\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 12, P(X0)",
+      "text": [
+        "0,0:gold|0,1:gold|",
+        "0,2:gold|0,5:gray|",
+        "0,6:gray|0,7:gray|",
+        "0,8:gray|\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 12, P(X1)",
+      "text": [
+        "0,0:gold|0,1:gold|",
+        "0,2:gold|0,4:gray|",
+        "0,5:gray|0,6:gray|",
+        "0,7:gray|\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 12, P(X2)",
+      "text": [
+        "0,0:gold|0,1:gold|",
+        "0,2:gold|0,3:gray|",
+        "0,4:gray|0,5:gray|",
+        "0,6:gray|\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 12, P(X3)",
+      "text": [
+        "0,0:gold|0,1:gold|",
+        "0,2:gray|0,3:gray|",
+        "0,4:gray|0,5:gray|\u2026"
+      ]
+    },
+    {
+      "label": "Dynamics model learned by iteration 12",
+      "text": [
+        "\u2026 They form two contiguous blocks \u2026",
+        "\u2026 actions can bring them together \u2026",
+        "\u2026 left: \u2026 If a gray block exists, it shifts left by one column \u2026",
+        "\u2026 right: \u2026 The column vacated on the left becomes empty",
+        "unless it is immediately right of a gold block, \u2026",
+        "in which case that column becomes gold \u2026"
+      ]
+    },
+    {
+      "label": "Iteration 13, P(X0)",
+      "text": [
+        "\u2026 bg=black;",
+        "gold:0-2,0-2|",
+        "gray:0-2,5-8|",
+        "green:15,1|\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 13, P(X1)",
+      "text": [
+        "\u2026 bg=black;",
+        "gold:0-2,0-2|",
+        "gray:0-2,4-7|",
+        "green:15,1|\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 13, P(X2)",
+      "text": [
+        "\u2026 bg=black;",
+        "gold:0-2,0-2|",
+        "gray:0-2,3-6|",
+        "green:15,1|\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 13, P(X3)",
+      "text": [
+        "\u2026 bg=black;",
+        "gold:0-2,0-1|",
+        "gray:0-2,2-5|",
+        "green:15,1|\u2026"
+      ]
+    },
+    {
+      "label": "Dynamics model at iteration 13",
+      "text": [
+        "\u2026 If a gray block exists, it shifts left by one column \u2026"
+      ]
+    },
+    {
+      "label": "Iteration 27, P(X0)",
+      "text": [
+        "\u2026 f: \u2026 gare=0, \u2026",
+        "|gold:0,0-2;\u2026",
+        "|gray:0,5-8;\u2026",
+        "|green:15,1;\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 27, P(X1)",
+      "text": [
+        "\u2026 f: \u2026 gare=0, \u2026",
+        "|gold:0,0-2;\u2026",
+        "|gray:0,4-7;\u2026",
+        "|green:15,1;\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 27, P(X2)",
+      "text": [
+        "\u2026 f: \u2026 gare=1, \u2026",
+        "|gold:0,0-2;\u2026",
+        "|gray:0,3-6;\u2026",
+        "|green:15,1;\u2026"
+      ]
+    },
+    {
+      "label": "Iteration 27, P(X3)",
+      "text": [
+        "\u2026 f: \u2026 gare=1, \u2026",
+        "|gold:0,0-1;\u2026",
+        "|gray:0,2-5;\u2026",
+        "|green:15,1;\u2026"
+      ]
+    }
+  ],
+  "text_width_checks": 165,
+  "source_unchanged": true,
+  "combined": {
+    "native_text_layers": 165,
+    "grid_cells": 1024,
+    "perception_panels": 16,
+    "belief_panels": 4,
+    "all_blob_and_parent_references_valid": true,
+    "all_original_nodes_preserved": true,
+    "figma_application_import_tested": false
+  },
+  "uses_figma_mcp": false,
+  "dynamics_model_D": "Display name for the run's world_knowledge (B).",
+  "notes": [
+    "All text is native editable Figma text with glyph caches from the supplied Inter font.",
+    "Native path/glyph caches are rendered for previews; Figma application import is untested.",
+    "Beliefs are unchanged from iteration 12 and do not reference gare.",
+    "The selected sequence concerns cloud movement and visible sun contact, not learned conditional plant growth."
+  ]
+}

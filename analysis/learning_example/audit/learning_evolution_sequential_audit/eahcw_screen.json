@@ -1,0 +1,355 @@
+{
+  "game": "eahcw",
+  "classification": "No qualifying active perception/belief coupling.",
+  "findings": [
+    "P11 ACTIVE always defaults to red because single-frame input has no previous click to compare; only descendant P13 is broken, and no later B occurs on that branch.",
+    "P18/21/24/29 try to read cursor/brush metadata that is absent after stripping; cur remains unknown.",
+    "P26/28 infer active color from changes across observations, so AC stays ? under one-frame evaluation; PH also stays ? and STEP stays0.",
+    "Later B27 makes claims about cursor history but receives no functioning cursor feature; saved B14 improves recoloring using cell lists, not a new active semantic predicate."
+  ],
+  "saved_node": 28,
+  "saved_lineage": [
+    0,
+    2,
+    5,
+    9,
+    14,
+    26,
+    28
+  ],
+  "candidate_path": "logs/2026-08-24/human_curated/rexpure/eahcw_s1/rexpure_run_seed1/candidates.jsonl",
+  "process_path": "logs/2026-08-24/human_curated/rexpure/eahcw_s1/rexpure_run_seed1/process_log.jsonl",
+  "candidates_reviewed": 30,
+  "candidates": [
+    {
+      "node": 0,
+      "parents": [],
+      "iteration": null,
+      "candidate_line": 1,
+      "process_line": null,
+      "train_score": 0.0
+    },
+    {
+      "node": 1,
+      "parents": [
+        0
+      ],
+      "iteration": 1,
+      "candidate_line": 2,
+      "process_line": 1,
+      "train_score": 0.7192081560283689
+    },
+    {
+      "node": 2,
+      "parents": [
+        0
+      ],
+      "iteration": 2,
+      "candidate_line": 3,
+      "process_line": 2,
+      "train_score": 0.6906375886524823
+    },
+    {
+      "node": 3,
+      "parents": [
+        0
+      ],
+      "iteration": 3,
+      "candidate_line": 4,
+      "process_line": 3,
+      "train_score": 0.6808840425531915
+    },
+    {
+      "node": 4,
+      "parents": [
+        2
+      ],
+      "iteration": 7,
+      "candidate_line": 5,
+      "process_line": 7,
+      "train_score": 0.0
+    },
+    {
+      "node": 5,
+      "parents": [
+        2
+      ],
+      "iteration": 8,
+      "candidate_line": 6,
+      "process_line": 8,
+      "train_score": 0.8597464539007091
+    },
+    {
+      "node": 6,
+      "parents": [
+        3
+      ],
+      "iteration": 9,
+      "candidate_line": 7,
+      "process_line": 9,
+      "train_score": 0.3967177304964539
+    },
+    {
+      "node": 7,
+      "parents": [
+        5
+      ],
+      "iteration": 11,
+      "candidate_line": 8,
+      "process_line": 12,
+      "train_score": 0.0
+    },
+    {
+      "node": 8,
+      "parents": [
+        5
+      ],
+      "iteration": 14,
+      "candidate_line": 9,
+      "process_line": 14,
+      "train_score": 0.3651
+    },
+    {
+      "node": 9,
+      "parents": [
+        5
+      ],
+      "iteration": 15,
+      "candidate_line": 10,
+      "process_line": 15,
+      "train_score": 0.8422539007092199
+    },
+    {
+      "node": 10,
+      "parents": [
+        3
+      ],
+      "iteration": 16,
+      "candidate_line": 11,
+      "process_line": 16,
+      "train_score": 0.8691939716312056
+    },
+    {
+      "node": 11,
+      "parents": [
+        9
+      ],
+      "iteration": 17,
+      "candidate_line": 12,
+      "process_line": 17,
+      "train_score": 0.8222482269503547
+    },
+    {
+      "node": 12,
+      "parents": [
+        3
+      ],
+      "iteration": 18,
+      "candidate_line": 13,
+      "process_line": 18,
+      "train_score": 0.0
+    },
+    {
+      "node": 13,
+      "parents": [
+        11
+      ],
+      "iteration": 19,
+      "candidate_line": 14,
+      "process_line": 20,
+      "train_score": 0.0
+    },
+    {
+      "node": 14,
+      "parents": [
+        9
+      ],
+      "iteration": 20,
+      "candidate_line": 15,
+      "process_line": 21,
+      "train_score": 0.9000283687943262
+    },
+    {
+      "node": 15,
+      "parents": [
+        14
+      ],
+      "iteration": 22,
+      "candidate_line": 16,
+      "process_line": 22,
+      "train_score": 0.0
+    },
+    {
+      "node": 16,
+      "parents": [
+        14
+      ],
+      "iteration": 23,
+      "candidate_line": 17,
+      "process_line": 23,
+      "train_score": 0.0
+    },
+    {
+      "node": 17,
+      "parents": [
+        6
+      ],
+      "iteration": 24,
+      "candidate_line": 18,
+      "process_line": 24,
+      "train_score": 0.6622737588652483
+    },
+    {
+      "node": 18,
+      "parents": [
+        10
+      ],
+      "iteration": 26,
+      "candidate_line": 19,
+      "process_line": 26,
+      "train_score": 0.8505836879432623
+    },
+    {
+      "node": 19,
+      "parents": [
+        2
+      ],
+      "iteration": 27,
+      "candidate_line": 20,
+      "process_line": 27,
+      "train_score": 0.7725471631205674
+    },
+    {
+      "node": 20,
+      "parents": [
+        19
+      ],
+      "iteration": 29,
+      "candidate_line": 21,
+      "process_line": 29,
+      "train_score": 0.7572971631205674
+    },
+    {
+      "node": 21,
+      "parents": [
+        18
+      ],
+      "iteration": 30,
+      "candidate_line": 22,
+      "process_line": 30,
+      "train_score": 0.863918439716312
+    },
+    {
+      "node": 22,
+      "parents": [
+        20
+      ],
+      "iteration": 31,
+      "candidate_line": 23,
+      "process_line": 31,
+      "train_score": 0.7006333333333333
+    },
+    {
+      "node": 23,
+      "parents": [
+        18
+      ],
+      "iteration": 32,
+      "candidate_line": 24,
+      "process_line": 32,
+      "train_score": 0.8600312056737588
+    },
+    {
+      "node": 24,
+      "parents": [
+        21
+      ],
+      "iteration": 33,
+      "candidate_line": 25,
+      "process_line": 33,
+      "train_score": 0.8375195035460993
+    },
+    {
+      "node": 25,
+      "parents": [
+        22
+      ],
+      "iteration": 34,
+      "candidate_line": 26,
+      "process_line": 34,
+      "train_score": 0.680627659574468
+    },
+    {
+      "node": 26,
+      "parents": [
+        14
+      ],
+      "iteration": 35,
+      "candidate_line": 27,
+      "process_line": 35,
+      "train_score": 0.8714365248226951
+    },
+    {
+      "node": 27,
+      "parents": [
+        24
+      ],
+      "iteration": 36,
+      "candidate_line": 28,
+      "process_line": 36,
+      "train_score": 0.9000212765957446
+    },
+    {
+      "node": 28,
+      "parents": [
+        26
+      ],
+      "iteration": 37,
+      "candidate_line": 29,
+      "process_line": 37,
+      "train_score": 0.9069840425531914
+    },
+    {
+      "node": 29,
+      "parents": [
+        23
+      ],
+      "iteration": 38,
+      "candidate_line": 30,
+      "process_line": 38,
+      "train_score": 0.8533531914893617
+    }
+  ],
+  "selected_records": [
+    {
+      "node": 11,
+      "perception": "\"\"\"\nImproved perceive() that includes the active colour explicitly.\nWhen the grid hasn't changed but a movement may have occurred,\nthe active colour is set to \"?\" to signal the change.\n\"\"\"\n\nimport json\nimport hashlib\nfrom collections import Counter\n\n\ndef _compute_background(grid):\n    \"\"\"Return the most common colour in the grid.\"\"\"\n    counter = Counter()\n    for row in grid:\n        counter.update(row)\n    return counter.most_common(1)[0][0]\n\n\ndef _summarize_non_background(grid, background):\n    \"\"\"Return sorted list of \"r,c:colour\" for cells not equal to background.\"\"\"\n    items = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != background:\n                items.append(f\"{r},{c}:{colour}\")\n    items.sort()\n    return items\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the grid as list[list[str]] from the observation string.\"\"\"\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end <= start:\n        return None\n    try:\n        grid = json.loads(obs[start:end+2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _grid_hash(grid):\n    \"\"\"MD5 hex digest of the grid's JSON representation (short).\"\"\"\n    return hashlib.md5(json.dumps(grid, separators=(',', ':')).encode()).hexdigest()[:12]\n\n\ndef _get_active_colour(history: list[str], current_index: int) -> str:\n    \"\"\"\n    Determine the active colour at the current state.\n    Look back through the history for the most recent click (grid change).\n    If the current state is immediately after that click, return the colour of the new cell.\n    Otherwise, if there are intermediate states, return \"?\" (movement may have occurred).\n    If no click ever happened, return \"red\" as default.\n    \"\"\"\n    # Parse all grids in history (caching could help, but we do it fresh)\n    grids = []\n    for obs in history:\n        g = _parse_grid(obs)\n        if g is None:\n            grids.append(None)\n        else:\n            grids.append(g)\n\n    # Find the last index where grid changed (click)\n    last_click_idx = None\n    new_cell_colour = None\n    bg = None\n    for i in range(len(grids)-1, 0, -1):\n        g_prev = grids[i-1]\n        g_curr = grids[i]\n        if g_prev is None or g_curr is None:\n            continue\n        if g_prev == g_curr:\n            continue\n        # They differ \u2013 find the new cell(s)\n        bg_prev = _compute_background(g_prev)\n        bg_curr = _compute_background(g_curr)\n        # Get sets of (r,c,colour) for non-background cells\n        set_prev = {(r,c,colour) for r,row in enumerate(g_prev) for c,colour in enumerate(row) if colour != bg_prev}\n        set_curr = {(r,c,colour) for r,row in enumerate(g_curr) for c,colour in enumerate(row) if colour != bg_curr}\n        added = set_curr - set_prev\n        if len(added) == 1:\n            # Exactly one cell added \u2013 that is the click\n            r,c, colour = added.pop()\n            last_click_idx = i\n            new_cell_colour = colour\n            bg = bg_curr\n            break\n        # Could also handle colour change (click on existing cell)\n        changed = set()\n        for cell in set_curr:\n            r,c,colour = cell\n            if (r,c) not in {(rr,cc) for rr,cc,_ in set_prev}:\n                changed.add(cell)\n        if len(changed) == 1:\n            r,c, colour = changed.pop()\n            last_click_idx = i\n            new_cell_colour = colour\n            bg = bg_curr\n            break\n        # If multiple changes, fallback to first difference (should not happen)\n        # For safety, we break anyway\n        last_click_idx = i\n        new_cell_colour = \"unknown\"\n        break\n\n    if last_click_idx is None:\n        # No click ever \u2013 default active colour\n        return \"red\"\n\n    # Now determine the state of current_index relative to last_click_idx\n    if current_index == last_click_idx:\n        # Immediately after the click\n        return new_cell_colour\n    elif current_index > last_click_idx:\n        # There are intermediate states \u2013 movement may have changed the colour\n        # Check if there is any movement action between last_click_idx and current_index\n        # We cannot know for sure, but we can assume that if any state has the same grid as\n        # the state at last_click_idx, and we are not the next state, then a movement occurred.\n        # But even without movement, noop keeps grid same. We cannot distinguish.\n        # So we return \"?\" to indicate uncertainty.\n        return \"?\"\n    else:\n        # Should not happen (current_index < last_click_idx)\n        return \"?\"\n\n\ndef perceive(observation_history: list[str]) -> str:\n    if not observation_history:\n        return \"error: empty history\"\n\n    current_index = len(observation_history) - 1\n    obs = observation_history[-1]\n    grid = _parse_grid(obs)\n    if grid is None:\n        return \"error: cannot parse grid\"\n\n    # Determine background\n    try:\n        background = _compute_background(grid)\n    except Exception:\n        background = \"black\"\n\n    # Collect non\u2011background cells\n    try:\n        items = _summarize_non_background(grid, background)\n    except Exception:\n        return f\"BGRD:{background}|error_collecting_cells\"\n\n    # Active colour\n    try:\n        active_colour = _get_active_colour(observation_history, current_index)\n    except Exception:\n        active_colour = \"red\"\n\n    # Build summary\n    base = f\"BGRD:{background}|ACTIVE:{active_colour}|\"\n    if not items:\n        base += \"empty\"\n    else:\n        base += \";\".join(items)\n\n    # Add a grid hash for uniqueness (still useful for forward contrast)\n    curr_hash = _grid_hash(grid)\n    summary = f\"GH:{curr_hash}|{base}\"\n\n    # Ensure length <= 2000 characters\n    if len(summary) > 2000:\n        # Keep prefix and truncate the cell list\n        prefix_end = summary.find(\"|\", summary.find(\"|\") + 1) + 1  # after second '|'\n        if prefix_end == 0:\n            prefix_end = len(summary)\n        allowed = 2000 - prefix_end - 3\n        if allowed > 0:\n            summary = summary[:prefix_end] + summary[prefix_end:prefix_end+allowed] + \"...\"\n        else:\n            summary = summary[:1997] + \"...\"\n\n    return summary",
+      "belief": "The perceptible state consists solely of the set of non-background cells, each with a coordinate and a color. No other objects (e.g., an agent) are visible.\n\n- The actions **up**, **down**, **left**, **right**, and **noop** never alter the set of visible colored cells. (They may affect hidden state that influences future click outcomes.)\n- The action **click ROW COL** on a cell that is not currently present in the visible set **adds** a new cell of some color at that coordinate. The color added is determined by a hidden variable (the \"active color\") that changes only when a movement action is taken.\n- The mapping from movement direction to the new active color is fixed per episode but varies across episodes; the predictor must infer this mapping from the observed sequence of clicks and movements within the same episode.\n- Clicking on a cell that is already present in the visible set would either toggle its color or have no effect, but no such instance is observed in the available data; therefore this case is unspecified."
+    },
+    {
+      "node": 18,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nOutput a concise (<2000 char) text summary of decision-relevant features.\nThe summary must move whenever the world moves, so that actions are recoverable\nfrom the feature trajectory even when evidence lies several steps away.\n\"\"\"\n\nimport json\nimport re\nfrom collections import Counter\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]].\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not isinstance(grid, list) or not grid:\n        return None\n    if not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _parse_cursor_brush(obs: str):\n    \"\"\"Extract cursor (row, col) and brush colour from the observation text.\n    Returns (r, c, brush) or None if not found.\"\"\"\n    # try to find \"cursor: x y\" or \"cursor(x,y)\"\n    cursor_match = re.search(r'cursor[:\\s]+(\\d+)\\s+(\\d+)', obs)\n    if not cursor_match:\n        cursor_match = re.search(r'cursor[\\(\\s]+(\\d+)[,\\s]+(\\d+)[\\)\\s]', obs)\n    brush_match = re.search(r'brush[:\\s]+(\\w+)', obs)\n    if cursor_match and brush_match:\n        r = int(cursor_match.group(1))\n        c = int(cursor_match.group(2))\n        brush = brush_match.group(1).lower()\n        return r, c, brush\n    return None\n\n\ndef perceive(observation_history: list[str]) -> str:\n    obs = observation_history[-1] if observation_history else \"\"\n    grid = _parse_grid(obs)\n    if grid is None:\n        return \"parse_error\"\n\n    # Determine background (most frequent colour)\n    all_colours = [cell for row in grid for cell in row]\n    if not all_colours:\n        return \"empty_grid\"\n    bg = Counter(all_colours).most_common(1)[0][0]\n\n    # Collect non-background cells\n    non_bg = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                non_bg.append(f\"{r} {c} {colour}\")\n\n    # Try to get cursor and brush from the observation string\n    cursor_brush = _parse_cursor_brush(obs)\n    if cursor_brush is not None:\n        r_pos, c_pos, brush = cursor_brush\n        features = [f\"cursor {r_pos} {c_pos} {brush}\"]\n    else:\n        # Fallback: use a simple tracker over history (less accurate)\n        # This is only a safety net; the cursor is expected in the observation.\n        # We'll just leave out cursor rather than making things worse.\n        features = []\n\n    features.extend(non_bg)\n\n    if not features:\n        return \"empty\"\n\n    result = \"; \".join(features)\n    if len(result) <= 2000:\n        return result\n\n    # Truncate to fit under 2000 characters\n    truncated = []\n    total_len = 0\n    for f in features:\n        add = len(f) + 2  # plus \"; \" separator\n        if total_len + add > 2000:\n            break\n        truncated.append(f)\n        total_len += add\n    if truncated:\n        return \"; \".join(truncated)\n    return \"many_objects\"",
+      "belief": "- A click action at (row, col) either adds a new colored cell at that location or changes the color of an existing cell there. The color it places is the current \u201cbrush\u201d color.  \n- The brush color is not directly visible in the state features; it is determined by the history of actions.  \n- Movement actions (up, down, left, right) never change the visible state. They only move an invisible cursor position. When the cursor moves onto a cell that already has a color, the brush color becomes that cell\u2019s color. If the cursor moves onto an empty cell, the brush color remains unchanged.  \n- No operation (noop) leaves both the visible state and all hidden state unchanged.  \n- The brush\u2019s initial position and color are set before the observed sequence and can be inferred from the first click\u2019s outcome.  \n\n<changes>  \n- Added rule: click places brush color at target cell.  \n- Added rule: movement changes brush color to color of cell stepped onto (if any), otherwise leaves it.  \n- Added rule: movement and noop cause no visible change.  \n- Removed (no prior block existed).  \n</changes>"
+    },
+    {
+      "node": 24,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nOutput a concise (<2000 char) text summary of decision-relevant features.\nThe summary must move whenever the world moves, so that actions are recoverable\nfrom the feature trajectory even when evidence lies several steps away.\n\"\"\"\n\nimport json\nimport re\nfrom collections import Counter\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]].\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not isinstance(grid, list) or not grid:\n        return None\n    if not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _parse_cursor_brush(obs: str):\n    \"\"\"Extract cursor (row, col) and brush colour from the observation text.\n    Returns (r, c, brush) or (None, None, None) if not found.\"\"\"\n    # Try several formats for cursor: \"cursor: r c\", \"cursor (r, c)\", \"position: r c\"\n    cursor_match = re.search(r'(?:cursor|position)[:\\s]+(\\d+)[\\s,;]+(\\d+)', obs, re.IGNORECASE)\n    if not cursor_match:\n        cursor_match = re.search(r'(?:cursor|position)[\\s(]+(\\d+)[,\\s]+(\\d+)[)\\s]*', obs, re.IGNORECASE)\n    if not cursor_match:\n        cursor_match = re.search(r'(?:cursor|position)\\s*[:=]\\s*\\(?\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)?', obs, re.IGNORECASE)\n\n    # Brush: \"brush: colour\" or \"brush colour\"\n    brush_match = re.search(r'brush[:\\s]+(\\w+)', obs, re.IGNORECASE)\n\n    if cursor_match and brush_match:\n        r = int(cursor_match.group(1))\n        c = int(cursor_match.group(2))\n        brush = brush_match.group(1).lower()\n        return r, c, brush\n    return None, None, None\n\n\ndef perceive(observation_history: list[str]) -> str:\n    obs = observation_history[-1] if observation_history else \"\"\n    grid = _parse_grid(obs)\n    if grid is None:\n        return \"parse_error\"\n\n    rows = len(grid)\n    cols = len(grid[0]) if rows > 0 else 0\n\n    # Determine background (most frequent colour)\n    all_colours = [cell for row in grid for cell in row]\n    if not all_colours:\n        return \"empty_grid\"\n    bg = Counter(all_colours).most_common(1)[0][0]\n\n    # Collect non-background cells, sorted by row then col\n    non_bg = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                non_bg.append(f\"{r}:{c}:{colour}\")\n\n    # Cursor and brush (if available)\n    r_pos, c_pos, brush = _parse_cursor_brush(obs)\n    if r_pos is not None and c_pos is not None and brush is not None:\n        cursor_str = f\"cur {r_pos}:{c_pos}:{brush}\"\n    else:\n        cursor_str = \"cur unknown\"\n\n    # Build compact summary: background, dimensions, cursor, then cells\n    parts = [f\"bg {bg}\", f\"sz {rows}x{cols}\", cursor_str]\n    parts.extend(non_bg)\n    result = \";\".join(parts)\n\n    # If result is too long, drop from the end (cells are sorted, so we keep the top-left ones)\n    if len(result) > 2000:\n        result = result[:2000]\n        # trim at last complete cell entry to avoid broken segment\n        last_semicolon = result.rfind(\";\")\n        if last_semicolon > 0:\n            result = result[:last_semicolon]\n        # ensure it's not empty\n        if not result:\n            result = \"too_many_cells\"\n    # Never return empty\n    if not result:\n        result = \"empty\"\n    return result",
+      "belief": "- A click action at (row, col) either adds a new colored cell at that location or changes the color of an existing cell there. The color it places is the current \u201cbrush\u201d color.  \n- The brush color is not directly visible in the state features; it is determined by the history of actions.  \n- Movement actions (up, down, left, right) never change the visible state. They only move an invisible cursor position. When the cursor moves onto a cell that already has a color, the brush color becomes that cell\u2019s color. If the cursor moves onto an empty cell, the brush color remains unchanged.  \n- No operation (noop) leaves both the visible state and all hidden state unchanged.  \n- The brush\u2019s initial position and color are set before the observed sequence and can be inferred from the first click\u2019s outcome.  \n\n<changes>  \n- Added rule: click places brush color at target cell.  \n- Added rule: movement changes brush color to color of cell stepped onto (if any), otherwise leaves it.  \n- Added rule: movement and noop cause no visible change.  \n- Removed (no prior block existed).  \n</changes>"
+    },
+    {
+      "node": 26,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nProduces a concise text summary of all non-background cells in the current grid observation,\nplus the current active colour (inferred from the most recent click), plus hashes to ensure\nuniqueness.  This output changes even when only the active colour changes (i.e., after a\nmovement), allowing the predictor to recover the hidden action.\n\"\"\"\n\nimport json\nimport hashlib\nfrom collections import Counter\n\n\ndef _compute_background(grid):\n    \"\"\"Return the most common colour in the grid (the background).\"\"\"\n    counter = Counter()\n    for row in grid:\n        counter.update(row)\n    return counter.most_common(1)[0][0]\n\n\ndef _summarize_non_background(grid, background):\n    \"\"\"Return sorted list \"r,c:colour\" for every non-background cell.\"\"\"\n    items = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != background:\n                items.append(f\"{r},{c}:{colour}\")\n    items.sort()\n    return items\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] from the observation string.\"\"\"\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end <= start:\n        return None\n    try:\n        grid = json.loads(obs[start:end+2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _grid_hash(grid):\n    \"\"\"Return an MD5 hex digest of the grid's JSON representation.\"\"\"\n    return hashlib.md5(json.dumps(grid, separators=(',', ':')).encode()).hexdigest()[:12]\n\n\ndef _compute_active_color(observation_history, default=\"?\"):\n    \"\"\"\n    Infer the current active colour by scanning the history for the most recent\n    click that added a new non-background cell.  The colour of that new cell is\n    the active colour at that time.  If no change occurred in the last step, the\n    active colour stays the same as the previous state's active colour.\n    Returns a colour string (or default if unknown).\n    \"\"\"\n    # We'll walk backwards until we find a change, but it's easier to process forward.\n    active = default\n    prev_grid = None\n    prev_background = None\n    for i, obs in enumerate(observation_history):\n        grid = _parse_grid(obs)\n        if grid is None:\n            continue\n        background = _compute_background(grid) if i == 0 else prev_background  # reuse if possible\n        if prev_grid is not None:\n            # Find cells in current grid that were not in prev_grid (non-background)\n            new_cells = []\n            for r, row in enumerate(grid):\n                for c, colour in enumerate(row):\n                    if colour != background:\n                        # Check if this cell exists and has same colour in prev_grid\n                        # (we assume grid dimensions are constant)\n                        if r < len(prev_grid) and c < len(prev_grid[r]):\n                            prev_colour = prev_grid[r][c]\n                            if prev_colour == background or prev_colour != colour:\n                                # It's new or recoloured -> this click's colour\n                                new_cells.append(colour)\n                        else:\n                            # row/col out of previous bounds -> new cell\n                            new_cells.append(colour)\n            if new_cells:\n                # Take the colour of the first new cell (usually there is exactly one)\n                active = new_cells[0]\n            # If no new cells, active remains unchanged\n        prev_grid = grid\n        prev_background = background\n    return active\n\n\ndef perceive(observation_history: list[str]) -> str:\n    if not observation_history:\n        return \"error: empty history\"\n\n    obs = observation_history[-1]\n    grid = _parse_grid(obs)\n    if grid is None:\n        return \"error: cannot parse grid\"\n\n    # Determine background\n    try:\n        background = _compute_background(grid)\n    except Exception:\n        background = \"black\"\n\n    # Active colour inferred from history\n    try:\n        active_color = _compute_active_color(observation_history, \"?\")\n    except Exception:\n        active_color = \"?\"\n\n    # Non-background cells\n    try:\n        items = _summarize_non_background(grid, background)\n    except Exception:\n        return f\"BGRD:{background}|AC:{active_color}|error_collecting_cells\"\n\n    # Build base summary\n    base = f\"BGRD:{background}|\"\n    if not items:\n        base += \"empty\"\n    else:\n        base += \";\".join(items)\n\n    # Hashes\n    curr_hash = _grid_hash(grid)\n    prev_hash = \"?\"\n    if len(observation_history) >= 2:\n        prev_obs = observation_history[-2]\n        prev_grid = _parse_grid(prev_obs)\n        if prev_grid is not None:\n            prev_hash = _grid_hash(prev_grid)\n\n    # Final string: active colour, hashes, then base\n    summary = f\"AC:{active_color}|PH:{prev_hash}|CH:{curr_hash}|{base}\"\n\n    # Enforce length <= 2000\n    if len(summary) > 2000:\n        # Truncate the non-background list if needed\n        # Find start of list after \"BGRD:...\"\n        bgr_start = summary.find(\"BGRD:\")\n        if bgr_start != -1:\n            prefix_end = summary.find(\"|\", bgr_start) + 1  # after first '|' of base\n        else:\n            prefix_end = len(summary)\n        allowed = 2000 - prefix_end - 3\n        if allowed > 0:\n            summary = summary[:prefix_end] + summary[prefix_end:prefix_end+allowed] + \"...\"\n        else:\n            summary = summary[:1997] + \"...\"\n\n    return summary",
+      "belief": "The perceptible state consists solely of the set of non-background cells, each with a coordinate and a color. No other objects (e.g., an agent) are visible.\n\n- The actions **up**, **down**, **left**, **right**, and **noop** never alter the set of visible colored cells. (They may affect a hidden variable called the \"active color\".)\n- The action **click ROW COL** on a cell that is not currently present in the visible set adds a new cell at that coordinate. The color of the new cell is exactly the current active color. The active color does not change as a result of a click.\n- The action **click ROW COL** on a cell that is already present changes the color of that cell to the current active color (if it is not already that color); otherwise the state remains unchanged. In some cases, additional cells sharing the same original color as the clicked cell may also change to the active color, but the condition for this is deterministic given the full state and the active color (to be inferred from data).\n- The active color changes only when a movement action (up, down, left, right) is taken. Each movement direction maps to a specific new active color; this mapping is fixed for the entire episode but varies across episodes.\n- The active color can be inferred from the colors of cells that have been added by clicks: the color of a newly added cell is the active color at that time. If no cell has been added yet, the active color is an initial color that is fixed for the episode but unknown.\n- The color hash (CH) is a fingerprint of the set of visible cells; it changes exactly when the set changes (i.e., when a click adds or changes a cell)."
+    },
+    {
+      "node": 28,
+      "perception": "\"\"\"\nContract: perceive(observation_history: list[str]) -> str must never raise, never return empty.\nProduces a concise text summary of all non-background cells in the current grid observation,\nplus the current active colour (inferred from the most recent click), plus hashes,\na step counter, and the number of non-background cells.  The output changes when the\nunderlying grid changes (even if only the active colour changes), making the hidden action\nrecoverable from a window of consecutive summaries.\n\"\"\"\n\nimport json\nimport hashlib\nfrom collections import Counter\n\n\ndef _compute_background(grid):\n    \"\"\"Return the most common colour in the grid (the background).\"\"\"\n    counter = Counter()\n    for row in grid:\n        counter.update(row)\n    return counter.most_common(1)[0][0]\n\n\ndef _summarize_non_background(grid, background):\n    \"\"\"Return sorted list \"r,c:colour\" for every non-background cell.\"\"\"\n    items = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != background:\n                items.append(f\"{r},{c}:{colour}\")\n    items.sort()  # sort by row then column (natural string order)\n    return items\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]] from the observation string.\"\"\"\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end <= start:\n        return None\n    try:\n        grid = json.loads(obs[start:end + 2])\n    except Exception:\n        return None\n    if not grid or not isinstance(grid, list) or not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _grid_hash(grid):\n    \"\"\"Return an MD5 hex digest (first 12 characters) of the grid's JSON representation.\"\"\"\n    return hashlib.md5(json.dumps(grid, separators=(',', ':')).encode()).hexdigest()[:12]\n\n\ndef _compute_active_color(observation_history):\n    \"\"\"\n    Infer the current active colour by scanning the history for the most recent click.\n    A click is detected by comparing consecutive grids: any cell that changes colour\n    (including from background to non\u2011background) indicates a click, and the *new* colour\n    is the active colour after that click.  Movements (no grid change) keep the active\n    colour unchanged.\n    Returns a colour string or \"?\" if no click has occurred yet.\n    \"\"\"\n    if len(observation_history) < 2:\n        return \"?\"\n\n    # Iterate forward to track active colour\n    active = \"?\"\n    prev_grid = None\n    for i, obs in enumerate(observation_history):\n        grid = _parse_grid(obs)\n        if grid is None:\n            continue\n        if prev_grid is not None:\n            # check for any colour change (click)\n            found_change = False\n            for r, row in enumerate(grid):\n                for c, colour in enumerate(row):\n                    # ensure prev_grid has the same cell\n                    if r < len(prev_grid) and c < len(prev_grid[r]):\n                        prev_colour = prev_grid[r][c]\n                        if colour != prev_colour:\n                            # click changed the colour of this cell\n                            active = colour\n                            found_change = True\n                            break\n                    else:\n                        # new row/col \u2013 treat as change (should not happen if grids same size)\n                        active = colour\n                        found_change = True\n                        break\n                if found_change:\n                    break\n        prev_grid = grid\n    return active\n\n\ndef perceive(observation_history: list[str]) -> str:\n    # Safety: never raise, never return empty.\n    try:\n        if not observation_history:\n            return \"error: empty history\"\n\n        obs = observation_history[-1]\n        grid = _parse_grid(obs)\n        if grid is None:\n            return \"error: cannot parse grid\"\n\n        # Determine background\n        try:\n            background = _compute_background(grid)\n        except Exception:\n            background = \"black\"\n\n        # Active colour from entire history\n        try:\n            active_color = _compute_active_color(observation_history)\n        except Exception:\n            active_color = \"?\"\n\n        # Step counter (0-based index of current observation in the history)\n        step = len(observation_history) - 1\n\n        # Non-background cells\n        try:\n            items = _summarize_non_background(grid, background)\n        except Exception:\n            return f\"STEP:{step}|AC:{active_color}|error_collecting_cells\"\n\n        # Build base summary with size first\n        base = f\"size:{len(items)}|\" + (\"empty\" if not items else \";\".join(items))\n\n        # Hashes\n        curr_hash = _grid_hash(grid)\n        prev_hash = \"?\"\n        if len(observation_history) >= 2:\n            prev_obs = observation_history[-2]\n            prev_grid = _parse_grid(prev_obs)\n            if prev_grid is not None:\n                prev_hash = _grid_hash(prev_grid)\n\n        # Final string: step, active colour, hashes, then base\n        summary = f\"STEP:{step}|AC:{active_color}|PH:{prev_hash}|CH:{curr_hash}|{base}\"\n\n        # Enforce length <= 2000\n        if len(summary) > 2000:\n            # Truncate the cell list if needed; keep all prefixes intact.\n            # Find where the cell list begins (after \"size:N|\")\n            size_prefix = \"size:\"\n            size_pos = summary.find(size_prefix)\n            if size_pos != -1:\n                # Find the '|' after the size prefix\n                list_start = summary.find(\"|\", size_pos) + 1  # start of cell list or \"empty\"\n            else:\n                list_start = len(summary)\n            allowed = 2000 - list_start - 3\n            if allowed > 0:\n                summary = summary[:list_start] + summary[list_start:list_start + allowed] + \"...\"\n            else:\n                summary = summary[:1997] + \"...\"\n\n        return summary\n\n    except Exception:\n        # Final safety net \u2013 never raise, never return empty.\n        return \"perception_error\"",
+      "belief": "The perceptible state consists solely of the set of non-background cells, each with a coordinate and a color. No other objects (e.g., an agent) are visible.\n\n- The actions **up**, **down**, **left**, **right**, and **noop** never alter the set of visible colored cells. (They may affect a hidden variable called the \"active color\".)\n- The action **click ROW COL** on a cell that is not currently present in the visible set adds a new cell at that coordinate. The color of the new cell is exactly the current active color. The active color does not change as a result of a click.\n- The action **click ROW COL** on a cell that is already present changes the color of that cell to the current active color (if it is not already that color); otherwise the state remains unchanged. In some cases, additional cells sharing the same original color as the clicked cell may also change to the active color, but the condition for this is deterministic given the full state and the active color (to be inferred from data).\n- The active color changes only when a movement action (up, down, left, right) is taken. Each movement direction maps to a specific new active color; this mapping is fixed for the entire episode but varies across episodes.\n- The active color can be inferred from the colors of cells that have been added by clicks: the color of a newly added cell is the active color at that time. If no cell has been added yet, the active color is an initial color that is fixed for the episode but unknown.\n- The color hash (CH) is a fingerprint of the set of visible cells; it changes exactly when the set changes (i.e., when a click adds or changes a cell)."
+    },
+    {
+      "node": 27,
+      "perception": "\"\"\"\nContract: perceive(observation_history) -> str must never raise, never return empty.\nOutput a concise (<2000 char) text summary of decision-relevant features.\nThe summary must move whenever the world moves, so that actions are recoverable\nfrom the feature trajectory even when evidence lies several steps away.\n\"\"\"\n\nimport json\nimport re\nfrom collections import Counter\n\n\ndef _parse_grid(obs: str):\n    \"\"\"Extract the 2D colour grid as list[list[str]].\"\"\"\n    if not obs:\n        return None\n    start = obs.find(\"[[\")\n    end = obs.rfind(\"]]\")\n    if start == -1 or end == -1 or end < start:\n        return None\n    try:\n        grid = json.loads(obs[start : end + 2])\n    except Exception:\n        return None\n    if not isinstance(grid, list) or not grid:\n        return None\n    if not isinstance(grid[0], list):\n        return None\n    return grid\n\n\ndef _parse_cursor_brush(obs: str):\n    \"\"\"Extract cursor (row, col) and brush colour from the observation text.\n    Returns (r, c, brush) or (None, None, None) if not found.\"\"\"\n    # Try several formats for cursor: \"cursor: r c\", \"cursor (r, c)\", \"position: r c\"\n    cursor_match = re.search(r'(?:cursor|position)[:\\s]+(\\d+)[\\s,;]+(\\d+)', obs, re.IGNORECASE)\n    if not cursor_match:\n        cursor_match = re.search(r'(?:cursor|position)[\\s(]+(\\d+)[,\\s]+(\\d+)[)\\s]*', obs, re.IGNORECASE)\n    if not cursor_match:\n        cursor_match = re.search(r'(?:cursor|position)\\s*[:=]\\s*\\(?\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)?', obs, re.IGNORECASE)\n\n    # Brush: \"brush: colour\" or \"brush colour\"\n    brush_match = re.search(r'brush[:\\s]+(\\w+)', obs, re.IGNORECASE)\n\n    if cursor_match and brush_match:\n        r = int(cursor_match.group(1))\n        c = int(cursor_match.group(2))\n        brush = brush_match.group(1).lower()\n        return r, c, brush\n    return None, None, None\n\n\ndef perceive(observation_history: list[str]) -> str:\n    obs = observation_history[-1] if observation_history else \"\"\n    grid = _parse_grid(obs)\n    if grid is None:\n        return \"parse_error\"\n\n    rows = len(grid)\n    cols = len(grid[0]) if rows > 0 else 0\n\n    # Determine background (most frequent colour)\n    all_colours = [cell for row in grid for cell in row]\n    if not all_colours:\n        return \"empty_grid\"\n    bg = Counter(all_colours).most_common(1)[0][0]\n\n    # Collect non-background cells, sorted by row then col\n    non_bg = []\n    for r, row in enumerate(grid):\n        for c, colour in enumerate(row):\n            if colour != bg:\n                non_bg.append(f\"{r}:{c}:{colour}\")\n\n    # Cursor and brush (if available)\n    r_pos, c_pos, brush = _parse_cursor_brush(obs)\n    if r_pos is not None and c_pos is not None and brush is not None:\n        cursor_str = f\"cur {r_pos}:{c_pos}:{brush}\"\n    else:\n        cursor_str = \"cur unknown\"\n\n    # Build compact summary: background, dimensions, cursor, then cells\n    parts = [f\"bg {bg}\", f\"sz {rows}x{cols}\", cursor_str]\n    parts.extend(non_bg)\n    result = \";\".join(parts)\n\n    # If result is too long, drop from the end (cells are sorted, so we keep the top-left ones)\n    if len(result) > 2000:\n        result = result[:2000]\n        # trim at last complete cell entry to avoid broken segment\n        last_semicolon = result.rfind(\";\")\n        if last_semicolon > 0:\n            result = result[:last_semicolon]\n        # ensure it's not empty\n        if not result:\n            result = \"too_many_cells\"\n    # Never return empty\n    if not result:\n        result = \"empty\"\n    return result",
+      "belief": "- The environment is a 16x16 grid with black background. Cells may be empty or have a color (e.g., red, gold, blue, green, purple).  \n- Actions: up, down, left, right, noop, and click ROW COL (0-indexed).  \n- Movement actions (up, down, left, right) never change the visible grid. They only move an invisible cursor. **The brush color is never changed by movement.**  \n- Noop leaves both the visible state and all hidden state unchanged.  \n- Click action at (row, col) places the current brush color onto that cell. If the target cell is empty, it becomes that color. If the target cell already has a different color, it is overwritten with the brush color. If the target cell already has exactly the brush color, the visible state does not change.  \n- The brush color is not directly visible in the state features, but it can be inferred from the history of clicks. After each click, the brush color becomes the color that was placed (i.e., the color that appears on the clicked cell after the click). The initial brush color is unknown until the first click; after the first click, the brush is known to be that click's resulting color.  \n- The cursor position is not observable and does not affect the visible state or the brush color.  \n\n<changes>  \n- Removed rule: \u201cWhen the cursor moves onto a cell that already has a color, the brush color becomes that cell\u2019s color. If the cursor moves onto an empty cell, the brush color remains unchanged.\u201d (Contradicted by examples where movement did not change brush color, e.g., Example 1, 5, 6, 7 \u2013 brush remained the same after movements.)  \n- Added rule: \u201cThe brush color is never changed by movement.\u201d (Derived from the same examples.)  \n- Added rule: \u201cIf the target cell already has exactly the brush color, the visible state does not change.\u201d (Required to correctly handle Example 8 where clicking a same\u2011color cell would leave the state unchanged, making movement and such click equally plausible; prevents the predictor from excluding movement.)  \n- Added rule: \u201cAfter each click, the brush color becomes the color that was placed.\u201d (Explicitly links brush color to the click outcome, allowing forward prediction to determine the next state uniquely.)  \n- No other changes; the existing rules about click adding/changing cells and noop leaving state unchanged remain.  \n</changes>"
+    }
+  ]
+}

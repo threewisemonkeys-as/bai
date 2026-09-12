@@ -1,0 +1,108 @@
+Magnets: exact P(X) and world knowledge for the diagram
+
+train_d1, steps 32–35; actions down → noop → down.
+Displayed iterations: 0 (initialization), 4, and 8; candidate nodes 0, 4, and 8.
+Different branches: 0 → 3 → 4 and 0 → 1 → 6 → 8; the figure does not depict a single lineage.
+The fixed crop is rows 5–11, columns 4–9 of the 16×16 grid; only black background is omitted.
+
+===========================================================================
+Node 0; iteration None; lineage [0]
+
+P(X0), frame 32:
+(empty string)
+
+P(X1), frame 33:
+(empty string)
+
+P(X2), frame 34:
+(empty string)
+
+P(X3), frame 35:
+(empty string)
+
+B (complete, verbatim):
+(empty)
+
+===========================================================================
+Node 4; iteration 4; lineage [0, 3, 4]
+
+P(X0), frame 32:
+bg=black; cells: 7,5,blue 7,7,red 8,5,blue 8,7,red
+
+P(X1), frame 33:
+bg=black; cells: 7,7,red 8,6,blue 8,7,red 9,6,blue
+
+P(X2), frame 34:
+bg=black; cells: 7,7,red 8,6,blue 8,7,red 9,6,blue
+
+P(X3), frame 35:
+bg=black; cells: 7,7,red 8,7,red 9,6,blue 10,6,blue
+
+B (complete, verbatim):
+- There are two static red cells at positions (7,7) and (8,7). They never move or disappear.
+- A pair of blue cells exists. They always occupy two vertically adjacent cells (same column, consecutive rows). Their state is fully described by the top cell’s coordinates (r, c). The pair may be off‑screen (r < 0, r > 13, c < 0, c > 13).
+- Action effects on the blue pair:
+  * `up`: (r, c) -> (r-1, c)
+  * `left`: (r, c) -> (r, c-1)
+  * `down`: (r, c) -> (r+1, c); if c == 5 then additionally c -> c+1; if c == 9 then additionally c -> c-1.
+  * `right`: (r, c) -> (r, c+1); if c < 7 and r == 5 then additionally r -> r+1; if c < 7 and r == 10 then additionally r -> r-1.
+  * `noop`: no change.
+- When the blue pair is off‑screen, the same rules apply to its hidden (r, c) coordinates. The pair becomes visible when its coordinates enter the visible grid (0 ≤ r ≤ 13, 0 ≤ c ≤ 13) and disappears when they leave it.
+
+B (figure excerpts):
+… A pair of blue cells exists. … the top cell’s coordinates (r, c). …
+… down: (r, c) -> (r+1, c); if c == 5 then additionally c -> c+1;
+if c == 9 then additionally c -> c-1. …
+… noop: no change. …
+
+===========================================================================
+Node 8; iteration 8; lineage [0, 1, 6, 8]
+
+P(X0), frame 32:
+7,5,blue,rDist2; 7,7,red; 8,5,blue,rDist2; 8,7,red
+
+P(X1), frame 33:
+7,7,red; 8,6,blue,rDist1; 8,7,red; 9,6,blue,noRedRow
+
+P(X2), frame 34:
+7,7,red; 8,6,blue,rDist1; 8,7,red; 9,6,blue,noRedRow
+
+P(X3), frame 35:
+7,7,red; 8,7,red; 9,6,blue,noRedRow; 10,6,blue,noRedRow
+
+B (complete, verbatim):
+world knowledge
+- There are two static red cells permanently at (7,7) and (8,7); they never move or change color.
+- There are exactly two blue cells. Their label indicates their row:
+  * If a blue cell is in row 7 or row 8, its label is "rDistN", where N = |col - 7| (horizontal distance to nearest red).
+  * Otherwise, its label is "noRedRow".
+- Horizontal actions (left/right):
+  * Both blue cells move 1 column left (col-1) or right (col+1).
+  * After moving, each blue's label is recalculated based on its new row and column.
+- Vertical actions (up/down):
+  * All blue cells with label "noRedRow" move 1 row up (row-1) or down (row+1).
+  * For blue cells with label "rDist":
+    - If there is a "noRedRow" blue in the same column, then:
+        * The rDist blue moves 1 row toward that noRedRow blue (up if noRedRow is above, down if below) and becomes "noRedRow".
+        * The noRedRow blue moves 1 row further in the same vertical direction.
+    - Else (no "noRedRow" in the same column):
+        * For action "up":
+            - The rDist blue in row 8 (lower red row) moves up 2 rows to row 6 and becomes "noRedRow".
+            - The rDist blue in row 7 (upper red row) moves horizontally 1 step toward column 7 (right if col<7, left if col>7) and remains "rDist" with updated N.
+        * For action "down":
+            - The rDist blue in row 7 (upper red row) moves down 2 rows to row 9, also moves horizontally 1 step toward column 7, and becomes "noRedRow".
+            - The rDist blue in row 8 (lower red row) moves horizontally 1 step toward column 7 and remains "rDist" with updated N.
+- The action "noop" changes no feature.
+- After any action, labels and positions update consistently: a blue that reaches a row other than 7 or 8 gets label "noRedRow"; a blue in row 7 or 8 gets label "rDistN".
+
+B (figure excerpts):
+… Vertical actions (up/down): … For blue cells with label "rDist":
+If there is a "noRedRow" blue in the same column, then:
+  The rDist blue moves 1 row toward that noRedRow blue …
+  The noRedRow blue moves 1 row further in the same vertical direction.
+Else (no "noRedRow" in the same column): … For action "down":
+  The rDist blue in row 7 … moves down 2 rows to row 9,
+  also moves horizontally 1 step toward column 7, and becomes "noRedRow".
+  The rDist blue in row 8 … moves horizontally 1 step toward column 7 …
+… The action "noop" changes no feature. …
+

@@ -1,0 +1,4486 @@
+{
+  "games": 15,
+  "candidate_records": 450,
+  "selected_perception_frame_evaluations": 101,
+  "cached_prediction_records_verified": 35,
+  "local_transitions_checked": 23,
+  "method": "Manual sequential review of all candidates; exact P reruns on selected recorded frames, fresh namespace and single-frame history. Local checks cover only specified B clauses.",
+  "score_note": "Cached CFD is contrastive next-frame selection, not free-form simulation. Whole-training scores are not window accuracies.",
+  "review_order": [
+    "Disease",
+    "Egg",
+    "Logic Gates",
+    "SET",
+    "Mario",
+    "Ice",
+    "Space Invaders",
+    "Colour Lines",
+    "Diffusion",
+    "Paint",
+    "Ants",
+    "Sand",
+    "Magnets",
+    "Dino",
+    "Grow"
+  ],
+  "games_detail": [
+    {
+      "game": "dq8gc",
+      "name": "Disease",
+      "candidates": 30,
+      "classification": "Additional direct feature-use case, with incorrect stack interpretation; node 23 locally explains entire window.",
+      "saved_node": 29,
+      "saved_lineage": [
+        0,
+        1,
+        14,
+        16,
+        29
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 2,
+          "candidate_line": 2,
+          "process_line": 2
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 3,
+          "process_line": 3
+        },
+        {
+          "node": 3,
+          "parents": [
+            1
+          ],
+          "iteration": 6,
+          "candidate_line": 4,
+          "process_line": 6
+        },
+        {
+          "node": 4,
+          "parents": [
+            2
+          ],
+          "iteration": 8,
+          "candidate_line": 5,
+          "process_line": 9
+        },
+        {
+          "node": 5,
+          "parents": [
+            3
+          ],
+          "iteration": 10,
+          "candidate_line": 6,
+          "process_line": 10
+        },
+        {
+          "node": 6,
+          "parents": [
+            4
+          ],
+          "iteration": 11,
+          "candidate_line": 7,
+          "process_line": 11
+        },
+        {
+          "node": 7,
+          "parents": [
+            4
+          ],
+          "iteration": 12,
+          "candidate_line": 8,
+          "process_line": 12
+        },
+        {
+          "node": 8,
+          "parents": [
+            1
+          ],
+          "iteration": 13,
+          "candidate_line": 9,
+          "process_line": 14
+        },
+        {
+          "node": 9,
+          "parents": [
+            7
+          ],
+          "iteration": 14,
+          "candidate_line": 10,
+          "process_line": 15
+        },
+        {
+          "node": 10,
+          "parents": [
+            8
+          ],
+          "iteration": 16,
+          "candidate_line": 11,
+          "process_line": 16
+        },
+        {
+          "node": 11,
+          "parents": [
+            9
+          ],
+          "iteration": 17,
+          "candidate_line": 12,
+          "process_line": 17
+        },
+        {
+          "node": 12,
+          "parents": [
+            8
+          ],
+          "iteration": 18,
+          "candidate_line": 13,
+          "process_line": 18
+        },
+        {
+          "node": 13,
+          "parents": [
+            10
+          ],
+          "iteration": 20,
+          "candidate_line": 14,
+          "process_line": 20
+        },
+        {
+          "node": 14,
+          "parents": [
+            1
+          ],
+          "iteration": 21,
+          "candidate_line": 15,
+          "process_line": 21
+        },
+        {
+          "node": 15,
+          "parents": [
+            10
+          ],
+          "iteration": 22,
+          "candidate_line": 16,
+          "process_line": 23
+        },
+        {
+          "node": 16,
+          "parents": [
+            14
+          ],
+          "iteration": 24,
+          "candidate_line": 17,
+          "process_line": 24
+        },
+        {
+          "node": 17,
+          "parents": [
+            15
+          ],
+          "iteration": 25,
+          "candidate_line": 18,
+          "process_line": 26
+        },
+        {
+          "node": 18,
+          "parents": [
+            5
+          ],
+          "iteration": 27,
+          "candidate_line": 19,
+          "process_line": 27
+        },
+        {
+          "node": 19,
+          "parents": [
+            18
+          ],
+          "iteration": 28,
+          "candidate_line": 20,
+          "process_line": 28
+        },
+        {
+          "node": 20,
+          "parents": [
+            17
+          ],
+          "iteration": 29,
+          "candidate_line": 21,
+          "process_line": 29
+        },
+        {
+          "node": 21,
+          "parents": [
+            17
+          ],
+          "iteration": 30,
+          "candidate_line": 22,
+          "process_line": 30
+        },
+        {
+          "node": 22,
+          "parents": [
+            7
+          ],
+          "iteration": 31,
+          "candidate_line": 23,
+          "process_line": 32
+        },
+        {
+          "node": 23,
+          "parents": [
+            21
+          ],
+          "iteration": 32,
+          "candidate_line": 24,
+          "process_line": 33
+        },
+        {
+          "node": 24,
+          "parents": [
+            22
+          ],
+          "iteration": 34,
+          "candidate_line": 25,
+          "process_line": 34
+        },
+        {
+          "node": 25,
+          "parents": [
+            21
+          ],
+          "iteration": 35,
+          "candidate_line": 26,
+          "process_line": 35
+        },
+        {
+          "node": 26,
+          "parents": [
+            19
+          ],
+          "iteration": 36,
+          "candidate_line": 27,
+          "process_line": 36
+        },
+        {
+          "node": 27,
+          "parents": [
+            16
+          ],
+          "iteration": 37,
+          "candidate_line": 28,
+          "process_line": 38
+        },
+        {
+          "node": 28,
+          "parents": [
+            25
+          ],
+          "iteration": 39,
+          "candidate_line": 29,
+          "process_line": 39
+        },
+        {
+          "node": 29,
+          "parents": [
+            16
+          ],
+          "iteration": 40,
+          "candidate_line": 30,
+          "process_line": 40
+        }
+      ],
+      "local_rule_verification": {
+        "transitions": 3,
+        "scope": "All visible cells in approach/infection window; no physical stack interpretation."
+      },
+      "selected_lineage": [
+        0,
+        1,
+        8,
+        10,
+        15,
+        17,
+        21,
+        23
+      ],
+      "selected_nodes": [
+        1,
+        8,
+        10,
+        17,
+        23
+      ],
+      "steps": [
+        20,
+        21,
+        22,
+        23
+      ],
+      "drive": "train_d0"
+    },
+    {
+      "game": "egg",
+      "name": "Egg",
+      "candidates": 30,
+      "classification": "Secondary: meaningful button/blob decomposition and explicit agent-field adoption; new bounds/centroid are not used as learned rule conditions.",
+      "saved_node": 8,
+      "saved_lineage": [
+        0,
+        2,
+        3,
+        5,
+        8
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 2,
+          "candidate_line": 2,
+          "process_line": 2
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 3,
+          "process_line": 3
+        },
+        {
+          "node": 3,
+          "parents": [
+            2
+          ],
+          "iteration": 4,
+          "candidate_line": 4,
+          "process_line": 5
+        },
+        {
+          "node": 4,
+          "parents": [
+            2
+          ],
+          "iteration": 5,
+          "candidate_line": 5,
+          "process_line": 6
+        },
+        {
+          "node": 5,
+          "parents": [
+            3
+          ],
+          "iteration": 7,
+          "candidate_line": 6,
+          "process_line": 8
+        },
+        {
+          "node": 6,
+          "parents": [
+            3
+          ],
+          "iteration": 9,
+          "candidate_line": 7,
+          "process_line": 9
+        },
+        {
+          "node": 7,
+          "parents": [
+            5
+          ],
+          "iteration": 11,
+          "candidate_line": 8,
+          "process_line": 12
+        },
+        {
+          "node": 8,
+          "parents": [
+            5
+          ],
+          "iteration": 13,
+          "candidate_line": 9,
+          "process_line": 14
+        },
+        {
+          "node": 9,
+          "parents": [
+            5
+          ],
+          "iteration": 14,
+          "candidate_line": 10,
+          "process_line": 15
+        },
+        {
+          "node": 10,
+          "parents": [
+            9
+          ],
+          "iteration": 19,
+          "candidate_line": 11,
+          "process_line": 20
+        },
+        {
+          "node": 11,
+          "parents": [
+            9
+          ],
+          "iteration": 20,
+          "candidate_line": 12,
+          "process_line": 21
+        },
+        {
+          "node": 12,
+          "parents": [
+            10
+          ],
+          "iteration": 22,
+          "candidate_line": 13,
+          "process_line": 22
+        },
+        {
+          "node": 13,
+          "parents": [
+            10
+          ],
+          "iteration": 23,
+          "candidate_line": 14,
+          "process_line": 23
+        },
+        {
+          "node": 14,
+          "parents": [
+            10
+          ],
+          "iteration": 24,
+          "candidate_line": 15,
+          "process_line": 24
+        },
+        {
+          "node": 15,
+          "parents": [
+            9
+          ],
+          "iteration": 26,
+          "candidate_line": 16,
+          "process_line": 26
+        },
+        {
+          "node": 16,
+          "parents": [
+            10
+          ],
+          "iteration": 27,
+          "candidate_line": 17,
+          "process_line": 27
+        },
+        {
+          "node": 17,
+          "parents": [
+            13
+          ],
+          "iteration": 28,
+          "candidate_line": 18,
+          "process_line": 28
+        },
+        {
+          "node": 18,
+          "parents": [
+            13
+          ],
+          "iteration": 29,
+          "candidate_line": 19,
+          "process_line": 29
+        },
+        {
+          "node": 19,
+          "parents": [
+            8
+          ],
+          "iteration": 30,
+          "candidate_line": 20,
+          "process_line": 30
+        },
+        {
+          "node": 20,
+          "parents": [
+            14
+          ],
+          "iteration": 31,
+          "candidate_line": 21,
+          "process_line": 31
+        },
+        {
+          "node": 21,
+          "parents": [
+            17
+          ],
+          "iteration": 32,
+          "candidate_line": 22,
+          "process_line": 32
+        },
+        {
+          "node": 22,
+          "parents": [
+            13
+          ],
+          "iteration": 33,
+          "candidate_line": 23,
+          "process_line": 33
+        },
+        {
+          "node": 23,
+          "parents": [
+            19
+          ],
+          "iteration": 34,
+          "candidate_line": 24,
+          "process_line": 34
+        },
+        {
+          "node": 24,
+          "parents": [
+            14
+          ],
+          "iteration": 35,
+          "candidate_line": 25,
+          "process_line": 35
+        },
+        {
+          "node": 25,
+          "parents": [
+            20
+          ],
+          "iteration": 36,
+          "candidate_line": 26,
+          "process_line": 36
+        },
+        {
+          "node": 26,
+          "parents": [
+            18
+          ],
+          "iteration": 37,
+          "candidate_line": 27,
+          "process_line": 38
+        },
+        {
+          "node": 27,
+          "parents": [
+            14
+          ],
+          "iteration": 39,
+          "candidate_line": 28,
+          "process_line": 39
+        },
+        {
+          "node": 28,
+          "parents": [
+            25
+          ],
+          "iteration": 40,
+          "candidate_line": 29,
+          "process_line": 41
+        },
+        {
+          "node": 29,
+          "parents": [
+            24
+          ],
+          "iteration": 42,
+          "candidate_line": 30,
+          "process_line": 42
+        }
+      ],
+      "local_rule_verification": {
+        "transitions": 2,
+        "scope": "All cells for pre-break noop and button click; excludes liquid spreading and height generalization."
+      },
+      "selected_lineage": [
+        0,
+        2,
+        3,
+        5,
+        9,
+        10,
+        14
+      ],
+      "selected_nodes": [
+        9,
+        10,
+        14
+      ],
+      "steps": [
+        212,
+        213,
+        214
+      ],
+      "drive": "train_d1"
+    },
+    {
+      "game": "logic_gates",
+      "name": "Logic Gates",
+      "candidates": 30,
+      "classification": "Secondary: learned six-block abstraction is used by later conditional gate rules; direct trace vocabulary use, but no general gate predicates.",
+      "saved_node": 17,
+      "saved_lineage": [
+        0,
+        2,
+        3,
+        6,
+        17
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 2,
+          "candidate_line": 2,
+          "process_line": 2
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 3,
+          "process_line": 3
+        },
+        {
+          "node": 3,
+          "parents": [
+            2
+          ],
+          "iteration": 4,
+          "candidate_line": 4,
+          "process_line": 5
+        },
+        {
+          "node": 4,
+          "parents": [
+            2
+          ],
+          "iteration": 6,
+          "candidate_line": 5,
+          "process_line": 6
+        },
+        {
+          "node": 5,
+          "parents": [
+            4
+          ],
+          "iteration": 7,
+          "candidate_line": 6,
+          "process_line": 7
+        },
+        {
+          "node": 6,
+          "parents": [
+            3
+          ],
+          "iteration": 8,
+          "candidate_line": 7,
+          "process_line": 8
+        },
+        {
+          "node": 7,
+          "parents": [
+            3
+          ],
+          "iteration": 9,
+          "candidate_line": 8,
+          "process_line": 9
+        },
+        {
+          "node": 8,
+          "parents": [
+            7
+          ],
+          "iteration": 10,
+          "candidate_line": 9,
+          "process_line": 10
+        },
+        {
+          "node": 9,
+          "parents": [
+            2
+          ],
+          "iteration": 11,
+          "candidate_line": 10,
+          "process_line": 11
+        },
+        {
+          "node": 10,
+          "parents": [
+            4
+          ],
+          "iteration": 12,
+          "candidate_line": 11,
+          "process_line": 12
+        },
+        {
+          "node": 11,
+          "parents": [
+            8
+          ],
+          "iteration": 13,
+          "candidate_line": 12,
+          "process_line": 13
+        },
+        {
+          "node": 12,
+          "parents": [
+            5
+          ],
+          "iteration": 14,
+          "candidate_line": 13,
+          "process_line": 14
+        },
+        {
+          "node": 13,
+          "parents": [
+            6
+          ],
+          "iteration": 15,
+          "candidate_line": 14,
+          "process_line": 15
+        },
+        {
+          "node": 14,
+          "parents": [
+            6
+          ],
+          "iteration": 17,
+          "candidate_line": 15,
+          "process_line": 17
+        },
+        {
+          "node": 15,
+          "parents": [
+            12
+          ],
+          "iteration": 18,
+          "candidate_line": 16,
+          "process_line": 18
+        },
+        {
+          "node": 16,
+          "parents": [
+            8
+          ],
+          "iteration": 19,
+          "candidate_line": 17,
+          "process_line": 19
+        },
+        {
+          "node": 17,
+          "parents": [
+            6
+          ],
+          "iteration": 20,
+          "candidate_line": 18,
+          "process_line": 20
+        },
+        {
+          "node": 18,
+          "parents": [
+            4
+          ],
+          "iteration": 21,
+          "candidate_line": 19,
+          "process_line": 21
+        },
+        {
+          "node": 19,
+          "parents": [
+            14
+          ],
+          "iteration": 22,
+          "candidate_line": 20,
+          "process_line": 22
+        },
+        {
+          "node": 20,
+          "parents": [
+            10
+          ],
+          "iteration": 23,
+          "candidate_line": 21,
+          "process_line": 23
+        },
+        {
+          "node": 21,
+          "parents": [
+            7
+          ],
+          "iteration": 24,
+          "candidate_line": 22,
+          "process_line": 24
+        },
+        {
+          "node": 22,
+          "parents": [
+            17
+          ],
+          "iteration": 25,
+          "candidate_line": 23,
+          "process_line": 26
+        },
+        {
+          "node": 23,
+          "parents": [
+            1
+          ],
+          "iteration": 27,
+          "candidate_line": 24,
+          "process_line": 27
+        },
+        {
+          "node": 24,
+          "parents": [
+            19
+          ],
+          "iteration": 28,
+          "candidate_line": 25,
+          "process_line": 28
+        },
+        {
+          "node": 25,
+          "parents": [
+            14
+          ],
+          "iteration": 29,
+          "candidate_line": 26,
+          "process_line": 29
+        },
+        {
+          "node": 26,
+          "parents": [
+            19
+          ],
+          "iteration": 30,
+          "candidate_line": 27,
+          "process_line": 30
+        },
+        {
+          "node": 27,
+          "parents": [
+            9
+          ],
+          "iteration": 33,
+          "candidate_line": 28,
+          "process_line": 33
+        },
+        {
+          "node": 28,
+          "parents": [
+            19
+          ],
+          "iteration": 34,
+          "candidate_line": 29,
+          "process_line": 34
+        },
+        {
+          "node": 29,
+          "parents": [
+            22
+          ],
+          "iteration": 35,
+          "candidate_line": 30,
+          "process_line": 35
+        }
+      ],
+      "local_rule_verification": {
+        "transitions": 3,
+        "scope": "Six 2x2 blocks only; wire model is incorrect and excluded."
+      },
+      "selected_lineage": [
+        0,
+        2,
+        3,
+        7,
+        21
+      ],
+      "selected_nodes": [
+        3,
+        7,
+        21
+      ],
+      "steps": [
+        58,
+        59,
+        60,
+        61
+      ],
+      "drive": "train_d0"
+    },
+    {
+      "game": "SET",
+      "name": "SET",
+      "candidates": 30,
+      "classification": "Additional operational joint-learning case: nine-card decomposition then a count-based selection-reset rule.",
+      "saved_node": 12,
+      "saved_lineage": [
+        0,
+        1,
+        2,
+        6,
+        10,
+        12
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 1,
+          "candidate_line": 2,
+          "process_line": 3
+        },
+        {
+          "node": 2,
+          "parents": [
+            1
+          ],
+          "iteration": 4,
+          "candidate_line": 3,
+          "process_line": 4
+        },
+        {
+          "node": 3,
+          "parents": [
+            1
+          ],
+          "iteration": 5,
+          "candidate_line": 4,
+          "process_line": 5
+        },
+        {
+          "node": 4,
+          "parents": [
+            1
+          ],
+          "iteration": 6,
+          "candidate_line": 5,
+          "process_line": 6
+        },
+        {
+          "node": 5,
+          "parents": [
+            4
+          ],
+          "iteration": 7,
+          "candidate_line": 6,
+          "process_line": 7
+        },
+        {
+          "node": 6,
+          "parents": [
+            2
+          ],
+          "iteration": 8,
+          "candidate_line": 7,
+          "process_line": 8
+        },
+        {
+          "node": 7,
+          "parents": [
+            2
+          ],
+          "iteration": 9,
+          "candidate_line": 8,
+          "process_line": 9
+        },
+        {
+          "node": 8,
+          "parents": [
+            2
+          ],
+          "iteration": 15,
+          "candidate_line": 9,
+          "process_line": 15
+        },
+        {
+          "node": 9,
+          "parents": [
+            0
+          ],
+          "iteration": 16,
+          "candidate_line": 10,
+          "process_line": 16
+        },
+        {
+          "node": 10,
+          "parents": [
+            6
+          ],
+          "iteration": 17,
+          "candidate_line": 11,
+          "process_line": 17
+        },
+        {
+          "node": 11,
+          "parents": [
+            2
+          ],
+          "iteration": 18,
+          "candidate_line": 12,
+          "process_line": 18
+        },
+        {
+          "node": 12,
+          "parents": [
+            10
+          ],
+          "iteration": 19,
+          "candidate_line": 13,
+          "process_line": 19
+        },
+        {
+          "node": 13,
+          "parents": [
+            8
+          ],
+          "iteration": 20,
+          "candidate_line": 14,
+          "process_line": 20
+        },
+        {
+          "node": 14,
+          "parents": [
+            8
+          ],
+          "iteration": 21,
+          "candidate_line": 15,
+          "process_line": 21
+        },
+        {
+          "node": 15,
+          "parents": [
+            10
+          ],
+          "iteration": 22,
+          "candidate_line": 16,
+          "process_line": 23
+        },
+        {
+          "node": 16,
+          "parents": [
+            11
+          ],
+          "iteration": 23,
+          "candidate_line": 17,
+          "process_line": 24
+        },
+        {
+          "node": 17,
+          "parents": [
+            15
+          ],
+          "iteration": 27,
+          "candidate_line": 18,
+          "process_line": 27
+        },
+        {
+          "node": 18,
+          "parents": [
+            2
+          ],
+          "iteration": 28,
+          "candidate_line": 19,
+          "process_line": 29
+        },
+        {
+          "node": 19,
+          "parents": [
+            15
+          ],
+          "iteration": 29,
+          "candidate_line": 20,
+          "process_line": 30
+        },
+        {
+          "node": 20,
+          "parents": [
+            16
+          ],
+          "iteration": 32,
+          "candidate_line": 21,
+          "process_line": 32
+        },
+        {
+          "node": 21,
+          "parents": [
+            14
+          ],
+          "iteration": 33,
+          "candidate_line": 22,
+          "process_line": 33
+        },
+        {
+          "node": 22,
+          "parents": [
+            21
+          ],
+          "iteration": 35,
+          "candidate_line": 23,
+          "process_line": 36
+        },
+        {
+          "node": 23,
+          "parents": [
+            21
+          ],
+          "iteration": 37,
+          "candidate_line": 24,
+          "process_line": 39
+        },
+        {
+          "node": 24,
+          "parents": [
+            15
+          ],
+          "iteration": 43,
+          "candidate_line": 25,
+          "process_line": 43
+        },
+        {
+          "node": 25,
+          "parents": [
+            17
+          ],
+          "iteration": 44,
+          "candidate_line": 26,
+          "process_line": 44
+        },
+        {
+          "node": 26,
+          "parents": [
+            17
+          ],
+          "iteration": 45,
+          "candidate_line": 27,
+          "process_line": 45
+        },
+        {
+          "node": 27,
+          "parents": [
+            22
+          ],
+          "iteration": 49,
+          "candidate_line": 28,
+          "process_line": 49
+        },
+        {
+          "node": 28,
+          "parents": [
+            14
+          ],
+          "iteration": 50,
+          "candidate_line": 29,
+          "process_line": 50
+        },
+        {
+          "node": 29,
+          "parents": [
+            26
+          ],
+          "iteration": 51,
+          "candidate_line": 30,
+          "process_line": 51
+        }
+      ],
+      "local_rule_verification": {
+        "transitions": 3,
+        "scope": "All cells; invalid triple selection/reset only."
+      },
+      "selected_lineage": [
+        0,
+        1,
+        2,
+        6,
+        10,
+        15,
+        17,
+        25
+      ],
+      "selected_nodes": [
+        15,
+        17,
+        25
+      ],
+      "steps": [
+        187,
+        188,
+        189,
+        190
+      ],
+      "drive": "train_d1"
+    },
+    {
+      "game": "n2ntd",
+      "name": "Mario",
+      "candidates": 30,
+      "classification": "Secondary B-before-P case: B16 learns support-limited falling, then P29 exposes red-neighbor colors; B never names red_adj.",
+      "saved_node": 16,
+      "saved_lineage": [
+        0,
+        2,
+        3,
+        6,
+        15,
+        16
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 1,
+          "candidate_line": 2,
+          "process_line": 2
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 3,
+          "process_line": 3
+        },
+        {
+          "node": 3,
+          "parents": [
+            2
+          ],
+          "iteration": 4,
+          "candidate_line": 4,
+          "process_line": 4
+        },
+        {
+          "node": 4,
+          "parents": [
+            2
+          ],
+          "iteration": 5,
+          "candidate_line": 5,
+          "process_line": 5
+        },
+        {
+          "node": 5,
+          "parents": [
+            1
+          ],
+          "iteration": 6,
+          "candidate_line": 6,
+          "process_line": 6
+        },
+        {
+          "node": 6,
+          "parents": [
+            3
+          ],
+          "iteration": 7,
+          "candidate_line": 7,
+          "process_line": 7
+        },
+        {
+          "node": 7,
+          "parents": [
+            4
+          ],
+          "iteration": 8,
+          "candidate_line": 8,
+          "process_line": 8
+        },
+        {
+          "node": 8,
+          "parents": [
+            5
+          ],
+          "iteration": 9,
+          "candidate_line": 9,
+          "process_line": 9
+        },
+        {
+          "node": 9,
+          "parents": [
+            7
+          ],
+          "iteration": 10,
+          "candidate_line": 10,
+          "process_line": 12
+        },
+        {
+          "node": 10,
+          "parents": [
+            3
+          ],
+          "iteration": 13,
+          "candidate_line": 11,
+          "process_line": 13
+        },
+        {
+          "node": 11,
+          "parents": [
+            4
+          ],
+          "iteration": 14,
+          "candidate_line": 12,
+          "process_line": 14
+        },
+        {
+          "node": 12,
+          "parents": [
+            9
+          ],
+          "iteration": 15,
+          "candidate_line": 13,
+          "process_line": 15
+        },
+        {
+          "node": 13,
+          "parents": [
+            10
+          ],
+          "iteration": 16,
+          "candidate_line": 14,
+          "process_line": 16
+        },
+        {
+          "node": 14,
+          "parents": [
+            12
+          ],
+          "iteration": 17,
+          "candidate_line": 15,
+          "process_line": 17
+        },
+        {
+          "node": 15,
+          "parents": [
+            6
+          ],
+          "iteration": 18,
+          "candidate_line": 16,
+          "process_line": 18
+        },
+        {
+          "node": 16,
+          "parents": [
+            15
+          ],
+          "iteration": 20,
+          "candidate_line": 17,
+          "process_line": 20
+        },
+        {
+          "node": 17,
+          "parents": [
+            12
+          ],
+          "iteration": 21,
+          "candidate_line": 18,
+          "process_line": 21
+        },
+        {
+          "node": 18,
+          "parents": [
+            16
+          ],
+          "iteration": 22,
+          "candidate_line": 19,
+          "process_line": 23
+        },
+        {
+          "node": 19,
+          "parents": [
+            5
+          ],
+          "iteration": 24,
+          "candidate_line": 20,
+          "process_line": 24
+        },
+        {
+          "node": 20,
+          "parents": [
+            13
+          ],
+          "iteration": 25,
+          "candidate_line": 21,
+          "process_line": 25
+        },
+        {
+          "node": 21,
+          "parents": [
+            19
+          ],
+          "iteration": 26,
+          "candidate_line": 22,
+          "process_line": 26
+        },
+        {
+          "node": 22,
+          "parents": [
+            6
+          ],
+          "iteration": 27,
+          "candidate_line": 23,
+          "process_line": 27
+        },
+        {
+          "node": 23,
+          "parents": [
+            1
+          ],
+          "iteration": 28,
+          "candidate_line": 24,
+          "process_line": 28
+        },
+        {
+          "node": 24,
+          "parents": [
+            12
+          ],
+          "iteration": 29,
+          "candidate_line": 25,
+          "process_line": 29
+        },
+        {
+          "node": 25,
+          "parents": [
+            20
+          ],
+          "iteration": 30,
+          "candidate_line": 26,
+          "process_line": 30
+        },
+        {
+          "node": 26,
+          "parents": [
+            20
+          ],
+          "iteration": 31,
+          "candidate_line": 27,
+          "process_line": 32
+        },
+        {
+          "node": 27,
+          "parents": [
+            22
+          ],
+          "iteration": 33,
+          "candidate_line": 28,
+          "process_line": 33
+        },
+        {
+          "node": 28,
+          "parents": [
+            15
+          ],
+          "iteration": 34,
+          "candidate_line": 29,
+          "process_line": 34
+        },
+        {
+          "node": 29,
+          "parents": [
+            16
+          ],
+          "iteration": 35,
+          "candidate_line": 30,
+          "process_line": 35
+        }
+      ],
+      "local_rule_verification": {
+        "transitions": 3,
+        "scope": "Red motion only; excludes other moving objects and other mechanics."
+      },
+      "selected_lineage": [
+        0,
+        2,
+        3,
+        6,
+        15,
+        16,
+        29
+      ],
+      "selected_nodes": [
+        15,
+        16,
+        29
+      ],
+      "steps": [
+        223,
+        224,
+        225,
+        226
+      ],
+      "drive": "train_d2"
+    },
+    {
+      "game": "bt3gb",
+      "name": "Ice",
+      "candidates": 30,
+      "classification": "Additional weaker role-based branch, not a new relational mechanic.",
+      "saved_node": 12,
+      "saved_lineage": [
+        0,
+        3,
+        4,
+        6,
+        8,
+        12
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 1,
+          "candidate_line": 2,
+          "process_line": 1
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 2,
+          "candidate_line": 3,
+          "process_line": 2
+        },
+        {
+          "node": 3,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 4,
+          "process_line": 3
+        },
+        {
+          "node": 4,
+          "parents": [
+            3
+          ],
+          "iteration": 4,
+          "candidate_line": 5,
+          "process_line": 5
+        },
+        {
+          "node": 5,
+          "parents": [
+            3
+          ],
+          "iteration": 6,
+          "candidate_line": 6,
+          "process_line": 6
+        },
+        {
+          "node": 6,
+          "parents": [
+            4
+          ],
+          "iteration": 8,
+          "candidate_line": 7,
+          "process_line": 8
+        },
+        {
+          "node": 7,
+          "parents": [
+            4
+          ],
+          "iteration": 9,
+          "candidate_line": 8,
+          "process_line": 9
+        },
+        {
+          "node": 8,
+          "parents": [
+            6
+          ],
+          "iteration": 14,
+          "candidate_line": 9,
+          "process_line": 14
+        },
+        {
+          "node": 9,
+          "parents": [
+            6
+          ],
+          "iteration": 15,
+          "candidate_line": 10,
+          "process_line": 15
+        },
+        {
+          "node": 10,
+          "parents": [
+            4
+          ],
+          "iteration": 17,
+          "candidate_line": 11,
+          "process_line": 17
+        },
+        {
+          "node": 11,
+          "parents": [
+            9
+          ],
+          "iteration": 18,
+          "candidate_line": 12,
+          "process_line": 18
+        },
+        {
+          "node": 12,
+          "parents": [
+            8
+          ],
+          "iteration": 22,
+          "candidate_line": 13,
+          "process_line": 22
+        },
+        {
+          "node": 13,
+          "parents": [
+            8
+          ],
+          "iteration": 23,
+          "candidate_line": 14,
+          "process_line": 23
+        },
+        {
+          "node": 14,
+          "parents": [
+            8
+          ],
+          "iteration": 24,
+          "candidate_line": 15,
+          "process_line": 24
+        },
+        {
+          "node": 15,
+          "parents": [
+            13
+          ],
+          "iteration": 25,
+          "candidate_line": 16,
+          "process_line": 25
+        },
+        {
+          "node": 16,
+          "parents": [
+            13
+          ],
+          "iteration": 26,
+          "candidate_line": 17,
+          "process_line": 26
+        },
+        {
+          "node": 17,
+          "parents": [
+            14
+          ],
+          "iteration": 27,
+          "candidate_line": 18,
+          "process_line": 27
+        },
+        {
+          "node": 18,
+          "parents": [
+            10
+          ],
+          "iteration": 28,
+          "candidate_line": 19,
+          "process_line": 28
+        },
+        {
+          "node": 19,
+          "parents": [
+            17
+          ],
+          "iteration": 29,
+          "candidate_line": 20,
+          "process_line": 29
+        },
+        {
+          "node": 20,
+          "parents": [
+            17
+          ],
+          "iteration": 30,
+          "candidate_line": 21,
+          "process_line": 30
+        },
+        {
+          "node": 21,
+          "parents": [
+            14
+          ],
+          "iteration": 31,
+          "candidate_line": 22,
+          "process_line": 32
+        },
+        {
+          "node": 22,
+          "parents": [
+            17
+          ],
+          "iteration": 32,
+          "candidate_line": 23,
+          "process_line": 33
+        },
+        {
+          "node": 23,
+          "parents": [
+            14
+          ],
+          "iteration": 34,
+          "candidate_line": 24,
+          "process_line": 34
+        },
+        {
+          "node": 24,
+          "parents": [
+            20
+          ],
+          "iteration": 35,
+          "candidate_line": 25,
+          "process_line": 35
+        },
+        {
+          "node": 25,
+          "parents": [
+            21
+          ],
+          "iteration": 36,
+          "candidate_line": 26,
+          "process_line": 36
+        },
+        {
+          "node": 26,
+          "parents": [
+            15
+          ],
+          "iteration": 37,
+          "candidate_line": 27,
+          "process_line": 39
+        },
+        {
+          "node": 27,
+          "parents": [
+            22
+          ],
+          "iteration": 42,
+          "candidate_line": 28,
+          "process_line": 42
+        },
+        {
+          "node": 28,
+          "parents": [
+            27
+          ],
+          "iteration": 43,
+          "candidate_line": 29,
+          "process_line": 43
+        },
+        {
+          "node": 29,
+          "parents": [
+            25
+          ],
+          "iteration": 44,
+          "candidate_line": 30,
+          "process_line": 44
+        }
+      ]
+    },
+    {
+      "game": "f5w3n",
+      "name": "Space Invaders",
+      "candidates": 30,
+      "classification": "No clean qualifying case.",
+      "saved_node": 20,
+      "saved_lineage": [
+        0,
+        1,
+        2,
+        5,
+        9,
+        13,
+        15,
+        20
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 2,
+          "process_line": 3
+        },
+        {
+          "node": 2,
+          "parents": [
+            1
+          ],
+          "iteration": 4,
+          "candidate_line": 3,
+          "process_line": 5
+        },
+        {
+          "node": 3,
+          "parents": [
+            1
+          ],
+          "iteration": 6,
+          "candidate_line": 4,
+          "process_line": 6
+        },
+        {
+          "node": 4,
+          "parents": [
+            0
+          ],
+          "iteration": 7,
+          "candidate_line": 5,
+          "process_line": 8
+        },
+        {
+          "node": 5,
+          "parents": [
+            2
+          ],
+          "iteration": 8,
+          "candidate_line": 6,
+          "process_line": 9
+        },
+        {
+          "node": 6,
+          "parents": [
+            5
+          ],
+          "iteration": 10,
+          "candidate_line": 7,
+          "process_line": 10
+        },
+        {
+          "node": 7,
+          "parents": [
+            4
+          ],
+          "iteration": 11,
+          "candidate_line": 8,
+          "process_line": 11
+        },
+        {
+          "node": 8,
+          "parents": [
+            2
+          ],
+          "iteration": 12,
+          "candidate_line": 9,
+          "process_line": 12
+        },
+        {
+          "node": 9,
+          "parents": [
+            5
+          ],
+          "iteration": 16,
+          "candidate_line": 10,
+          "process_line": 17
+        },
+        {
+          "node": 10,
+          "parents": [
+            8
+          ],
+          "iteration": 18,
+          "candidate_line": 11,
+          "process_line": 18
+        },
+        {
+          "node": 11,
+          "parents": [
+            6
+          ],
+          "iteration": 19,
+          "candidate_line": 12,
+          "process_line": 19
+        },
+        {
+          "node": 12,
+          "parents": [
+            10
+          ],
+          "iteration": 20,
+          "candidate_line": 13,
+          "process_line": 20
+        },
+        {
+          "node": 13,
+          "parents": [
+            9
+          ],
+          "iteration": 21,
+          "candidate_line": 14,
+          "process_line": 21
+        },
+        {
+          "node": 14,
+          "parents": [
+            11
+          ],
+          "iteration": 23,
+          "candidate_line": 15,
+          "process_line": 23
+        },
+        {
+          "node": 15,
+          "parents": [
+            13
+          ],
+          "iteration": 24,
+          "candidate_line": 16,
+          "process_line": 24
+        },
+        {
+          "node": 16,
+          "parents": [
+            12
+          ],
+          "iteration": 25,
+          "candidate_line": 17,
+          "process_line": 26
+        },
+        {
+          "node": 17,
+          "parents": [
+            10
+          ],
+          "iteration": 26,
+          "candidate_line": 18,
+          "process_line": 27
+        },
+        {
+          "node": 18,
+          "parents": [
+            10
+          ],
+          "iteration": 28,
+          "candidate_line": 19,
+          "process_line": 28
+        },
+        {
+          "node": 19,
+          "parents": [
+            16
+          ],
+          "iteration": 29,
+          "candidate_line": 20,
+          "process_line": 29
+        },
+        {
+          "node": 20,
+          "parents": [
+            15
+          ],
+          "iteration": 30,
+          "candidate_line": 21,
+          "process_line": 30
+        },
+        {
+          "node": 21,
+          "parents": [
+            17
+          ],
+          "iteration": 34,
+          "candidate_line": 22,
+          "process_line": 34
+        },
+        {
+          "node": 22,
+          "parents": [
+            14
+          ],
+          "iteration": 35,
+          "candidate_line": 23,
+          "process_line": 35
+        },
+        {
+          "node": 23,
+          "parents": [
+            13
+          ],
+          "iteration": 36,
+          "candidate_line": 24,
+          "process_line": 36
+        },
+        {
+          "node": 24,
+          "parents": [
+            15
+          ],
+          "iteration": 37,
+          "candidate_line": 25,
+          "process_line": 38
+        },
+        {
+          "node": 25,
+          "parents": [
+            18
+          ],
+          "iteration": 39,
+          "candidate_line": 26,
+          "process_line": 39
+        },
+        {
+          "node": 26,
+          "parents": [
+            6
+          ],
+          "iteration": 40,
+          "candidate_line": 27,
+          "process_line": 41
+        },
+        {
+          "node": 27,
+          "parents": [
+            20
+          ],
+          "iteration": 42,
+          "candidate_line": 28,
+          "process_line": 42
+        },
+        {
+          "node": 28,
+          "parents": [
+            22
+          ],
+          "iteration": 43,
+          "candidate_line": 29,
+          "process_line": 43
+        },
+        {
+          "node": 29,
+          "parents": [
+            26
+          ],
+          "iteration": 44,
+          "candidate_line": 30,
+          "process_line": 44
+        }
+      ]
+    },
+    {
+      "game": "colour_lines",
+      "name": "Colour Lines",
+      "candidates": 30,
+      "classification": "No qualifying semantic feature-to-rule case.",
+      "saved_node": 12,
+      "saved_lineage": [
+        0,
+        1,
+        9,
+        12
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 1,
+          "candidate_line": 2,
+          "process_line": 2
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 2,
+          "candidate_line": 3,
+          "process_line": 3
+        },
+        {
+          "node": 3,
+          "parents": [
+            1
+          ],
+          "iteration": 6,
+          "candidate_line": 4,
+          "process_line": 6
+        },
+        {
+          "node": 4,
+          "parents": [
+            3
+          ],
+          "iteration": 7,
+          "candidate_line": 5,
+          "process_line": 8
+        },
+        {
+          "node": 5,
+          "parents": [
+            0
+          ],
+          "iteration": 9,
+          "candidate_line": 6,
+          "process_line": 9
+        },
+        {
+          "node": 6,
+          "parents": [
+            4
+          ],
+          "iteration": 10,
+          "candidate_line": 7,
+          "process_line": 12
+        },
+        {
+          "node": 7,
+          "parents": [
+            6
+          ],
+          "iteration": 13,
+          "candidate_line": 8,
+          "process_line": 14
+        },
+        {
+          "node": 8,
+          "parents": [
+            0
+          ],
+          "iteration": 14,
+          "candidate_line": 9,
+          "process_line": 15
+        },
+        {
+          "node": 9,
+          "parents": [
+            1
+          ],
+          "iteration": 16,
+          "candidate_line": 10,
+          "process_line": 16
+        },
+        {
+          "node": 10,
+          "parents": [
+            1
+          ],
+          "iteration": 17,
+          "candidate_line": 11,
+          "process_line": 17
+        },
+        {
+          "node": 11,
+          "parents": [
+            6
+          ],
+          "iteration": 18,
+          "candidate_line": 12,
+          "process_line": 18
+        },
+        {
+          "node": 12,
+          "parents": [
+            9
+          ],
+          "iteration": 19,
+          "candidate_line": 13,
+          "process_line": 19
+        },
+        {
+          "node": 13,
+          "parents": [
+            9
+          ],
+          "iteration": 20,
+          "candidate_line": 14,
+          "process_line": 20
+        },
+        {
+          "node": 14,
+          "parents": [
+            3
+          ],
+          "iteration": 21,
+          "candidate_line": 15,
+          "process_line": 21
+        },
+        {
+          "node": 15,
+          "parents": [
+            13
+          ],
+          "iteration": 22,
+          "candidate_line": 16,
+          "process_line": 22
+        },
+        {
+          "node": 16,
+          "parents": [
+            12
+          ],
+          "iteration": 23,
+          "candidate_line": 17,
+          "process_line": 23
+        },
+        {
+          "node": 17,
+          "parents": [
+            13
+          ],
+          "iteration": 24,
+          "candidate_line": 18,
+          "process_line": 24
+        },
+        {
+          "node": 18,
+          "parents": [
+            10
+          ],
+          "iteration": 26,
+          "candidate_line": 19,
+          "process_line": 26
+        },
+        {
+          "node": 19,
+          "parents": [
+            12
+          ],
+          "iteration": 27,
+          "candidate_line": 20,
+          "process_line": 27
+        },
+        {
+          "node": 20,
+          "parents": [
+            15
+          ],
+          "iteration": 31,
+          "candidate_line": 21,
+          "process_line": 31
+        },
+        {
+          "node": 21,
+          "parents": [
+            17
+          ],
+          "iteration": 32,
+          "candidate_line": 22,
+          "process_line": 32
+        },
+        {
+          "node": 22,
+          "parents": [
+            19
+          ],
+          "iteration": 33,
+          "candidate_line": 23,
+          "process_line": 33
+        },
+        {
+          "node": 23,
+          "parents": [
+            20
+          ],
+          "iteration": 34,
+          "candidate_line": 24,
+          "process_line": 34
+        },
+        {
+          "node": 24,
+          "parents": [
+            22
+          ],
+          "iteration": 35,
+          "candidate_line": 25,
+          "process_line": 35
+        },
+        {
+          "node": 25,
+          "parents": [
+            21
+          ],
+          "iteration": 36,
+          "candidate_line": 26,
+          "process_line": 36
+        },
+        {
+          "node": 26,
+          "parents": [
+            25
+          ],
+          "iteration": 37,
+          "candidate_line": 27,
+          "process_line": 37
+        },
+        {
+          "node": 27,
+          "parents": [
+            25
+          ],
+          "iteration": 38,
+          "candidate_line": 28,
+          "process_line": 38
+        },
+        {
+          "node": 28,
+          "parents": [
+            16
+          ],
+          "iteration": 39,
+          "candidate_line": 29,
+          "process_line": 39
+        },
+        {
+          "node": 29,
+          "parents": [
+            24
+          ],
+          "iteration": 40,
+          "candidate_line": 30,
+          "process_line": 40
+        }
+      ]
+    },
+    {
+      "game": "diffusion",
+      "name": "Diffusion",
+      "candidates": 30,
+      "classification": "Interesting dynamics but no semantic perception/belief coupling.",
+      "saved_node": 28,
+      "saved_lineage": [
+        0,
+        2,
+        3,
+        7,
+        12,
+        13,
+        22,
+        24,
+        28
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 1,
+          "candidate_line": 2,
+          "process_line": 2
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 3,
+          "process_line": 3
+        },
+        {
+          "node": 3,
+          "parents": [
+            2
+          ],
+          "iteration": 4,
+          "candidate_line": 4,
+          "process_line": 4
+        },
+        {
+          "node": 4,
+          "parents": [
+            2
+          ],
+          "iteration": 5,
+          "candidate_line": 5,
+          "process_line": 5
+        },
+        {
+          "node": 5,
+          "parents": [
+            1
+          ],
+          "iteration": 6,
+          "candidate_line": 6,
+          "process_line": 6
+        },
+        {
+          "node": 6,
+          "parents": [
+            5
+          ],
+          "iteration": 7,
+          "candidate_line": 7,
+          "process_line": 7
+        },
+        {
+          "node": 7,
+          "parents": [
+            3
+          ],
+          "iteration": 8,
+          "candidate_line": 8,
+          "process_line": 8
+        },
+        {
+          "node": 8,
+          "parents": [
+            5
+          ],
+          "iteration": 9,
+          "candidate_line": 9,
+          "process_line": 9
+        },
+        {
+          "node": 9,
+          "parents": [
+            6
+          ],
+          "iteration": 10,
+          "candidate_line": 10,
+          "process_line": 12
+        },
+        {
+          "node": 10,
+          "parents": [
+            4
+          ],
+          "iteration": 13,
+          "candidate_line": 11,
+          "process_line": 13
+        },
+        {
+          "node": 11,
+          "parents": [
+            2
+          ],
+          "iteration": 14,
+          "candidate_line": 12,
+          "process_line": 14
+        },
+        {
+          "node": 12,
+          "parents": [
+            7
+          ],
+          "iteration": 15,
+          "candidate_line": 13,
+          "process_line": 15
+        },
+        {
+          "node": 13,
+          "parents": [
+            12
+          ],
+          "iteration": 16,
+          "candidate_line": 14,
+          "process_line": 17
+        },
+        {
+          "node": 14,
+          "parents": [
+            9
+          ],
+          "iteration": 17,
+          "candidate_line": 15,
+          "process_line": 18
+        },
+        {
+          "node": 15,
+          "parents": [
+            14
+          ],
+          "iteration": 24,
+          "candidate_line": 16,
+          "process_line": 24
+        },
+        {
+          "node": 16,
+          "parents": [
+            15
+          ],
+          "iteration": 25,
+          "candidate_line": 17,
+          "process_line": 26
+        },
+        {
+          "node": 17,
+          "parents": [
+            10
+          ],
+          "iteration": 27,
+          "candidate_line": 18,
+          "process_line": 27
+        },
+        {
+          "node": 18,
+          "parents": [
+            13
+          ],
+          "iteration": 28,
+          "candidate_line": 19,
+          "process_line": 28
+        },
+        {
+          "node": 19,
+          "parents": [
+            9
+          ],
+          "iteration": 29,
+          "candidate_line": 20,
+          "process_line": 29
+        },
+        {
+          "node": 20,
+          "parents": [
+            12
+          ],
+          "iteration": 30,
+          "candidate_line": 21,
+          "process_line": 30
+        },
+        {
+          "node": 21,
+          "parents": [
+            20
+          ],
+          "iteration": 31,
+          "candidate_line": 22,
+          "process_line": 31
+        },
+        {
+          "node": 22,
+          "parents": [
+            13
+          ],
+          "iteration": 32,
+          "candidate_line": 23,
+          "process_line": 32
+        },
+        {
+          "node": 23,
+          "parents": [
+            7
+          ],
+          "iteration": 33,
+          "candidate_line": 24,
+          "process_line": 33
+        },
+        {
+          "node": 24,
+          "parents": [
+            22
+          ],
+          "iteration": 34,
+          "candidate_line": 25,
+          "process_line": 34
+        },
+        {
+          "node": 25,
+          "parents": [
+            23
+          ],
+          "iteration": 35,
+          "candidate_line": 26,
+          "process_line": 35
+        },
+        {
+          "node": 26,
+          "parents": [
+            18
+          ],
+          "iteration": 36,
+          "candidate_line": 27,
+          "process_line": 36
+        },
+        {
+          "node": 27,
+          "parents": [
+            11
+          ],
+          "iteration": 37,
+          "candidate_line": 28,
+          "process_line": 37
+        },
+        {
+          "node": 28,
+          "parents": [
+            24
+          ],
+          "iteration": 38,
+          "candidate_line": 29,
+          "process_line": 38
+        },
+        {
+          "node": 29,
+          "parents": [
+            24
+          ],
+          "iteration": 39,
+          "candidate_line": 30,
+          "process_line": 39
+        }
+      ]
+    },
+    {
+      "game": "eahcw",
+      "name": "Paint",
+      "candidates": 30,
+      "classification": "No qualifying active perception/belief coupling.",
+      "saved_node": 28,
+      "saved_lineage": [
+        0,
+        2,
+        5,
+        9,
+        14,
+        26,
+        28
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 1,
+          "candidate_line": 2,
+          "process_line": 1
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 2,
+          "candidate_line": 3,
+          "process_line": 2
+        },
+        {
+          "node": 3,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 4,
+          "process_line": 3
+        },
+        {
+          "node": 4,
+          "parents": [
+            2
+          ],
+          "iteration": 7,
+          "candidate_line": 5,
+          "process_line": 7
+        },
+        {
+          "node": 5,
+          "parents": [
+            2
+          ],
+          "iteration": 8,
+          "candidate_line": 6,
+          "process_line": 8
+        },
+        {
+          "node": 6,
+          "parents": [
+            3
+          ],
+          "iteration": 9,
+          "candidate_line": 7,
+          "process_line": 9
+        },
+        {
+          "node": 7,
+          "parents": [
+            5
+          ],
+          "iteration": 11,
+          "candidate_line": 8,
+          "process_line": 12
+        },
+        {
+          "node": 8,
+          "parents": [
+            5
+          ],
+          "iteration": 14,
+          "candidate_line": 9,
+          "process_line": 14
+        },
+        {
+          "node": 9,
+          "parents": [
+            5
+          ],
+          "iteration": 15,
+          "candidate_line": 10,
+          "process_line": 15
+        },
+        {
+          "node": 10,
+          "parents": [
+            3
+          ],
+          "iteration": 16,
+          "candidate_line": 11,
+          "process_line": 16
+        },
+        {
+          "node": 11,
+          "parents": [
+            9
+          ],
+          "iteration": 17,
+          "candidate_line": 12,
+          "process_line": 17
+        },
+        {
+          "node": 12,
+          "parents": [
+            3
+          ],
+          "iteration": 18,
+          "candidate_line": 13,
+          "process_line": 18
+        },
+        {
+          "node": 13,
+          "parents": [
+            11
+          ],
+          "iteration": 19,
+          "candidate_line": 14,
+          "process_line": 20
+        },
+        {
+          "node": 14,
+          "parents": [
+            9
+          ],
+          "iteration": 20,
+          "candidate_line": 15,
+          "process_line": 21
+        },
+        {
+          "node": 15,
+          "parents": [
+            14
+          ],
+          "iteration": 22,
+          "candidate_line": 16,
+          "process_line": 22
+        },
+        {
+          "node": 16,
+          "parents": [
+            14
+          ],
+          "iteration": 23,
+          "candidate_line": 17,
+          "process_line": 23
+        },
+        {
+          "node": 17,
+          "parents": [
+            6
+          ],
+          "iteration": 24,
+          "candidate_line": 18,
+          "process_line": 24
+        },
+        {
+          "node": 18,
+          "parents": [
+            10
+          ],
+          "iteration": 26,
+          "candidate_line": 19,
+          "process_line": 26
+        },
+        {
+          "node": 19,
+          "parents": [
+            2
+          ],
+          "iteration": 27,
+          "candidate_line": 20,
+          "process_line": 27
+        },
+        {
+          "node": 20,
+          "parents": [
+            19
+          ],
+          "iteration": 29,
+          "candidate_line": 21,
+          "process_line": 29
+        },
+        {
+          "node": 21,
+          "parents": [
+            18
+          ],
+          "iteration": 30,
+          "candidate_line": 22,
+          "process_line": 30
+        },
+        {
+          "node": 22,
+          "parents": [
+            20
+          ],
+          "iteration": 31,
+          "candidate_line": 23,
+          "process_line": 31
+        },
+        {
+          "node": 23,
+          "parents": [
+            18
+          ],
+          "iteration": 32,
+          "candidate_line": 24,
+          "process_line": 32
+        },
+        {
+          "node": 24,
+          "parents": [
+            21
+          ],
+          "iteration": 33,
+          "candidate_line": 25,
+          "process_line": 33
+        },
+        {
+          "node": 25,
+          "parents": [
+            22
+          ],
+          "iteration": 34,
+          "candidate_line": 26,
+          "process_line": 34
+        },
+        {
+          "node": 26,
+          "parents": [
+            14
+          ],
+          "iteration": 35,
+          "candidate_line": 27,
+          "process_line": 35
+        },
+        {
+          "node": 27,
+          "parents": [
+            24
+          ],
+          "iteration": 36,
+          "candidate_line": 28,
+          "process_line": 36
+        },
+        {
+          "node": 28,
+          "parents": [
+            26
+          ],
+          "iteration": 37,
+          "candidate_line": 29,
+          "process_line": 37
+        },
+        {
+          "node": 29,
+          "parents": [
+            23
+          ],
+          "iteration": 38,
+          "candidate_line": 30,
+          "process_line": 38
+        }
+      ]
+    },
+    {
+      "game": "s2kt7",
+      "name": "Ants",
+      "candidates": 30,
+      "classification": "No qualifying semantic perception change.",
+      "saved_node": 23,
+      "saved_lineage": [
+        0,
+        1,
+        2,
+        4,
+        19,
+        23
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 2,
+          "candidate_line": 2,
+          "process_line": 3
+        },
+        {
+          "node": 2,
+          "parents": [
+            1
+          ],
+          "iteration": 6,
+          "candidate_line": 3,
+          "process_line": 6
+        },
+        {
+          "node": 3,
+          "parents": [
+            1
+          ],
+          "iteration": 11,
+          "candidate_line": 4,
+          "process_line": 11
+        },
+        {
+          "node": 4,
+          "parents": [
+            2
+          ],
+          "iteration": 12,
+          "candidate_line": 5,
+          "process_line": 12
+        },
+        {
+          "node": 5,
+          "parents": [
+            4
+          ],
+          "iteration": 13,
+          "candidate_line": 6,
+          "process_line": 13
+        },
+        {
+          "node": 6,
+          "parents": [
+            4
+          ],
+          "iteration": 14,
+          "candidate_line": 7,
+          "process_line": 14
+        },
+        {
+          "node": 7,
+          "parents": [
+            1
+          ],
+          "iteration": 15,
+          "candidate_line": 8,
+          "process_line": 15
+        },
+        {
+          "node": 8,
+          "parents": [
+            6
+          ],
+          "iteration": 16,
+          "candidate_line": 9,
+          "process_line": 17
+        },
+        {
+          "node": 9,
+          "parents": [
+            7
+          ],
+          "iteration": 17,
+          "candidate_line": 10,
+          "process_line": 18
+        },
+        {
+          "node": 10,
+          "parents": [
+            4
+          ],
+          "iteration": 19,
+          "candidate_line": 11,
+          "process_line": 20
+        },
+        {
+          "node": 11,
+          "parents": [
+            5
+          ],
+          "iteration": 21,
+          "candidate_line": 12,
+          "process_line": 21
+        },
+        {
+          "node": 12,
+          "parents": [
+            10
+          ],
+          "iteration": 22,
+          "candidate_line": 13,
+          "process_line": 22
+        },
+        {
+          "node": 13,
+          "parents": [
+            3
+          ],
+          "iteration": 23,
+          "candidate_line": 14,
+          "process_line": 23
+        },
+        {
+          "node": 14,
+          "parents": [
+            4
+          ],
+          "iteration": 24,
+          "candidate_line": 15,
+          "process_line": 24
+        },
+        {
+          "node": 15,
+          "parents": [
+            8
+          ],
+          "iteration": 25,
+          "candidate_line": 16,
+          "process_line": 25
+        },
+        {
+          "node": 16,
+          "parents": [
+            14
+          ],
+          "iteration": 26,
+          "candidate_line": 17,
+          "process_line": 26
+        },
+        {
+          "node": 17,
+          "parents": [
+            14
+          ],
+          "iteration": 27,
+          "candidate_line": 18,
+          "process_line": 27
+        },
+        {
+          "node": 18,
+          "parents": [
+            17
+          ],
+          "iteration": 28,
+          "candidate_line": 19,
+          "process_line": 28
+        },
+        {
+          "node": 19,
+          "parents": [
+            4
+          ],
+          "iteration": 29,
+          "candidate_line": 20,
+          "process_line": 29
+        },
+        {
+          "node": 20,
+          "parents": [
+            12
+          ],
+          "iteration": 30,
+          "candidate_line": 21,
+          "process_line": 30
+        },
+        {
+          "node": 21,
+          "parents": [
+            6
+          ],
+          "iteration": 32,
+          "candidate_line": 22,
+          "process_line": 33
+        },
+        {
+          "node": 22,
+          "parents": [
+            16
+          ],
+          "iteration": 34,
+          "candidate_line": 23,
+          "process_line": 34
+        },
+        {
+          "node": 23,
+          "parents": [
+            19
+          ],
+          "iteration": 35,
+          "candidate_line": 24,
+          "process_line": 35
+        },
+        {
+          "node": 24,
+          "parents": [
+            5
+          ],
+          "iteration": 36,
+          "candidate_line": 25,
+          "process_line": 36
+        },
+        {
+          "node": 25,
+          "parents": [
+            24
+          ],
+          "iteration": 37,
+          "candidate_line": 26,
+          "process_line": 37
+        },
+        {
+          "node": 26,
+          "parents": [
+            15
+          ],
+          "iteration": 38,
+          "candidate_line": 27,
+          "process_line": 38
+        },
+        {
+          "node": 27,
+          "parents": [
+            19
+          ],
+          "iteration": 39,
+          "candidate_line": 28,
+          "process_line": 39
+        },
+        {
+          "node": 28,
+          "parents": [
+            24
+          ],
+          "iteration": 40,
+          "candidate_line": 29,
+          "process_line": 40
+        },
+        {
+          "node": 29,
+          "parents": [
+            16
+          ],
+          "iteration": 41,
+          "candidate_line": 30,
+          "process_line": 41
+        }
+      ]
+    },
+    {
+      "game": "va6fq",
+      "name": "Sand",
+      "candidates": 30,
+      "classification": "No qualifying semantic perception change.",
+      "saved_node": 24,
+      "saved_lineage": [
+        0,
+        2,
+        4,
+        7,
+        14,
+        22,
+        24
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 1,
+          "candidate_line": 2,
+          "process_line": 1
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 2,
+          "candidate_line": 3,
+          "process_line": 2
+        },
+        {
+          "node": 3,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 4,
+          "process_line": 3
+        },
+        {
+          "node": 4,
+          "parents": [
+            2
+          ],
+          "iteration": 4,
+          "candidate_line": 5,
+          "process_line": 5
+        },
+        {
+          "node": 5,
+          "parents": [
+            1
+          ],
+          "iteration": 5,
+          "candidate_line": 6,
+          "process_line": 6
+        },
+        {
+          "node": 6,
+          "parents": [
+            1
+          ],
+          "iteration": 8,
+          "candidate_line": 7,
+          "process_line": 8
+        },
+        {
+          "node": 7,
+          "parents": [
+            4
+          ],
+          "iteration": 9,
+          "candidate_line": 8,
+          "process_line": 9
+        },
+        {
+          "node": 8,
+          "parents": [
+            4
+          ],
+          "iteration": 10,
+          "candidate_line": 9,
+          "process_line": 11
+        },
+        {
+          "node": 9,
+          "parents": [
+            7
+          ],
+          "iteration": 11,
+          "candidate_line": 10,
+          "process_line": 12
+        },
+        {
+          "node": 10,
+          "parents": [
+            3
+          ],
+          "iteration": 14,
+          "candidate_line": 11,
+          "process_line": 14
+        },
+        {
+          "node": 11,
+          "parents": [
+            9
+          ],
+          "iteration": 15,
+          "candidate_line": 12,
+          "process_line": 15
+        },
+        {
+          "node": 12,
+          "parents": [
+            4
+          ],
+          "iteration": 17,
+          "candidate_line": 13,
+          "process_line": 17
+        },
+        {
+          "node": 13,
+          "parents": [
+            7
+          ],
+          "iteration": 18,
+          "candidate_line": 14,
+          "process_line": 18
+        },
+        {
+          "node": 14,
+          "parents": [
+            7
+          ],
+          "iteration": 21,
+          "candidate_line": 15,
+          "process_line": 21
+        },
+        {
+          "node": 15,
+          "parents": [
+            9
+          ],
+          "iteration": 22,
+          "candidate_line": 16,
+          "process_line": 22
+        },
+        {
+          "node": 16,
+          "parents": [
+            1
+          ],
+          "iteration": 23,
+          "candidate_line": 17,
+          "process_line": 23
+        },
+        {
+          "node": 17,
+          "parents": [
+            3
+          ],
+          "iteration": 24,
+          "candidate_line": 18,
+          "process_line": 24
+        },
+        {
+          "node": 18,
+          "parents": [
+            4
+          ],
+          "iteration": 26,
+          "candidate_line": 19,
+          "process_line": 26
+        },
+        {
+          "node": 19,
+          "parents": [
+            12
+          ],
+          "iteration": 27,
+          "candidate_line": 20,
+          "process_line": 27
+        },
+        {
+          "node": 20,
+          "parents": [
+            17
+          ],
+          "iteration": 28,
+          "candidate_line": 21,
+          "process_line": 28
+        },
+        {
+          "node": 21,
+          "parents": [
+            6
+          ],
+          "iteration": 29,
+          "candidate_line": 22,
+          "process_line": 29
+        },
+        {
+          "node": 22,
+          "parents": [
+            14
+          ],
+          "iteration": 30,
+          "candidate_line": 23,
+          "process_line": 30
+        },
+        {
+          "node": 23,
+          "parents": [
+            14
+          ],
+          "iteration": 31,
+          "candidate_line": 24,
+          "process_line": 31
+        },
+        {
+          "node": 24,
+          "parents": [
+            22
+          ],
+          "iteration": 32,
+          "candidate_line": 25,
+          "process_line": 32
+        },
+        {
+          "node": 25,
+          "parents": [
+            22
+          ],
+          "iteration": 33,
+          "candidate_line": 26,
+          "process_line": 33
+        },
+        {
+          "node": 26,
+          "parents": [
+            17
+          ],
+          "iteration": 34,
+          "candidate_line": 27,
+          "process_line": 35
+        },
+        {
+          "node": 27,
+          "parents": [
+            18
+          ],
+          "iteration": 35,
+          "candidate_line": 28,
+          "process_line": 36
+        },
+        {
+          "node": 28,
+          "parents": [
+            19
+          ],
+          "iteration": 37,
+          "candidate_line": 29,
+          "process_line": 37
+        },
+        {
+          "node": 29,
+          "parents": [
+            27
+          ],
+          "iteration": 38,
+          "candidate_line": 30,
+          "process_line": 38
+        }
+      ]
+    },
+    {
+      "game": "7www9",
+      "name": "Magnets",
+      "candidates": 30,
+      "classification": "Strong explicit relational adoption; correct local visible-state transitions, incomplete global model.",
+      "saved_node": 14,
+      "saved_lineage": [
+        0,
+        3,
+        9,
+        11,
+        14
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 1,
+          "candidate_line": 2,
+          "process_line": 1
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 2,
+          "candidate_line": 3,
+          "process_line": 2
+        },
+        {
+          "node": 3,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 4,
+          "process_line": 3
+        },
+        {
+          "node": 4,
+          "parents": [
+            3
+          ],
+          "iteration": 4,
+          "candidate_line": 5,
+          "process_line": 4
+        },
+        {
+          "node": 5,
+          "parents": [
+            1
+          ],
+          "iteration": 5,
+          "candidate_line": 6,
+          "process_line": 5
+        },
+        {
+          "node": 6,
+          "parents": [
+            1
+          ],
+          "iteration": 6,
+          "candidate_line": 7,
+          "process_line": 6
+        },
+        {
+          "node": 7,
+          "parents": [
+            4
+          ],
+          "iteration": 7,
+          "candidate_line": 8,
+          "process_line": 7
+        },
+        {
+          "node": 8,
+          "parents": [
+            6
+          ],
+          "iteration": 8,
+          "candidate_line": 9,
+          "process_line": 8
+        },
+        {
+          "node": 9,
+          "parents": [
+            3
+          ],
+          "iteration": 9,
+          "candidate_line": 10,
+          "process_line": 9
+        },
+        {
+          "node": 10,
+          "parents": [
+            4
+          ],
+          "iteration": 15,
+          "candidate_line": 11,
+          "process_line": 15
+        },
+        {
+          "node": 11,
+          "parents": [
+            9
+          ],
+          "iteration": 16,
+          "candidate_line": 12,
+          "process_line": 17
+        },
+        {
+          "node": 12,
+          "parents": [
+            2
+          ],
+          "iteration": 17,
+          "candidate_line": 13,
+          "process_line": 18
+        },
+        {
+          "node": 13,
+          "parents": [
+            10
+          ],
+          "iteration": 19,
+          "candidate_line": 14,
+          "process_line": 19
+        },
+        {
+          "node": 14,
+          "parents": [
+            11
+          ],
+          "iteration": 20,
+          "candidate_line": 15,
+          "process_line": 20
+        },
+        {
+          "node": 15,
+          "parents": [
+            6
+          ],
+          "iteration": 21,
+          "candidate_line": 16,
+          "process_line": 21
+        },
+        {
+          "node": 16,
+          "parents": [
+            14
+          ],
+          "iteration": 22,
+          "candidate_line": 17,
+          "process_line": 22
+        },
+        {
+          "node": 17,
+          "parents": [
+            11
+          ],
+          "iteration": 23,
+          "candidate_line": 18,
+          "process_line": 23
+        },
+        {
+          "node": 18,
+          "parents": [
+            14
+          ],
+          "iteration": 24,
+          "candidate_line": 19,
+          "process_line": 24
+        },
+        {
+          "node": 19,
+          "parents": [
+            16
+          ],
+          "iteration": 25,
+          "candidate_line": 20,
+          "process_line": 26
+        },
+        {
+          "node": 20,
+          "parents": [
+            18
+          ],
+          "iteration": 27,
+          "candidate_line": 21,
+          "process_line": 27
+        },
+        {
+          "node": 21,
+          "parents": [
+            3
+          ],
+          "iteration": 28,
+          "candidate_line": 22,
+          "process_line": 30
+        },
+        {
+          "node": 22,
+          "parents": [
+            13
+          ],
+          "iteration": 31,
+          "candidate_line": 23,
+          "process_line": 31
+        },
+        {
+          "node": 23,
+          "parents": [
+            17
+          ],
+          "iteration": 32,
+          "candidate_line": 24,
+          "process_line": 32
+        },
+        {
+          "node": 24,
+          "parents": [
+            19
+          ],
+          "iteration": 33,
+          "candidate_line": 25,
+          "process_line": 33
+        },
+        {
+          "node": 25,
+          "parents": [
+            21
+          ],
+          "iteration": 34,
+          "candidate_line": 26,
+          "process_line": 35
+        },
+        {
+          "node": 26,
+          "parents": [
+            21
+          ],
+          "iteration": 35,
+          "candidate_line": 27,
+          "process_line": 36
+        },
+        {
+          "node": 27,
+          "parents": [
+            20
+          ],
+          "iteration": 37,
+          "candidate_line": 28,
+          "process_line": 37
+        },
+        {
+          "node": 28,
+          "parents": [
+            13
+          ],
+          "iteration": 38,
+          "candidate_line": 29,
+          "process_line": 38
+        },
+        {
+          "node": 29,
+          "parents": [
+            23
+          ],
+          "iteration": 39,
+          "candidate_line": 30,
+          "process_line": 39
+        }
+      ],
+      "local_rule_verification": {
+        "transitions": 3,
+        "scope": "All visible cells; not cell identity or general magnet dynamics."
+      },
+      "selected_lineage": [
+        0,
+        1,
+        6,
+        8
+      ],
+      "selected_nodes": [
+        1,
+        6,
+        8
+      ],
+      "steps": [
+        32,
+        33,
+        34,
+        35
+      ],
+      "drive": "train_d1"
+    },
+    {
+      "game": "dino",
+      "name": "Dino",
+      "candidates": 30,
+      "classification": "Secondary semantic match; belief states equivalent floor condition but does not name the learned flag.",
+      "saved_node": 18,
+      "saved_lineage": [
+        0,
+        3,
+        4,
+        8,
+        14,
+        17,
+        18
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 1,
+          "candidate_line": 2,
+          "process_line": 1
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 2,
+          "candidate_line": 3,
+          "process_line": 2
+        },
+        {
+          "node": 3,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 4,
+          "process_line": 3
+        },
+        {
+          "node": 4,
+          "parents": [
+            3
+          ],
+          "iteration": 4,
+          "candidate_line": 5,
+          "process_line": 4
+        },
+        {
+          "node": 5,
+          "parents": [
+            3
+          ],
+          "iteration": 5,
+          "candidate_line": 6,
+          "process_line": 5
+        },
+        {
+          "node": 6,
+          "parents": [
+            3
+          ],
+          "iteration": 6,
+          "candidate_line": 7,
+          "process_line": 6
+        },
+        {
+          "node": 7,
+          "parents": [
+            4
+          ],
+          "iteration": 7,
+          "candidate_line": 8,
+          "process_line": 8
+        },
+        {
+          "node": 8,
+          "parents": [
+            4
+          ],
+          "iteration": 9,
+          "candidate_line": 9,
+          "process_line": 9
+        },
+        {
+          "node": 9,
+          "parents": [
+            8
+          ],
+          "iteration": 10,
+          "candidate_line": 10,
+          "process_line": 10
+        },
+        {
+          "node": 10,
+          "parents": [
+            8
+          ],
+          "iteration": 11,
+          "candidate_line": 11,
+          "process_line": 11
+        },
+        {
+          "node": 11,
+          "parents": [
+            8
+          ],
+          "iteration": 12,
+          "candidate_line": 12,
+          "process_line": 12
+        },
+        {
+          "node": 12,
+          "parents": [
+            10
+          ],
+          "iteration": 13,
+          "candidate_line": 13,
+          "process_line": 14
+        },
+        {
+          "node": 13,
+          "parents": [
+            11
+          ],
+          "iteration": 14,
+          "candidate_line": 14,
+          "process_line": 15
+        },
+        {
+          "node": 14,
+          "parents": [
+            8
+          ],
+          "iteration": 17,
+          "candidate_line": 15,
+          "process_line": 17
+        },
+        {
+          "node": 15,
+          "parents": [
+            12
+          ],
+          "iteration": 18,
+          "candidate_line": 16,
+          "process_line": 18
+        },
+        {
+          "node": 16,
+          "parents": [
+            12
+          ],
+          "iteration": 19,
+          "candidate_line": 17,
+          "process_line": 21
+        },
+        {
+          "node": 17,
+          "parents": [
+            14
+          ],
+          "iteration": 24,
+          "candidate_line": 18,
+          "process_line": 24
+        },
+        {
+          "node": 18,
+          "parents": [
+            17
+          ],
+          "iteration": 25,
+          "candidate_line": 19,
+          "process_line": 27
+        },
+        {
+          "node": 19,
+          "parents": [
+            12
+          ],
+          "iteration": 30,
+          "candidate_line": 20,
+          "process_line": 30
+        },
+        {
+          "node": 20,
+          "parents": [
+            19
+          ],
+          "iteration": 32,
+          "candidate_line": 21,
+          "process_line": 32
+        },
+        {
+          "node": 21,
+          "parents": [
+            10
+          ],
+          "iteration": 33,
+          "candidate_line": 22,
+          "process_line": 33
+        },
+        {
+          "node": 22,
+          "parents": [
+            20
+          ],
+          "iteration": 35,
+          "candidate_line": 23,
+          "process_line": 35
+        },
+        {
+          "node": 23,
+          "parents": [
+            21
+          ],
+          "iteration": 36,
+          "candidate_line": 24,
+          "process_line": 36
+        },
+        {
+          "node": 24,
+          "parents": [
+            22
+          ],
+          "iteration": 37,
+          "candidate_line": 25,
+          "process_line": 37
+        },
+        {
+          "node": 25,
+          "parents": [
+            20
+          ],
+          "iteration": 38,
+          "candidate_line": 26,
+          "process_line": 38
+        },
+        {
+          "node": 26,
+          "parents": [
+            22
+          ],
+          "iteration": 39,
+          "candidate_line": 27,
+          "process_line": 39
+        },
+        {
+          "node": 27,
+          "parents": [
+            26
+          ],
+          "iteration": 42,
+          "candidate_line": 28,
+          "process_line": 42
+        },
+        {
+          "node": 28,
+          "parents": [
+            17
+          ],
+          "iteration": 43,
+          "candidate_line": 29,
+          "process_line": 43
+        },
+        {
+          "node": 29,
+          "parents": [
+            25
+          ],
+          "iteration": 44,
+          "candidate_line": 30,
+          "process_line": 44
+        }
+      ],
+      "local_rule_verification": {
+        "transitions": 3,
+        "scope": "Red, green and yellow cells in local window; no general collision or wrap claim."
+      },
+      "selected_lineage": [
+        0,
+        3,
+        4,
+        8,
+        10,
+        12,
+        19,
+        20
+      ],
+      "selected_nodes": [
+        12,
+        19,
+        20
+      ],
+      "steps": [
+        100,
+        101,
+        102,
+        103
+      ],
+      "drive": "train_d1",
+      "alternative_local_rule_verification": {
+        "transitions": 3,
+        "scope": "Red, green and yellow cells in local window; no general collision or wrap claim."
+      }
+    },
+    {
+      "game": "7xf97",
+      "name": "Grow",
+      "candidates": 30,
+      "classification": "Does not support the requested rain/growth learning claim.",
+      "saved_node": 23,
+      "saved_lineage": [
+        0,
+        2,
+        3,
+        7,
+        10,
+        11,
+        14,
+        19,
+        23
+      ],
+      "candidates_metadata": [
+        {
+          "node": 0,
+          "parents": [],
+          "iteration": null,
+          "candidate_line": 1,
+          "process_line": null
+        },
+        {
+          "node": 1,
+          "parents": [
+            0
+          ],
+          "iteration": 1,
+          "candidate_line": 2,
+          "process_line": 2
+        },
+        {
+          "node": 2,
+          "parents": [
+            0
+          ],
+          "iteration": 3,
+          "candidate_line": 3,
+          "process_line": 3
+        },
+        {
+          "node": 3,
+          "parents": [
+            2
+          ],
+          "iteration": 4,
+          "candidate_line": 4,
+          "process_line": 4
+        },
+        {
+          "node": 4,
+          "parents": [
+            2
+          ],
+          "iteration": 5,
+          "candidate_line": 5,
+          "process_line": 5
+        },
+        {
+          "node": 5,
+          "parents": [
+            1
+          ],
+          "iteration": 6,
+          "candidate_line": 6,
+          "process_line": 6
+        },
+        {
+          "node": 6,
+          "parents": [
+            5
+          ],
+          "iteration": 7,
+          "candidate_line": 7,
+          "process_line": 8
+        },
+        {
+          "node": 7,
+          "parents": [
+            3
+          ],
+          "iteration": 8,
+          "candidate_line": 8,
+          "process_line": 9
+        },
+        {
+          "node": 8,
+          "parents": [
+            6
+          ],
+          "iteration": 10,
+          "candidate_line": 9,
+          "process_line": 10
+        },
+        {
+          "node": 9,
+          "parents": [
+            7
+          ],
+          "iteration": 11,
+          "candidate_line": 10,
+          "process_line": 11
+        },
+        {
+          "node": 10,
+          "parents": [
+            7
+          ],
+          "iteration": 12,
+          "candidate_line": 11,
+          "process_line": 12
+        },
+        {
+          "node": 11,
+          "parents": [
+            10
+          ],
+          "iteration": 13,
+          "candidate_line": 12,
+          "process_line": 15
+        },
+        {
+          "node": 12,
+          "parents": [
+            4
+          ],
+          "iteration": 16,
+          "candidate_line": 13,
+          "process_line": 16
+        },
+        {
+          "node": 13,
+          "parents": [
+            7
+          ],
+          "iteration": 17,
+          "candidate_line": 14,
+          "process_line": 17
+        },
+        {
+          "node": 14,
+          "parents": [
+            11
+          ],
+          "iteration": 18,
+          "candidate_line": 15,
+          "process_line": 18
+        },
+        {
+          "node": 15,
+          "parents": [
+            10
+          ],
+          "iteration": 19,
+          "candidate_line": 16,
+          "process_line": 19
+        },
+        {
+          "node": 16,
+          "parents": [
+            11
+          ],
+          "iteration": 20,
+          "candidate_line": 17,
+          "process_line": 20
+        },
+        {
+          "node": 17,
+          "parents": [
+            7
+          ],
+          "iteration": 21,
+          "candidate_line": 18,
+          "process_line": 21
+        },
+        {
+          "node": 18,
+          "parents": [
+            16
+          ],
+          "iteration": 22,
+          "candidate_line": 19,
+          "process_line": 22
+        },
+        {
+          "node": 19,
+          "parents": [
+            14
+          ],
+          "iteration": 23,
+          "candidate_line": 20,
+          "process_line": 23
+        },
+        {
+          "node": 20,
+          "parents": [
+            17
+          ],
+          "iteration": 24,
+          "candidate_line": 21,
+          "process_line": 24
+        },
+        {
+          "node": 21,
+          "parents": [
+            19
+          ],
+          "iteration": 25,
+          "candidate_line": 22,
+          "process_line": 25
+        },
+        {
+          "node": 22,
+          "parents": [
+            3
+          ],
+          "iteration": 26,
+          "candidate_line": 23,
+          "process_line": 26
+        },
+        {
+          "node": 23,
+          "parents": [
+            19
+          ],
+          "iteration": 27,
+          "candidate_line": 24,
+          "process_line": 27
+        },
+        {
+          "node": 24,
+          "parents": [
+            23
+          ],
+          "iteration": 28,
+          "candidate_line": 25,
+          "process_line": 28
+        },
+        {
+          "node": 25,
+          "parents": [
+            15
+          ],
+          "iteration": 29,
+          "candidate_line": 26,
+          "process_line": 29
+        },
+        {
+          "node": 26,
+          "parents": [
+            15
+          ],
+          "iteration": 30,
+          "candidate_line": 27,
+          "process_line": 30
+        },
+        {
+          "node": 27,
+          "parents": [
+            24
+          ],
+          "iteration": 31,
+          "candidate_line": 28,
+          "process_line": 31
+        },
+        {
+          "node": 28,
+          "parents": [
+            21
+          ],
+          "iteration": 32,
+          "candidate_line": 29,
+          "process_line": 32
+        },
+        {
+          "node": 29,
+          "parents": [
+            25
+          ],
+          "iteration": 33,
+          "candidate_line": 30,
+          "process_line": 33
+        }
+      ]
+    }
+  ]
+}

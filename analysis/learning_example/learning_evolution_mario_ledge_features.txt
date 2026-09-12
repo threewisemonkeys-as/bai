@@ -1,0 +1,121 @@
+P(X) and K for every node in learning_evolution_mario_ledge.pdf
+==========================================================================
+
+game       n2ntd   drive train_d0   steps 22-25
+artifacts  logs/2026-08-24/human_curated/rexpure/n2ntd_s1/rexpure_run_seed1/candidates.jsonl
+frames     train_d0/episode_0/trajectory.csv
+
+Every P(X) below is that node's own perception() run over that step's
+observation, and every K is that node's world_knowledge field verbatim --
+the same material the figure draws from, nothing transcribed. Each K is
+followed by a condensed form, one line per rule, tagged [new] / [revised] /
+[kept] / [dropped] against the previous K on the lineage. The tags and the
+quoted edits under a [revised] line are computed from the two texts; the
+short lines are hand-written and hash-bound to the rule they summarise.
+
+  X0 = step 22  --right-->
+  X1 = step 23  --noop-->
+  X2 = step 24  --noop-->
+  X3 = step 25
+
+==========================================================================
+node 0  (seed)   min(ID, cFD) = 0.000
+--------------------------------------------------------------------------
+P(X0) [step 22] = (empty string)
+P(X1) [step 23] = (empty string)
+P(X2) [step 24] = (empty string)
+P(X3) [step 25] = (empty string)
+
+--------------------------------------------------------------------------
+K [node 0]
+--------------------------------------------------------------------------
+(empty -- no world knowledge yet)
+
+==========================================================================
+node 2  (iter 3 · P)   min(ID, cFD) = 0.233
+--------------------------------------------------------------------------
+P(X0) [step 22] = grid 12x12; bg:white; cells:(0,0,blue);(0,1,blue);(0,2,blue);(1,0,blue);(1,1,blue);(1,2,blue);(4,7,gold);(5,9,gold);(6,8,darkorange);(6,9,darkorange);(6,10,darkorange);(8,4,darkorange);(8,5,darkorange);(8,6,darkorange);(9,2,red);(10,0,darkorange);(10,1,darkorange);(10,2,darkorange)
+P(X1) [step 23] = grid 12x12; bg:white; cells:(0,1,blue);(0,2,blue);(0,3,blue);(1,1,blue);(1,2,blue);(1,3,blue);(4,7,gold);(5,9,gold);(6,8,darkorange);(6,9,darkorange);(6,10,darkorange);(8,4,darkorange);(8,5,darkorange);(8,6,darkorange);(9,3,red);(10,0,darkorange);(10,1,darkorange);(10,2,darkorange)
+P(X2) [step 24] = grid 12x12; bg:white; cells:(0,2,blue);(0,3,blue);(0,4,blue);(1,2,blue);(1,3,blue);(1,4,blue);(4,7,gold);(5,9,gold);(6,8,darkorange);(6,9,darkorange);(6,10,darkorange);(8,4,darkorange);(8,5,darkorange);(8,6,darkorange);(10,0,darkorange);(10,1,darkorange);(10,2,darkorange);(10,3,red)
+P(X3) [step 25] = grid 12x12; bg:white; cells:(0,3,blue);(0,4,blue);(0,5,blue);(1,3,blue);(1,4,blue);(1,5,blue);(4,7,gold);(5,9,gold);(6,8,darkorange);(6,9,darkorange);(6,10,darkorange);(8,4,darkorange);(8,5,darkorange);(8,6,darkorange);(10,0,darkorange);(10,1,darkorange);(10,2,darkorange);(11,3,red)
+
+--------------------------------------------------------------------------
+K [node 2]   [identical to node 0]
+--------------------------------------------------------------------------
+(empty -- no world knowledge yet)
+
+==========================================================================
+node 3  (iter 4 · K)   min(ID, cFD) = 0.695   [P identical to node 2]
+--------------------------------------------------------------------------
+P(X0) [step 22] = grid 12x12; bg:white; cells:(0,0,blue);(0,1,blue);(0,2,blue);(1,0,blue);(1,1,blue);(1,2,blue);(4,7,gold);(5,9,gold);(6,8,darkorange);(6,9,darkorange);(6,10,darkorange);(8,4,darkorange);(8,5,darkorange);(8,6,darkorange);(9,2,red);(10,0,darkorange);(10,1,darkorange);(10,2,darkorange)
+P(X1) [step 23] = grid 12x12; bg:white; cells:(0,1,blue);(0,2,blue);(0,3,blue);(1,1,blue);(1,2,blue);(1,3,blue);(4,7,gold);(5,9,gold);(6,8,darkorange);(6,9,darkorange);(6,10,darkorange);(8,4,darkorange);(8,5,darkorange);(8,6,darkorange);(9,3,red);(10,0,darkorange);(10,1,darkorange);(10,2,darkorange)
+P(X2) [step 24] = grid 12x12; bg:white; cells:(0,2,blue);(0,3,blue);(0,4,blue);(1,2,blue);(1,3,blue);(1,4,blue);(4,7,gold);(5,9,gold);(6,8,darkorange);(6,9,darkorange);(6,10,darkorange);(8,4,darkorange);(8,5,darkorange);(8,6,darkorange);(10,0,darkorange);(10,1,darkorange);(10,2,darkorange);(10,3,red)
+P(X3) [step 25] = grid 12x12; bg:white; cells:(0,3,blue);(0,4,blue);(0,5,blue);(1,3,blue);(1,4,blue);(1,5,blue);(4,7,gold);(5,9,gold);(6,8,darkorange);(6,9,darkorange);(6,10,darkorange);(8,4,darkorange);(8,5,darkorange);(8,6,darkorange);(10,0,darkorange);(10,1,darkorange);(10,2,darkorange);(11,3,red)
+
+--------------------------------------------------------------------------
+K [node 3]
+--------------------------------------------------------------------------
+- The world contains a red cell that is moved by directional actions: 'up' moves it 4 cells upward, 'left' moves it 1 cell left, 'right' moves it 1 cell right ('down' is assumed to move 4 cells downward but is not observed).
+- Clicking any cell (the coordinates are irrelevant) causes the current red cell to instantly change to mediumpurple. That mediumpurple cell then moves upward by 1 cell each subsequent time step. On the step immediately after the click, a new red cell appears at the exact location where the red cell was before the click.
+- The blue 2×3 block moves autonomously: each time step it shifts either left or right by 1 column. This movement is independent of the action taken (it is not a consequence of any action).
+- All other objects (gold cells, dark orange L-shaped groups) are stationary and never change.
+
+--------------------------------------------------------------------------
+K [node 3], condensed -- one line per rule (the first K on this lineage)
+--------------------------------------------------------------------------
+ 1 [new]     arrows move the red cell: up 4 rows, left/right 1 column
+             (down assumed 4 rows, unobserved)
+ 2 [new]     click anywhere: red becomes mediumpurple and drifts up a row
+             per step; a new red respawns at the old location on the next
+             step
+ 3 [new]     the blue 2x3 block moves on its own, one column per step,
+             independent of the action
+ 4 [new]     everything else — gold cells, darkorange L-shapes — is
+             stationary and never changes
+
+==========================================================================
+node 16  (iter 20 · K)   min(ID, cFD) = 0.790
+--------------------------------------------------------------------------
+P(X0) [step 22] = grid 12x12; bg:white; blue: 0,0 0,1 0,2 1,0 1,1 1,2 darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 gold: 4,7 5,9 red: 9,2
+P(X1) [step 23] = grid 12x12; bg:white; blue: 0,1 0,2 0,3 1,1 1,2 1,3 darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 gold: 4,7 5,9 red: 9,3
+P(X2) [step 24] = grid 12x12; bg:white; blue: 0,2 0,3 0,4 1,2 1,3 1,4 darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 gold: 4,7 5,9 red: 10,3
+P(X3) [step 25] = grid 12x12; bg:white; blue: 0,3 0,4 0,5 1,3 1,4 1,5 darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 gold: 4,7 5,9 red: 11,3
+
+--------------------------------------------------------------------------
+K [node 16]
+--------------------------------------------------------------------------
+- The red cell moves downward by 1 cell on each noop step, unless it is at row 11 or the cell directly below is occupied by any other object (including gold, darkorange, blue, or mediumpurple). Directional actions ('up', 'left', 'right') override this automatic movement on their step and produce their own displacement.
+- 'up' moves the red cell upward by 4 cells; 'left' moves it left by 1 cell; 'right' moves it right by 1 cell. 'down' is assumed to move it downward by 4 cells but is not observed.
+- Clicking any cell (coordinates irrelevant) instantaneously changes the current red cell to mediumpurple. That mediumpurple cell then moves upward by 1 cell each subsequent time step (on noop or any action). On the step immediately after the click, a new red cell appears at the exact location where the original red cell was before the click.
+- When a red cell moves (by any means, including automatic downward or directional action) onto a cell containing a gold cell, the gold cell disappears immediately. The red cell does not appear in that cell until the next time step; on that next step, a red cell appears at that location (and the gold is permanently gone).
+- The blue 2×3 block moves autonomously: each time step it shifts either left or right by 1 column. It moves right until its rightmost column reaches 11, then moves left until its leftmost column reaches 0, then moves right again, oscillating continuously. This movement is independent of the action taken.
+- All other objects (darkorange L-shaped groups) are stationary and never change, except that they can block red movement if they occupy the cell immediately below the red cell (preventing automatic downward movement).
+
+--------------------------------------------------------------------------
+K [node 16], condensed -- one line per rule, against node 3
+--------------------------------------------------------------------------
+ 1 [new]     red falls one row per noop unless it is at row 11 or the cell
+             below is occupied; a direction key overrides the fall on its
+             own step
+ 2 [revised] arrows: up 4 rows, left/right 1 column (down assumed 4 rows,
+             unobserved)
+              (reworded; no term added or dropped)
+ 3 [revised] click anywhere: red becomes mediumpurple and drifts up a row
+             per step; a new red respawns at the old location on the next
+             step
+              + “step (on noop or any action).”
+              − “to instantly change”
+ 4 [new]     red moving onto gold eats it at once; red is invisible for
+             one step, then appears there and the gold is gone for good
+ 5 [revised] the blue 2x3 block oscillates on its own: right until column
+             11, left until column 0, repeating, independent of the action
+              + “It moves right until its rightmost column reaches 11,
+                 then moves left until its leftmost column reaches 0, then
+                 moves right again, oscillating continuously.”
+              − “taken (it is not a consequence of any action).”
+ 6 [revised] the darkorange L-shapes are stationary, but block the fall
+             from directly below
+              + “change, except that they can block red movement if they
+                 occupy the cell immediately below the red cell (preventing
+                 automatic downward movement).”
+              − “(gold cells, dark orange”
