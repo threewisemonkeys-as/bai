@@ -1,0 +1,114 @@
+{
+  "s2kt7": {
+    "train": {
+      "frames": 106,
+      "same_after_removing_redundant_fields": true,
+      "ratio_before": 0.9465012915930147,
+      "ratio_after": 1.5880803746384737,
+      "ratio_with_fields_removed": 0.9465012915930147
+    },
+    "test": {
+      "frames": 88,
+      "same_after_removing_redundant_fields": true,
+      "ratio_before": 0.9550567872891369,
+      "ratio_after": 1.6116416616781073,
+      "ratio_with_fields_removed": 0.9550567872891369
+    }
+  },
+  "SET": {
+    "train": {
+      "frames": 99,
+      "same_cell_facts": true,
+      "identical_after_header_removal_and_sort_restoration": true
+    },
+    "test": {
+      "frames": 77,
+      "same_cell_facts": true,
+      "identical_after_header_removal_and_sort_restoration": true
+    }
+  },
+  "colour_lines": {
+    "train": {
+      "frames": 109,
+      "same_background_and_cell_facts": true
+    },
+    "test": {
+      "frames": 88,
+      "same_background_and_cell_facts": true
+    }
+  },
+  "n2ntd": {
+    "train": {
+      "frames": 103,
+      "initial_unique_outputs": 99,
+      "final_unique_outputs": 103,
+      "collision_cell_difference": [
+        [
+          9,
+          1,
+          "red",
+          "mediumpurple"
+        ]
+      ]
+    },
+    "test": {
+      "frames": 91,
+      "initial_unique_outputs": 90,
+      "final_unique_outputs": 91
+    }
+  },
+  "f5w3n": {
+    "train": {
+      "frames": 110,
+      "all_nonbackground_cells_preserved": true,
+      "assumptions": "Known 16x16 black grid and observed palette/color-code mapping"
+    },
+    "test": {
+      "frames": 94,
+      "all_nonbackground_cells_preserved": true,
+      "assumptions": "Known 16x16 black grid and observed palette/color-code mapping"
+    }
+  },
+  "egg": {
+    "train": {
+      "frames": 74,
+      "extra_fields_are_corner_color_and_blob_bounds": true,
+      "ratio_before": 1.4504398859849987,
+      "ratio_after": 1.9621219298069552
+    },
+    "test": {
+      "frames": 60,
+      "extra_fields_are_corner_color_and_blob_bounds": true,
+      "ratio_before": 1.4399448357260418,
+      "ratio_after": 1.9481126017449024
+    }
+  },
+  "diffusion": {
+    "train": {
+      "frames": 114,
+      "final_increase_adds_background_and_dimensions": true,
+      "background_values": [
+        "bg:black",
+        "bg:blue"
+      ]
+    },
+    "test": {
+      "frames": 85,
+      "final_increase_adds_background_and_dimensions": true,
+      "background_values": [
+        "bg:black",
+        "bg:red"
+      ]
+    }
+  },
+  "unique_P_nonempty_K": {
+    "median_rho": 0.3088235294117647,
+    "positive_games": 11
+  },
+  "planning_correlations": {
+    "info_plain": -0.21883628101692343,
+    "info_agentic": 0.04364357804719848,
+    "growth_plain": -0.057399680266734004,
+    "growth_agentic": -0.05819143739626463
+  }
+}

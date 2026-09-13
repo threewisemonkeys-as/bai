@@ -1,0 +1,19 @@
+- The grid has a background color (bg) which is either black or tan.  
+- Cells are of colors: green (fixed at (0,7)), red (fixed at (0,2)), tan, black, sandybrown, skyblue.  
+- When bg=black, tan cells are the "active solid" cells; when bg=tan, black cells are the active solid cells.  
+- Green and red cells never change.  
+- Autonomous evolution (noop):  
+  - Skyblue cells: move downward by one row each step. If the cell directly below is occupied by any non-background cell, they instead move left by one column.  
+  - Active solid cells: each step, if the cell directly below is background, that cell moves down one row (its previous cell becomes background). This is applied simultaneously. (Thus active solid cells fall like sand; no movement when the cell below is occupied or out of bounds.)  
+  - Sandybrown cells: do not move autonomously.  
+- Click actions:  
+  - If the clicked cell is an active solid cell:  
+    - If it is orthogonally adjacent to at least one sandybrown cell, it becomes sandybrown.  
+    - Otherwise, it becomes background.  
+  - If the clicked cell is a background cell:  
+    - If it is orthogonally adjacent to an active solid cell, it becomes an active solid cell.  
+    - Else if it is orthogonally adjacent to a sandybrown cell, it becomes sandybrown.  
+    - Else if it is orthogonally adjacent to a skyblue cell, it becomes skyblue.  
+    - Else (no orthogonal adjacency to any of the three types), consider the column of the clicked cell. Find the non‑background cell in that column with the largest row index (the bottommost cell). If such a cell exists, the clicked cell becomes that cell’s color. If the column contains no non‑background cells, the click has no effect.  
+  - Clicks on cells that are not background and not active solid (e.g., sandybrown or skyblue) have no effect (not observed, but assumed).  
+- The background color never flips.

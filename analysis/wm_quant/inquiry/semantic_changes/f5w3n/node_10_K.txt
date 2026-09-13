@@ -1,0 +1,11 @@
+- The agent's row always increases by exactly 1 each timestep, regardless of the action chosen. When the agent's row is 15, the next row becomes 1 and the column decreases by 1. This drift applies in every transition.  
+- Agent's column is unaffected by left/right actions; it only changes via the wrap-around rule above.  
+- Red objects: each timestep their row decreases by 1 (independent of the action). If the resulting row would be < 0, the red object disappears.  
+- Blue objects: their positions alternate each timestep between two fixed sets. Which set appears depends on the parity of the agent’s row (or equivalently, the step number mod 2). This pattern is independent of the action taken.  
+- Gray objects are the only objects affected by directional actions:  
+  - `up`: every gray object’s row decreases by 1 (if the result would be < 0, it disappears).  
+  - `down`: every gray object’s row increases by 1 (if the result would be > 15, it disappears).  
+  - `left`: every gray object’s column decreases by 1 (if the result would be < 0, it disappears).  
+  - `right`: every gray object’s column increases by 1 (if the result would be > 15, it disappears).  
+  - `noop`: no gray object changes position.  
+- `click ROW COL`: the agent instantly moves to (ROW, COL); all other objects (red, blue, gray) are unaffected.

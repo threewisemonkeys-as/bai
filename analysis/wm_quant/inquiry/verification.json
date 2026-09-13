@@ -1,0 +1,44 @@
+{
+  "input_csv_sha256": "9a07d0cb4d5ebf3b48a00888d48a66b41d7876f65f5edc5762c738f4d0339fbc",
+  "verified_incumbent_split_rows": 158,
+  "incumbent_updates": 64,
+  "updates_from_other_parent": 44,
+  "updates_with_same_P": 14,
+  "admitted_nonseed_candidates_not_improving_best": 356,
+  "split_summaries": {
+    "train": {
+      "rises": 13,
+      "falls": 2,
+      "median_info_change_pct": 18.115789361057423,
+      "rises_above_5pct": 11,
+      "falls_below_minus_5pct": 2,
+      "two_sided_sign_p_exploratory": 0.00738525390625,
+      "median_ship_info_ratio": 1.2371731944441133,
+      "ship_info_ratio_above_1": 12,
+      "median_chars_change_pct": -6.073386756642762,
+      "median_corpus_change_pct": -1.19236883942766,
+      "median_ast_change_pct": 84.43708609271523
+    },
+    "test": {
+      "rises": 12,
+      "falls": 3,
+      "median_info_change_pct": 15.830761581918784,
+      "rises_above_5pct": 11,
+      "falls_below_minus_5pct": 2,
+      "two_sided_sign_p_exploratory": 0.03515625,
+      "median_ship_info_ratio": 1.1629061004026424,
+      "ship_info_ratio_above_1": 12,
+      "median_chars_change_pct": -5.369612328437268,
+      "median_corpus_change_pct": -0.49358341559724295,
+      "median_ast_change_pct": 84.43708609271523
+    }
+  },
+  "info_score_correlation_all_working": {
+    "median_rho": 0.22764664385902295,
+    "positive_games": 12
+  },
+  "info_score_correlation_nonempty_K": {
+    "median_rho": 0.23972337007117875,
+    "positive_games": 13
+  }
+}

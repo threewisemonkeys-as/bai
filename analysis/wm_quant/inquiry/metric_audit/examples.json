@@ -1,0 +1,438 @@
+{
+  "7www9": {
+    "raw": "[[\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"red\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"red\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"blue\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"blue\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"]]",
+    "raw_gzip": 69,
+    "compact_raw_gzip": 67,
+    "lossless_grid_raw_gzip": 51,
+    "incumbents": {
+      "1": {
+        "output": "10,6,blue; 11,6,blue; 7,7,red; 8,7,red",
+        "gzip": 46
+      },
+      "4": {
+        "output": "bg=black; cells: 7,7,red 8,7,red 10,6,blue 11,6,blue",
+        "gzip": 61
+      },
+      "11": {
+        "output": "no_header bg=black cells:7,7,red;8,7,red;10,6,blue;11,6,blue",
+        "gzip": 69
+      },
+      "14": {
+        "output": "no_header bg=black cells:7,7,red;8,7,red;10,6,blue;11,6,blue",
+        "gzip": 69
+      }
+    }
+  },
+  "7xf97": {
+    "raw": "[[\"gold\", \"gold\", \"gold\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gold\", \"gold\", \"gold\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gold\", \"gold\", \"gold\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"blue\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"mediumpurple\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"black\", \"black\"], [\"black\", \"green\", \"black\", \"green\", \"black\", \"green\", \"black\", \"green\", \"black\", \"green\", \"black\", \"green\", \"black\", \"green\", \"black\", \"green\"]]",
+    "raw_gzip": 107,
+    "compact_raw_gzip": 100,
+    "lossless_grid_raw_gzip": 89,
+    "incumbents": {
+      "1": {
+        "output": "0,0:gold 0,1:gold 0,2:gold 0,12:gray 0,13:gray 0,14:gray 0,15:gray 1,0:gold 1,1:gold 1,2:gold 1,12:gray 1,13:gray 1,14:gray 1,15:gray 2,0:gold 2,1:gold 2,2:gold 2,12:gray 2,13:gray 2,14:gray 2,15:gray 3,13:blue 12,13:mediumpurple 13,13:green 14,13:green 15,1:green 15,3:green 15,5:green 15,7:green 15,9:green 15,11:green 15,13:green 15,15:green",
+        "gzip": 139
+      },
+      "2": {
+        "output": "0,0:gold|0,1:gold|0,2:gold|0,12:gray|0,13:gray|0,14:gray|0,15:gray|1,0:gold|1,1:gold|1,2:gold|1,12:gray|1,13:gray|1,14:gray|1,15:gray|2,0:gold|2,1:gold|2,2:gold|2,12:gray|2,13:gray|2,14:gray|2,15:gray|3,13:blue|12,13:mediumpurple|13,13:green|14,13:green|15,1:green|15,3:green|15,5:green|15,7:green|15,9:green|15,11:green|15,13:green|15,15:green",
+        "gzip": 138
+      },
+      "7": {
+        "output": "0,0:gold|0,1:gold|0,2:gold|0,12:gray|0,13:gray|0,14:gray|0,15:gray|1,0:gold|1,1:gold|1,2:gold|1,12:gray|1,13:gray|1,14:gray|1,15:gray|2,0:gold|2,1:gold|2,2:gold|2,12:gray|2,13:gray|2,14:gray|2,15:gray|3,13:blue|12,13:mediumpurple|13,13:green|14,13:green|15,1:green|15,3:green|15,5:green|15,7:green|15,9:green|15,11:green|15,13:green|15,15:green",
+        "gzip": 138
+      },
+      "10": {
+        "output": "0,0:gold|0,1:gold|0,2:gold|0,12:gray|0,13:gray|0,14:gray|0,15:gray|1,0:gold|1,1:gold|1,2:gold|1,12:gray|1,13:gray|1,14:gray|1,15:gray|2,0:gold|2,1:gold|2,2:gold|2,12:gray|2,13:gray|2,14:gray|2,15:gray|3,13:blue|12,13:mediumpurple|13,13:green|14,13:green|15,1:green|15,3:green|15,5:green|15,7:green|15,9:green|15,11:green|15,13:green|15,15:green",
+        "gzip": 138
+      },
+      "23": {
+        "output": "rows=16,cols=16,bg=black;f:gx=1,ax=1,gle=1,gre=0,gcle=0,gcre=1,gare=0,gale=0,uc=0|gold:0,0-2;1,0-2;2,0-2|gray:0,12-15;1,12-15;2,12-15|blue:3,13|mediumpurple:12,13|green:13,13;14,13;15,1;15,3;15,5;15,7;15,9;15,11;15,13;15,15",
+        "gzip": 151
+      }
+    }
+  },
+  "SET": {
+    "raw": "[[\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"white\", \"seagreen\", \"white\", \"black\", \"white\", \"coral\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"white\", \"white\", \"white\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"]]",
+    "raw_gzip": 121,
+    "compact_raw_gzip": 116,
+    "lossless_grid_raw_gzip": 89,
+    "incumbents": {
+      "1": {
+        "output": "bg=black; cells=1,10:white 1,12:white 1,13:white 1,14:white 1,4:white 1,5:white 1,6:white 1,8:white 1,9:white 10,10:white 10,12:white 10,13:coral 10,14:white 10,4:white 10,5:seagreen 10,6:white 10,8:white 10,9:seagreen 11,10:white 11,12:white 11,13:white 11,14:white 11,4:white 11,5:white 11,6:white 11,8:white 11,9:white 13,10:white 13,12:white 13,13:white 13,14:white 13,4:white 13,5:white 13,6:white 13,8:white 13,9:white 14,10:white 14,12:white 14,13:coral 14,14:white 14,4:white 14,5:coral 14,6:white 14,8:white 14,9:seagreen 15,10:white 15,12:white 15,13:coral 15,14:white 15,4:white 15,5:coral 15,6:white 15,8:white 15,9:seagreen 16,10:white 16,12:white 16,13:coral 16,14:white 16,4:white 16,5:coral 16,6:white 16,8:white 16,9:seagreen 17,10:white 17,12:white 17,13:white 17,14:white 17,4:white 17,5:white 17,6:white 17,8:white 17,9:white 2,10:white 2,12:white 2,13:seagreen 2,14:white 2,4:white 2,5:coral 2,6:white 2,8:white 2,9:seagreen 3,10:white 3,12:white 3,13:seagreen 3,14:white 3,4:white 3,5:coral 3,6:white 3,8:white 3,9:seagreen 4,10:white 4,12:white 4,13:seagreen 4,14:white 4,4:white 4,5:coral 4,6:white 4,8:white 4,9:seagreen 5,10:white 5,12:white 5,13:white 5,14:white 5,4:white 5,5:white 5,6:white 5,8:white 5,9:white 7,10:white 7,12:white 7,13:white 7,14:white 7,4:white 7,5:white 7,6:white 7,8:white 7,9:white 8,10:white 8,12:white 8,13:coral 8,14:white 8,4:white 8,5:seagreen 8,6:white 8,8:white 8,9:seagreen 9,10:white 9,12:white 9,13:coral 9,14:white 9,4:white 9,5:seagreen 9,6:white 9,8:white 9,9:seagreen",
+        "gzip": 343
+      },
+      "2": {
+        "output": "bg=black; cells=1,10:white 1,12:white 1,13:white 1,14:white 1,4:white 1,5:white 1,6:white 1,8:white 1,9:white 10,10:white 10,12:white 10,13:coral 10,14:white 10,4:white 10,5:seagreen 10,6:white 10,8:white 10,9:seagreen 11,10:white 11,12:white 11,13:white 11,14:white 11,4:white 11,5:white 11,6:white 11,8:white 11,9:white 13,10:white 13,12:white 13,13:white 13,14:white 13,4:white 13,5:white 13,6:white 13,8:white 13,9:white 14,10:white 14,12:white 14,13:coral 14,14:white 14,4:white 14,5:coral 14,6:white 14,8:white 14,9:seagreen 15,10:white 15,12:white 15,13:coral 15,14:white 15,4:white 15,5:coral 15,6:white 15,8:white 15,9:seagreen 16,10:white 16,12:white 16,13:coral 16,14:white 16,4:white 16,5:coral 16,6:white 16,8:white 16,9:seagreen 17,10:white 17,12:white 17,13:white 17,14:white 17,4:white 17,5:white 17,6:white 17,8:white 17,9:white 2,10:white 2,12:white 2,13:seagreen 2,14:white 2,4:white 2,5:coral 2,6:white 2,8:white 2,9:seagreen 3,10:white 3,12:white 3,13:seagreen 3,14:white 3,4:white 3,5:coral 3,6:white 3,8:white 3,9:seagreen 4,10:white 4,12:white 4,13:seagreen 4,14:white 4,4:white 4,5:coral 4,6:white 4,8:white 4,9:seagreen 5,10:white 5,12:white 5,13:white 5,14:white 5,4:white 5,5:white 5,6:white 5,8:white 5,9:white 7,10:white 7,12:white 7,13:white 7,14:white 7,4:white 7,5:white 7,6:white 7,8:white 7,9:white 8,10:white 8,12:white 8,13:coral 8,14:white 8,4:white 8,5:seagreen 8,6:white 8,8:white 8,9:seagreen 9,10:white 9,12:white 9,13:coral 9,14:white 9,4:white 9,5:seagreen 9,6:white 9,8:white 9,9:seagreen",
+        "gzip": 343
+      },
+      "12": {
+        "output": "bg=black; shape=20x20; cursor:unknown; 1,4:white 1,5:white 1,6:white 1,8:white 1,9:white 1,10:white 1,12:white 1,13:white 1,14:white 2,4:white 2,5:coral 2,6:white 2,8:white 2,9:seagreen 2,10:white 2,12:white 2,13:seagreen 2,14:white 3,4:white 3,5:coral 3,6:white 3,8:white 3,9:seagreen 3,10:white 3,12:white 3,13:seagreen 3,14:white 4,4:white 4,5:coral 4,6:white 4,8:white 4,9:seagreen 4,10:white 4,12:white 4,13:seagreen 4,14:white 5,4:white 5,5:white 5,6:white 5,8:white 5,9:white 5,10:white 5,12:white 5,13:white 5,14:white 7,4:white 7,5:white 7,6:white 7,8:white 7,9:white 7,10:white 7,12:white 7,13:white 7,14:white 8,4:white 8,5:seagreen 8,6:white 8,8:white 8,9:seagreen 8,10:white 8,12:white 8,13:coral 8,14:white 9,4:white 9,5:seagreen 9,6:white 9,8:white 9,9:seagreen 9,10:white 9,12:white 9,13:coral 9,14:white 10,4:white 10,5:seagreen 10,6:white 10,8:white 10,9:seagreen 10,10:white 10,12:white 10,13:coral 10,14:white 11,4:white 11,5:white 11,6:white 11,8:white 11,9:white 11,10:white 11,12:white 11,13:white 11,14:white 13,4:white 13,5:white 13,6:white 13,8:white 13,9:white 13,10:white 13,12:white 13,13:white 13,14:white 14,4:white 14,5:coral 14,6:white 14,8:white 14,9:seagreen 14,10:white 14,12:white 14,13:coral 14,14:white 15,4:white 15,5:coral 15,6:white 15,8:white 15,9:seagreen 15,10:white 15,12:white 15,13:coral 15,14:white 16,4:white 16,5:coral 16,6:white 16,8:white 16,9:seagreen 16,10:white 16,12:white 16,13:coral 16,14:white 17,4:white 17,5:white 17,6:white 17,8:white 17,9:white 17,10:white 17,12:white 17,13:white 17,14:white",
+        "gzip": 379
+      }
+    }
+  },
+  "bt3gb": {
+    "raw": "[[\"gold\", \"gold\", \"black\", \"black\", \"black\", \"gray\", \"gray\", \"gray\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"gold\", \"gold\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"blue\", \"blue\", \"blue\", \"blue\", \"blue\", \"blue\", \"blue\", \"blue\", \"black\", \"black\", \"black\", \"black\", \"black\"]]",
+    "raw_gzip": 86,
+    "compact_raw_gzip": 83,
+    "lossless_grid_raw_gzip": 65,
+    "incumbents": {
+      "1": {
+        "output": "",
+        "gzip": 20
+      },
+      "2": {
+        "output": "0,0:gold 0,1:gold 0,5:gray 0,6:gray 0,7:gray 1,0:gold 1,1:gold 15,3:blue 15,4:blue 15,5:blue 15,6:blue 15,7:blue 15,8:blue 15,9:blue 15,10:blue",
+        "gzip": 84
+      },
+      "4": {
+        "output": "bg=black; gold(0,0), gold(0,1), gray(0,5), gray(0,6), gray(0,7), gold(1,0), gold(1,1), blue(15,3), blue(15,4), blue(15,5), blue(15,6), blue(15,7), blue(15,8), blue(15,9), blue(15,10)",
+        "gzip": 95
+      },
+      "6": {
+        "output": "bg=black; gold(0,0), gold(0,1), gray(0,5), gray(0,6), gray(0,7), gold(1,0), gold(1,1), blue(15,3), blue(15,4), blue(15,5), blue(15,6), blue(15,7), blue(15,8), blue(15,9), blue(15,10)",
+        "gzip": 95
+      },
+      "8": {
+        "output": "bg=black; fixed:gold(0,0),gold(0,1),gold(1,0),gold(1,1); movable:gray_row0:5-7; other:blue_row15:3-10",
+        "gzip": 100
+      },
+      "10": {
+        "output": "bg=black; gold(0,0-1), gray(0,5-7), gold(1,0-1), blue(15,3-10)",
+        "gzip": 71
+      },
+      "12": {
+        "output": "step=0; bg=black; fixed:gold(0,0),gold(0,1),gold(1,0),gold(1,1); movable:gray_row0:5-7; other:blue_row15:3-10",
+        "gzip": 106
+      }
+    }
+  },
+  "colour_lines": {
+    "raw": "[[\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"red\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"purple\", \"black\", \"black\", \"blue\", \"blue\", \"black\", \"black\", \"green\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"blue\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"blue\", \"black\", \"green\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"red\", \"black\", \"black\", \"black\"]]",
+    "raw_gzip": 85,
+    "compact_raw_gzip": 82,
+    "lossless_grid_raw_gzip": 75,
+    "incumbents": {
+      "1": {
+        "output": "bg=black; cells:;(2,0,red);(5,0,purple);(5,3,blue);(5,4,blue);(5,7,green);(6,7,blue);(8,5,blue);(8,7,green);(9,6,red)",
+        "gzip": 93
+      },
+      "5": {
+        "output": "size=10x10 | background=black | cells: (2,0):red; (5,0):purple; (5,3):blue; (5,4):blue; (5,7):green; (6,7):blue; (8,5):blue; (8,7):green; (9,6):red",
+        "gzip": 116
+      },
+      "9": {
+        "output": "bg=black; cells:;(2,0,red);(5,0,purple);(5,3,blue);(5,4,blue);(5,7,green);(6,7,blue);(8,5,blue);(8,7,green);(9,6,red)",
+        "gzip": 93
+      },
+      "12": {
+        "output": "bg=black; cells: | (2,0,red)(5,0,purple)(5,3,blue)(5,4,blue)(5,7,green)(6,7,blue)(8,5,blue)(8,7,green)(9,6,red)",
+        "gzip": 94
+      }
+    }
+  },
+  "diffusion": {
+    "raw": "[[\"black\", \"red\", \"black\", \"red\", \"white\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"blue\", \"black\", \"black\", \"white\", \"black\", \"blue\", \"black\", \"black\"], [\"black\", \"black\", \"red\", \"black\", \"white\", \"black\", \"black\", \"blue\", \"black\"], [\"red\", \"black\", \"black\", \"red\", \"white\", \"black\", \"blue\", \"black\", \"blue\"], [\"red\", \"black\", \"blue\", \"black\", \"white\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"blue\", \"black\", \"black\", \"blue\", \"blue\"], [\"red\", \"black\", \"red\", \"black\", \"white\", \"black\", \"blue\", \"black\", \"blue\"], [\"red\", \"black\", \"red\", \"black\", \"white\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"white\", \"black\", \"black\", \"blue\", \"black\"]]",
+    "raw_gzip": 112,
+    "compact_raw_gzip": 108,
+    "lossless_grid_raw_gzip": 90,
+    "incumbents": {
+      "1": {
+        "output": "bg:black; (0,1,red) (0,3,red) (0,4,white) (1,1,blue) (1,4,white) (1,6,blue) (2,2,red) (2,4,white) (2,7,blue) (3,0,red) (3,3,red) (3,4,white) (3,6,blue) (3,8,blue) (4,0,red) (4,2,blue) (4,4,white) (5,4,blue) (5,7,blue) (5,8,blue) (6,0,red) (6,2,red) (6,4,white) (6,6,blue) (6,8,blue) (7,0,red) (7,2,red) (7,4,white) (8,4,white) (8,7,blue)",
+        "gzip": 141
+      },
+      "2": {
+        "output": "bg:black; blue:(1,1)(1,6)(2,7)(3,6)(3,8)(4,2)(5,4)(5,7)(5,8)(6,6)(6,8)(8,7); red:(0,1)(0,3)(2,2)(3,0)(3,3)(4,0)(6,0)(6,2)(7,0)(7,2); white:(0,4)(1,4)(2,4)(3,4)(4,4)(6,4)(7,4)(8,4)",
+        "gzip": 131
+      },
+      "3": {
+        "output": "bg:black; blue:(1,1)(1,6)(2,7)(3,6)(3,8)(4,2)(5,4)(5,7)(5,8)(6,6)(6,8)(8,7); red:(0,1)(0,3)(2,2)(3,0)(3,3)(4,0)(6,0)(6,2)(7,0)(7,2); white:(0,4)(1,4)(2,4)(3,4)(4,4)(6,4)(7,4)(8,4)",
+        "gzip": 131
+      },
+      "7": {
+        "output": "bg:black; blue:(1,1)(1,6)(2,7)(3,6)(3,8)(4,2)(5,4)(5,7)(5,8)(6,6)(6,8)(8,7); red:(0,1)(0,3)(2,2)(3,0)(3,3)(4,0)(6,0)(6,2)(7,0)(7,2); white:(0,4)(1,4)(2,4)(3,4)(4,4)(6,4)(7,4)(8,4)",
+        "gzip": 131
+      },
+      "18": {
+        "output": "black:0,0 0,2 0,5 0,6 0,7 0,8 1,0 1,2 1,3 1,5 1,7 1,8 2,0 2,1 2,3 2,5 2,6 2,8 3,1 3,2 3,5 3,7 4,1 4,3 4,5 4,6 4,7 4,8 5,0 5,1 5,2 5,3 5,5 5,6 6,1 6,3 6,5 6,7 7,1 7,3 7,5 7,6 7,7 7,8 8,0 8,1 8,2 8,3 8,5 8,6 8,8; blue:1,1 1,6 2,7 3,6 3,8 4,2 5,4 5,7 5,8 6,6 6,8 8,7; red:0,1 0,3 2,2 3,0 3,3 4,0 6,0 6,2 7,0 7,2; white:0,4 1,4 2,4 3,4 4,4 6,4 7,4 8,4",
+        "gzip": 198
+      },
+      "21": {
+        "output": "bg:black; dim:9,9\nblue:1:1,6;2:7;3:6,8;4:2;5:4,7,8;6:6,8;8:7\nred:0:1,3;2:2;3:0,3;4:0;6:0,2;7:0,2\nwhite:0:4;1:4;2:4;3:4;4:4;6:4;7:4;8:4",
+        "gzip": 119
+      },
+      "24": {
+        "output": "blue:1,1 1,6 2,7 3,6 3,8 4,2 5,4 5,7 5,8 6,6 6,8 8,7; red:0,1 0,3 2,2 3,0 3,3 4,0 6,0 6,2 7,0 7,2; white:0,4 1,4 2,4 3,4 4,4 6,4 7,4 8,4",
+        "gzip": 112
+      },
+      "28": {
+        "output": "bg:black; dim:9x9; blue:1,1 1,6 2,7 3,6 3,8 4,2 5,4 5,7 5,8 6,6 6,8 8,7; red:0,1 0,3 2,2 3,0 3,3 4,0 6,0 6,2 7,0 7,2; white:0,4 1,4 2,4 3,4 4,4 6,4 7,4 8,4",
+        "gzip": 129
+      }
+    }
+  },
+  "dino": {
+    "raw": "[[\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"red\", \"red\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"red\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"red\", \"red\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"red\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"black\", \"black\"]]",
+    "raw_gzip": 107,
+    "compact_raw_gzip": 97,
+    "lossless_grid_raw_gzip": 66,
+    "incumbents": {
+      "1": {
+        "output": "11,2:red;11,3:red;12,2:red;13,1:red;13,2:red;14,2:red;14,5:yellow;17,17:green;18,17:green;19,17:green",
+        "gzip": 74
+      },
+      "2": {
+        "output": "bg:black cells:(11,2,red);(11,3,red);(12,2,red);(13,1,red);(13,2,red);(14,2,red);(14,5,yellow);(17,17,green);(18,17,green);(19,17,green)",
+        "gzip": 87
+      },
+      "3": {
+        "output": "bg:black; green:(17,17),(18,17),(19,17); red:(11,2),(11,3),(12,2),(13,1),(13,2),(14,2); yellow:(14,5)",
+        "gzip": 92
+      },
+      "4": {
+        "output": "bg:black; green:(17,17),(18,17),(19,17); red:(11,2),(11,3),(12,2),(13,1),(13,2),(14,2); yellow:(14,5)",
+        "gzip": 92
+      },
+      "8": {
+        "output": "rows=20 cols=20 bg:black; green:(17,17),(18,17),(19,17); red:(11,2),(11,3),(12,2),(13,1),(13,2),(14,2); yellow:(14,5)",
+        "gzip": 104
+      },
+      "16": {
+        "output": "step=1; rows=20 cols=20 bg:black; sig:4724eb3e; cells:green:(17,17)(18,17)(19,17)|red:(11,2)(11,3)(12,2)(13,1)(13,2)(14,2)|yellow:(14,5)",
+        "gzip": 123
+      },
+      "18": {
+        "output": "step=1 20x20 bg=black; green:17,17 18,17 19,17; red:11,2 11,3 12,2 13,1 13,2 14,2; yellow:14,5",
+        "gzip": 98
+      }
+    }
+  },
+  "dq8gc": {
+    "raw": "[[\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"darkgreen\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"darkgreen\", \"black\", \"black\", \"black\", \"darkgreen\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"darkgreen\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"darkgreen\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"]]",
+    "raw_gzip": 84,
+    "compact_raw_gzip": 77,
+    "lossless_grid_raw_gzip": 60,
+    "incumbents": {
+      "1": {
+        "output": "3,4:darkgreen; 5,3:darkgreen; 5,7:darkgreen; 6,6:darkgreen; 8,6:darkgreen",
+        "gzip": 50
+      },
+      "2": {
+        "output": "bg:black;3,4,darkgreen;5,3,darkgreen;5,7,darkgreen;6,6,darkgreen;8,6,darkgreen",
+        "gzip": 58
+      },
+      "4": {
+        "output": "bg:black;3,4,darkgreen;5,3,darkgreen;5,7,darkgreen;6,6,darkgreen;8,6,darkgreen",
+        "gzip": 58
+      },
+      "10": {
+        "output": "bg:black;size:16x16; 3,4:darkgreen[]; 5,3:darkgreen[]; 5,7:darkgreen[]; 6,6:darkgreen[]; 8,6:darkgreen[]",
+        "gzip": 74
+      },
+      "29": {
+        "output": "bg:black | hash:b1ba6550 | dim:16x16 | 3,4:darkgreen; 5,3:darkgreen; 5,7:darkgreen; 6,6:darkgreen; 8,6:darkgreen",
+        "gzip": 87
+      }
+    }
+  },
+  "eahcw": {
+    "raw": "[[\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"green\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"green\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"black\", \"black\", \"green\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"green\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"]]",
+    "raw_gzip": 87,
+    "compact_raw_gzip": 84,
+    "lossless_grid_raw_gzip": 58,
+    "incumbents": {
+      "1": {
+        "output": "4,11:green; 5,5:green; 8,8:green; 8,9:green; 9,8:green; 9,9:green; 10,5:green; 10,8:green; 11,10:green",
+        "gzip": 64
+      },
+      "5": {
+        "output": "BGRD:black|10,5:green;10,8:green;11,10:green;4,11:green;5,5:green;8,8:green;8,9:green;9,8:green;9,9:green",
+        "gzip": 74
+      },
+      "10": {
+        "output": "4 11 green; 5 5 green; 8 8 green; 8 9 green; 9 8 green; 9 9 green; 10 5 green; 10 8 green; 11 10 green",
+        "gzip": 62
+      },
+      "14": {
+        "output": "PH:?|CH:afa3d6908b60|BGRD:black|10,5:green;10,8:green;11,10:green;4,11:green;5,5:green;8,8:green;8,9:green;9,8:green;9,9:green",
+        "gzip": 95
+      },
+      "28": {
+        "output": "STEP:0|AC:?|PH:?|CH:afa3d6908b60|size:9|10,5:green;10,8:green;11,10:green;4,11:green;5,5:green;8,8:green;8,9:green;9,8:green;9,9:green",
+        "gzip": 102
+      }
+    }
+  },
+  "egg": {
+    "raw": "[[\"red\", \"tan\", \"tan\", \"tan\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"tan\", \"tan\", \"tan\", \"tan\", \"tan\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"tan\", \"tan\", \"tan\", \"tan\", \"tan\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"tan\", \"tan\", \"tan\", \"tan\", \"tan\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"tan\", \"tan\", \"tan\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"], [\"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\", \"gray\"]]",
+    "raw_gzip": 76,
+    "compact_raw_gzip": 71,
+    "lossless_grid_raw_gzip": 55,
+    "incumbents": {
+      "1": {
+        "output": "bg=gray | 0,0:red 0,1:tan 0,2:tan 0,3:tan 1,0:tan 1,1:tan 1,2:tan 1,3:tan 1,4:tan 2,0:tan 2,1:tan 2,2:tan 2,3:tan 2,4:tan 3,0:tan 3,1:tan 3,2:tan 3,3:tan 3,4:tan 4,1:tan 4,2:tan 4,3:tan",
+        "gzip": 96
+      },
+      "2": {
+        "output": "bg:gray; cells: (0,0,red) (0,1,tan) (0,2,tan) (0,3,tan) (1,0,tan) (1,1,tan) (1,2,tan) (1,3,tan) (1,4,tan) (2,0,tan) (2,1,tan) (2,2,tan) (2,3,tan) (2,4,tan) (3,0,tan) (3,1,tan) (3,2,tan) (3,3,tan) (3,4,tan) (4,1,tan) (4,2,tan) (4,3,tan)",
+        "gzip": 104
+      },
+      "3": {
+        "output": "bg:gray; cells: (0,0,red) (0,1,tan) (0,2,tan) (0,3,tan) (1,0,tan) (1,1,tan) (1,2,tan) (1,3,tan) (1,4,tan) (2,0,tan) (2,1,tan) (2,2,tan) (2,3,tan) (2,4,tan) (3,0,tan) (3,1,tan) (3,2,tan) (3,3,tan) (3,4,tan) (4,1,tan) (4,2,tan) (4,3,tan)",
+        "gzip": 104
+      },
+      "5": {
+        "output": "16x16; bg:gray; cells: (0,0,red) (0,1,tan) (0,2,tan) (0,3,tan) (1,0,tan) (1,1,tan) (1,2,tan) (1,3,tan) (1,4,tan) (2,0,tan) (2,1,tan) (2,2,tan) (2,3,tan) (2,4,tan) (3,0,tan) (3,1,tan) (3,2,tan) (3,3,tan) (3,4,tan) (4,1,tan) (4,2,tan) (4,3,tan)",
+        "gzip": 110
+      },
+      "8": {
+        "output": "16x16; bg:gray; (0,0)=red; red_blob: rows 0-0, cols 0-0; tan_blob: rows 0-4, cols 0-4; cells: (0,0,red) (0,1,tan) (0,2,tan) (0,3,tan) (1,0,tan) (1,1,tan) (1,2,tan) (1,3,tan) (1,4,tan) (2,0,tan) (2,1,tan) (2,2,tan) (2,3,tan) (2,4,tan) (3,0,tan) (3,1,tan) (3,2,tan) (3,3,tan) (3,4,tan) (4,1,tan) (4,2,tan) (4,3,tan)",
+        "gzip": 148
+      }
+    }
+  },
+  "f5w3n": {
+    "raw": "[[\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"blue\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"gray\", \"black\", \"black\", \"black\", \"black\", \"black\", \"orange\", \"black\"]]",
+    "raw_gzip": 81,
+    "compact_raw_gzip": 75,
+    "lossless_grid_raw_gzip": 60,
+    "incumbents": {
+      "1": {
+        "output": "agent row=15 col=14 | others: (1,13,blue); (15,8,gray)",
+        "gzip": 72
+      },
+      "2": {
+        "output": "agent row=15 col=14 | others: (1,13,blue); (15,8,gray)",
+        "gzip": 72
+      },
+      "5": {
+        "output": "agent row=15 col=14 | others: (1,13,blue); (15,8,gray)",
+        "gzip": 72
+      },
+      "8": {
+        "output": "agent row=15 col=14 | others: (1,13,blue); (15,8,gray)",
+        "gzip": 72
+      },
+      "10": {
+        "output": "bg=black rows=16 cols=16 | agent row=15 col=14 | colors: blue:1 gray:1 | others: (1,13,blue); (15,8,gray)",
+        "gzip": 105
+      },
+      "11": {
+        "output": "bg=black|a(15,14)|others=(1,13,blue);(15,8,gray)|delta=none",
+        "gzip": 77
+      },
+      "12": {
+        "output": "bg=black rows=16 cols=16 | agent row=15 col=14 | colors: blue:1 gray:1 | others: (1,13,blue); (15,8,gray)",
+        "gzip": 105
+      },
+      "14": {
+        "output": "bg=black|a(15,14)|ap=T|others=(1,13,blue);(15,8,gray)|delta=none",
+        "gzip": 82
+      },
+      "16": {
+        "output": "bg=black rows=16 cols=16 | agent at (15,14) | colors: blue:1 gray:1 | others: (1,13,blue); (15,8,gray)",
+        "gzip": 105
+      },
+      "20": {
+        "output": "a:15,14 | cells:1,13,u;15,8,g",
+        "gzip": 48
+      }
+    }
+  },
+  "logic_gates": {
+    "raw": "[[\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"darkblue\", \"darkblue\", \"grey\", \"grey\", \"grey\", \"grey\", \"grey\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"darkblue\", \"darkblue\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"darkblue\", \"darkblue\", \"grey\", \"grey\", \"grey\", \"grey\", \"grey\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"darkblue\", \"darkblue\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"pink\", \"pink\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"pink\", \"pink\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"pink\", \"pink\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"pink\", \"pink\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"orange\", \"orange\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"orange\", \"orange\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"darkblue\", \"darkblue\", \"black\", \"black\", \"black\", \"black\", \"black\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"yellow\", \"darkblue\", \"darkblue\", \"grey\", \"grey\", \"grey\", \"grey\", \"grey\", \"grey\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"]]",
+    "raw_gzip": 160,
+    "compact_raw_gzip": 156,
+    "lossless_grid_raw_gzip": 125,
+    "incumbents": {
+      "1": {
+        "output": "darkblue:412,413,512,513,812,813,912,913,2012,2013,2112,2113;grey:414,415,416,417,418,419,519,619,719,814,815,816,817,818,819,919,1019,1119,1419,1519,1619,1719,1819,1919,2019,2114,2115,2116,2117,2118,2119;orange:1612,1613,1712,1713;pink:124,125,1219,1220,134,135,1319,1320;yellow:45,46,47,48,49,410,411,55,65,75,85,86,87,88,89,810,811,95,105,115,126,127,128,129,1210,1211,1212,1312,145,1412,155,1512,165,175,185,195,205,215,216,217,218,219,2110,2111",
+        "gzip": 245
+      },
+      "2": {
+        "output": "4,5:yellow;4,6:yellow;4,7:yellow;4,8:yellow;4,9:yellow;4,10:yellow;4,11:yellow;4,12:darkblue;4,13:darkblue;4,14:grey;4,15:grey;4,16:grey;4,17:grey;4,18:grey;4,19:grey;5,5:yellow;5,12:darkblue;5,13:darkblue;5,19:grey;6,5:yellow;6,19:grey;7,5:yellow;7,19:grey;8,5:yellow;8,6:yellow;8,7:yellow;8,8:yellow;8,9:yellow;8,10:yellow;8,11:yellow;8,12:darkblue;8,13:darkblue;8,14:grey;8,15:grey;8,16:grey;8,17:grey;8,18:grey;8,19:grey;9,5:yellow;9,12:darkblue;9,13:darkblue;9,19:grey;10,5:yellow;10,19:grey;11,5:yellow;11,19:grey;12,4:pink;12,5:pink;12,6:yellow;12,7:yellow;12,8:yellow;12,9:yellow;12,10:yellow;12,11:yellow;12,12:yellow;12,19:pink;12,20:pink;13,4:pink;13,5:pink;13,12:yellow;13,19:pink;13,20:pink;14,5:yellow;14,12:yellow;14,19:grey;15,5:yellow;15,12:yellow;15,19:grey;16,5:yellow;16,12:orange;16,13:orange;16,19:grey;17,5:yellow;17,12:orange;17,13:orange;17,19:grey;18,5:yellow;18,19:grey;19,5:yellow;19,19:grey;20,5:yellow;20,12:darkblue;20,13:darkblue;20,19:grey;21,5:yellow;21,6:yellow;21,7:yellow;21,8:yellow;21,9:yellow;21,10:yellow;21,11:yellow;21,12:darkblue;21,13:darkblue;21,14:grey;21,15:grey;21,16:grey;21,17:grey;21,18:grey;21,19:grey",
+        "gzip": 294
+      },
+      "3": {
+        "output": "4,5:yellow;4,6:yellow;4,7:yellow;4,8:yellow;4,9:yellow;4,10:yellow;4,11:yellow;4,12:darkblue;4,13:darkblue;4,14:grey;4,15:grey;4,16:grey;4,17:grey;4,18:grey;4,19:grey;5,5:yellow;5,12:darkblue;5,13:darkblue;5,19:grey;6,5:yellow;6,19:grey;7,5:yellow;7,19:grey;8,5:yellow;8,6:yellow;8,7:yellow;8,8:yellow;8,9:yellow;8,10:yellow;8,11:yellow;8,12:darkblue;8,13:darkblue;8,14:grey;8,15:grey;8,16:grey;8,17:grey;8,18:grey;8,19:grey;9,5:yellow;9,12:darkblue;9,13:darkblue;9,19:grey;10,5:yellow;10,19:grey;11,5:yellow;11,19:grey;12,4:pink;12,5:pink;12,6:yellow;12,7:yellow;12,8:yellow;12,9:yellow;12,10:yellow;12,11:yellow;12,12:yellow;12,19:pink;12,20:pink;13,4:pink;13,5:pink;13,12:yellow;13,19:pink;13,20:pink;14,5:yellow;14,12:yellow;14,19:grey;15,5:yellow;15,12:yellow;15,19:grey;16,5:yellow;16,12:orange;16,13:orange;16,19:grey;17,5:yellow;17,12:orange;17,13:orange;17,19:grey;18,5:yellow;18,19:grey;19,5:yellow;19,19:grey;20,5:yellow;20,12:darkblue;20,13:darkblue;20,19:grey;21,5:yellow;21,6:yellow;21,7:yellow;21,8:yellow;21,9:yellow;21,10:yellow;21,11:yellow;21,12:darkblue;21,13:darkblue;21,14:grey;21,15:grey;21,16:grey;21,17:grey;21,18:grey;21,19:grey",
+        "gzip": 294
+      },
+      "14": {
+        "output": "bg:black;A:darkblue;B:darkblue;C:pink;D:pink;E:orange;F:darkblue",
+        "gzip": 64
+      },
+      "17": {
+        "output": "4,5:yellow;4,6:yellow;4,7:yellow;4,8:yellow;4,9:yellow;4,10:yellow;4,11:yellow;4,12:darkblue;4,13:darkblue;4,14:grey;4,15:grey;4,16:grey;4,17:grey;4,18:grey;4,19:grey;5,5:yellow;5,12:darkblue;5,13:darkblue;5,19:grey;6,5:yellow;6,19:grey;7,5:yellow;7,19:grey;8,5:yellow;8,6:yellow;8,7:yellow;8,8:yellow;8,9:yellow;8,10:yellow;8,11:yellow;8,12:darkblue;8,13:darkblue;8,14:grey;8,15:grey;8,16:grey;8,17:grey;8,18:grey;8,19:grey;9,5:yellow;9,12:darkblue;9,13:darkblue;9,19:grey;10,5:yellow;10,19:grey;11,5:yellow;11,19:grey;12,4:pink;12,5:pink;12,6:yellow;12,7:yellow;12,8:yellow;12,9:yellow;12,10:yellow;12,11:yellow;12,12:yellow;12,19:pink;12,20:pink;13,4:pink;13,5:pink;13,12:yellow;13,19:pink;13,20:pink;14,5:yellow;14,12:yellow;14,19:grey;15,5:yellow;15,12:yellow;15,19:grey;16,5:yellow;16,12:orange;16,13:orange;16,19:grey;17,5:yellow;17,12:orange;17,13:orange;17,19:grey;18,5:yellow;18,19:grey;19,5:yellow;19,19:grey;20,5:yellow;20,12:darkblue;20,13:darkblue;20,19:grey;21,5:yellow;21,6:yellow;21,7:yellow;21,8:yellow;21,9:yellow;21,10:yellow;21,11:yellow;21,12:darkblue;21,13:darkblue;21,14:grey;21,15:grey;21,16:grey;21,17:grey;21,18:grey;21,19:grey",
+        "gzip": 294
+      }
+    }
+  },
+  "n2ntd": {
+    "raw": "[[\"white\", \"white\", \"white\", \"white\", \"blue\", \"blue\", \"blue\", \"white\", \"white\", \"white\", \"white\", \"white\"], [\"white\", \"white\", \"white\", \"white\", \"blue\", \"blue\", \"blue\", \"white\", \"white\", \"white\", \"white\", \"white\"], [\"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\"], [\"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\"], [\"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"gold\", \"white\", \"white\", \"white\", \"white\"], [\"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"gold\", \"white\", \"white\"], [\"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"darkorange\", \"darkorange\", \"darkorange\", \"white\"], [\"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\"], [\"white\", \"white\", \"white\", \"white\", \"darkorange\", \"darkorange\", \"darkorange\", \"white\", \"white\", \"white\", \"white\", \"white\"], [\"white\", \"red\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\"], [\"darkorange\", \"darkorange\", \"darkorange\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\"], [\"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\", \"white\"]]",
+    "raw_gzip": 98,
+    "compact_raw_gzip": 95,
+    "lossless_grid_raw_gzip": 86,
+    "incumbents": {
+      "1": {
+        "output": "bg:white agent:9,1 objs:[blue(0,4),blue(0,5),blue(0,6),blue(1,4),blue(1,5),blue(1,6),darkorange(10,0),darkorange(10,1),darkorange(10,2),darkorange(6,10),darkorange(6,8),darkorange(6,9),darkorange(8,4),darkorange(8,5),darkorange(8,6),gold(4,7),gold(5,9)]",
+        "gzip": 126
+      },
+      "3": {
+        "output": "grid 12x12; bg:white; cells:(0,4,blue);(0,5,blue);(0,6,blue);(1,4,blue);(1,5,blue);(1,6,blue);(4,7,gold);(5,9,gold);(6,8,darkorange);(6,9,darkorange);(6,10,darkorange);(8,4,darkorange);(8,5,darkorange);(8,6,darkorange);(9,1,red);(10,0,darkorange);(10,1,darkorange);(10,2,darkorange)",
+        "gzip": 139
+      },
+      "6": {
+        "output": "grid 12x12; bg:white; objects:; blue(0,4)3x2; gold(4,7)1x1; gold(5,9)1x1; darkorange(6,8)3x1; darkorange(8,4)3x1; red(9,1)1x1; darkorange(10,0)3x1",
+        "gzip": 118
+      },
+      "16": {
+        "output": "grid 12x12; bg:white; blue: 0,4 0,5 0,6 1,4 1,5 1,6 darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 gold: 4,7 5,9 red: 9,1",
+        "gzip": 111
+      }
+    }
+  },
+  "s2kt7": {
+    "raw": "[[\"red\", \"red\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"red\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"red\"], [\"black\", \"gray\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"gray\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"]]",
+    "raw_gzip": 82,
+    "compact_raw_gzip": 77,
+    "lossless_grid_raw_gzip": 58,
+    "incumbents": {
+      "1": {
+        "output": "cells: (0,0,red); (0,1,red); (1,0,red); (1,15,red); (2,1,gray); (7,1,gray)",
+        "gzip": 61
+      },
+      "4": {
+        "output": "bg:black; rows:16; cols:16; cells:(0,0,red), (0,1,red), (1,0,red), (1,15,red), (2,1,gray), (7,1,gray)",
+        "gzip": 83
+      },
+      "23": {
+        "output": "step:0; sid:0fafb7e1; bg:black; rows:16; cols:16; cells:(0,0,red), (0,1,red), (1,0,red), (1,15,red), (2,1,gray), (7,1,gray); added:(0,0,red), (0,1,red), (1,0,red), (1,15,red), (2,1,gray), (7,1,gray); removed:empty; changed:empty",
+        "gzip": 131
+      }
+    }
+  },
+  "va6fq": {
+    "raw": "[[\"black\", \"black\", \"red\", \"black\", \"black\", \"black\", \"black\", \"green\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\", \"black\"], [\"black\", \"black\", \"tan\", \"black\", \"tan\", \"tan\", \"black\", \"tan\", \"black\", \"black\"], [\"black\", \"black\", \"tan\", \"black\", \"tan\", \"tan\", \"black\", \"tan\", \"black\", \"black\"], [\"black\", \"black\", \"tan\", \"tan\", \"tan\", \"tan\", \"tan\", \"tan\", \"black\", \"black\"], [\"black\", \"black\", \"tan\", \"tan\", \"tan\", \"tan\", \"tan\", \"tan\", \"black\", \"black\"], [\"black\", \"black\", \"tan\", \"tan\", \"tan\", \"tan\", \"tan\", \"tan\", \"black\", \"black\"]]",
+    "raw_gzip": 75,
+    "compact_raw_gzip": 71,
+    "lossless_grid_raw_gzip": 64,
+    "incumbents": {
+      "1": {
+        "output": "0,2:red\n0,7:green\n5,2:tan\n5,4:tan\n5,5:tan\n5,7:tan\n6,2:tan\n6,4:tan\n6,5:tan\n6,7:tan\n7,2:tan\n7,3:tan\n7,4:tan\n7,5:tan\n7,6:tan\n7,7:tan\n8,2:tan\n8,3:tan\n8,4:tan\n8,5:tan\n8,6:tan\n8,7:tan\n9,2:tan\n9,3:tan\n9,4:tan\n9,5:tan\n9,6:tan\n9,7:tan",
+        "gzip": 100
+      },
+      "2": {
+        "output": "bg=black cells:green:0,7; red:0,2; tan:5,2;5,4;5,5;5,7;6,2;6,4;6,5;6,7;7,2;7,3;7,4;7,5;7,6;7,7;8,2;8,3;8,4;8,5;8,6;8,7;9,2;9,3;9,4;9,5;9,6;9,7",
+        "gzip": 110
+      },
+      "7": {
+        "output": "bg=black dims=10x10 cells:green:0,7; red:0,2; tan:5,2;5,4;5,5;5,7;6,2;6,4;6,5;6,7;7,2;7,3;7,4;7,5;7,6;7,7;8,2;8,3;8,4;8,5;8,6;8,7;9,2;9,3;9,4;9,5;9,6;9,7",
+        "gzip": 121
+      },
+      "24": {
+        "output": "step=1 bg=black dims=10x10 cells:green:0,7; red:0,2; tan:5,2;5,4;5,5;5,7;6,2;6,4;6,5;6,7;7,2;7,3;7,4;7,5;7,6;7,7;8,2;8,3;8,4;8,5;8,6;8,7;9,2;9,3;9,4;9,5;9,6;9,7",
+        "gzip": 127
+      }
+    }
+  }
+}

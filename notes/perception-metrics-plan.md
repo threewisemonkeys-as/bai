@@ -218,7 +218,10 @@ Each is an assertion in the script, not a thing to remember to check:
   uncompressed-numerator companions.
 * `offline_learning/scripts/wm_panel_grid.py` -- the 15-panel grid itself, shared by both
   per-game families so a layout change reaches both. The metric-specific parts (column,
-  colour, titles, unit scale, reference line, the paragraph in the key) are arguments.
+  colour, titles, unit scale, reference line, the paragraph in the key) are arguments. Every
+  panel carries the whole pool: a soft dot per node the search PROPOSED, at the iteration it
+  entered, under the incumbent line -- dead nodes included, which is why several panels have
+  a row of dots on the floor.
 * `offline_learning/scripts/fig_dynamics_size_per_game.py` -- the same treatment for `K`,
   the dynamics model. One figure, `k_chars`; `k_sentences`, `k_gzip_bytes`, `k_words`,
   `k_claims`, `k_lines` and `k_norm_bytes` are measured into `metrics.csv` and drawable with

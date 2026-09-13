@@ -1,0 +1,21 @@
+world knowledge
+- The grid is 9x9 (rows 0-8, cols 0-8). A vertical white column always exists at col=4; the set of rows with white cells changes only under the 'up' action and under clicks on white cells.
+- 'up' action:
+    - White rows cycle deterministically through four sets: 
+        D = {0,1,2,3,4,5,6,7,8}
+        A = {0,3,6}
+        B = {0,1,3,4,6,7}
+        C = {0,1,3,4,5,6,7,8}
+      The mapping is: D → A, A → B, B → C, C → A.
+    - Blue and red tokens move according to a deterministic rule that depends on their current (row, col) and the white set; the exact mapping is consistent across all instances and can be derived from the trajectory.
+- 'noop' action:
+    - The set of white rows does not change.
+    - All tokens (blue and red) move one step in a deterministic fashion that depends on the current white set and each token's position; the pattern is consistent and can be learned from the trajectory (it is not an identity transformation).
+- 'click ROW COL' action:
+    - If the clicked cell is white (col=4): that white row is removed from the white set, and a red token appears at (ROW, COL).
+    - If the clicked cell is empty and col<4: a red token appears at (ROW, COL), and all blue tokens move one step in a deterministic pattern (the step depends on the tokens' positions relative to the clicked cell; it is not simply "toward").
+    - If the clicked cell is empty and col>4: a blue token appears at (ROW, COL), and all red tokens move one step in the same style deterministic pattern.
+    - If the clicked cell contains a blue token: all red tokens move one step deterministically (pattern style as above).
+    - If the clicked cell contains a red token: all blue tokens move one step deterministically (same style).
+  - The exact movement pattern for the opposite-color tokens is deterministic and consistent across all instances; it can be derived from the trajectory but is not simply "toward" the clicked cell.
+- All dynamics are deterministic: given the current state and action, the next state is uniquely determined.

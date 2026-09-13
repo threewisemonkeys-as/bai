@@ -1,0 +1,17 @@
+- The agent's row increases by exactly 1 each timestep regardless of action. For rows other than 15, the column is unchanged by noop. When the agent's row is 15, the next row and column depend on the action: 
+  - `up`: row becomes 3, column unchanged.
+  - `right`: row becomes 1, column decreases by 1.
+  - `left`: row becomes 3, column unchanged.
+  - `noop`: the agent becomes off‑grid (not shown) and reappears at row=1 after two subsequent timesteps; the reappearance column is the same as the column it had before going off‑grid.
+  - `down` and `click` follow the standard rules (down would increase row further, but this case is not observed; click teleports instantly).
+- Red objects (any non‑blue, non‑gray object) always have their row decreased by exactly 1 each timestep, independent of the action taken, except that a red created from a gray by an up action does not move on the next timestep; it begins moving on the second subsequent step. If the resulting row would be < 0, the object disappears.
+- Blue objects occupy two rows: row 1 and row 3. They alternate between two fixed sets each timestep. Set A: row1 columns 1,4,7,10,13; row3 columns 2,5,8,11,14. Set B: row1 columns 2,5,8,11,14; row3 columns 1,4,7,10,13. The set toggles each timestep. Additionally, if the agent occupies a cell that currently contains a blue object, that blue object is not visible (removed) while the agent is on that cell and reappears when the agent moves away.
+- Gray objects move according to the action, regardless of their location:
+  - `up`: gray's row decreases by 1 (if < 0, disappears)
+  - `down`: gray's row increases by 1 (if > 15, disappears)
+  - `left`: gray's column decreases by 1 (if < 0, disappears)
+  - `right`: gray's column increases by 1 (if > 15, disappears)
+  - `noop`: gray's position does not change
+  - `click ROW COL`: gray's position is unaffected
+- Additionally, when the agent executes an `up` action, any gray object present at that timestep turns into a red object at the same cell. This transformation happens immediately (the gray disappears and a red appears in its place) and the new red then follows the normal red‑object movement rule on subsequent steps, except that it does not move on the next timestep.
+- Note that all coordinates are given as (row, col). Row indices increase downward, column indices increase rightward.

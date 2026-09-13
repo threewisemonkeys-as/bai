@@ -1,0 +1,16 @@
+- Agent's row always increases by exactly 1 each timestep, regardless of the action chosen.  
+  When the agent's row would become 16 (i.e., after the increase from row 15), the next row becomes 1 and the column decreases by 1, **unless** there is no gray object on row 15.  
+  If there is no gray object on row 15, then the normal wrap rule does not apply; instead the agent's next position is determined solely by the action taken:  
+    • `up`: the agent's row becomes 3 and its column is unchanged.  
+    • `noop`: the agent's row becomes 1 and column decreases by 1 (same as the wrap rule).  
+    • (Other actions on row 15 without gray are not observed, but would follow the action's default effect on the agent's position without wrap.)
+- Agent's column is unchanged by any directional action (left, right, up, down) and only changes via the wrap rule described above.  
+- Red objects: each timestep their row decreases by 1 (independent of the action). If the resulting row would be < 0, the red object disappears.  
+- Blue objects are not affected by any action. Their positions evolve in a fixed deterministic cycle that repeats every 5 timesteps: all blues collectively shift one column to the right (for rows 1) and one column to the left (for rows 3) between two patterns. The cycle is fully determined by the step number (mod 5) and is independent of the agent's position or actions.  
+- Gray objects are the only objects affected by directional actions:  
+  • `up`: every gray object’s row decreases by 1 (if the result would be < 0, it disappears).  
+  • `down`: every gray object’s row increases by 1 (if the result would be > 15, it disappears).  
+  • `left`: every gray object’s column decreases by 1 (if the result would be < 0, it disappears).  
+  • `right`: every gray object’s column increases by 1 (if the result would be > 15, it disappears).  
+  • `noop`: no gray object changes position.  
+- `click ROW COL`: the agent instantly moves to (ROW, COL); all other objects (red, blue, gray) are unaffected.

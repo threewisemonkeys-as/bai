@@ -1,0 +1,14 @@
+world knowledge
+- Grid is 16x16 (rows 0-15, cols 0-15), background black.
+- Cell types: gold, gray, blue, lightblue.
+- There is a fixed 2x2 block at cells (0,0),(0,1),(1,0),(1,1). These cells are either gold or gray. Their color persists even when covered by the movable block; they are visible only when not covered.
+- There is a movable block: three contiguous gray cells on row 0. It moves left/right with left/right actions. Left/right are possible only if the three target cells are within [0,15] and contain no blue/lightblue cells. The movable block can overwrite fixed block cells (which are not obstacles). When the movable block moves, it leaves its previous cells empty; if those were fixed block cells, the fixed block's stored color reappears.
+- There is a bottom block: a contiguous block of blue or lightblue cells on row 15. Its color toggles on clicks outside the top-left 2x2. Its width varies as new cells arrive.
+- On noop: every blue/lightblue cell not on row 15 attemps to move down one row. If the cell directly below is empty (no other cell), it moves; otherwise it stays. Cells on row 15 do not move.
+- On left: the movable block shifts one column left (decrements column of all three cells) if possible.
+- On right: the movable block shifts one column right (increments column) if possible.
+- On down: if the cell (1, c) is empty (no cell of any type), where c is the middle column of the movable block (the second of its three cells), a new blue/lightblue cell appears at (1, c) with color equal to the current color of the bottom block. If (1, c) is occupied, nothing happens.
+- On click ROW COL:
+   - If ROW in {0,1} and COL in {0,1} (i.e. clicked inside the top-left 2x2 block), then the fixed 2x2 block toggles: all four cells become gold if they were gray, or gray if they were gold. (The toggled state applies to the stored color; if any of these cells are covered by the movable block, they are not visible until uncovered.)
+   - Else (click outside the top-left 2x2 block), then both of the following occur simultaneuously: the fixed 2x2 block toggles (as above), and every blue/lightblue cell on the grid toggles (blue<->lightblue).
+- Up action: no visible effect.

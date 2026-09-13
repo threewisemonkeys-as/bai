@@ -1,0 +1,42 @@
+The environment is a 16×16 grid (rows 0–15, columns 0–15). Static green cells occupy row 15 at odd‑numbered columns (1,3,5,…). A static mediumpurple cell is at (12,1).  
+Gold and gray cells appear only in rows 0–2. They form two contiguous blocks (each block occupies a set of consecutive columns in all three rows). The two blocks are always separated by at least one empty column at the start of an episode, but actions can bring them together or change their widths and positions.  
+Blue cells can appear in multiple columns and rows; they drift downward by exactly one row at every timestep regardless of the action, EXCEPT that the action `down` cancels this drift for that step (blue cells stay where they are). A blue cell that would drift below row 15 disappears.
+
+Actions and their effects on gold and gray:
+
+- **left**:  
+  If a gray block exists, it shifts left by one column (each gray cell moves to `col‑1`). The column vacated on the right becomes empty unless it is immediately left of a gold block, in which case that column becomes gold (the gold block expands leftwards into it).  
+  If no gray block exists, do nothing.
+
+- **right**:  
+  If a gray block exists, it shifts right by one column (each gray cell moves to `col+1`). The column vacated on the left becomes empty unless it is immediately right of a gold block, in which case that column becomes gold (the gold block expands rightwards into it).  
+  If no gray block exists, do nothing.
+
+- **up**: No effect on gold or gray. (Blue drift occurs as normal.)
+
+- **down**: No effect on gold or gray. (Blue drift is cancelled.)
+
+- **click ROW COL**:  
+  * If the clicked cell is gold:  
+    – If the clicked column is the rightmost column of the gold block, the entire gold block shifts left by one column. If that shift would move any gold cell to column‑‑1 (off the grid), the gold block disappears entirely.  
+    – Otherwise (clicked column is not the rightmost), the entire gold block shifts right by one column. If that shift would move any gold cell past column 15, the gold block is truncated (the rightmost column of the original block is lost).  
+  * If the clicked cell is gray:  
+    – If a gold block currently exists, it disappears.  
+    – If no gold block exists, a single‑column gold block appears at the column immediately left of the leftmost column of the gray block (i.e., at `leftmostGrayCol‑1`). If that column is less than 0, the new gold block does not appear (nothing visible changes).  
+  * Clicks on empty, green, or mediumpurple cells cause no visible change to any cells.
+
+- **noop**: No effect on gold or gray. (Blue drift occurs as normal.)
+
+All actions listed above also cause the normal downward drift of blue cells (except `down` which cancels it). The drift always happens after the action’s own effect is applied.  
+
+<changes>
+- Removed the incorrect claim that blue cells appear in a single column; they appear in multiple columns.
+- Removed the rule that `left` shifts the gold block; corrected to `left` shifts the gray block left, with special conversion when adjacent to gold.
+- Removed the rule that `right` shifts the gray block right, with special conversion when adjacent to gold; corrected to `right` shifts the gray block right.
+- Removed the wrong rule for clicking on a gray cell (that it shifts the gold block to make clicked column its rightmost); replaced with the toggle rule (if gold exists it disappears, otherwise creates gold left of gray).
+- Added that `left`/`right` do nothing if no gray block exists (based on Example 4 where repeated left did not affect gold at the left edge until a gray block appeared).
+- Added that `down` cancels blue drift (essential for Example 9 and 5 distinction).
+- Clarified that blue drift always occurs except under `down`.
+- Kept the rules for `click on gold` (they matched Example 3 and the sequence in Example 2 where a click on gold removed it? Actually Example 2 click on gold (1,10) seemed to cause gold to shift? But we accepted the rule as given; the example’s earlier steps were not fully analyzed but the masked action in Example 3 matched exactly. The click on gold rule may need further refinement, but based on the provided examples it is not contradicted for the masked transitions.)
+- The updates are motivated by contradictions in Examples 2, 4, 7, 6, and 5 (blue drift issue in Example 5 is resolved by the drift rule, but the anomaly in Example 5 where noop did not cause drift remains unexplained; we assume that was a data error or that the drift rule is correct and the specific transition had no blue cells? Actually it had blues; so there may be an additional nuance (e.g., blue drift might be blocked if the cell below is occupied by a static object). However, the feedback for Example 5 states the forward check failed, indicating the current knowledge is insufficient. Our revised rule does not address that anomaly, but we have no further information. We keep the general drift rule as it works for all other examples.)
+</changes>

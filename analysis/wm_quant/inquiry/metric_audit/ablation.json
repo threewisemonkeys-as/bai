@@ -1,0 +1,22 @@
+{
+  "colour_lines": {
+    "n_frames": 109,
+    "equal_coordinate_color_lists": 109,
+    "ratio_first": 1.0981763028850868,
+    "ratio_ship": 1.1120483498541336,
+    "mean_gzip_first": 119.46788990825688,
+    "mean_gzip_ship": 120.89908256880734
+  },
+  "SET": {
+    "n_frames": 99,
+    "equal_coordinate_color_lists": 99,
+    "ratio_first": 2.4160654371368673,
+    "ratio_ship": 2.61858079817096,
+    "mean_gzip_first": 327.24242424242425,
+    "mean_gzip_ship": 354.050505050505,
+    "ratio_after_constant_prefix_only": 2.5593394682349695,
+    "mean_gzip_after_constant_prefix_only": 346.1515151515151,
+    "constant_prefix_share_of_ratio_increase": 0.707472412791356,
+    "constant_ship_prefix": "bg=black; shape=20x20; cursor:unknown; "
+  }
+}

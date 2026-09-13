@@ -12,7 +12,9 @@ generally not zero-based: read the shape from the line and the level from the ti
 therefore are NOT comparable panel-to-panel by eye -- for that, use a figure whose axes are
 shared.
 
-Each line is the INCUMBENT: at iteration i, the value for whichever node has the best
+The dots are every node the search PROPOSED, at the iteration it entered the pool -- dead
+ones included, since they were proposed and cost a step. Each line is the INCUMBENT: at
+iteration i, the value for whichever node has the best
 train_score so far -- what the run would have shipped had it stopped there. It steps only
 when a node beats the running best, so a flat stretch is a node that left this parameter
 alone and changed the other one. The ringed marker is where the run actually stopped, i.e.
@@ -42,10 +44,12 @@ from fig_perception_metrics import (  # noqa: E402
 from report_planning_v2_online import display_name  # noqa: E402
 
 OUT = REPO / "analysis/wm_quant"
-# True of the layout rather than of any one metric, so it is appended to every key.
-LAYOUT_NOTE = ("Every panel has its own linear scale and is generally not\n"
-               "zero-based: read the shape from the line, the level from\n"
-               "the ticks. Panels are not comparable to each other by eye.")
+# True of the grid rather than of any one metric, so it is appended to every key.
+GRID_NOTE = ("A dot is one node the search proposed; most are rejected,\n"
+             "and the line moves only when one beats the running best.\n\n"
+             "Every panel has its own linear scale and is generally not\n"
+             "zero-based: read the shape from the line, the level from\n"
+             "the ticks. Panels are not comparable to each other by eye.")
 
 
 def ship_point(rows, game, field):
@@ -70,6 +74,14 @@ def draw_grid(rows, games, field, split, *, color, stem, subtitle, ylab, note,
     flat = [ax for row in axes for ax in row]
 
     for ax, game in zip(flat, games):
+        # every proposal, incumbent or not: the pool the incumbent was chosen out of. Dead
+        # nodes are in here too -- a P that crashed still has a measured value, usually at
+        # the floor -- because they were proposed and cost the search a step.
+        prop = [(r["iteration"], r[field] * scale) for r in rows
+                if r["game"] == game and r["iteration"] is not None and r[field] is not None]
+        ax.scatter([x for x, _ in prop], [y for _, y in prop], s=10, color=color, alpha=0.28,
+                   linewidths=0, zorder=2)
+
         its, inc, _mean = curves[(arm, game)]
         xs = [i for i, v in zip(its, inc) if v is not None]
         ys = [v * scale for v in inc if v is not None]
@@ -104,13 +116,18 @@ def draw_grid(rows, games, field, split, *, color, stem, subtitle, ylab, note,
         handles = [Line2D([], [], color=color, lw=2.2, label=f"{ylab} — incumbent"),
                    Line2D([], [], color=color, lw=0, marker="o", markersize=7,
                           markerfacecolor=color, markeredgecolor=SURFACE, markeredgewidth=1.6,
-                          label="the node that shipped")]
+                          label="the node that shipped"),
+                   Line2D([], [], color=color, lw=0, marker="o", markersize=4.5, alpha=0.28,
+                          markerfacecolor=color, markeredgewidth=0,
+                          label="every node proposed")]
         if ref:
             handles.append(Line2D([], [], color=INK3, lw=0.9, ls=(0, (2, 2)), label=ref))
         key.legend(handles=handles, loc="upper left", frameon=False, fontsize=8,
                    labelcolor=INK2, handlelength=2.3, labelspacing=0.85, borderaxespad=0.4)
-        key.text(0.0, 0.55, f"{note}\n\n{LAYOUT_NOTE}", transform=key.transAxes, va="top",
-                 ha="left", color=INK2, fontsize=7.2, linespacing=1.5)
+        # the legend is as tall as it has rows, so the note starts under whatever it needs
+        key.text(0.0, 0.52 - 0.1 * (len(handles) - 3), f"{note}\n\n{GRID_NOTE}",
+                 transform=key.transAxes, va="top", ha="left", color=INK2, fontsize=7.2,
+                 linespacing=1.5)
 
     fig.suptitle(f"{subtitle}, per game  ·  {ARM_LABEL[arm]}  ·  {split} split",
                  color=INK, fontsize=11, x=0.008, ha="left", y=0.995)

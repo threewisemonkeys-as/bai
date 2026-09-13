@@ -1,0 +1,27 @@
+world knowledge
+- The grid is 9x9 (rows 0-8, cols 0-8). A vertical white column always exists at col=4; the set of rows with white cells changes only under the 'up' action and under clicks on white cells.
+- 'up' action:
+    - White rows cycle deterministically through four sets: 
+        D = {0,1,2,3,4,5,6,7,8}
+        A = {0,3,6}
+        B = {0,1,3,4,6,7}
+        C = {0,1,3,4,5,6,7,8}
+      The mapping is: D → A, A → B, B → C, C → A.
+    - Blue and red tokens move according to a deterministic rule that depends on their current (row, col) and the white set, but the exact mapping is not yet fully deduced from the given data.
+- 'noop' action:
+    - The set of white rows does not change.
+    - Tokens (blue and red) may move; the effect is deterministic but not yet fully characterized. In particular, noop is not an identity transformation.
+- 'click ROW COL' action:
+    - If the clicked cell is white (col=4):
+        - That white cell disappears (the row is removed from the white set), and a red token appears at (ROW, COL).
+    - If the clicked cell is empty and col<4:
+        - A red token appears at (ROW, COL).
+    - If the clicked cell is empty and col>4:
+        - A blue token appears at (ROW, COL).
+    - If the clicked cell contains a token (blue or red):
+        - The effect on the opposite-color tokens depends on the column of the click. Observed regularities:
+            * Clicks at col=1 (whether the cell is red or empty) cause blue tokens to move in a deterministic pattern (the exact transformation is not fully deduced but involves shifts in rows and columns).
+            * Clicks at col=8 on a blue token cause red tokens to move in a deterministic pattern (the exact transformation is not fully deduced but appears to involve movement toward the clicked cell).
+        - For clicks on tokens at other columns, the effect is not yet fully determined but may involve movement of the opposite-color tokens toward the clicked cell.
+- Background color (bg) can be black or blue; it transitions under some clicks, but the exact trigger is not yet fully captured.
+- All dynamics are deterministic: given the current state and action, the next state is uniquely determined.

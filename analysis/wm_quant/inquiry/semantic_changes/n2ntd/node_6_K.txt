@@ -1,0 +1,4 @@
+- The world contains a red cell that is moved by directional actions: 'up' moves it 4 cells upward, 'left' moves it 1 cell left, 'right' moves it 1 cell right ('down' is assumed to move 4 cells downward but is not observed).
+- Clicking any cell (the coordinates are irrelevant) causes the current red cell to instantly change to mediumpurple. That mediumpurple cell then moves upward by 1 cell each subsequent time step. On the step immediately after the click, a new red cell appears at the exact location where the red cell was before the click.
+- The blue 2×3 block moves autonomously: each time step it shifts either left or right by 1 column. This movement is independent of the action taken (it is not a consequence of any action).
+- All other objects (gold cells, dark orange L-shaped groups) are stationary and never change.

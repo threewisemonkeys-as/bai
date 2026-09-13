@@ -1,0 +1,7 @@
+{
+  "intervals": 370,
+  "unchanged_P_no_new_incumbent": 74,
+  "changed_P_no_new_incumbent": 282,
+  "same_P_new_incumbent": 14,
+  "changed_P_new_incumbent_same_metric": 0
+}

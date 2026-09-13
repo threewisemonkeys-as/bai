@@ -1,0 +1,5 @@
+The visible grid consists of nine 5×3 tiles arranged in three row blocks (rows 1–5, 7–11, 13–17) and three column blocks (columns 4–6, 8–10, 12–14). Rows 6 and 12 and columns 7 and 11 are gaps and contain no cells. The background is always black. Cells can be white, gold, seagreen, blue, or coral.
+
+- A click action on any cell (r, c) fills the entire tile containing that cell with gold: any white cell in that tile becomes gold; any cell that is already seagreen, blue, coral, or gold remains unchanged. If the tile has no white cells (i.e., all its cells are non‑white), the click causes no visible change.
+- The noop action causes no visible change unless, before the noop, all three tiles in any row block are entirely gold OR all three tiles in any column block are entirely gold. In that case, the noop removes all gold from the grid (every gold cell becomes white).
+- The up, down, left, right actions cause no visible change to the cell colors; they may affect a hidden cursor.

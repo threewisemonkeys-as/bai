@@ -1,0 +1,149 @@
+train {
+  "relative_change": {
+    "n": 15,
+    "median": 0.18115789361057422,
+    "mean": 0.30383024800303576,
+    "positive": 13,
+    "negative": 2,
+    "zero": 0,
+    "sign_p_two_sided": 0.00738525390625
+  },
+  "median_relative_change_bootstrap_95pct": [
+    0.012631894289289125,
+    0.529241096993383
+  ],
+  "median_first_info": 1.0981763028850868,
+  "median_ship_info": 1.2371731944441133,
+  "monotonic_games": 6,
+  "incumbent_jumps": {
+    "n": 63,
+    "median": 0.05436400000316777,
+    "mean": 0.06079569158661112,
+    "positive": 35,
+    "negative": 14,
+    "zero": 14,
+    "sign_p_two_sided": 0.003801654409748778
+  },
+  "correlations": {
+    "rho_all_ok": {
+      "n": 15,
+      "median": 0.22764664385902295,
+      "mean": 0.20312436816277157,
+      "positive": 12,
+      "negative": 3,
+      "zero": 0,
+      "sign_p_two_sided": 0.03515625
+    },
+    "rho_nonempty_k": {
+      "n": 15,
+      "median": 0.23972337007117875,
+      "mean": 0.21401873765750787,
+      "positive": 13,
+      "negative": 2,
+      "zero": 0,
+      "sign_p_two_sided": 0.00738525390625
+    },
+    "rho_unique_p_mean_score": {
+      "n": 15,
+      "median": 0.3531234337388525,
+      "mean": 0.23291619195815122,
+      "positive": 12,
+      "negative": 3,
+      "zero": 0,
+      "sign_p_two_sided": 0.03515625
+    },
+    "rho_unique_p_nonempty_k_mean_score": {
+      "n": 15,
+      "median": 0.3088235294117647,
+      "mean": 0.25833544161257616,
+      "positive": 11,
+      "negative": 4,
+      "zero": 0,
+      "sign_p_two_sided": 0.11846923828124999
+    },
+    "within_k_centered_rank_corr": {
+      "n": 15,
+      "median": 0.2,
+      "mean": 0.20410130343034333,
+      "positive": 11,
+      "negative": 4,
+      "zero": 0,
+      "sign_p_two_sided": 0.11846923828124999
+    }
+  }
+}
+test {
+  "relative_change": {
+    "n": 15,
+    "median": 0.15830761581918784,
+    "mean": 0.31220797094284464,
+    "positive": 12,
+    "negative": 3,
+    "zero": 0,
+    "sign_p_two_sided": 0.03515625
+  },
+  "median_relative_change_bootstrap_95pct": [
+    0.014534865633518912,
+    0.5489739746377533
+  ],
+  "median_first_info": 1.1052548765056864,
+  "median_ship_info": 1.1629061004026424,
+  "monotonic_games": 6,
+  "incumbent_jumps": {
+    "n": 63,
+    "median": 0.05243232036502676,
+    "mean": 0.06081423972301921,
+    "positive": 35,
+    "negative": 14,
+    "zero": 14,
+    "sign_p_two_sided": 0.003801654409748778
+  },
+  "correlations": {
+    "rho_all_ok": {
+      "n": 15,
+      "median": 0.22764664385902295,
+      "mean": 0.18983649724141427,
+      "positive": 11,
+      "negative": 4,
+      "zero": 0,
+      "sign_p_two_sided": 0.11846923828124999
+    },
+    "rho_nonempty_k": {
+      "n": 15,
+      "median": 0.23972337007117875,
+      "mean": 0.2052978792549908,
+      "positive": 12,
+      "negative": 3,
+      "zero": 0,
+      "sign_p_two_sided": 0.03515625
+    },
+    "rho_unique_p_mean_score": {
+      "n": 15,
+      "median": 0.2920562464362651,
+      "mean": 0.2158450976049678,
+      "positive": 11,
+      "negative": 4,
+      "zero": 0,
+      "sign_p_two_sided": 0.11846923828124999
+    },
+    "rho_unique_p_nonempty_k_mean_score": {
+      "n": 15,
+      "median": 0.3581280806895406,
+      "mean": 0.235372007926952,
+      "positive": 11,
+      "negative": 4,
+      "zero": 0,
+      "sign_p_two_sided": 0.11846923828124999
+    },
+    "within_k_centered_rank_corr": {
+      "n": 15,
+      "median": 0.2,
+      "mean": 0.19606365685752264,
+      "positive": 10,
+      "negative": 5,
+      "zero": 0,
+      "sign_p_two_sided": 0.30175781249999994
+    }
+  }
+}
+Wrote artifacts to /home/ays57/bai/analysis/wm_quant/inquiry/cross_game_statistics

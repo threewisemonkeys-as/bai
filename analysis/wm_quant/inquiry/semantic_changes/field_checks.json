@@ -1,0 +1,234 @@
+{
+  "SET": {
+    "train": {
+      "old_ratio": 2.4160654371368673,
+      "new_ratio": 2.61858079817096,
+      "after_remove_headers_ratio": 2.4689948194366194,
+      "remove_headers_and_restore_sort_same_as_old": true,
+      "mean_sort_only_effect_gzip_bytes": 7.0606060606060606
+    },
+    "test": {
+      "old_ratio": 2.316239726857479,
+      "new_ratio": 2.5117211706520246,
+      "after_remove_headers_ratio": 2.3608837896671355,
+      "remove_headers_and_restore_sort_same_as_old": true,
+      "mean_sort_only_effect_gzip_bytes": 5.935064935064935
+    }
+  },
+  "egg": {
+    "train": {
+      "remove_00_and_blobs_same_as_node5": true,
+      "after_remove_ratio": 1.4504398859849987
+    },
+    "test": {
+      "remove_00_and_blobs_same_as_node5": true,
+      "after_remove_ratio": 1.4399448357260418
+    }
+  },
+  "diffusion": {
+    "train": {
+      "remove_bg_dim_same_as_node24": true,
+      "after_remove_ratio": 1.0199060071090396,
+      "backgrounds": [
+        "black",
+        "blue"
+      ]
+    },
+    "test": {
+      "remove_bg_dim_same_as_node24": true,
+      "after_remove_ratio": 0.9698733825714554,
+      "backgrounds": [
+        "black",
+        "red"
+      ]
+    }
+  },
+  "n2ntd": {
+    "train": {
+      "n_frames": 103,
+      "old_unique": 99,
+      "new_unique": 103,
+      "collisions": [
+        {
+          "frame_ids": [
+            1,
+            12
+          ],
+          "old_output": "bg:white agent:9,1 objs:[blue(0,3),blue(0,4),blue(0,5),blue(1,3),blue(1,4),blue(1,5),darkorange(10,0),darkorange(10,1),darkorange(10,2),darkorange(6,10),darkorange(6,8),darkorange(6,9),darkorange(8,4),darkorange(8,5),darkorange(8,6),gold(4,7),gold(5,9)]",
+          "new_outputs": [
+            "grid 12x12; bg:white; blue: 0,3 0,4 0,5 1,3 1,4 1,5 darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 gold: 4,7 5,9 red: 9,1",
+            "grid 12x12; bg:white; blue: 0,3 0,4 0,5 1,3 1,4 1,5 darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 gold: 4,7 5,9 mediumpurple: 9,1"
+          ],
+          "first_two_cell_differences": [
+            [
+              9,
+              1,
+              "red",
+              "mediumpurple"
+            ]
+          ]
+        },
+        {
+          "frame_ids": [
+            10,
+            11,
+            71
+          ],
+          "old_output": "bg:white agent:5,9 objs:[darkorange(10,0),darkorange(10,1),darkorange(10,2),darkorange(6,10),darkorange(6,8),darkorange(6,9),darkorange(8,4),darkorange(8,5),darkorange(8,6)]",
+          "new_outputs": [
+            "grid 12x12; bg:white; darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 red: 5,9",
+            "grid 12x12; bg:white; darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 mediumpurple: 5,9",
+            "grid 12x12; bg:white; darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 gold: 5,9"
+          ],
+          "first_two_cell_differences": [
+            [
+              5,
+              9,
+              "red",
+              "mediumpurple"
+            ]
+          ]
+        },
+        {
+          "frame_ids": [
+            15,
+            16
+          ],
+          "old_output": "bg:white agent:5,8 objs:[darkorange(10,0),darkorange(10,1),darkorange(10,2),darkorange(6,10),darkorange(6,8),darkorange(6,9),darkorange(8,4),darkorange(8,5),darkorange(8,6)]",
+          "new_outputs": [
+            "grid 12x12; bg:white; darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 red: 5,8",
+            "grid 12x12; bg:white; darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 mediumpurple: 5,8"
+          ],
+          "first_two_cell_differences": [
+            [
+              5,
+              8,
+              "red",
+              "mediumpurple"
+            ]
+          ]
+        }
+      ]
+    },
+    "test": {
+      "n_frames": 91,
+      "old_unique": 90,
+      "new_unique": 91,
+      "collisions": [
+        {
+          "frame_ids": [
+            116,
+            120
+          ],
+          "old_output": "bg:white agent:9,1 objs:[blue(0,1),blue(0,2),blue(0,3),blue(1,1),blue(1,2),blue(1,3),darkorange(10,0),darkorange(10,1),darkorange(10,2),darkorange(6,10),darkorange(6,8),darkorange(6,9),darkorange(8,4),darkorange(8,5),darkorange(8,6),gold(4,7),gold(5,9)]",
+          "new_outputs": [
+            "grid 12x12; bg:white; blue: 0,1 0,2 0,3 1,1 1,2 1,3 darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 gold: 4,7 5,9 mediumpurple: 9,1",
+            "grid 12x12; bg:white; blue: 0,1 0,2 0,3 1,1 1,2 1,3 darkorange: 6,8 6,9 6,10 8,4 8,5 8,6 10,0 10,1 10,2 gold: 4,7 5,9 red: 9,1"
+          ],
+          "first_two_cell_differences": [
+            [
+              9,
+              1,
+              "mediumpurple",
+              "red"
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  "f5w3n": {
+    "train": {
+      "n_frames": 110,
+      "exact_raw_grid_reconstruction_all": true,
+      "n_exact": 110,
+      "assumed_invariants": "16x16 black background and colour-short dictionary"
+    },
+    "test": {
+      "n_frames": 94,
+      "exact_raw_grid_reconstruction_all": true,
+      "n_exact": 94,
+      "assumed_invariants": "16x16 black background and colour-short dictionary"
+    }
+  },
+  "7xf97": {
+    "train": {
+      "flag_values": {
+        "gx": [
+          "0",
+          "1"
+        ],
+        "ax": [
+          "0",
+          "1"
+        ],
+        "gle": [
+          "0",
+          "1"
+        ],
+        "gre": [
+          "0",
+          "1"
+        ],
+        "gcle": [
+          "0",
+          "1"
+        ],
+        "gcre": [
+          "0",
+          "1"
+        ],
+        "gare": [
+          "0",
+          "1"
+        ],
+        "gale": [
+          "0",
+          "1"
+        ],
+        "uc": [
+          "0"
+        ]
+      },
+      "n_frames": 73
+    },
+    "test": {
+      "flag_values": {
+        "gx": [
+          "1"
+        ],
+        "ax": [
+          "0",
+          "1"
+        ],
+        "gle": [
+          "0",
+          "1"
+        ],
+        "gre": [
+          "0"
+        ],
+        "gcle": [
+          "0",
+          "1"
+        ],
+        "gcre": [
+          "0",
+          "1"
+        ],
+        "gare": [
+          "0",
+          "1"
+        ],
+        "gale": [
+          "0",
+          "1"
+        ],
+        "uc": [
+          "0"
+        ]
+      },
+      "n_frames": 65
+    }
+  }
+}

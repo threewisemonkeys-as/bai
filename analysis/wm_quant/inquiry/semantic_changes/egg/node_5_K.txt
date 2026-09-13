@@ -1,0 +1,15 @@
+world knowledge  
+- The grid has a background color gray.  
+- There is a special cell at (0,0) that can be red or pink. Clicking on that cell toggles its color.  
+- The remaining colored cells form a contiguous blob. The blob’s color is either tan or gold.  
+- **Tan‑blob dynamics**:  
+  - On a noop action the tan blob does not change.  
+  - On an up/down/left/right action every cell of the tan blob shifts exactly one cell in that direction (the shape is preserved).  
+- **Gold‑blob dynamics**:  
+  - The gold blob changes autonomously every timestep, even when the action is noop.  
+  - The transformation is deterministic from the current configuration: each gold cell moves one row downward and one column rightward; if that new cell is outside the grid, the cell disappears and may spawn new cells in adjacent positions according to a fixed rule.  
+- **Click on (0,0) effect**:  
+  - The cell (0,0) toggles color (red ↔ pink).  
+  - If (0,0) was red before the click, the blob also changes from tan to gold and its entire shape shifts one cell down and one cell right.  
+  - If (0,0) was pink before the click, the blob remains tan and its positions are unchanged.  
+- All actions (including noop) always produce a deterministic next state given the current state; the above rules capture that determinism.

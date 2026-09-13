@@ -1,0 +1,5 @@
+world knowledge block
+- The grid contains two types of cells: gray and red.
+- During a noop action, every gray cell moves one step towards the nearest red cell (Manhattan distance, with ties broken in a consistent but unspecified order). If no red cells exist, gray cells do not move.
+- The action of clicking a cell (r,c) produces a transformation that depends on the entire current configuration. The transformation may create or remove red cells and may move gray cells. The same transformation can often be produced by many different click coordinates. Therefore, when identifying the action from state change, any click that could have produced the observed change (including noop if the change is consistent with gray drift) should be considered a candidate.
+- The transformation itself is deterministic given the state and the click coordinates, but its effect cannot be summarized by a simple local rule.

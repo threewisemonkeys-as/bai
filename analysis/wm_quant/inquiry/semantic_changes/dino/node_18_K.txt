@@ -1,0 +1,9 @@
+- The grid is 20 rows (0–19) and 20 columns (0–19), background black.
+- Three colored objects exist: green, red, yellow.
+- Green: three vertical cells at rows 17,18,19 with the same column. On every step (regardless of the action taken), the column decreases by 1 (wrapping from 0 to19); rows never change.
+- Yellow: a single cell. On every step (regardless of action), its column decreases by1 (wrapping); its row remains unchanged.
+- Red: a fixed shape of six cells (relative positions preserved). Its movement:
+  - On `up`: every red cell’s row decreases by6. If a red cell’s row becomes <0, it disappears permanently.
+  - On `noop`: every red cell’s row increases by1 UNLESS any red cell is already at row19 (the bottom edge). In that case, the red shape does not move at all. If a red cell’s row becomes >19, it disappears permanently (but since the move is suppressed when at row19, this only happens if a cell starts at row19 and the move is forced, which never occurs under this rule).
+- Actions `down`, `left`, `right`, and `click` are not observed; their effects are unknown.
+- The background and all other cells remain unchanged.
