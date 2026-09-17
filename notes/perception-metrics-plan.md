@@ -208,14 +208,16 @@ Each is an assertion in the script, not a thing to remember to check:
   gates alone; `--games`, `--arms`, `--jobs`, `--rebuild-corpus` narrow or refresh it.
 * `offline_learning/scripts/fig_perception_metrics.py` -- the summary figure and
   `analysis/perception_metrics/REPORT.md`, both from `metrics.csv`.
-* `offline_learning/scripts/fig_perception_compression_per_game.py` -- the compression
-  ratios drawn per game rather than medianed, one FIGURE per ratio, each panel on its own
-  linear scale, shipped node marked. The summary panels state the trend; these show that the
+* `offline_learning/scripts/fig_perception_compression_per_game.py` -- `P` drawn per game
+  rather than medianed, one FIGURE per score, each panel on its own linear scale, shipped
+  node marked: `ast_nodes` (the program), `mean_out_chars` (what it emits) and the three
+  compression scores. A node whose code never parsed has no program size, so the loader maps
+  the `-1` AST sentinel to missing and those nodes are absent from that one curve. The summary panels state the trend; these show that the
   games disagree about it. Separate figures rather than two y-scales in one panel: the
   corpus series differ by ~10x for a real reason (the raw frames compress ~100x and the
   features do not), and a dual axis would hide that behind an arbitrary alignment.
-  `--metric named` (the default) draws the three named scores; `all` adds the two
-  uncompressed-numerator companions.
+  `--metric named` (the default) draws the four named scores; `all` adds the two
+  uncompressed-numerator ratio companions.
 * `offline_learning/scripts/wm_panel_grid.py` -- the 15-panel grid itself, shared by both
   per-game families so a layout change reaches both. The metric-specific parts (column,
   colour, titles, unit scale, reference line, the paragraph in the key) are arguments. Every
@@ -230,9 +232,10 @@ Each is an assertion in the script, not a thing to remember to check:
 * Outputs: `analysis/perception_metrics/{metrics.csv, manifest.json, REPORT.md, cache/}` and
   `analysis/wm_quant/perception_metrics.{pdf,png}`. The figure is six cells: A size, B bytes
   emitted, C bytes after compression, D dead nodes by failure mode, E compression against
-  train score, F the key; `analysis/wm_quant/perception_{diversity,norm_diversity,info_extraction}_per_game`
-  are the 15-panel companions (`--metric all` adds `perception_dl_per_game` and
-  `perception_pf_dl_gz_per_game`), and `analysis/wm_quant/dynamics_chars_per_game` the same
+  train score, F the key;
+  `analysis/wm_quant/perception_{program_size,output_chars,diversity,norm_diversity,info_extraction}_per_game`
+  are the 15-panel companions (`--metric all` adds the `dl`, `pf_dl_gz`, `code_chars` and
+  `sloc` figures), and `analysis/wm_quant/dynamics_chars_per_game` the same
   for the dynamics model. `REPORT.md` carries the per-arm medians, the per-game
   shipped nodes, the rank-correlation table behind the paragraph above, and the dynamics-model
   section behind §7b.
@@ -247,6 +250,12 @@ after the compressor:
 | `diversity_bytes` | `gz([P(X) for all X])` | output diversity -- how many irreducible bytes P's features carry over the whole corpus |
 | `norm_diversity` | `gz([P(X)]) / gz([X])` | the same against what the observations themselves cost (was `gzip_ratio`) |
 | `info_extraction_ratio` | mean over frames of `gz(P(X)) / gz(X)` | the per-frame version, priced without the cross-frame discount (was `pf_gz_gz_ratio`) |
+
+Drawn alongside them, and the plainest of the four: `mean_out_chars`, the characters `P`
+emits about one frame, before any compressor or denominator. Within a game it is
+rank-identical to `pf_dl_gz_ratio` (same numerator, node-independent denominator), so the
+two are one curve in two units — the ratio makes games comparable, the character count says
+what `P` actually writes.
 
 `dl_ratio` (uncompressed feature bytes per raw observation byte), `pf_dl_gz_ratio` (per
 COMPRESSED observation byte, frame by frame), `lzma_ratio` and `twopart_ratio` stay in

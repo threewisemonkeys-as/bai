@@ -78,11 +78,14 @@ def load(split: str = "train") -> list[dict]:
         for k in ("idx", "iteration", "depth", "ast_nodes", "is_ship", "on_ship_lineage",
                   "n_unique_outputs", "out_vocab", "diversity_bytes", "raw_gzip_bytes",
                   "k_chars", "k_lines", "k_sentences", "k_claims", "k_words",
-                  "k_gzip_bytes"):
+                  "k_gzip_bytes", "code_chars", "code_lines", "sloc", "code_gzip_bytes"):
             r[k] = int(r[k]) if r[k] not in ("", "None") else None
+        if r["ast_nodes"] == -1:
+            r["ast_nodes"] = None       # never parsed: no program size, not a size of -1
         for k in ("train_score", "set_ratio", "dl_ratio", "norm_diversity", "lzma_ratio",
                   "twopart_ratio", "pf_dl_gz_ratio", "info_extraction_ratio", "static_rate",
-                  "change_ratio", "decoy_collapse", "err_rate", "k_norm_bytes"):
+                  "change_ratio", "decoy_collapse", "err_rate", "k_norm_bytes",
+                  "mean_out_chars", "mean_raw_chars"):
             r[k] = float(r[k]) if r[k] not in ("", "None") else None
         rows.append(r)
     return rows
@@ -369,21 +372,24 @@ def report(rows):
              "`analysis/perception_metrics/metrics.csv`. Scope and provenance:",
              "`notes/perception-metrics-plan.md`.", "",
              "## Per arm (medians across the 15 games)", "",
-             "| arm | games | nodes | ran | dead | ship AST | pool max AST | ship dl_ratio "
+             "| arm | games | nodes | ran | dead | ship AST | pool max AST | ship out chars "
+             "| ship dl_ratio "
              "| ship gz(P) B | ship norm_diversity | ship lzma_ratio | ship two-part | "
              "ship pf_dl_gz | ship info_extr | ship K chars | ship gz(K) B | "
              "ship train score |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for arm in ARM_COLOR:
         rs = [r for r in rows if r["arm"] == arm]
         if not rs:
             continue
         ships = [r for r in rs if r["is_ship"]]
-        pool_max = [max(x["ast_nodes"] for x in rs if x["game"] == r["game"]) for r in ships]
+        pool_max = [max((x["ast_nodes"] for x in rs if x["game"] == r["game"]
+                         and x["ast_nodes"] is not None), default=0) for r in ships]
         lines.append(
             f"| {ARM_LABEL[arm]} | {len({r['game'] for r in rs})} | {len(rs)} | "
             f"{sum(r['status'] == 'ok' for r in rs)} | {sum(r['status'] != 'ok' for r in rs)} | "
             f"{st.median(r['ast_nodes'] for r in ships):.0f} | {st.median(pool_max):.0f} | "
+            f"{st.median(r['mean_out_chars'] for r in ships):.0f} | "
             f"{st.median(r['dl_ratio'] for r in ships):.4f} | "
             f"{st.median(r['diversity_bytes'] for r in ships):.0f} | "
             f"{st.median(r['norm_diversity'] for r in ships):.3f} | "
@@ -454,15 +460,15 @@ def report(rows):
     lines += dynamics_section(rows)
     lines += ["",
               "## Shipped node per game", "",
-              "| game | arm | node | iteration | AST | dl_ratio | gz(P) B | "
+              "| game | arm | node | iteration | AST | out chars | dl_ratio | gz(P) B | "
               "norm_diversity | pf_dl_gz | info_extr | K chars | K sent | gz(K) B | "
               "static_rate | change_ratio | train score |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in sorted((r for r in rows if r["is_ship"]), key=lambda r: (r["game"], r["arm"])):
         cr = f"{r['change_ratio']:.2f}" if r["change_ratio"] is not None else "--"
         lines.append(
             f"| {r['game']} | {r['arm']} | #{r['idx']} | {r['iteration']} | {r['ast_nodes']} | "
-            f"{r['dl_ratio']:.4f} | {r['diversity_bytes']} | "
+            f"{r['mean_out_chars']:.0f} | {r['dl_ratio']:.4f} | {r['diversity_bytes']} | "
             f"{r['norm_diversity']:.4f} | {r['pf_dl_gz_ratio']:.3f} | "
             f"{r['info_extraction_ratio']:.3f} | {r['k_chars']} | {r['k_sentences']} | "
             f"{r['k_gzip_bytes']} | {r['static_rate']:.3f} | {cr} | "
@@ -473,8 +479,9 @@ def report(rows):
         ships = [r for r in rows if r["arm"] == arm and r["is_ship"]]
         if not ships:
             continue
-        smaller = sum(r["ast_nodes"] < max(x["ast_nodes"] for x in rows
-                                           if x["arm"] == arm and x["game"] == r["game"])
+        smaller = sum(r["ast_nodes"] < max((x["ast_nodes"] for x in rows
+                                            if x["arm"] == arm and x["game"] == r["game"]
+                                            and x["ast_nodes"] is not None), default=0)
                       for r in ships)
         lines.append(f"* **{ARM_LABEL[arm]}** — the shipped P is smaller than its own pool's "
                      f"largest node in {smaller}/{len(ships)} games; median static_rate "
