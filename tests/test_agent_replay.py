@@ -269,3 +269,78 @@ def test_the_summary_reports_the_bill_not_only_the_score():
     assert s["n"] == 2 and s["wins"] == 2
     assert s["calls"] == 4 and s["in"] == 200 and s["reasoning"] == 18
     assert s["games"][0]["human"]
+
+
+# ------------------------------------------------- a dead key is not a failed turn
+#
+# Measured on the real run: the key hit its spend limit 12.9h into the 86 problems and
+# codex reported it as an ordinary failed turn after retrying the 403 five times. The
+# runner then did what it does with a model that will not answer -- retried, recorded
+# `budget-exhausted`, and moved on to do the same to every remaining problem. Because
+# `rows.jsonl` is also the resume ledger, that row would have been skipped on the way
+# back and stood as a real miss.
+
+from research.autumn.agent import (                                 # noqa: E402
+    FATAL_PATTERNS, CredentialsExhausted, _UsageParser)
+
+
+class _Sink:
+    def write(self, _text): pass
+    def flush(self): pass
+
+
+def _parser():
+    return _UsageParser(_Sink())
+
+
+@pytest.mark.parametrize("message", [
+    "unexpected status 403 Forbidden: Key limit exceeded (total limit).",
+    "insufficient_quota: you have run out of credits",
+    "401 Unauthorized",
+    "Invalid API key provided",
+])
+def test_a_dead_key_is_recognised_as_fatal(message):
+    p = _parser()
+    p.handle({"type": "error", "message": message})
+    assert p.fatal_error, f"not recognised: {message}"
+
+
+@pytest.mark.parametrize("message", [
+    "the model returned an empty response",
+    "stream disconnected before completion",
+    "tool call could not be parsed",
+])
+def test_an_ordinary_turn_failure_is_not_fatal(message):
+    """The run must not abort on something a retry would fix -- that would throw away a
+    battery over one bad stream."""
+    p = _parser()
+    p.handle({"type": "error", "message": message})
+    assert p.fatal_error is None, f"wrongly fatal: {message}"
+
+
+def test_the_error_is_still_kept_in_the_transcript():
+    p = _parser()
+    p.handle({"type": "error", "message": "403 Forbidden: Key limit exceeded"})
+    assert [e["kind"] for e in p.events] == ["error"]
+    assert "Key limit exceeded" in p.events[0]["text"]
+
+
+def test_turn_failed_carries_the_same_signal():
+    """Codex reports the give-up as `turn.failed` with the message nested under `error`,
+    not only as a bare `error` event."""
+    p = _parser()
+    p.handle({"type": "turn.failed",
+              "error": {"message": "unexpected status 403 Forbidden: Key limit exceeded"}})
+    assert p.fatal_error
+
+
+def test_the_patterns_are_lowercase_so_matching_works():
+    """They are matched against `message.lower()`; an uppercase entry would never fire."""
+    assert all(pat == pat.lower() for pat in FATAL_PATTERNS)
+
+
+def test_the_exception_is_distinct_from_an_ordinary_error():
+    """`launch.py` catches this one specifically to abort the run; if it were a plain
+    RuntimeError the catch would swallow unrelated bugs and stop the battery for them."""
+    assert issubclass(CredentialsExhausted, RuntimeError)
+    assert CredentialsExhausted is not RuntimeError

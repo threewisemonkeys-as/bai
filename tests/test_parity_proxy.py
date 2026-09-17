@@ -221,7 +221,7 @@ def test_healthz_reports_the_pin(stub):
 
 
 # ------------------------------------------------------------ the catalog it feeds
-def test_a_code_mode_clone_is_refused():
+def test_a_code_mode_clone_is_refused(monkeypatch):
     """Measured: `tool_mode="code_mode_only"` offers one tool whose argument is freeform
     JavaScript. DeepSeek sends JSON, codex drops the call with no error, and the turn
     ends having done nothing -- 1/5 success against 3/3 for a non-code-mode clone. The
@@ -234,6 +234,8 @@ def test_a_code_mode_clone_is_refused():
     class _Done:
         stdout = json.dumps(catalog)
 
-    agent_mod.subprocess.run = lambda *a, **k: _Done()                 # type: ignore
+    # monkeypatch, not a bare assignment: agent_mod.subprocess is the shared subprocess
+    # module, so an unrestored stub follows every later test that shells out.
+    monkeypatch.setattr(agent_mod.subprocess, "run", lambda *a, **k: _Done())
     with pytest.raises(RuntimeError, match="code_mode_only"):
         agent_mod.build_catalog(Path("/tmp/never-written.json"))
