@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import base64
 import difflib
+import functools
 import hashlib
 import json
 import math
@@ -4423,6 +4424,11 @@ def bake_choices(transitions, action_pool, k, rng):
     ]
 
 
+# bake_decoys ranks the WHOLE frame pool against every instance's truth, so the same
+# (frame, truth) pair is scored many times over -- and difflib on a ~2.6 KB frame is
+# ~7 ms, which made this 99% of build_data. Pure function of two strings, so memoising it
+# is free: it returns the identical ranking, just once per distinct pair.
+@functools.lru_cache(maxsize=1 << 17)
 def _frame_sim(a, b):
     """Content similarity between two raw frames: cell-wise match fraction when the
     strings are shape-compatible, difflib ratio otherwise. Generic (no task

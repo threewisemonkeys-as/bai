@@ -34,16 +34,21 @@ def _chunk(content="", reasoning="", **extra) -> dict:
 def _run(llm, handler, attempts=1):
     transport = httpx.MockTransport(handler)
     real = httpx.AsyncClient
+    real_backoff = E.retry_backoff
 
     def patched(*a, **kw):
         kw["transport"] = transport
         return real(*a, **kw)
 
     E.httpx.AsyncClient = patched
+    # The retry ladder is real wall clock against a mock transport that answers
+    # instantly; what these tests pin is that a retry HAPPENS, not how long it waits.
+    E.retry_backoff = lambda attempt: 0.0
     try:
         return asyncio.run(E.llm_call("prompt", asyncio.Semaphore(1), llm, attempts=attempts))
     finally:
         E.httpx.AsyncClient = real
+        E.retry_backoff = real_backoff
 
 
 OR = E.LLMConfig(backend="openrouter", url="https://openrouter.test/v1/chat/completions",

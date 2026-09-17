@@ -146,7 +146,11 @@ def stub(monkeypatch, tmp_path):
                          "native_tokens_prompt": 10, "native_tokens_completion": 20,
                          "native_tokens_reasoning": 5, "total_cost": 0.001}}
 
-    state = proxy.Parity(audit_path=tmp_path / "parity.jsonl", upstream="http://up")
+    # audit_backoff=(0.0,): the stub answers /generation deterministically on the first
+    # poll, so the production ladder's leading sleep(2.0) is 2s of dead wall clock per
+    # test and buys nothing here.
+    state = proxy.Parity(audit_path=tmp_path / "parity.jsonl", upstream="http://up",
+                         audit_backoff=(0.0,))
     # Both hops go over ASGI: no sockets, no key, no cost. The proxy's lifespan adopts a
     # client and a tag map that are already set, so nothing here has to be monkeypatched;
     # the lifespan still runs, which is what drains the detached audits on shutdown.

@@ -9,6 +9,7 @@ The scripted agent means all of this runs with no API key and no cost.
 """
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import sys
@@ -206,7 +207,10 @@ needs_reference = pytest.mark.skipif(
     reason="needs the published online run to compare against")
 
 
+@functools.lru_cache(maxsize=1)
 def _reference_rows():
+    """Cached: three tests read the same published run, and re-parsing every online.json
+    costs ~2s a call. Callers only ever read from the result."""
     import glob
     rows = {}
     for f in sorted(glob.glob(str(REFERENCE_RUN / "*/online.json"))):
@@ -240,6 +244,7 @@ def test_the_eval_configuration_is_the_published_one():
 
 
 @needs_reference
+@pytest.mark.slow
 def test_our_scorer_is_the_scorer_the_published_arms_were_scored_with(problems):
     """The one that cannot be argued from source: 258 real rollouts, three arms, and the
     verdict AND the step it was reached at must both agree.

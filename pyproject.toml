@@ -20,6 +20,7 @@ dependencies = [
     "opencv-python-headless==4.12.0.88",
     "wandb==0.23.0",
     "pytest==7.4.4",
+    "pytest-xdist==3.6.1",
     "scipy==1.16.3",
     "crafter==1.8.3",
     "gym==0.23",
@@ -68,6 +69,17 @@ py-modules = [
     "llm_utils",
     "rollout",
     "run_utils",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers --durations=10"
+markers = [
+    # Irreducible wall clock: replaying real rollouts through the Autumn engine, or
+    # rebuilding a real train/test split off the local 221M data blobs. Everything else
+    # in the suite runs in a couple of seconds, so `-m "not slow"` is the edit loop and
+    # the unfiltered run is what CI does.
+    "slow: heavy integration test (engine replay / local data blobs)",
 ]
 
 [tool.uv]

@@ -298,6 +298,13 @@ async def _post_call(c: httpx.AsyncClient, llm: "LLMConfig", body: dict,
     return acc
 
 
+def retry_backoff(attempt: int) -> float:
+    """Seconds to wait before retrying a failed/empty completion. A seam rather than a
+    literal so a test exercising the retry path can drop it to 0 instead of sleeping out
+    the real ladder (a 3-attempt test costs 2+4 = 6s of dead wall clock otherwise)."""
+    return float(min(2 ** attempt, 8))
+
+
 async def llm_call(prompt: str, sem: asyncio.Semaphore, llm: LLMConfig,
                    attempts: int = 4) -> tuple[str, str, float, list]:
     """Returns (content, reasoning, cost, errors). `reasoning` is the provider's
@@ -363,7 +370,7 @@ async def llm_call(prompt: str, sem: asyncio.Semaphore, llm: LLMConfig,
         except Exception as exc:  # noqa: BLE001
             errors.append(f"attempt {attempt}: {type(exc).__name__}: {exc}")
         if attempt < attempts:
-            await asyncio.sleep(min(2 ** attempt, 8))
+            await asyncio.sleep(retry_backoff(attempt))
     return "", "", 0.0, errors
 
 

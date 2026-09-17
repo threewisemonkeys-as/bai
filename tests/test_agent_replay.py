@@ -66,9 +66,12 @@ def sse(tmp_path):
             yield b'data: {"type":"response.completed","response":{"usage":{}}}\n\n'
         return StreamingResponse(body(), media_type="text/event-stream")
 
+    # This upstream serves no /generation, so every audit poll 404s. With the production
+    # ladder the detached audit sleeps out all 123s of it and the lifespan's shutdown
+    # drain blocks on it -- for a test that only reads the transcript.
     state = proxy.Parity(audit_path=tmp_path / "parity.jsonl",
                          transcript=tmp_path / "reasoning.jsonl",
-                         upstream="http://up")
+                         upstream="http://up", audit_backoff=(0.0,))
     state.client = httpx.AsyncClient(
         transport=httpx.ASGITransport(app=upstream), base_url="http://up")
     state.tags = {"Alibaba": "alibaba/fp8"}
@@ -99,7 +102,8 @@ def test_a_run_without_a_transcript_still_streams(tmp_path):
             yield b'data: {"type":"response.created","response":{"id":"gen-x"}}\n\n'
         return StreamingResponse(body(), media_type="text/event-stream")
 
-    state = proxy.Parity(audit_path=tmp_path / "p.jsonl", upstream="http://up")
+    state = proxy.Parity(audit_path=tmp_path / "p.jsonl", upstream="http://up",
+                         audit_backoff=(0.0,))
     state.client = httpx.AsyncClient(
         transport=httpx.ASGITransport(app=upstream), base_url="http://up")
     state.tags = {}

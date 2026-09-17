@@ -103,11 +103,15 @@ def _text(records) -> str:
 
 
 # ------------------------------------------------- the load-bearing data claim
-needs_data = pytest.mark.skipif(
-    not (REF_RUN / "launch.json").is_file()
-    or not (REPO / "offline_learning/human_data/bt3gb/informative_curated").is_dir(),
-    reason="reference run + human_data pools are local blobs (221M), not in git",
-)
+def needs_data(fn):
+    """These rebuild the real split off 221M of local blobs: skipped without them, and
+    `slow` because the first one through pays ~13s priming the frame-similarity memo."""
+    fn = pytest.mark.slow(fn)
+    return pytest.mark.skipif(
+        not (REF_RUN / "launch.json").is_file()
+        or not (REPO / "offline_learning/human_data/bt3gb/informative_curated").is_dir(),
+        reason="reference run + human_data pools are local blobs (221M), not in git",
+    )(fn)
 
 
 @needs_data
