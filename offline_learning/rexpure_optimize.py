@@ -162,6 +162,16 @@ def build_data(args, rng):
     return train, test, action_pool, context_k, whitelist, transitions, id_n
 
 
+def _gate_inputs(train, perception_history):
+    """What the constant-output gate perceives: every train X_t, then every X_t+1. With
+    perception_history 1 these are the bare frames, exactly as before the flag existed;
+    otherwise the histories P sees for them."""
+    if perception_history == 1:
+        return [inst["tr"].x_t for inst in train] + [inst["tr"].x_t1 for inst in train]
+    pairs = [center_histories(inst["tr"], perception_history) for inst in train]
+    return [h_t for h_t, _ in pairs] + [h_t1 for _, h_t1 in pairs]
+
+
 # ---------------------------------------------------------------------------
 # The CLI lives in its own function so an offline analysis can re-parse a completed
 # run's saved argv through the SAME parser (inheriting every default) instead of
@@ -299,6 +309,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--fd-reflect", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--analyze-mistakes", action="store_true")
     ap.add_argument("--context-k", type=int, default=3)
+    ap.add_argument("--perception-history", type=int, default=1,
+                    help="most observations one perceive() call gets. 1 (default) = the "
+                         "current observation alone, as every earlier run did. N > 1 = each "
+                         "state in the --context-k window is perceived with up to N-1 states "
+                         "before it from the same window, oldest first (never a later one); "
+                         "the proposer is told so. Needs --context-k >= 1")
     ap.add_argument("--analyze-mode", choices=["combined", "per-mistake"], default="combined")
     ap.add_argument("--log-reflection", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--resume", action="store_true",
@@ -329,6 +345,11 @@ def validate_args(parser, args) -> None:
                            or (args.fd_scorer != "none" and args.fd_weight > 0)):
         parser.error("--no-id removes the only term from the composite; add "
                      "--contrastive-fd or --fd-scorer textdiff|judge|exact")
+    if args.perception_history < 1:
+        parser.error("--perception-history must be >= 1")
+    if args.perception_history > 1 and args.context_k < 1:
+        parser.error("--perception-history > 1 takes its history from the temporal "
+                     "window; add --context-k >= 1")
     if args.cfd_test and not args.contrastive_fd:
         parser.error("--cfd-test scores the contrastive term; add --contrastive-fd")
     if args.no_perception and args.no_beliefs:
@@ -437,13 +458,15 @@ def main():
         start_acc, _ = run_async(eval_on(
             task_cfg, seed_code, "", test, context_k=context_k,
             id_set_loss=args.id_set_loss, id_eps=args.id_eps, id_n_actions=id_n,
-            credited_scoring=args.credited_scoring))
+            credited_scoring=args.credited_scoring,
+            perception_history=args.perception_history))
         good_acc = None
         if args.good_baseline:
             good_acc, _ = run_async(eval_on(
                 task_cfg, GOOD_P, "", test, context_k=context_k,
                 id_set_loss=args.id_set_loss, id_eps=args.id_eps, id_n_actions=id_n,
-                credited_scoring=args.credited_scoring))
+                credited_scoring=args.credited_scoring,
+                perception_history=args.perception_history))
         baselines_path.write_text(json.dumps(
             {"raw_acc": raw_acc, "start_acc": start_acc, "good_acc": good_acc}))
     print(f"[test baselines] random={chance:.2f} | start-P={start_acc:.2f} | raw-frame={raw_acc:.2f}"
@@ -461,7 +484,7 @@ def main():
         pred_log_path=run_dir / "predictions.jsonl",
         analysis_log_path=(run_dir / "analysis_calls.jsonl" if args.analyze_mistakes else None),
         run_ctx=run_ctx, context_k=context_k, reuse_traces=True, f_image=args.f_image,
-        gate_train_x=[inst["tr"].x_t for inst in train] + [inst["tr"].x_t1 for inst in train],
+        gate_train_x=_gate_inputs(train, args.perception_history),
         id_set_loss=args.id_set_loss, id_eps=args.id_eps, id_n_actions=id_n,
         credited_scoring=args.credited_scoring, composite=args.composite,
         softmin_tau=args.softmin_tau,
@@ -471,8 +494,10 @@ def main():
         reflect_max_failures=args.reflect_max_failures,
         reflect_raw_prefix=args.reflect_raw_prefix,
         image_cls=Image,
+        perception_history=args.perception_history,
     )
-    templates = build_reflection_templates(env_name, no_id=args.no_id)
+    templates = build_reflection_templates(env_name, no_id=args.no_id,
+                                           perception_history=args.perception_history)
     selector = RExPureCandidateSelector(c=args.rex_c, rng=random.Random(args.seed + 7331))
     if args.no_perception:
         module_selector = SingleComponentSelector("world_knowledge")
@@ -484,7 +509,8 @@ def main():
     reflection_lm = make_reflection_lm(refl_cfg, log_path=refl_log)
 
     print(f"[rexpure] optimizing (max_nodes={args.max_nodes}, REx-pure C={args.rex_c:g}, "
-          f"no gate, h=full-train, mb=full | context_k={context_k})...")
+          f"no gate, h=full-train, mb=full | context_k={context_k} | "
+          f"perception_history={args.perception_history})...")
     t0 = time.perf_counter()
     result = rex_search(
         adapter=adapter, seed_candidate=seed_candidate, train=train,
@@ -507,7 +533,8 @@ def main():
         task_cfg, best_code, best_beliefs, test,
         log_path=outd / f"test_trace_rexpure_seed{args.seed}.json", context_k=context_k,
         id_set_loss=args.id_set_loss, id_eps=args.id_eps, id_n_actions=id_n,
-        credited_scoring=args.credited_scoring))
+        credited_scoring=args.credited_scoring,
+        perception_history=args.perception_history))
     cost = adapter.total_cost + _REFLECTION["cost"]
     print(f"[rexpure] CLEAN test acc (inverse) = {test_acc:.2f}")
 
@@ -524,7 +551,8 @@ def main():
             s, c = run_async(eval_cfd_on(
                 task_cfg, best_code, best_beliefs, test, concurrency=args.concurrency,
                 context_k=context_k, raw_targets=raw,
-                log_path=outd / f"test_trace_cfd_{mode}_rexpure_seed{args.seed}.json"))
+                log_path=outd / f"test_trace_cfd_{mode}_rexpure_seed{args.seed}.json",
+                perception_history=args.perception_history))
             cfd_test[mode] = s
             cost += c
             print(f"[rexpure] CLEAN held-out cFD [{mode} targets] = {s:.2f} "
@@ -535,7 +563,8 @@ def main():
         fd_test, fd_cost = run_async(eval_fd_on(
             task_cfg, best_code, best_beliefs, test, args.fd_scorer, args.concurrency,
             context_k=context_k, log_path=outd / f"test_trace_fd_rexpure_seed{args.seed}.json",
-            credited_scoring=args.credited_scoring))
+            credited_scoring=args.credited_scoring,
+            perception_history=args.perception_history))
         cost += fd_cost
         print(f"[rexpure] CLEAN test FD[{args.fd_scorer}] = {fd_test:.2f}")
 
@@ -556,6 +585,9 @@ def main():
         },
         "n_test": len(test),
         "context_k": context_k,
+        # downstream consumers (planning evals) read this to call the shipped P the way
+        # it was trained; absent in runs that predate the flag, which all used 1
+        "perception_history": args.perception_history,
         "best_train_score": result["best_train_score"],
         "num_candidates": result["num_candidates"],
         "nodes_explored": result["nodes_explored"],

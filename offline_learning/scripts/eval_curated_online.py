@@ -201,7 +201,9 @@ async def llm_rollout_v2(arm: str, p: dict, prog: str, perceive, beliefs: str,
                    "plan_error": None, "retry_errors": errs,
                    "prompt": sent_prompt, "response": text, **trace}
             if arm == "lmwm":
-                z_after, z_err = perceive(new_grid)
+                # every grid of this rollout so far, oldest first; perceive() keeps as
+                # many as the world model was trained with (1 = the new grid alone)
+                z_after, z_err = perceive([g for g, _ in hist_raw] + [new_grid])
                 hist_z.append((cur_z, action))
                 cur_z = z_after
                 row["z_after"] = z_after
@@ -304,13 +306,23 @@ def load_checkpoint(path: Path) -> dict:
 
 
 # ------------------------------------------------------------------- resources
+def trained_perception_history(rex: Path) -> int:
+    """How many observations the run's perceive() got per call in training
+    (rexpure --perception-history). Runs that predate the flag record none; they all
+    used 1."""
+    summary = rex / "test_summary_rexpure_seed1.json"
+    if not summary.is_file():
+        return 1
+    return int(json.loads(summary.read_text()).get("perception_history", 1))
+
+
 def build_resources(game: str, root: Path, arms: list[str],
                     icl_cfg: dict | None = None) -> tuple[dict, dict]:
     """Load a game's artifacts; a missing artifact skips that arm with a warning."""
     skipped: dict[str, str] = {}
     R = {"prog": HGAMES[game][0], "verbs": list(HGAMES[game][2]),
-         "perceive": compile_perceive(""), "beliefs": "", "rt": None,
-         "icl": "", "icl_meta": {}}
+         "perceive": compile_perceive(""), "perception_history": 1,
+         "beliefs": "", "rt": None, "icl": "", "icl_meta": {}}
     if "lmwm" in arms:
         rex = root / "rexpure" / f"{game}_s1"
         pp = rex / "best_perception_rexpure_seed1.py"
@@ -320,7 +332,8 @@ def build_resources(game: str, root: Path, arms: list[str],
             skipped["lmwm"] = f"missing artifact: {missing}"
             print(f"WARNING: {game}: skipping arm lmwm -- {skipped['lmwm']}", flush=True)
         else:
-            R["perceive"] = compile_perceive(pp.read_text())
+            R["perception_history"] = trained_perception_history(rex)
+            R["perceive"] = compile_perceive(pp.read_text(), R["perception_history"])
             R["beliefs"] = bp.read_text()
     if "icl" in arms:
         block, meta = load_icl_block(game, root, icl_cfg)
@@ -524,6 +537,8 @@ def emit(problems, per, skipped_by_game, llm, off_idx, elapsed, a, done, total) 
                     "rollouts_done": done,
                     "rollouts_total": total, "attempts_planned": a.attempts,
                     "context_k": CONTEXT_K, "wc_budget": a.wc_budget,
+                    "perception_history": {p["game"]: p.get("_perception_history", 1)
+                                           for p in problems},
                     "warm_start": a.warm_start,
                     "max_floor": a.max_floor,
                     "arms": [x.strip() for x in a.arms.split(",") if x.strip()],
@@ -599,6 +614,8 @@ async def main_async(a):
     for game, ps in by_game.items():
         R, skipped = build_resources(game, root, arms, icl_config(a))
         resources[game] = R
+        for p in ps:
+            p["_perception_history"] = R["perception_history"]
         if skipped:
             skipped_by_game[game] = skipped
         prepare(ps, R["perceive"])

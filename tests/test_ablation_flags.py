@@ -131,6 +131,8 @@ def test_reference_split_reproduces_the_shipped_fingerprint():
     ("-Beliefs", lambda a: a + ["--no-beliefs"]),
     ("-Perception", lambda a: _drop(a, "--start-perception", valued=True)
                               + ["--no-perception"]),
+    # not an ablation, but compared against the same reference column
+    ("+History", lambda a: a + ["--perception-history", "10"]),
 ])
 def test_split_is_invariant_to_every_ablation_flag(arm, mutate):
     """Every arm must see the identical 60 train / 50 test transitions and choice sets.

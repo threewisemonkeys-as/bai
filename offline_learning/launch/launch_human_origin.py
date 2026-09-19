@@ -186,7 +186,8 @@ def ref_cmd(learner: str, game: str) -> list[str]:
 
 def build(learner: str, game: str, outd: Path, variant: str,
           reflection_model: str | None = None, reflection_client: str | None = None,
-          reflection_timeout: float = 900.0, ablation: str = "none") -> list[str]:
+          reflection_timeout: float = 900.0, ablation: str = "none",
+          perception_history: int = 1, max_nodes: int | None = None) -> list[str]:
     cmd = ref_cmd(learner, game)
     abl = ABLATIONS.get(ablation, {})
     # value-taking flags to drop: data paths always; for the unified variant also rexpure's
@@ -195,6 +196,8 @@ def build(learner: str, game: str, outd: Path, variant: str,
     # the ablation removes.
     drop = set(DATA_FLAGS) | ({"--train-n"} if is_unified(variant) else set())
     drop |= set(abl.get("drop", ()))
+    if max_nodes is not None:
+        drop.add("--max-nodes")
     if reflection_model:
         drop |= set(REFLECTION_FLAGS)
     # valueless (store_true) flags to drop: for the unified variant un-collapse worldcoder's
@@ -217,6 +220,10 @@ def build(learner: str, game: str, outd: Path, variant: str,
     if is_unified(variant) and learner == "rexpure":
         stripped += ["--train-n", str(UNIFIED_TRAIN_N)]
     stripped += list(abl.get("add", ()))
+    if perception_history > 1:
+        stripped += ["--perception-history", str(perception_history)]
+    if max_nodes is not None:
+        stripped += ["--max-nodes", str(max_nodes)]
     if reflection_model:
         stripped += ["--reflection-model", reflection_model,
                      "--reflection-provider-order", "",      # explicit no-pin
@@ -260,6 +267,13 @@ def main() -> None:
                     help="apply ONE documented flag delta to the reference command "
                          "(rexpure only): " + "; ".join(
                              f"{k} = {v['doc']}" for k, v in sorted(ABLATIONS.items())))
+    ap.add_argument("--perception-history", type=int, default=1,
+                    help="rexpure --perception-history: perceive() gets up to N recent "
+                         "observations from the --context-k window (default 1 = the "
+                         "reference, current observation only). Composes with --ablation")
+    ap.add_argument("--max-nodes", type=int, default=None,
+                    help="override the reference search budget (e.g. a smoke run); "
+                         "default keeps the reference's")
     ap.add_argument("--proxy-base", default=PROXY_BASE)
     ap.add_argument("--resume", action="store_true",
                     help="for games whose out-dir already holds a search checkpoint "
@@ -277,6 +291,8 @@ def main() -> None:
 
     if args.ablation != "none" and args.learner != "rexpure":
         raise SystemExit(f"--ablation {args.ablation} applies to rexpure flags only")
+    if args.perception_history > 1 and args.learner != "rexpure":
+        raise SystemExit("--perception-history applies to rexpure only")
 
     # The groq pin exists for rexpure's TASK model (gpt-oss-20b@groq). worldcoder has no
     # task LLM -- exporting it there pins its reflection model to a provider that does not
@@ -300,7 +316,8 @@ def main() -> None:
             print(f"skip  {game}: already complete")
             continue
         cmd = build(args.learner, game, outd, variant, args.reflection_model,
-                    args.reflection_client, args.reflection_timeout, args.ablation)
+                    args.reflection_client, args.reflection_timeout, args.ablation,
+                    args.perception_history, args.max_nodes)
         ckpt = outd / ("rexpure_run_seed1" if args.learner == "rexpure" else "wc_run_seed1") / "resume_state.json"
         if args.resume and ckpt.exists():
             cmd.append("--resume")
@@ -319,6 +336,7 @@ def main() -> None:
         (outd / "launch.json").write_text(json.dumps(
             {"game": game, "learner": args.learner, "variant": variant,
              "ablation": args.ablation,
+             "perception_history": args.perception_history, "max_nodes": args.max_nodes,
              "reflection_model": args.reflection_model, "reflection_client": args.reflection_client,
              "pid": p.pid, "cmd": cmd,
              "env": {**ref_env(args.learner, game),

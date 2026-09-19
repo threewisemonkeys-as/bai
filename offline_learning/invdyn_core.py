@@ -334,27 +334,65 @@ async def predict_next_state(cfg, z_t, action, beliefs, sem):
 # scoring labels are unchanged (id_score on a_t; fd_score on the center z_t1), so the
 # signal stays pure -- only the CONTEXT shown to F is widened. Falls back to the two-state
 # templates when context_k==0 (exact back-compat with the validated path).
+#
+# PERCEPTION HISTORY (--perception-history N). perceive() takes a list of observations,
+# but by default every state is perceived alone, as a one-element list. With N > 1 each
+# window state is perceived with up to N-1 states before it, taken from the SAME window,
+# oldest first. The history is causal -- it never holds a state later than the one being
+# perceived -- and it is shorter near the window's left edge (and at an episode start,
+# where the window itself is cut). N = 1 reproduces the single-frame calls exactly.
 # ---------------------------------------------------------------------------
-def build_window(code, tr):
+def window_raw_frames(tr):
+    """Raw observations of a Transition's window in time order, and the index of X_t."""
+    frames = ([raw for raw, _ in tr.ctx_prev] + [tr.x_t, tr.x_t1]
+              + [raw for _, raw in tr.ctx_next])
+    return frames, len(tr.ctx_prev)
+
+
+def frame_history(frames, i, history):
+    """What perceive() sees for frames[i]: up to `history` frames ending at i."""
+    return frames[max(0, i - history + 1): i + 1]
+
+
+def option_history(tr, option, history):
+    """What perceive() sees when a contrastive-FD option is rendered as the next state:
+    the window up to X_t, then the option. X_t+1 is never in it -- it would put the true
+    answer into every option's input."""
+    frames, it = window_raw_frames(tr)
+    return frames[max(0, it - history + 2): it + 1] + [option]
+
+
+def center_histories(tr, history):
+    """(history of X_t, history of X_t+1), as tuples so they can be hashed."""
+    frames, it = window_raw_frames(tr)
+    return (tuple(frame_history(frames, it, history)),
+            tuple(frame_history(frames, it + 1, history)))
+
+
+def check_perception_history(history, context_k):
+    """The history comes from the window, so the two-state path (K == 0) has none."""
+    if history < 1:
+        raise ValueError("perception_history must be >= 1")
+    if history > 1 and context_k <= 0:
+        raise ValueError("perception_history > 1 needs a temporal window (context_k >= 1)")
+
+
+def build_window(code, tr, history=1):
     """Run P over the whole temporal window of a Transition. Returns (win, perc_err) where
     win = {prev:[(z, a)], z_t, z_t1, nxt:[(a, z)]} in feature space, aligned with tr.ctx_*.
     The raw observation of every window state is also retained (prev_raw / x_t / x_t1 /
     nxt_raw, same order as the feature lists) so the image-augmented windowed predictors and
-    the P-writer can render one image per state."""
-    err = None
-    prev = []
-    for raw, a in tr.ctx_prev:
-        z, e = run_perceive(code, raw)
+    the P-writer can render one image per state. `history` is the most observations one
+    perceive() call gets (see PERCEPTION HISTORY above); 1 = each state alone."""
+    frames, it = window_raw_frames(tr)
+    feats, err = [], None
+    for i in range(len(frames)):
+        z, e = run_perceive(code, frame_history(frames, i, history))
         err = err or e
-        prev.append((z, a))
-    z_t, e1 = run_perceive(code, tr.x_t)
-    z_t1, e2 = run_perceive(code, tr.x_t1)
-    err = err or e1 or e2
-    nxt = []
-    for a, raw in tr.ctx_next:
-        z, e = run_perceive(code, raw)
-        err = err or e
-        nxt.append((a, z))
+        feats.append(z)
+    prev = [(feats[k], a) for k, (_, a) in enumerate(tr.ctx_prev)]
+    z_t, z_t1 = feats[it], feats[it + 1]
+    nxt = [(a, feats[it + 2 + k]) for k, (a, _) in enumerate(tr.ctx_next)]
     return {
         "prev": prev,
         "z_t": z_t,
@@ -1290,6 +1328,7 @@ class InvDynAdapter:
         reflect_raw_prefix=1500,
         analysis_memo=True,
         image_cls=None,
+        perception_history=1,
     ):
         self.cfg = cfg
         # Mistake-analysis calls belong to the reflection stack (they write the
@@ -1317,7 +1356,7 @@ class InvDynAdapter:
         self.contrastive_fd = contrastive_fd
         self.cfd_raw_targets = cfd_raw_targets
         self.image_cls = image_cls or Image
-        self._popt_cache = {}  # (cand_hash, option) -> P(option) rendering
+        self._popt_cache = {}  # (cand_hash, option history) -> P(option) rendering
         if contrastive_fd and f_image:
             raise ValueError("--contrastive-fd does not support --f-image")
         if composite in ("min", "softmin") and credited_scoring:
@@ -1351,6 +1390,9 @@ class InvDynAdapter:
         self.action_pool = action_pool
         # K-step temporal window shown to F (0 = two-state, validated path)
         self.context_k = context_k
+        # most observations one perceive() call gets (see PERCEPTION HISTORY)
+        check_perception_history(perception_history, context_k)
+        self.perception_history = perception_history
         # sidecar: per-(candidate, transition) prediction detail for the viewer.
         # Keyed by content hashes so build_optim_viz.py can join without indices.
         self.pred_log_path = pred_log_path
@@ -1423,6 +1465,8 @@ class InvDynAdapter:
         # z makes FD[exact] a free 1.0 and leaves ID guessable from the visible action
         # history, so any credit earned by such a P is spurious (the s2kt7
         # "error_in_perception" collapse won the run exactly this way).
+        # Under a perception history the entries are the histories P sees (tuples of
+        # observations), so "all identical" compares those rather than single frames.
         self.gate_train_x = list(gate_train_x or [])
         self._gate_cache = {}  # perception-code hash -> (fired, constant_output)
 
@@ -1438,7 +1482,7 @@ class InvDynAdapter:
             # K==0 perceives just the two center states (validated path).
             win = None
             if self.context_k > 0:
-                win, perc_err = build_window(code, tr)
+                win, perc_err = build_window(code, tr, self.perception_history)
                 z_t, z_t1 = win["z_t"], win["z_t1"]
             else:
                 z_t, err_t = run_perceive(code, tr.x_t)
@@ -1552,18 +1596,21 @@ class InvDynAdapter:
                 # (pred_idx, cost, prompt, raw_response, rendered); no call unless
                 # enabled AND the instance carries baked options (test-eval
                 # instances don't). Default: options shown as P(option) -- rendered
-                # with THIS candidate's perceive(), cached per (candidate, frame)
-                # since the same pool frames recur across transitions.
+                # with THIS candidate's perceive(), cached per (candidate, input)
+                # since the same pool frames recur across transitions. Under a
+                # perception history the input is the window up to X_t plus the
+                # option, so the key carries that history, not just the frame.
                 if not self.contrastive_fd or not inst.get("cfd_options"):
                     return None, 0.0, None, "", None
                 rendered = None
                 if not self.cfd_raw_targets:
                     rendered = []
                     for o in inst["cfd_options"]:
-                        key = (cand_hash, o)
+                        hist = tuple(option_history(tr, o, self.perception_history))
+                        key = (cand_hash, hist)
                         r = self._popt_cache.get(key)
                         if r is None:
-                            z, e = run_perceive(code, o)
+                            z, e = run_perceive(code, hist)
                             r = "(perception error)" if e else (z.strip() or "(empty)")
                             self._popt_cache[key] = r
                         rendered.append(r)
@@ -3019,17 +3066,43 @@ def _apply_no_id_swaps(comp: str, text: str, *, required: bool = True) -> str:
     return text
 
 
-def build_reflection_templates(env_name: str | None = None, no_id: bool = False) -> dict:
+# The perception template's contract sentence, and what replaces it under a perception
+# history (--perception-history N > 1). N = 1 keeps the template byte-identical.
+_P_CONTRACT = ("It must define `perceive(observation_history: list[str]) -> str`; "
+               "observation_history[-1] is the current raw observation.")
+_P_CONTRACT_HISTORY = (
+    "It must define `perceive(observation_history: list[str]) -> str`. "
+    "observation_history holds the most recent raw observations of the episode, OLDEST "
+    "FIRST: up to {n} of them, fewer near the start of an episode (possibly only one). "
+    "observation_history[-1] is the current raw observation; every element has the format "
+    "described in the OBSERVATION SCHEMA below, and the actions taken between them are NOT "
+    "included. The output is used as the features of the CURRENT state, so earlier "
+    "observations are there to help describe it -- e.g. to report what just changed, or to "
+    "track state the current frame alone does not show.")
+
+
+def build_reflection_templates(env_name: str | None = None, no_id: bool = False,
+                               perception_history: int = 1) -> dict:
     """REFLECTION_TEMPLATES with the OBSERVATION SCHEMA scoped to env_name (autumn/arc_agi ->
     only that grid format; None -> both). Pass the running env to avoid leaking the other
     env's format/palette into the proposed perception code.
 
     no_id=True (the --no-id objective ablation) additionally restates the proposer's task
-    in terms of the contrastive forward objective; see _NO_ID_TEMPLATE_SWAPS."""
+    in terms of the contrastive forward objective; see _NO_ID_TEMPLATE_SWAPS.
+
+    perception_history > 1 tells the proposer that perceive() receives that many recent
+    observations rather than only the current one (see PERCEPTION HISTORY)."""
+    perception = REFLECTION_TEMPLATES["perception"].replace(
+        OBSERVATION_SCHEMA, observation_schema(env_name)
+    )
+    if perception_history > 1:
+        if perception.count(_P_CONTRACT) != 1:
+            raise RuntimeError("perception template: contract sentence moved; "
+                               "update _P_CONTRACT")
+        perception = perception.replace(
+            _P_CONTRACT, _P_CONTRACT_HISTORY.format(n=perception_history))
     out = {
-        "perception": REFLECTION_TEMPLATES["perception"].replace(
-            OBSERVATION_SCHEMA, observation_schema(env_name)
-        ),
+        "perception": perception,
         "world_knowledge": REFLECTION_TEMPLATES["world_knowledge"],
     }
     if not no_id:
@@ -3977,6 +4050,7 @@ async def eval_on(
     id_eps=0.1,
     id_n_actions=None,
     credited_scoring=False,
+    perception_history=1,
 ):
     """Evaluate on a list of baked {tr, choices} dicts using FIXED choice sets, so
     every method (learned, legacy, baselines) faces identical choices on the test set.
@@ -3997,6 +4071,8 @@ async def eval_on(
     plus, for every test item, P's output on both frames, F's reasoning, the chosen
     vs true action and the deterministic raw change). This lets later failure analysis
     read the trace directly -- no log reconstruction and no LLM replay needed."""
+    if not raw_mode:
+        check_perception_history(perception_history, context_k)
     sem = asyncio.Semaphore(concurrency)
     _blind_cache = {}  # (tr identity, choices) -> blind ID score, local to this call
 
@@ -4046,7 +4122,7 @@ async def eval_on(
             z_t = z_t1 = "<image>"
         elif (not raw_mode) and context_k > 0:
             # windowed test: same K-step transcript the optimizer trained F on
-            win, _ = build_window(code, tr)
+            win, _ = build_window(code, tr, perception_history)
             z_t, z_t1 = win["z_t"], win["z_t1"]
             if id_set_loss:
                 pred, reasoning, cost, _ = await predict_action_set_from_window(
@@ -4152,6 +4228,7 @@ async def eval_fd_on(
     context_k=0,
     log_path=None,
     credited_scoring=False,
+    perception_history=1,
 ):
     """Mean forward-dynamics score on the clean test set: generate Z_hat = Fwd(history,
     A, B) and score it against the TRUE next features P(X_t+1). Secondary readout (the
@@ -4167,6 +4244,7 @@ async def eval_fd_on(
     transition. This mirrors eval_on's durable ID trace so final FD results never exist only
     in terminal output.
     """
+    check_perception_history(perception_history, context_k)
     sem = asyncio.Semaphore(concurrency)
 
     async def one(idx, inst):
@@ -4175,7 +4253,7 @@ async def eval_fd_on(
         fwd_response = None
         blind_z_hat = None
         if context_k > 0:
-            win, _ = build_window(code, tr)
+            win, _ = build_window(code, tr, perception_history)
             z_t, z_t1 = win["z_t"], win["z_t1"]
             z_hat, c, fwd_response, fwd_prompt = await predict_next_state_from_window(
                 cfg, win, tr.action, beliefs, sem
@@ -4282,6 +4360,7 @@ async def eval_cfd_on(
     context_k=0,
     raw_targets=False,
     log_path=None,
+    perception_history=1,
 ):
     """HELD-OUT contrastive-FD score: on each baked test item, identify the TRUE next
     observation among that item's baked `cfd_options`.
@@ -4312,26 +4391,30 @@ async def eval_cfd_on(
             f"eval_cfd_on: {len(missing)} of {len(baked)} items carry no baked "
             "cfd_options -- run bake_decoys over the split first"
         )
+    check_perception_history(perception_history, context_k)
     sem = asyncio.Semaphore(concurrency)
-    _popt = {}  # frame -> P(frame), reused across items (pool frames recur as decoys)
+    # option history -> P(option), reused across items (pool frames recur as decoys);
+    # with perception_history 1 the history is just the frame
+    _popt = {}
 
-    def _render(o):
-        r = _popt.get(o)
+    def _render(tr, o):
+        hist = tuple(option_history(tr, o, perception_history))
+        r = _popt.get(hist)
         if r is None:
-            z, e = run_perceive(code, o)
+            z, e = run_perceive(code, hist)
             r = "(perception error)" if e else (z.strip() or "(empty)")
-            _popt[o] = r
+            _popt[hist] = r
         return r
 
     async def one(idx, inst):
         tr, opts = inst["tr"], inst["cfd_options"]
         win = None
         if context_k > 0:
-            win, _ = build_window(code, tr)
+            win, _ = build_window(code, tr, perception_history)
             z_t = win["z_t"]
         else:
             z_t = run_perceive(code, tr.x_t)[0]
-        rendered = None if raw_targets else [_render(o) for o in opts]
+        rendered = None if raw_targets else [_render(tr, o) for o in opts]
         pred_i, cost, prompt, raw = await predict_true_next_frame(
             cfg, win, z_t, tr.action, beliefs, opts, sem, rendered=rendered
         )

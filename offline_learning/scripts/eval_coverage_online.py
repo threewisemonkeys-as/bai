@@ -146,8 +146,12 @@ class Branch:
             pass
 
 
-def compile_perceive(code: str):
-    """Compile the perception module once; return perceive(grid_str)->(feat,err)."""
+def compile_perceive(code: str, history: int = 1):
+    """Compile the perception module once; return perceive(obs)->(feat,err).
+
+    `obs` is one grid string, or the grids seen so far, oldest first, ending at the current
+    one. perceive() receives the last `history` of them: the most one call got in training
+    (rexpure's --perception-history), so 1 means the current grid alone."""
     if not code.strip():
         return lambda _g: ("", None)
     ns: dict = {}
@@ -156,9 +160,10 @@ def compile_perceive(code: str):
     if not callable(fn):
         return lambda _g: ("", "no callable perceive()")
 
-    def perceive(grid_str: str):
+    def perceive(obs):
+        frames = [obs] if isinstance(obs, str) else list(obs)[-history:]
         try:
-            out = fn([grid_str])
+            out = fn(frames)
             return (out if isinstance(out, str) else str(out)), None
         except Exception as e:  # noqa: BLE001
             return "", f"{type(e).__name__}: {e}"

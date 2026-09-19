@@ -118,6 +118,7 @@ def score_game(run_dir: Path, *, concurrency: int, force: bool) -> dict:
         "run_dir": str(run_dir.relative_to(REPO) if run_dir.is_relative_to(REPO)
                        else run_dir),
         "seed": args.seed, "n_test": len(test), "context_k": context_k,
+        "perception_history": args.perception_history,
         "n_decoys": args.cfd_decoys, "hard_decoys": args.cfd_hard_decoys,
         "chance": 1.0 / (args.cfd_decoys + 1),
         "task_model": args.task_model,
@@ -135,7 +136,8 @@ def score_game(run_dir: Path, *, concurrency: int, force: bool) -> dict:
         s, c = run_async(eval_cfd_on(
             cfg, code, beliefs, test, concurrency=concurrency, context_k=context_k,
             raw_targets=raw,
-            log_path=run_dir / f"test_trace_cfd_{mode}_rexpure_seed{args.seed}.json"))
+            log_path=run_dir / f"test_trace_cfd_{mode}_rexpure_seed{args.seed}.json",
+            perception_history=args.perception_history))
         res[mode] = s
         res["cost"] += c
         print(f"    {mode:>9} targets: cFD {s:.2f}  (chance {res['chance']:.2f})",

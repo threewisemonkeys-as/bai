@@ -251,19 +251,24 @@ def strip_transitions_obs_metadata(transitions: list[Transition]) -> list[Transi
 
 
 # ---------------------------------------------------------------------------
-# Perception runner: exec code, call perceive() on a single-frame history.
+# Perception runner: exec code, call perceive() on an observation history.
 # Returns (output, error). Mirrors the forward pipeline P(X) per frame.
+# `obs` is either one raw observation (called as a single-frame history, the
+# historical behaviour every existing caller relies on) or a sequence of raw
+# observations, oldest first, ending at the current one. The sequence is copied,
+# so a perceive() that mutates its argument cannot corrupt the caller's frames.
 # ---------------------------------------------------------------------------
-def run_perceive(code: str, raw_obs: str) -> tuple[str, str | None]:
+def run_perceive(code: str, obs) -> tuple[str, str | None]:
     if not code.strip():
         return "", None
+    history = [obs] if isinstance(obs, str) else list(obs)
     try:
         ns: dict = {}
         exec(code, ns)
         fn = ns.get("perceive")
         if not callable(fn):
             return "", "no callable perceive()"
-        out = fn([raw_obs])  # history signature: perceive(observation_history: list[str])
+        out = fn(history)  # history signature: perceive(observation_history: list[str])
         return (out if isinstance(out, str) else str(out)), None
     except Exception as e:  # noqa: BLE001
         return "", f"{type(e).__name__}: {e}"
