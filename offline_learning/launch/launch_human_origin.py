@@ -95,13 +95,21 @@ def is_unified(variant: str) -> bool:
 # propose-batch, rex-C and the test protocol -- is carried over byte-identically by the
 # rebuild above, which is what makes the arms comparable to the NLWM column.
 #
-# The train/test split is provably untouched by all four: build_data() draws it from
+# The train/test split is provably untouched by every arm: build_data() draws it from
 # Random(--seed) and runs BEFORE any of these take effect, and bake_decoys draws from its
 # own Random(seed+9173), so dropping --contrastive-fd cannot advance the split rng either.
 # tests/test_ablation_flags.py asserts exactly this.
 #
 # Note the reference passes `--fd-scorer none`, so the live forward term is the
 # CONTRASTIVE one: "-FD" removes --contrastive-fd/--cfd-hard-decoys, NOT --fd-scorer.
+#
+# `fdexact` is a variant of the method, not an ablation: it SWAPS the forward term
+# instead of removing it. F generates P(X_t+1) from the window + action + beliefs and
+# scores 1 iff it equals the true P(X_t+1) (invdyn_core.exact_match_f1), so the objective
+# is min(ID, FD-exact) -- the formulation nlwm_paper/main.tex describes. It rides on
+# --ablation because the machinery is the same: one documented delta on the reference.
+# --fd-weight stays at its default 0.5, which under --composite min only switches the
+# term on (fd_weight > 0), never weights it.
 ABLATIONS = {
     "nofd": {
         "drop_flag": {"--contrastive-fd", "--cfd-hard-decoys"},
@@ -127,6 +135,13 @@ ABLATIONS = {
     "nobeliefs": {
         "add": ["--no-beliefs"],
         "doc": "world_knowledge dropped from the candidate; only perception is learned",
+    },
+    "fdexact": {
+        "drop": {"--fd-scorer"},
+        "drop_flag": {"--contrastive-fd", "--cfd-hard-decoys"},
+        "add": ["--fd-scorer", "exact"],
+        "doc": "objective = min(ID, exact match of the generated P(X_t+1)) in place "
+               "of min(ID, contrastive FD)",
     },
 }
 

@@ -49,6 +49,12 @@ def _drop(argv: list[str], *flags: str, valued: bool = False) -> list[str]:
     return out
 
 
+def _fdexact(argv: list[str]) -> list[str]:
+    """The fdexact arm's flag delta: swap the contrastive forward term for exact match."""
+    return _drop(_drop(argv, "--contrastive-fd", "--cfd-hard-decoys"),
+                 "--fd-scorer", valued=True) + ["--fd-scorer", "exact"]
+
+
 def _split(argv: list[str]):
     args = R.build_parser().parse_args(argv)
     train, test, pool, ck, wl, trs, idn = R.build_data(args, random.Random(args.seed))
@@ -131,16 +137,18 @@ def test_reference_split_reproduces_the_shipped_fingerprint():
     ("-Beliefs", lambda a: a + ["--no-beliefs"]),
     ("-Perception", lambda a: _drop(a, "--start-perception", valued=True)
                               + ["--no-perception"]),
-    # not an ablation, but compared against the same reference column
+    ("FD-exact", lambda a: _fdexact(a)),
+    # not ablations, but compared against the same reference column
     ("+History", lambda a: a + ["--perception-history", "10"]),
+    ("FD-exact +History", lambda a: _fdexact(a) + ["--perception-history", "10"]),
 ])
 def test_split_is_invariant_to_every_ablation_flag(arm, mutate):
     """Every arm must see the identical 60 train / 50 test transitions and choice sets.
 
     This is not incidental: build_data draws the split from Random(--seed) and runs BEFORE
-    any of the four deltas takes effect, and bake_decoys draws from its own
+    any of these deltas takes effect, and bake_decoys draws from its own
     Random(seed+9173) so toggling the contrastive term cannot advance the split rng.
-    If this test breaks, no ablation number is comparable to the NLWM column.
+    If this test breaks, no arm's number is comparable to the NLWM column.
     """
     ref = _ref_argv()
     _, tr_a, te_a, pool_a, ck_a, _, idn_a = _split(ref)
@@ -157,6 +165,98 @@ def test_no_fd_leaves_the_train_items_without_baked_decoys():
     _, train_nofd, *_ = _split(_drop(_ref_argv(), "--contrastive-fd", "--cfd-hard-decoys"))
     assert all(b.get("cfd_options") for b in train_ref)
     assert not any(b.get("cfd_options") for b in train_nofd)
+
+
+def _launcher():
+    import importlib.util
+    path = REPO / "offline_learning/launch/launch_human_origin.py"
+    spec = importlib.util.spec_from_file_location("launch_human_origin", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _set_out_dir(argv: list[str], out: str) -> list[str]:
+    argv = list(argv)
+    argv[argv.index("--out-dir") + 1] = out
+    return argv
+
+
+@needs_data
+def test_fdexact_arm_swaps_only_the_forward_term(tmp_path):
+    """--ablation fdexact must be the shipped command with the contrastive term swapped
+    for exact-match FD and nothing else: the rebuilt reference (--ablation none) is the
+    shipped argv, and the parsed configs differ in exactly the three forward-term fields."""
+    L = _launcher()
+    ref = L.build("rexpure", "bt3gb", tmp_path, "informative_curated")[2:]
+    arm = L.build("rexpure", "bt3gb", tmp_path, "informative_curated",
+                  ablation="fdexact")[2:]
+    assert ref == _set_out_dir(_ref_argv(), str(tmp_path))
+    assert arm == _fdexact(ref)
+    a_ref = vars(R.build_parser().parse_args(ref))
+    a_arm = vars(R.build_parser().parse_args(arm))
+    changed = {k for k in a_ref if a_ref[k] != a_arm[k]}
+    assert changed == {"fd_scorer", "contrastive_fd", "cfd_hard_decoys"}
+    assert (a_arm["fd_scorer"], a_arm["composite"]) == ("exact", "min")
+    assert a_arm["fd_weight"] > 0   # under min this only switches the term on
+
+
+@needs_data
+def test_the_two_method_variants_are_independently_selectable(tmp_path):
+    """fdexact and --perception-history are orthogonal knobs on one launcher: each is off
+    unless asked for, each alone changes only its own fields, and together they change the
+    union. Nothing here re-baselines -- the split is invariant to all three (above)."""
+    L = _launcher()
+    def cfg(**kw):
+        argv = L.build("rexpure", "bt3gb", tmp_path, "informative_curated", **kw)[2:]
+        return argv, vars(R.build_parser().parse_args(argv))
+
+    ref_argv, ref = cfg()
+    fd_argv, fd = cfg(ablation="fdexact")
+    hi_argv, hi = cfg(perception_history=10)
+    both_argv, both = cfg(ablation="fdexact", perception_history=10)
+
+    FD = {"fd_scorer", "contrastive_fd", "cfd_hard_decoys"}
+    HIST = {"perception_history"}
+    delta = lambda a: {k for k in ref if ref[k] != a[k]}   # noqa: E731
+    assert (ref["perception_history"], ref["fd_scorer"]) == (1, "none")  # both off
+    assert delta(fd) == FD
+    assert delta(hi) == HIST
+    assert delta(both) == FD | HIST
+    # and neither writes the other's flag into the command: fdexact never asks for a
+    # history, and the history arm keeps the reference's contrastive forward term
+    assert "--perception-history" not in fd_argv
+    assert hi_argv == ref_argv + ["--perception-history", "10"]
+    assert both_argv == _fdexact(ref_argv) + ["--perception-history", "10"]
+
+
+def test_fd_exact_scores_min_of_id_and_exact_match(monkeypatch):
+    """The fdexact arm's objective, per transition: min(ID, 1[generated P(X_t+1) equals
+    the true P(X_t+1)]), with no contrastive call. F is stubbed: it always names the true
+    action as a singleton, and generates the right next features for A->B only."""
+    async def fake_action_set(cfg, z_t, z_t1, beliefs, choices, sem):
+        return ["left"], "", 0.0
+
+    async def fake_next_state(cfg, z_t, action, beliefs, sem):
+        return {"A": "B", "C": "not D"}[z_t], 0.0
+
+    async def no_contrastive(*args, **kwargs):
+        raise AssertionError("contrastive FD was called under fdexact")
+
+    monkeypatch.setattr(C, "predict_action_set", fake_action_set)
+    monkeypatch.setattr(C, "predict_next_state", fake_next_state)
+    monkeypatch.setattr(C, "predict_true_next_frame", no_contrastive)
+    adapter = _adapter(contrastive_fd=False, fd_scorer="exact", fd_weight=0.5,
+                       id_set_loss=True, id_n_actions=2, gate_train_x=["A", "B", "C", "D"])
+    batch = [{"tr": _tr("A", "B"), "choices": ["left", "right"]},
+             {"tr": _tr("C", "D"), "choices": ["left", "right"]}]
+    out = adapter.evaluate(
+        batch, {"perception": "def perceive(h):\n    return h[-1]\n",
+                "world_knowledge": ""}, capture_traces=True)
+    assert [t["id_score"] for t in out.trajectories] == [1.0, 1.0]
+    assert [t["fd_score"] for t in out.trajectories] == [1.0, 0.0]
+    assert out.scores == [1.0, 0.0]
+    assert not any("cfd_score" in t for t in out.trajectories)
 
 
 # ------------------------------------------------------------- --no-id scoring
