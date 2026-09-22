@@ -773,7 +773,9 @@ brief.
   unreachable on this axis rather than merely distant — for this run and for every
   agent on that board alike. 3,279 of those human games actually won; this one was
   never close.
-* **M7 — the replay page and the readout.** *Done 2026-09-10, 131 tests.*
+* **M7 — the replay page and the readout.** *Done 2026-09-10, 131 tests. The page
+  described here was rebuilt for M6's scale and rescored on a human-calibrated axis —
+  see M8; what follows is what shipped on the day.*
   `tools/readout.py` replays a run and reports what no file kept: the curve at every
   milestone, and the three things the pilot asks — keys thrown into a prompt that
   could not take them (with the longest such run, which is what says whether the
@@ -785,6 +787,75 @@ brief.
   wrote at the time. Both are built from the keystroke history rather than from the
   files a run happened to write, so they work on any `--obs` and on a run whose
   screens `--again` rotated away.
+
+* **M8 — the viewer M6 needed, and a population to read it against.** *Done
+  2026-09-22, 187 tests.* M7's page was built for a 3,000-key run and M6 is ten times
+  that, which is a different problem; and M6's result could not be reported in points
+  at all, which is a different problem again. Four modules, in `cc_nle/nle-code`.
+
+  **The page, rebuilt for thirty thousand screens.** M7's track put a DOM node on the
+  page per batch and per mark — thirty thousand nodes here — so the track and the
+  chart are canvases. A full fold of every screen is >100 MB of strings, so screens
+  stay deltas with a checkpoint every 250 steps and are folded in the browser. Colour
+  is run-length encoded with letters `A`–`P` rather than hex digits, because a digit
+  run-length after a hex colour is ambiguous and a letter is not. One file, no `src=`
+  of any kind, **13.8 MB**. `tools/watch.py` rebuilds it while a run plays and stops
+  itself when the budget is spent: it carried the whole of M6 at 15-minute intervals,
+  **21 builds, 0 failures**.
+
+  **`tools/progression.py` — a second axis, because score is the wrong instrument.**
+  NetHack pays for kills, gold and items, so M6's best life scores 8,919 at Dlvl 25
+  while the bot's best game on this disk scores 250,914 without passing Dlvl 16. Both
+  are true and they order the two runs opposite ways. BALROG's ladder reads a run as
+  the probability a human who reached this dungeon or experience level went on to
+  ascend. The ladder is vendored (`achievements.json` at BALROG **38bb52f**) so a run
+  can be scored without the parent repo, guarded by a test that the copy still
+  matches the original and a stronger one that our arithmetic reproduces BALROG's own
+  per-episode number on all **135 episodes** that 24 of its 44 submissions shipped.
+  Their field is a fraction and the leaderboard column is its mean ×100 — a factor of
+  a hundred, invisible in one number and obvious only in a comparison.
+
+  A run is reported three ways because one would mislead: **best life** (flattered by
+  lives that share a dungeon and a notes file), **mean over lives**, and **first
+  life** — the only one played under the board's own conditions and so the only one
+  comparable to it. Both rungs are always shown apart, because the max alone reads a
+  character who dug past everything as half way to an ascension.
+
+  **`tools/humans.py` and `tools/nao.py` — the company.** The first reads the 1,934
+  AutoAscend games on this disk. The second reads nethack.alt.org's own archive:
+  **2,083,672 games of NetHack 3.6.6**, the exact version `nle==1.3.0` plays, against
+  the 1.5M mixed-version set F10 quotes. 81% of that file has `turns=1` — someone
+  connecting and quitting before acting — and counting those puts the median human
+  game at one turn and zero points, so the cut is `turns > 1`, mechanical rather than
+  tuned, with the sensitivity in the docstring rather than hidden. That leaves
+  **391,809 games, median 369 points and 1,080 turns**, which is *not* F10's 836 and
+  3,766 and must never be reported as if it were: two populations, not two readings
+  of one, and the page says so wherever both are drawn. Distilling costs 33 s and is
+  cached to 50 KB, keyed on the archive's size **and a schema version** — the archive
+  is immutable, so the size alone would never notice that the cache was stale.
+
+  **Three things the data cannot do, stated on the page rather than papered over.**
+  An `xlogfile` has no experience level, so a human or bot game can only be placed on
+  its *dungeon* rung — a lower bound, drawn hollow. A board episode has no score or
+  turns (zero on all 135, read after NetHack tears the character down), so it gets a
+  tick against the y axis and no position along x. And **nothing can score 100%**:
+  80.68% is the ceiling, and the 3,279 human games that actually won are drawn at the
+  100% the ladder defines, from `death=ascended`, because the rung cannot say it.
+
+  **Two bugs worth recording.** The ladder panel guarded on `if (!p.best)`, so a run
+  still on Dlvl 1 scores a perfectly good 0% and the whole panel vanished for exactly
+  the runs that most need the board drawn above them. And counting the games a run is
+  past by comparing rungs against the printed "46.64" silently dropped all 589 games
+  that ended on exactly Dlvl 25, because the rung is 46.63763 — that share is now
+  read off a CDF indexed by integer level, which has no such failure mode. Both were
+  caught by tests, and the stub-DOM check now records where the canvas was asked to
+  draw, so the claim that winners sit at 100% counts dots rather than trusting the
+  legend.
+
+  **Not done:** `nle_data/` is gitignored, so a fresh clone renders the page with the
+  published median and no human cloud until the archive is fetched by hand.
+  `tools/nao.py --check` verifies a download against the manifest's md5 and the
+  absent-archive path is tested, but nothing downloads it.
 
 ---
 
