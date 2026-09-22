@@ -689,10 +689,90 @@ brief.
   notes name the cause (*"an adjacent monster interrupts the dig every single
   turn"*). 54 distinct keys, 4.0 keys a tool call, no compaction.
 
-* **M6 — the matrix.** *Next, and now unblocked.* N seeds at 3,000 keys each. A seed is a character (F5) and the roles differ enormously in
-  survivability, so the matrix has to be large enough to say something about the
-  distribution rather than about one Priest: 8–12 seeds at ≈$96 each, with the roles
-  reported beside the scores.
+* **M6 — one deep run, not a matrix.** *Done 2026-09-22. Eleven days,
+  2026-09-11 → 2026-09-22.* **The plan changed before this was launched, and the
+  change is the point.** The matrix as written above — 8–12 seeds at 3,000 keys, to
+  say something about the distribution over roles rather than about one Priest — was
+  cancelled in favour of a single **30,000-key** continuation of M5b's seed 0.
+
+  The reasoning: M5b's finding was not its score, it was the *curve across lives*
+  (378 → 243 → 438 → 342 → **795**, the last life deeper in half the keystrokes of
+  the first). A matrix of 3,000-key seeds measures how much a role matters, which is
+  a fact about NetHack. Ten times the budget on one seed measures whether that curve
+  keeps going, which is a fact about the agent — and nothing else in this plan
+  answers it. Role variance is not answered here and stays deferred (§4), so this
+  milestone buys depth at the explicit cost of breadth: **every number below is one
+  chaotic elven Priest**, and none of it generalises across roles.
+
+  **Result: 30,000/30,000 keys, best life 8,919, Dlvl 25, 37 lives, $319.65, audit
+  clean.** 46,423 game turns (1.55/key), 31 sessions, 0 compactions, 2,641 tool calls
+  at 11.4 keys each, 66 distinct keys. 1,300 keys (4.3%) thrown into a `--More--`
+  that could not take them, longest such run 16 — up from 2.4% in M5b, and the run
+  never fixed it.
+
+  | keys | best life | turns | dlvl | xp | lives | progression |
+  |---|---|---|---|---|---|---|
+  | 1,000 | 378 | 1,564 | 6 | 2 | 2 | 3.5% |
+  | 3,000 | 795 | 4,549 | 10 | 4 | 5 | 12.6% |
+  | 5,000 | 1,268 | 7,004 | 14 | 4 | 10 | 29.2% |
+  | 10,000 | 5,768 | 13,963 | 24 | 4 | 19 | 44.5% |
+  | 20,000 | 7,622 | 28,175 | 25 | 5 | 29 | 46.6% |
+  | **30,000** | **8,919** | **46,423** | **25** | **6** | **37** | **46.6%** |
+
+  **The curve continues, and then it stops.** Per-life progression over all 37 lives:
+
+  ```
+  3.5  2.1  2.1  2.1 12.6  2.4  1.5 20.6 29.3 40.8 40.8 40.8  0.0 39.3 40.8  0.0
+  44.5 42.6 46.6 46.6 46.6 46.6 46.6 46.6 46.6 46.6 46.6 46.6 46.6 46.6 46.6 46.6 ...
+  ```
+
+  Nineteen lives of real climbing, two total write-offs (died on Dlvl 1), and then
+  **nineteen consecutive lives pinned at exactly 46.64%**. Score kept creeping inside
+  the plateau (7,622 → 8,919) because later lives collected more on the way down, but
+  the depth never moved again after key ~10,000. **Two thirds of the budget bought
+  the last 2% of progression.**
+
+  **Why it stopped, in the run's own words.** It found a dig loop costing ~23
+  keystrokes a dungeon level (`esc a l >` to pit, engrave Elbereth, dig again and
+  fall) and rode it to Dlvl 25 repeatedly. What it could not do was improve on it:
+
+  > *Falling through a dug hole lands you at a random spot on a level generated at
+  > that moment. **Any deviation upstream re-rolls every level below it**, which is
+  > why the recording cannot be detoured for an item.*
+
+  It had built a replayable descent and discovered the descent was brittle to its own
+  improvement — it could not stop for equipment without destroying the route. So it
+  kept re-running a fast dive with a level-6 character. That is why **depth carries
+  46.64% while experience contributes 3.69%**, and why Dlvl 25 is where a character
+  that weak stops.
+
+  **Where it stands.** Against the populations in F10/F13 and the two clouds now on
+  the page (`tools/nao.py`, `tools/humans.py`):
+
+  | | score | turns | keys |
+  |---|---|---|---|
+  | **this run, best life** | **8,919** | 46,423 | 30,000 |
+  | AutoAscend median, this disk (1,934 games) | 5,696 | 20,350 | — |
+  | median human game, NLD-NAO (F10, quoted) | 836 | 3,766 | 1,724 |
+  | median human game, NAO 3.6.6 (391,809, measured) | 369 | 1,080 | — |
+
+  On the human-calibrated axis it reaches **46.64% best life, 33.84% mean of lives,
+  3.54% first life**, against a BALROG NLE board whose best submission is 6.77% and
+  whose median is 0.37%. Those are not like-for-like — the board plays a
+  language-wrapped NLE in independent 500-step episodes with no memory, so only the
+  *first life* is measured under its conditions — but the best single episode any
+  agent on that board has recorded is **20.61%**, and this run's best life is past it.
+  Against people: **1.80% of 391,809 human 3.6.6 games reached Dlvl 25 or deeper**.
+
+  **What this does not say.** It is one seed and one role. It is 37 lives sharing one
+  dungeon and one `notes.md`, which is exactly the thing the board's episodes are not.
+  And the metric it is scored on **cannot exceed 80.68%**: BALROG's ladder holds 87
+  entries of which only 80 are levels, and the other seven are message strings
+  (`Astral Plane`, `You ascend t`) that its NetHackChallenge progress system never
+  looks up, because it builds its keys as `Dlvl:n` and `Xp:n`. Ascension is
+  unreachable on this axis rather than merely distant — for this run and for every
+  agent on that board alike. 3,279 of those human games actually won; this one was
+  never close.
 * **M7 — the replay page and the readout.** *Done 2026-09-10, 131 tests.*
   `tools/readout.py` replays a run and reports what no file kept: the curve at every
   milestone, and the three things the pilot asks — keys thrown into a prompt that
