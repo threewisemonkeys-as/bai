@@ -11,3 +11,9 @@
 [submodule "RGB-Agent"]
 	path = RGB-Agent
 	url = git@github.com:threewisemonkeys-as/RGB-Agent.git
+[submodule "cc_craftax/craftax-code"]
+	path = cc_craftax/craftax-code
+	url = git@github.com:threewisemonkeys-as/craftax-code.git
+[submodule "cc_nle/nle-code"]
+	path = cc_nle/nle-code
+	url = git@github.com:threewisemonkeys-as/nle-code.git

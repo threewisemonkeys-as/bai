@@ -277,17 +277,15 @@ cc_autumn/curated_replay.html
 cc_humanrl/humanrl-code/
 cc_humanrl/replay.html
 
-# cc_craftax/craftax-code is the Claude-Code-on-Craftax harness: its own checkout,
-# same arrangement as the two above. Its .env-venv is 776MB of JAX, which is why
-# Craftax is not a dependency of this project.
-cc_craftax/craftax-code/
+# cc_craftax/craftax-code is the Claude-Code-on-Craftax harness, a submodule
+# (github: threewisemonkeys-as/craftax-code). Its .env-venv is 776MB of JAX, which is
+# why Craftax is not a dependency of this project.
 cc_craftax/replay.html
 # ...and the frames beside it: a step scrolls the whole view in Craftax, so each
 # frame is its own picture rather than an edit, and 3000 of them do not inline.
 cc_craftax/replay_frames/
 
-# cc_nle/nle-code is the Claude-Code-on-NetHack harness: its own checkout, same
-# arrangement as the three above. Its .env-venv holds nle, which is a compiled
+# cc_nle/nle-code is the Claude-Code-on-NetHack harness, a submodule (github:
+# threewisemonkeys-as/nle-code). Its .env-venv holds nle, which is a compiled
 # NetHack 3.6.6 and pins gymnasium — neither belongs in this project's resolve.
-cc_nle/nle-code/
 cc_nle/replay.html
